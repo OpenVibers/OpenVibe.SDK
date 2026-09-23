@@ -3,6 +3,71 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.6.0 (2026-09-23)
+
+The OpenVibe.Tools platform API (ADR-027, openvibe-contracts v0.33.0) as `openvibe-sdk/tools`, and
+retry and result references in `openvibe-sdk/jobs`. The Tools routes are being built: the registry
+(`GET /api/v1/tools…`) comes with Tools S3, the run API and the gateway's `/api/v1/jobs` facade with
+Tools S6. Until they are deployed this client is tested against the contracts and the mock only.
+
+- **`createToolsClient(client, { baseUrl?, service = 'tools', audience = 'openvibe.tools', anonymousReads = true })`**
+  -> `{ list, get, schema, run, jobs }`, on the gateway (the `tools` origin from the platform
+  descriptor unless `baseUrl` is given). Also in `index.js`, `browser.js`, the ESM entry
+  (`esm/tools.mjs`) and the browser bundle (`tools` namespace).
+  - `list({ family, q, execution, api, status })` answers `tools.tool-list@1` (schemas as `$ref`);
+    `get(id)` the descriptor (`tools.tool@1`, schemas embedded); `schema(id)` `{ $schema, $id,
+    $defs: { input, output } }`. Both are `null` on 404. Registry reads send no token unless
+    `anonymousReads: false`.
+  - `run(id, input = {}, { files, waitMs, idempotencyKey, signal, timeoutMs })` posts
+    `tools.run-request@1`. An inline tool, or a job that finished within `waitMs`, resolves to
+    `{ state: 'succeeded', tool, result: { data | text | files }, took_ms, job?, location? }`. A job still
+    queued or running (202, or a replay) resolves to `{ state, tool, job, location }`. Both carry
+    `idempotencyKey` and `replayed`, and a non-enumerable `wait(opts)`: a finished run resolves to
+    itself, and a job follows its events (`jobs.wait`) to the succeeded run.
+  - A run that finished `failed` or `cancelled` throws **`ToolRunError`**, an `OpenVibeError` (same
+    `name`, `isOpenVibeError` is true) carrying the tool's problem+json (`code`, `status` of the
+    problem, `title`, `detail`, `errors`) plus `state`, `tool`, `job` and `run`; `isToolRunError()`.
+    A request refused before the tool ran (404 `tools.tool.not_found` | `not_runnable`, 422
+    `tools.input.invalid`, 401/403, 429, 503 `tools.tool.unavailable`) is a plain `OpenVibeError`.
+  - The `Idempotency-Key` is always sent (generated when omitted), so the core client retries a
+    429 after its `Retry-After`, and 5xx, with the same key: a job is created once. `timeoutMs` per
+    attempt is raised to `waitMs`, or to the tool's `limits.timeoutMs` once this client has read its
+    descriptor, plus 10 s.
+  - **Files**: uploads in the jobs client's shapes (a Blob/File, or `{ name, data, type? }`) go as
+    multipart `file` parts; references `{ media_id }` (a Media object you may read) and
+    `{ job_id, index }` (a result file of your own job) go in the JSON body's `files`, or, beside
+    uploads, as a multipart `files` part holding their JSON. The tool gets uploads first, then
+    references. Bad references are a `TypeError` before anything is sent.
+  - `jobs` is `createJobsClient()` on the same origin and credentials (the gateway facade).
+- **`openvibe-sdk/jobs`:** `retry(id)` -> `{ job, replayed }` (a failed job as a new one; asking
+  again returns that same retry), `reference(id, ref)` and `unreference(id, ref)` -> the job (keep a
+  succeeded result while `<service>:<kind>:<id>` points at it; `expires_at` is null meanwhile).
+  **Default origin:** without `baseUrl` the jobs client uses the `tools` origin
+  (https://openvibe.tools), whose gateway fronts every satellite's jobs once Tools S6 ships the
+  facade. Until then pass the satellite (`baseUrl: 'https://img.openvibe.tools'`); an explicit
+  `baseUrl` keeps working as before. `Job` types gain `tool`, `retry_of`, `retried_by`,
+  `references` and `links.retry` / `links.retried_by`.
+- **Mock platform (`openvibe-sdk/testing`):** `tools: true | { descriptors, handlers, mediaObjects, stepMs }`
+  serves the registry and run routes on `origins.tools`, with the default tools `dns`, `jsonminify`,
+  `png`, `port`, `yt` and `protectpdf`. It models caller tiers (probes need `tools.net.probe`, and
+  job tools need a token because the mock has no browser sessions), the refusal codes, idempotent job
+  runs, `wait_ms`, and file references. New: `addTool()`, `addMediaObject()`, `state.tools`. **Mock
+  jobs changed** so that they answer `tools.job@1` exactly: `error` is problem+json (`type`,
+  `title`, `status`, `code`, `detail`), not `{ code, detail }`; result files carry `sha256`,
+  `storage: 'local'` and `media: null`. Views also gain `retry_of`, `retried_by`, `references`,
+  `links.retry` and `expires_at`. Jobs now serve `POST /:id/retry` and `PUT|DELETE /:id/references/:ref`,
+  and `origins.tools` acts as the gateway facade, so it also finds the satellites' jobs. A test that
+  compared a failed mock job's `error` with `{ code, detail }` must compare those fields instead. The
+  mock `fetch` now rejects on an aborted signal, as `fetch` does.
+- **Contracts:** `openvibe-contracts` v0.33.0 is a devDependency (tarball tag pin, tests only; still no
+  runtime or peer dependency). `test/tools.test.js` validates every run request and every answer
+  with it. `types/contracts.d.ts` is re-copied from it: `ModuleNamespace` gains its doc comment, and
+  it adds `ToolDescriptor`, `ToolList`, `ToolsRunRequest`, `ToolsRun`, `ToolsJob` and
+  `ToolsJobRequest`. CI no longer clones Contracts v0.28.0.
+- Types: `types/tools.d.ts` (`ToolsClient`, `ToolRunOutcome`, `ToolRunSucceeded`, `ToolRunPending`,
+  `ToolRunError`, `ToolFileRef`, `ToolRunFile`, `ToolSchema`, `ToolListQuery`, `ToolRunOptions`),
+  plus the jobs and testing additions.
+
 ## 0.5.0 (2026-09-23)
 
 Media's object API v2 (`/api/v2/:app/objects`) and its jobs (`/api/v2/:app/jobs`), wrapped as
