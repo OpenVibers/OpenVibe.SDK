@@ -25,8 +25,11 @@ const TRACEPARENT_RE = /^00-([0-9a-f]{32})-[0-9a-f]{16}-[0-9a-f]{2}$/;
 const TABLE_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const RETRYABLE_4XX = new Set([401, 408, 409, 425, 429]);
 
+// Only Events refusing the envelope is permanent. A failure to get a token (no grant yet, Network
+// restarting) says nothing about the event, so it is always retried.
 function isPermanent(err) {
     const s = err && err.status;
+    if (err && typeof err.url === 'string' && /\/oauth\/token(\?|$)/.test(err.url)) return false;
     return Number.isInteger(s) && s >= 400 && s < 500 && !RETRYABLE_4XX.has(s);
 }
 

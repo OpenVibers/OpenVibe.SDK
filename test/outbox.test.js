@@ -97,6 +97,16 @@ run([
         assert.equal(outbox.rejected(), 1);
         assert.equal(platform.state.events.length, 2);
     }],
+    ['a token-endpoint refusal is retried, never rejected', async () => {
+        const { events, db } = setup();
+        const noGrant = { prepare: events.prepare, publish: () => Promise.reject(Object.assign(new Error('unauthorized_client'), { status: 400, url: 'http://127.0.0.1:4000/oauth/token' })) };
+        const outbox = createOutbox(db, { events: noGrant });
+        outbox.ensureSchema();
+        db.transaction(() => outbox.enqueue({ event_type: 'live.stream.started', actor, subject }))();
+        assert.deepEqual(await outbox.flush(), { sent: 0, failed: 1, rejected: 0 });
+        assert.equal(outbox.rejected(), 0);
+        assert.equal(outbox.pending(), 1);
+    }],
     ['inbox runs a handler exactly once and rolls back with it', async () => {
         const { db } = setup();
         const inbox = createInbox(db);

@@ -3,6 +3,11 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.2.1 (2026-09-23)
+
+- Outbox: a refusal from the Network token endpoint (for example a grant not provisioned yet) is
+  retried, never treated as Events rejecting the envelope.
+
 ## 0.2.0 (2026-09-23)
 
 - `openvibe-sdk/events`: `createOutbox(db, { events })` and `createInbox(db)` — the transactional

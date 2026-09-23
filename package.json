@@ -1,6 +1,6 @@
 {
   "name": "openvibe-sdk",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Supported browser and server clients for the OpenVibe platform: auth, registry discovery, identity, user modules, events, realtime, media and community, with deadlines, safe retries, problem errors and trace propagation.",
   "main": "index.js",
   "types": "types/index.d.ts",
