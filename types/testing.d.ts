@@ -1,4 +1,5 @@
 import type { FetchLike, EventEnvelope, Capability, ServiceManifest, ModuleNamespace } from './core';
+import type { ToolDescriptor } from './contracts';
 
 type Origin = 'network' | 'events' | 'media' | 'community' | 'tools';
 export interface MockGrant { capability: string; audience: string; namespaces?: string[]; }
@@ -33,6 +34,17 @@ export interface MockJobContext {
     progress(percent: number, message?: string | null): Promise<void>;
     readonly cancelled: boolean;
 }
+export interface MockToolContext {
+    input: Record<string, unknown>;
+    files: Array<{ name: string; type: string; bytes: Uint8Array }>;
+    /** Who runs it: owner null for an anonymous caller; tier anonymous | user | service | app. */
+    caller: { owner: string | null; tier: string };
+    signal: AbortSignal;
+}
+/** An inline tool's handler returns { data } or { text } (a string is text); a job tool's handler is a job handler. */
+export type MockToolHandler =
+    | ((ctx: MockToolContext) => Promise<{ data?: Record<string, unknown>; text?: string } | string>)
+    | ((ctx: MockJobContext) => Promise<{ data?: Record<string, unknown>; files?: Array<{ name?: string; mime?: string; bytes?: Uint8Array | string }> } | void>);
 export interface MockPlatformOptions {
     origins?: Partial<Record<Origin, string>>;
     issuer?: string;
@@ -64,8 +76,20 @@ export interface MockPlatformOptions {
     mediaSignedUrlTtlS?: number;
     /** Tools satellites that also answer /api/v1/jobs. Default: DEFAULT_TOOLS_SATELLITES. */
     toolsSatellites?: string[];
-    /** Serve Tools jobs at origins.tools and the satellites (each keeps its own jobs). */
+    /** Serve Tools jobs at origins.tools (the gateway facade: it also sees the satellites' jobs) and the satellites (each keeps its own jobs). */
     jobs?: boolean | { stepMs?: number; handlers?: Record<string, (ctx: MockJobContext) => Promise<{ data?: Record<string, unknown>; files?: Array<{ name?: string; mime?: string; bytes?: Uint8Array | string; data?: Uint8Array | string }> } | void>> };
+    /**
+     * The Tools platform API on origins.tools (implies the jobs facade there): GET /api/v1/tools[/:id[/schema]]
+     * and POST /api/v1/tools/:id/run. Defaults: dns, jsonminify, png, port, yt, protectpdf.
+     */
+    tools?: boolean | {
+        stepMs?: number;
+        /** Added to the defaults; the same id replaces one. */
+        descriptors?: ToolDescriptor[];
+        handlers?: Record<string, MockToolHandler>;
+        /** What { media_id } references read. */
+        mediaObjects?: Record<string, { name?: string; type?: string; data?: Uint8Array | string }>;
+    };
     /** fetch used by deliverEvents() (default: the global fetch). */
     deliveryFetch?: FetchLike;
 }
@@ -73,8 +97,12 @@ export interface DeliveryAttempt { subscription_id: string; event_id: string; se
 export interface MockPlatform {
     fetch: FetchLike;
     origins: Record<Origin, string>;
-    /** Every origin that answers /api/v1/jobs: origins.tools and the satellites. */
+    /** Every origin that answers /api/v1/jobs: origins.tools (the gateway facade) and the satellites. */
     toolsOrigins: string[];
+    /** Add or replace a tool (with { tools }); returns the stored descriptor. */
+    addTool(descriptor: ToolDescriptor, handler?: MockToolHandler): ToolDescriptor;
+    /** A Media object that { media_id } run references read -> its med_ id. */
+    addMediaObject(obj?: { id?: string; name?: string; type?: string; data?: Uint8Array | string }): string;
     issuer: string;
     keys: { privateKey: object; publicKey: object; jwks: { keys: object[]; public_key: string; algorithm: 'RS256' } };
     signUserToken(user: MockUser | string, opts?: { expiresInSec?: number; audience?: string[] }): string;
@@ -98,6 +126,7 @@ export interface MockPlatform {
         files: Map<string, any>;
         mediaTenants: Map<string, { id: string; project_id: string; env: 'sandbox' | 'production'; quota_bytes: number }>;
         users: Map<string, MockUser>; checkpoints: Map<string, { cursor: number; updated_at: string }>; apps: Map<string, any>; projects: Map<string, any>; jobs: Map<string, any>;
+        tools: Map<string, ToolDescriptor>;
     };
     /**
      * Store an event as if published. A publisher `app:<id>` of a registered app stores it as that

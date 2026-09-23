@@ -24,7 +24,10 @@
  *   Media    /api/v1/:app/files and /f/:key. Developer apps reach /api/v1/<project_id>/files only:
  *            production tenant prj_…, sandbox tenant prj_…-sandbox whose files have signed URLs only
  *   Tools    /api/v1/jobs (with { jobs: true }) at origins.tools and the img., audio. and docs.
- *            satellites (platform.toolsOrigins)
+ *            satellites (platform.toolsOrigins); origins.tools is the gateway's jobs facade (it
+ *            also sees the satellites' jobs). With { tools: true }, the platform API on
+ *            origins.tools: GET /api/v1/tools[/:id[/schema]] and POST /api/v1/tools/:id/run
+ *            (sync and job runs, file references), see ./tools.js
  * Tokens are real RS256 JWTs signed with a key generated per platform, checked the way the real
  * services check them (audience, capability, namespace, sandbox refusal). It is a fake: no
  * persistence, simplified visibility rules, no Chat. Like the Network, it verifies the PKCE
@@ -34,6 +37,7 @@ const crypto = require('node:crypto');
 const { b64url, fromB64url, ulid, topicRegex, json, problem, redirect } = require('./util');
 const { createDeveloper, DEFAULT_APP_CATALOG, PRJ_ID_RE } = require('./developer');
 const { createJobsService } = require('./jobs');
+const { createToolsService } = require('./tools');
 const appRules = require('./apps');
 const { signDeliveryHeaders } = require('../events');
 
@@ -157,7 +161,8 @@ function createMockPlatform(opts = {}) {
     }
 
     const developer = createDeveloper({ opts, issuer, sign, users, addUser, userOf, mediaApps, authorization });
-    const jobsService = createJobsService({ opts, decode, principal });
+    const jobsService = createJobsService({ opts, decode, principal, gateway: origins.tools });
+    const toolsService = createToolsService({ opts, decode, principal, origins, jobs: jobsService });
 
     // ── Network ─────────────────────────────────────────────
     function descriptor() {
@@ -794,16 +799,30 @@ function createMockPlatform(opts = {}) {
     }
 
     // ── Router ──────────────────────────────────────────────
-    async function fetchImpl(input, init) {
-        const req = input instanceof Request && !init ? input : new Request(input, init);
-        const url = new URL(req.url);
-        stats.requests.push({ method: req.method, url: req.url, headers: Object.fromEntries(req.headers) });
+    async function route(req, url) {
         const origin = url.origin;
         if (origin === new URL(origins.network).origin) return network(req, url);
         if (origin === new URL(origins.events).origin) return eventsService(req, url);
         if (origin === new URL(origins.media).origin) return media(req, url);
-        if (toolsOrigins.includes(origin)) return jobsService.handle(req, url);
+        if (toolsOrigins.includes(origin)) return /^\/api\/v1\/tools(\/|$)/.test(url.pathname) ? toolsService.handle(req, url) : jobsService.handle(req, url);
         throw new TypeError(`mock platform: no service at ${origin} (fetch failed)`);
+    }
+
+    /** Like fetch: an aborted signal rejects with an AbortError, also while the answer is pending. */
+    async function fetchImpl(input, init) {
+        const req = input instanceof Request && !init ? input : new Request(input, init);
+        const url = new URL(req.url);
+        stats.requests.push({ method: req.method, url: req.url, headers: Object.fromEntries(req.headers) });
+        const signal = req.signal;
+        const aborted = () => (signal.reason instanceof Error ? signal.reason : new DOMException('This operation was aborted', 'AbortError'));
+        if (signal && signal.aborted) throw aborted();
+        const answer = route(req, url);
+        if (!signal) return answer;
+        return new Promise((resolve, reject) => {
+            const onAbort = () => reject(aborted());
+            signal.addEventListener('abort', onAbort, { once: true });
+            answer.then((res) => { signal.removeEventListener('abort', onAbort); resolve(res); }, (err) => { signal.removeEventListener('abort', onAbort); reject(err); });
+        });
     }
 
     return {
@@ -811,6 +830,10 @@ function createMockPlatform(opts = {}) {
         origins,
         /** Every origin that answers /api/v1/jobs: origins.tools and the satellites (img., audio., docs.openvibe.tools). */
         toolsOrigins,
+        /** Add or replace a tool (tools.tool@1) and optionally its handler (with { tools }). */
+        addTool: (descriptor, handler) => toolsService.addTool(descriptor, handler),
+        /** A Media object that tools.run { media_id } references read -> its med_ id. */
+        addMediaObject: (obj) => toolsService.addMediaObject(obj),
         issuer,
         keys: { privateKey, publicKey, jwks },
         signUserToken,
@@ -828,7 +851,7 @@ function createMockPlatform(opts = {}) {
         addProject: (spec) => developer.addProject(spec).id,
         signAppToken,
         stats,
-        state: { events, subscriptions, modules, files, mediaTenants, users, checkpoints, apps: developer.apps, projects: developer.projects, jobs: jobsService.jobs },
+        state: { events, subscriptions, modules, files, mediaTenants, users, checkpoints, apps: developer.apps, projects: developer.projects, jobs: jobsService.jobs, tools: toolsService.tools },
         deliverEvents,
         startDeliveries,
         pruneEvents,

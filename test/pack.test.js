@@ -22,7 +22,7 @@ run([
             const out = execFileSync(npm, ['pack', '--json', '--pack-destination', tmp], { cwd: ROOT, env, encoding: 'utf8' });
             const info = JSON.parse(out)[0];
             const files = info.files.map((f) => f.path);
-            for (const must of ['package.json', 'index.js', 'browser.js', 'LICENSE', 'README.md', 'CHANGELOG.md', 'src/core/client.js', 'src/jobs.js', 'src/projects.js', 'esm/core.mjs', 'esm/jobs.mjs', 'types/core.d.ts', 'types/contracts.d.ts', 'types/bundle.d.ts', 'browser/openvibe-sdk.mjs']) {
+            for (const must of ['package.json', 'index.js', 'browser.js', 'LICENSE', 'README.md', 'CHANGELOG.md', 'src/core/client.js', 'src/jobs.js', 'src/tools.js', 'src/core/form.js', 'src/projects.js', 'esm/core.mjs', 'esm/jobs.mjs', 'esm/tools.mjs', 'types/tools.d.ts', 'types/core.d.ts', 'types/contracts.d.ts', 'types/bundle.d.ts', 'browser/openvibe-sdk.mjs']) {
                 assert.ok(files.includes(must), `tarball contains ${must}`);
             }
             assert.ok(!files.some((f) => f.startsWith('test/') || f.startsWith('scripts/') || f.startsWith('.github/')), 'no tests or tooling in the tarball');
@@ -56,12 +56,17 @@ run([
                     const bundle = await import('openvibe-sdk/browser/openvibe-sdk.mjs');
                     assert.equal(bundle.SDK_VERSION, ${JSON.stringify(pkg.version)});
                     assert.equal(typeof bundle.jobs.createJobsClient, 'function');
+                    assert.equal(typeof bundle.tools.createToolsClient, 'function');
+                    const { createToolsClient } = require('openvibe-sdk/tools');
+                    const tp = createMockPlatform({ tools: true });
+                    const ran = await createToolsClient(createClient({ fetch: tp.fetch })).run('jsonminify', { text: '{ "a": 1 }' });
+                    assert.equal(ran.result.text, '{"a":1}');
                     assert.equal(typeof require.resolve('openvibe-sdk/browser/openvibe-sdk.mjs'), 'string');
                     console.log('consumer ok: ' + specs.length + ' subpaths + the browser bundle');
                 })().catch((err) => { console.error(err); process.exit(1); });`;
             const res = execFileSync(process.execPath, ['-e', script], { cwd: app, encoding: 'utf8' });
             assert.match(res, new RegExp(`consumer ok: ${subpaths.length} subpaths \\+ the browser bundle`));
-            assert.equal(subpaths.length, 14);
+            assert.equal(subpaths.length, 15);
             assert.ok(!fs.existsSync(path.join(app, 'node_modules/openvibe-contracts')), 'the optional peer is not installed');
         } finally {
             fs.rmSync(tmp, { recursive: true, force: true });

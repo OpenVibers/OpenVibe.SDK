@@ -29,7 +29,7 @@ run([
         }
         const ids = collect().map((m) => m.id);
         for (const never of ['src/auth/tokens.js', 'src/auth/jwt.js', 'src/auth/oauth.js', 'src/events.js', 'src/outbox.js', 'src/identity.js', 'src/testing/index.js']) assert.ok(!ids.includes(never), never);
-        for (const must of ['browser.js', 'src/core/client.js', 'src/auth/browser.js', 'src/jobs.js', 'src/projects.js', 'src/realtime.js']) assert.ok(ids.includes(must), must);
+        for (const must of ['browser.js', 'src/core/client.js', 'src/auth/browser.js', 'src/jobs.js', 'src/tools.js', 'src/projects.js', 'src/realtime.js']) assert.ok(ids.includes(must), must);
     }],
 
     ['exports match the browser entry', async () => {
@@ -37,7 +37,7 @@ run([
         const cjs = require('../browser.js');
         assert.deepEqual(Object.keys(esm).filter((k) => k !== 'default').sort(), Object.keys(cjs).sort());
         assert.deepEqual(Object.keys(esm.default).sort(), Object.keys(cjs).sort());
-        for (const ns of ['auth', 'registry', 'modules', 'realtime', 'media', 'community', 'jobs', 'projects']) {
+        for (const ns of ['auth', 'registry', 'modules', 'realtime', 'media', 'community', 'jobs', 'tools', 'projects']) {
             assert.deepEqual(Object.keys(esm[ns]).sort(), Object.keys(cjs[ns]).sort(), ns);
         }
         assert.notEqual(esm.createClient, cjs.createClient, 'its own copy, not the CommonJS modules');

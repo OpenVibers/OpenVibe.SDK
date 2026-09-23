@@ -3,7 +3,7 @@
 /**
  * browser/openvibe-sdk.mjs: ONE self-contained ES module with the browser-safe part of the SDK
  * (everything browser.js exposes: core, auth/browser, registry, modules, realtime, media,
- * community, jobs, projects), for pages with no build step:
+ * community, jobs, tools, projects), for pages with no build step:
  *
  *   <script type="module">
  *     import { createClient, auth, registry } from '/vendor/openvibe-sdk.mjs';

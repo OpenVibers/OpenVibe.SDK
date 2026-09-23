@@ -78,7 +78,7 @@ run([
         assert.deepEqual(problems, []);
         assert.deepEqual(blocked.sort(), ['./events', './identity', './testing']);
         const rel = [...scanned].map((f) => path.relative(ROOT, f));
-        for (const must of ['browser.js', 'src/core/client.js', 'src/auth/browser.js', 'src/realtime.js', 'src/media.js', 'src/community.js', 'src/modules.js', 'src/registry.js', 'src/jobs.js', 'src/projects.js', 'browser/openvibe-sdk.mjs']) {
+        for (const must of ['browser.js', 'src/core/client.js', 'src/auth/browser.js', 'src/realtime.js', 'src/media.js', 'src/community.js', 'src/modules.js', 'src/registry.js', 'src/jobs.js', 'src/tools.js', 'src/core/form.js', 'src/projects.js', 'browser/openvibe-sdk.mjs']) {
             assert.ok(rel.includes(must), `${must} is scanned`);
         }
         for (const never of ['src/auth/tokens.js', 'src/auth/jwt.js', 'src/auth/oauth.js', 'src/events.js', 'src/identity.js', 'src/testing/index.js']) {

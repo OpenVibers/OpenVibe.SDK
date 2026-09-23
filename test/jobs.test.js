@@ -2,9 +2,11 @@
 /**
  * openvibe-sdk/jobs against the mock platform's Tools jobs: submit once (Idempotency-Key), follow
  * events across dropped streams and a restart (Last-Event-ID), 204 when finished, cancel, result
- * files as raw Responses, owner scoping, failures, and sandbox refusal.
+ * files as raw Responses, owner scoping, failures, sandbox refusal, retry, result references, and
+ * the gateway's jobs facade as the default origin. Job views are checked against tools.job@1.
  */
 const assert = require('node:assert/strict');
+const contracts = require('openvibe-contracts');
 const { run, stubServer, send } = require('./helpers');
 const { createClient } = require('../src/core');
 const { createServiceTokenClient } = require('../src/auth');
@@ -118,7 +120,9 @@ run([
         const failed = await jobs.submit({ type: 'boom' });
         const out = await jobs.wait(failed.job.id);
         assert.equal(out.state, 'failed');
-        assert.deepEqual(out.error, { code: 'tools.job.invalid_input', detail: 'bad input' });
+        assert.deepEqual(out.error, { type: 'https://openvibe.network/problems/tools.job.invalid_input', title: 'Unprocessable Content', status: 422, code: 'tools.job.invalid_input', detail: 'bad input', error: 'bad input' });
+        assert.equal(out.links.retry, `/api/v1/jobs/${out.id}/retry`);
+        assert.equal(cancelled.error.code, 'tools.job.cancelled');
         await assert.rejects(jobs.cancel(failed.job.id), { status: 409, code: 'tools.job.already_finished' });
         await assert.rejects(jobs.file(failed.job.id, 0), { status: 409, code: 'tools.job.not_ready' });
         await assert.rejects(jobs.submit({ type: 'nope' }), { status: 400, code: 'tools.job.unknown_type' });
@@ -182,5 +186,82 @@ run([
         await assert.rejects((async () => { for await (const e of createJobsClient(createClient({ baseUrls: { tools: down.url }, token: 't' })).events('job_x', { maxReconnects: 2, reconnectDelayMs: 1 })) void e; })(), { code: 'sdk.network_error' });
         assert.equal(down.requests.length, 3);
         await down.close();
+    }],
+
+    ['retry: a failed job becomes a new job once; asking again replays it; other states are refused', async () => {
+        let n = 0;
+        const { jobs, other, platform } = setup({ handlers: { 'img.process': async ({ files }) => { if (++n === 1) throw Object.assign(new Error('decoder crashed'), { code: 'tools.img.decoder', retryable: true }); return { data: { n }, files: files.map((f) => ({ name: f.name, mime: 'image/webp', bytes: f.bytes })) }; } } });
+        const { job } = await jobs.submit({ type: 'img.process', input: { tool: 'convert' }, files: [{ name: 'a.png', data: 'PNG' }] });
+        const failed = await jobs.wait(job.id);
+        assert.equal(failed.state, 'failed');
+        assert.equal(failed.retryable, true);
+        assert.deepEqual(contracts.validate('tools.job@1', failed).errors, []);
+
+        const a = await jobs.retry(job.id);
+        assert.equal(a.replayed, false);
+        assert.notEqual(a.job.id, job.id);
+        assert.equal(a.job.retry_of, job.id);
+        assert.equal(a.job.state, 'queued');
+        const b = await jobs.retry(job.id);
+        assert.equal(b.replayed, true);
+        assert.equal(b.job.id, a.job.id);
+        const retried = platform.stats.requests.filter((r) => r.url.endsWith('/retry'));
+        assert.ok(retried.every((r) => r.method === 'POST' && !r.headers['idempotency-key']), 'the server dedupes retries: no key needed');
+
+        const done = await jobs.wait(a.job.id);
+        assert.equal(done.state, 'succeeded');
+        assert.deepEqual(done.result.data, { n: 2 });
+        assert.equal(Buffer.from(await (await jobs.file(done.id, 0)).arrayBuffer()).toString(), 'PNG', 'the retry has the input files');
+        const original = await jobs.get(job.id);
+        assert.equal(original.retried_by, a.job.id);
+        assert.equal(original.links.retried_by, `/api/v1/jobs/${a.job.id}`);
+        await assert.rejects(jobs.retry(done.id), { status: 409, code: 'tools.job.not_failed' });
+        await assert.rejects(other.retry(job.id), { status: 404, code: 'tools.job.not_found' });
+    }],
+
+    ['references keep a succeeded result (expires_at null) until the last one is dropped', async () => {
+        const { jobs } = setup({ handlers: { 'docs.process': async () => ({ data: { pages: 3 } }) } });
+        const { job } = await jobs.submit({ type: 'docs.process', input: { tool: 'merge' } });
+        await assert.rejects(jobs.reference(job.id, 'community:paste:p_123'), { status: 409, code: 'tools.job.not_succeeded' });
+        const done = await jobs.wait(job.id);
+        assert.ok(done.expires_at, 'a result expires by default');
+
+        const kept = await jobs.reference(job.id, 'community:paste:p_123');
+        assert.equal(kept.expires_at, null);
+        assert.deepEqual(kept.references.map((r) => r.ref), ['community:paste:p_123']);
+        assert.deepEqual(contracts.validate('tools.job@1', kept).errors, []);
+        const again = await jobs.reference(job.id, 'community:paste:p_123');
+        assert.equal(again.references.length, 1, 'idempotent');
+        await jobs.reference(job.id, 'live:clip:c_9');
+        const one = await jobs.unreference(job.id, 'community:paste:p_123');
+        assert.deepEqual(one.references.map((r) => r.ref), ['live:clip:c_9']);
+        assert.equal(one.expires_at, null, 'still referenced');
+        const none = await jobs.unreference(job.id, 'live:clip:c_9');
+        assert.deepEqual(none.references, []);
+        assert.ok(none.expires_at, 'expires again after the last reference');
+        assert.equal((await jobs.unreference(job.id, 'live:clip:c_9')).references.length, 0, 'dropping a missing reference is fine');
+
+        await assert.rejects(jobs.reference(job.id, 'not a ref'), { status: 400, code: 'tools.job.invalid' });
+        await assert.rejects(jobs.reference(job.id, ''), TypeError);
+        await assert.rejects(jobs.reference('job_01K5WZX7S7Q4D2B8N3M6V1C9TR', 'community:paste:p_1'), { status: 404, code: 'tools.job.not_found' });
+    }],
+
+    ['no baseUrl: the gateway facade (origins.tools), which also finds the satellites\' jobs; an explicit baseUrl wins', async () => {
+        const { platform } = setup();
+        const clientFor = () => createClient({ fetch: platform.fetch, retryDelayMs: 5, tokenProvider: createServiceTokenClient({ clientId: APP, clientSecret: 'a', fetch: platform.fetch }) });
+        const gateway = createJobsClient(clientFor());
+        const img = createJobsClient(clientFor(), { baseUrl: 'https://img.openvibe.tools' });
+        const audio = createJobsClient(clientFor(), { baseUrl: 'https://audio.openvibe.tools' });
+
+        const { job } = await img.submit({ type: 'img.process', input: { tool: 'convert' } });
+        assert.equal(job.service, 'img');
+        assert.equal((await gateway.wait(job.id)).state, 'succeeded', 'the facade fronts the satellite');
+        assert.equal(await audio.get(job.id), null);
+        assert.ok(platform.stats.requests.some((r) => r.url === `https://openvibe.tools/api/v1/jobs/${job.id}`));
+
+        const viaGateway = (await gateway.submit({ type: 'audio.process', input: { tool: 'trim' } })).job;
+        assert.equal(viaGateway.service, 'audio');
+        assert.equal((await audio.get(viaGateway.id)).id, viaGateway.id, 'a gateway job lives on the satellite of its type');
+        assert.equal(await img.get(viaGateway.id), null);
     }],
 ]);

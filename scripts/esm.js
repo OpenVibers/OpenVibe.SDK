@@ -24,6 +24,7 @@ const ENTRIES = {
     'media.mjs': '../src/media.js',
     'community.mjs': '../src/community.js',
     'jobs.mjs': '../src/jobs.js',
+    'tools.mjs': '../src/tools.js',
     'projects.mjs': '../src/projects.js',
     'testing.mjs': '../src/testing/index.js',
 };

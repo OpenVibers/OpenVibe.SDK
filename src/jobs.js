@@ -1,29 +1,40 @@
 'use strict';
 /**
- * openvibe-sdk/jobs: asynchronous jobs on OpenVibe.Tools (/api/v1/jobs on each satellite that runs
- * jobs: img, audio, docs). Browser-safe; the credentials decide who owns a job.
+ * openvibe-sdk/jobs: asynchronous jobs on OpenVibe.Tools (tools.job@1). Browser-safe; the credentials
+ * decide who owns a job.
  *
- *   const jobs = createJobsClient(client, { baseUrl: 'https://img.openvibe.tools' });
+ *   const jobs = createJobsClient(client);           // the Tools gateway's /api/v1/jobs facade
  *   const { job } = await jobs.submit({ type: 'img.process', input: { tool: 'convert', format: 'webp' },
  *                                       files: [{ name: 'a.png', data: bytes }], idempotencyKey });
  *   for await (const e of jobs.events(job.id, { lastEventId: saved })) save(e.id);   // reattaches after drops
  *   const done = await jobs.get(job.id);
  *   const res = await jobs.file(job.id, 0);          // raw Response: stream or save it
+ *   await jobs.reference(job.id, 'community:paste:p_123');   // keep the result while the paste exists
  *
- * Capabilities (audience openvibe.tools): tools.job.create (submit), tools.job.read (get, events,
- * file), tools.job.cancel (cancel). Jobs are owner-scoped: another principal gets 404, the same
- * answer as for a job that does not exist.
+ * Where: without `baseUrl`, the `tools` service origin from the platform descriptor
+ * (https://openvibe.tools), whose gateway fronts every satellite's jobs under /api/v1/jobs (ADR-027).
+ * That facade comes with the Tools run API (Tools S6); until it is deployed, pass the satellite that
+ * runs the job type: `{ baseUrl: 'https://img.openvibe.tools' }` (img, audio, docs). An explicit
+ * baseUrl always wins.
+ *
+ * Capabilities (audience openvibe.tools): tools.job.create (submit, retry, reference, unreference),
+ * tools.job.read (get, events, file), tools.job.cancel (cancel). Jobs are owner-scoped: another
+ * principal gets 404, the same answer as for a job that does not exist.
  *
  *   POST   /api/v1/jobs                JSON { type, input } or multipart (type, input, file…);
  *                                      Idempotency-Key -> 202 new | 200 + Idempotent-Replayed
  *   GET    /api/v1/jobs/:id
  *   DELETE /api/v1/jobs/:id            cancel -> 200 cancelled | 202 cancel requested | 409 finished
+ *   POST   /api/v1/jobs/:id/retry      a failed job -> 202 new job | 200 + Idempotent-Replayed (its retry)
+ *   PUT    /api/v1/jobs/:id/references/:ref   keep a succeeded job's result (201 new | 200 existing)
+ *   DELETE /api/v1/jobs/:id/references/:ref   let it expire again after the last reference
  *   GET    /api/v1/jobs/:id/events     SSE with ids; Last-Event-ID replays only later events;
  *                                      204 when the job finished and nothing is newer
  *   GET    /api/v1/jobs/:id/files/:n   a result file
  */
 const { OpenVibeError, isOpenVibeError } = require('./core/errors');
 const { newIdempotencyKey } = require('./core/ids');
+const { appendFiles } = require('./core/form');
 const { parseSSE } = require('./realtime');
 
 const TERMINAL = new Set(['succeeded', 'failed', 'cancelled']);
@@ -34,12 +45,6 @@ const sleep = (ms, signal) => new Promise((resolve) => {
     if (signal) signal.addEventListener('abort', () => { clearTimeout(t); resolve(); }, { once: true });
 });
 
-function toBlob(data, type) {
-    if (typeof Blob !== 'undefined' && data instanceof Blob) return data;
-    if (typeof data === 'string' || data instanceof ArrayBuffer || ArrayBuffer.isView(data)) return new Blob([data], type ? { type } : undefined);
-    throw new TypeError('jobs.submit: a file is a Blob/File, or { name, data: Blob | ArrayBuffer | typed array | string, type? }');
-}
-
 /** Is this job finished (succeeded, failed or cancelled)? */
 function isTerminal(job) {
     return Boolean(job && TERMINAL.has(job.state));
@@ -47,6 +52,11 @@ function isTerminal(job) {
 
 function createJobsClient(client, { baseUrl, service = 'tools', audience = 'openvibe.tools' } = {}) {
     const call = (opts) => client.request({ service, baseUrl, audience, ...opts });
+    const replayedOf = (res) => String(res.headers.get('idempotent-replayed') || '') === 'true';
+    const refPath = (id, ref) => {
+        if (typeof ref !== 'string' || !ref) throw new TypeError('jobs: a reference is a string <service>:<kind>:<id>, e.g. community:paste:p_123');
+        return `/api/v1/jobs/${enc(id)}/references/${enc(ref)}`;
+    };
     const orNull = (p) => p.catch((err) => { if (isOpenVibeError(err) && err.status === 404) return null; throw err; });
 
     /**
@@ -68,17 +78,12 @@ function createJobsClient(client, { baseUrl, service = 'tools', audience = 'open
             const form = new FormData();
             form.append('type', String(type));
             form.append('input', JSON.stringify(input));
-            for (const f of list) {
-                const isBlob = typeof Blob !== 'undefined' && f instanceof Blob;
-                const blob = isBlob ? f : toBlob(f && f.data, f && f.type);
-                form.append('file', blob, (isBlob ? f.name : f && f.name) || 'file');
-            }
-            opts.form = form;
+            opts.form = appendFiles(form, list, 'jobs.submit');
         } else {
             opts.json = { type: String(type), input };
         }
         const res = await call(opts);
-        return { job: res.data, replayed: String(res.headers.get('idempotent-replayed') || '') === 'true', idempotencyKey: key };
+        return { job: res.data, replayed: replayedOf(res), idempotencyKey: key };
     }
 
     /** The job, or null when it does not exist or is not yours. */
@@ -93,6 +98,33 @@ function createJobsClient(client, { baseUrl, service = 'tools', audience = 'open
      */
     async function cancel(id, { signal } = {}) {
         return (await call({ method: 'DELETE', path: `/api/v1/jobs/${enc(id)}`, signal })).data;
+    }
+
+    /**
+     * Retry a failed job as a new job (same type, input and files; `retry_of` names the failed one)
+     * -> { job, replayed }. Idempotent on the server: asking again returns that same retry
+     * (`replayed: true`) whatever state it is in, so the call is retried safely without a key.
+     * Refusals: 409 tools.job.not_failed (only failed jobs), 410 tools.job.inputs_gone or
+     * tools.job.retry_gone, 429 tools.job.too_many_active.
+     */
+    async function retry(id, { signal } = {}) {
+        const res = await call({ method: 'POST', path: `/api/v1/jobs/${enc(id)}/retry`, idempotent: true, signal });
+        return { job: res.data, replayed: replayedOf(res) };
+    }
+
+    /**
+     * Keep a succeeded job's result while `ref` (<service>:<kind>:<id>, e.g. community:paste:p_123)
+     * points at it -> the job, whose expires_at is null while any reference remains. Idempotent.
+     * Refusals: 400 tools.job.invalid (a bad ref), 409 tools.job.not_succeeded, tools.job.sandbox
+     * (sandbox results are never kept) or tools.job.too_many_references (50).
+     */
+    async function reference(id, ref, { signal } = {}) {
+        return (await call({ method: 'PUT', path: refPath(id, ref), signal })).data;
+    }
+
+    /** Drop a reference -> the job; after the last one, the result expires again. Idempotent. */
+    async function unreference(id, ref, { signal } = {}) {
+        return (await call({ method: 'DELETE', path: refPath(id, ref), signal })).data;
     }
 
     /**
@@ -161,7 +193,7 @@ function createJobsClient(client, { baseUrl, service = 'tools', audience = 'open
         return (await call({ path: `/api/v1/jobs/${enc(id)}/files/${Number(n)}`, query: { inline }, responseType: 'response', signal })).data;
     }
 
-    return { submit, get, cancel, events, wait, file };
+    return { submit, get, cancel, retry, reference, unreference, events, wait, file };
 }
 
 module.exports = { createJobsClient, isTerminal, TERMINAL_STATES: [...TERMINAL] };

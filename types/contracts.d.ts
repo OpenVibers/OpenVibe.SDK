@@ -1,5 +1,6 @@
-/* Copied verbatim from openvibe-contracts v0.28.0 generated/typescript/index.d.ts (the SDK does not
- * require the package at runtime). test/types.test.js checks these against a Contracts checkout. */
+/* Copied verbatim from openvibe-contracts v0.33.0 generated/typescript/index.d.ts (the SDK does not
+ * require the package at runtime; it is a devDependency for the tests). test/types.test.js checks
+ * these against it. */
 /* eslint-disable */
 
 /** identity.subject-ref@1.0.0 (owner: network) */
@@ -181,7 +182,7 @@ export interface EventEnvelope {
 
 /** modules.namespace@1.0.0 (owner: network) */
 /**
- * Policy for one user-module namespace: portable per-subject summaries and preferences stored by OpenVibe.Network. Never domain truth, money or authoritative game inventory (roadmap 4.3-4.5).
+ * Policy for one user-module namespace: portable per-subject summaries and preferences stored by OpenVibe.Network. Never domain truth, money or authoritative game inventory (roadmap 4.3-4.5). The person's account decides what happens to their records in every namespace: when an account is removed, Network deletes all of its records; when two accounts are merged, the surviving account keeps its own record in a namespace where both have one (the other is deleted), and a record only the absorbed account had moves to the survivor. Each of these changes is announced as network.module.updated (reason subject_removed or subject_merged). That is separate from onOwnerRemoved, which says what happens to a namespace's records when the service that owns the namespace is retired.
  */
 export interface ModuleNamespace {
   namespace: string;
@@ -308,4 +309,453 @@ export interface AppManifest {
      */
     sdk?: string;
   };
+}
+
+/** tools.tool@1.0.0 (owner: tools) */
+/**
+ * One tool on openvibe.tools as its registry describes it (GET /api/v1/tools/:id, and each item of GET /api/v1/tools; capability tools.tool.read; ADR-027). There is one descriptor per catalogue tool (GET /api/catalog.json tools[].id), built from the tool's own code, so its page, the run API, openvibe-sdk/tools, the OpenAPI document and the docs all read the same facts. EXECUTION is where the tool's engine runs for its page: client (in the browser; nothing leaves it), sync (a server request answered inline) or job (an asynchronous job on a satellite, tools.job@1). API says whether POST /api/v1/tools/{id}/run exposes the tool. A client tool has api true only when it also has a server engine (a pure transform that runs in Node), and its page stays browser-only. A page-only tool (yt) has api false and run null. A job tool's run creates a job of run.job.type whose input is { ...input, ...run.job.preset, tool: run.job.operation } (the preset and the operation always win). INPUT is the JSON Schema (2020-12) that a run request's input must match, embedded or as { $ref: https://openvibe.tools/api/v1/tools/{id}/schema#/$defs/input }. GET /api/v1/tools/:id/schema answers { $schema, $id, $defs: { input, output } }, and the list uses the $ref form. RULES this schema enforces: api false has no run, and api true has a run and an input; an API job tool names its job, and only job tools name one; an API tool whose output is a file runs as a job (its results are served as job files); a tools.net.probe tool fetches (egress) and is never anonymous; an anonymous egress tool has a per-target throttle (limits.perTargetPerMinute); a client tool never fetches; an unavailable tool says why (statusReason); JSON output has a schema. contracts.tools.checkDescriptor(d) also checks what depends on the id (run.path, $ref targets) and files.min <= files.max.
+ */
+export interface ToolDescriptor {
+  /**
+   * The tool's catalogue id, which is its subdomain label (png, jsminify, dns, pdf2jpg). It never changes.
+   */
+  id: string;
+  /**
+   * The catalogue family: net, dev, img, audio, docs, text, media, places, pastes…
+   */
+  family: string;
+  name: string;
+  /**
+   * One plain sentence: what the tool does.
+   */
+  summary: string;
+  /**
+   * stable: works, and its input and output only grow. beta: works; input or output may still change in a minor. preview: works with known gaps (limits or output not final). unavailable: listed, but runs are refused with 503 tools.tool.unavailable and the page says so (statusReason).
+   */
+  status: "stable" | "beta" | "preview" | "unavailable";
+  /**
+   * Why the status is what it is, for people (e.g. 'needs qpdf on the host'). Required when unavailable.
+   */
+  statusReason?: string;
+  /**
+   * Where the engine runs for the tool's page: client (the browser), sync (a server request answered inline), job (an asynchronous job).
+   */
+  execution: "client" | "sync" | "job";
+  /**
+   * POST /api/v1/tools/{id}/run exposes the tool. false for a client tool without a server engine and for page-only tools (yt).
+   */
+  api: boolean;
+  /**
+   * How to call it; null when api is false.
+   */
+  run: {
+    method: "POST";
+    /**
+     * /api/v1/tools/{id}/run on https://openvibe.tools; the body is tools.run-request@1, the answer tools.run@1.
+     */
+    path: string;
+    /**
+     * For a job tool: the job the run creates. null for tools answered inline.
+     */
+    job: {
+      /**
+       * Job type, e.g. img.process.
+       */
+      type: string;
+      /**
+       * The job input's tool field: convert, compress, trim, mergepdf…
+       */
+      operation: string;
+      /**
+       * Input fields the tool itself fixes, applied over the caller's input (png: { format: png }).
+       */
+      preset?: {};
+    } | null;
+    /**
+     * Older routes that run the same engine (GET /api/net/dns/:target, POST /api/process…). They keep working until their Sunset date and answer with Deprecation, Sunset and Link: rel=successor-version pointing at path.
+     *
+     * @maxItems 32
+     */
+    legacy?: string[];
+  } | null;
+  /**
+   * JSON Schema (2020-12) of the run request's input: embedded (an object schema), or { $ref } to $defs/input of GET /api/v1/tools/:id/schema. null only for a tool without an API.
+   */
+  input:
+    | {
+        $ref: string;
+      }
+    | {
+        type: "object";
+      }
+    | null;
+  /**
+   * The files a run takes (multipart parts, or tools.run-request@1 files references); null when it takes none.
+   */
+  files: {
+    min: number;
+    max: number;
+    /**
+     * Accepted media types, checked against the bytes, not the client's Content-Type (image/png, image/*, application/pdf…).
+     *
+     * @minItems 1
+     */
+    accept: [string, ...string[]];
+    /**
+     * Largest accepted file.
+     */
+    maxBytes: number;
+  } | null;
+  output: {
+    /**
+     * json: result.data; text: result.text; file or files: result.files (job result files).
+     */
+    kind: "json" | "file" | "files" | "text";
+    /**
+     * JSON Schema of result.data (kind json): embedded, or { $ref } to $defs/output of GET /api/v1/tools/:id/schema.
+     */
+    schema?:
+      | {
+          $ref: string;
+        }
+      | {
+          type: "object";
+        };
+    /**
+     * Media types the result files can have (kind file or files).
+     *
+     * @minItems 1
+     */
+    mime?: [string, ...string[]];
+  };
+  limits: {
+    /**
+     * A run (or its job) longer than this fails with tools.job.timeout or 504.
+     */
+    timeoutMs: number;
+    /**
+     * Longest audio or video input.
+     */
+    maxDurationSec?: number;
+    /**
+     * Largest image input (width × height).
+     */
+    maxPixels?: number;
+    /**
+     * Most PDF pages.
+     */
+    maxPages?: number;
+    /**
+     * Largest input as JSON (text to transform, lists of hosts…).
+     */
+    maxInputBytes?: number;
+    /**
+     * Egress tools: most runs per minute against one target host or address, across all callers.
+     */
+    perTargetPerMinute?: number;
+  };
+  /**
+   * Caller tiers: anonymous < session < user < app/service.
+   */
+  auth: {
+    /**
+     * true: a caller with no token and no browser session may run it (keyed by IP, IPv6 by /64). false: a browser session (the ov_tools_jobs cookie), a signed-in person or a token is needed.
+     */
+    anonymous: boolean;
+    /**
+     * What an app or service token must hold. tools.tool.run is public. tools.net.probe (partner) covers network probes: only principals holding it run these through the API; people use their pages, which have a per-target throttle.
+     */
+    capability: "tools.tool.run" | "tools.net.probe";
+  };
+  /**
+   * The quota bucket a run counts against, with allowances per caller tier. Names describe the work, never a tier or a price (tools-run, tools-job, tools-probe, tools-fetch…), so a paid tier later adds allowances, not names.
+   */
+  quotaClass: string;
+  /**
+   * Relative weight of one run within its quota class (1 = a cheap lookup or transform). Quotas count weight, not requests.
+   */
+  cost: number;
+  /**
+   * The server fetches a host or URL the caller chose (DNS, WHOIS, headers, Open Graph, ports…), always through the SSRF guard.
+   */
+  egress: boolean;
+  /**
+   * The tool's public hostnames, canonical first (png.openvibe.tools, a custom domain…); empty for a tool that lives on another service.
+   *
+   * @maxItems 50
+   */
+  hosts: string[];
+  /**
+   * Where a person reads about the tool.
+   */
+  docs: string;
+}
+
+/** tools.tool-list@1.0.0 (owner: tools) */
+/**
+ * The answer of GET /api/v1/tools on openvibe.tools (capability tools.tool.read; ADR-027): every tool's descriptor (tools.tool@1), with input and output schemas in the { $ref } form (GET /api/v1/tools/:id has them embedded). Filters: ?family=, ?execution=client|sync|job, ?api=true|false, ?status=, ?q= (name, summary and keywords). Planned placeholders are not tools and are not listed. Cacheable (ETag); updated_at changes when any descriptor does.
+ */
+export interface ToolList {
+  tools: ToolDescriptor[];
+  /**
+   * The number of tools in this answer.
+   */
+  count: number;
+  updated_at: string;
+  /**
+   * The families of the tools in this answer.
+   */
+  families?: {
+    id: string;
+    name: string;
+    count: number;
+  }[];
+}
+
+/** tools.run-request@1.0.0 (owner: tools) */
+/**
+ * Body of POST /api/v1/tools/{id}/run on openvibe.tools (capability tools.tool.run, or tools.net.probe for network probes; ADR-027). JSON, or multipart/form-data like POST /api/v1/jobs: the text parts input (JSON text), wait_ms and idempotency_key, and uploaded files as file or files parts. The tool gets the uploaded files first, then the files references, in order; the count must fit the descriptor's files.min and files.max. input must match the tool's input schema (tools.tool@1 input). A job tool's job input is { ...input, ...run.job.preset, tool: run.job.operation } (the preset and the operation always win). The Idempotency-Key header wins over idempotency_key; ?wait_ms= on the query does the same as the field. Answers tools.run@1: 200 finished (succeeded, or failed with the tool's own error), 202 + Location while a job is queued or running, 200 + Idempotent-Replayed: true for a replay. Refusals are problem+json: 400 tools.run.invalid (not JSON, a bad field, wrong file count), 401 token.*, 403 capability.denied, 404 tools.tool.not_found, 404 tools.tool.not_runnable (api false: a page-only tool), 404 tools.run.file_not_found (a reference the caller cannot read), 409 tools.job.idempotency_conflict, 413 tools.file.too_large, 415 tools.file.unsupported_type (checked against the bytes), 422 tools.input.invalid (errors[] with JSON pointers), 429 quota.exceeded or tools.job.too_many_active (Retry-After), 503 tools.tool.unavailable.
+ */
+export interface ToolsRunRequest {
+  /**
+   * The tool's parameters, matching its input schema. Default {}.
+   */
+  input?: {};
+  /**
+   * Files that are already somewhere, instead of or besides uploaded parts.
+   *
+   * @maxItems 50
+   */
+  files?: (
+    | {
+        media_id: string;
+      }
+    | {
+        job_id: string;
+        index: number;
+      }
+  )[];
+  /**
+   * Job tools: wait up to this long for the job to finish before answering (200 finished, else 202 with the job). Default 0. Inline tools always answer finished.
+   */
+  wait_ms?: number;
+  /**
+   * Job tools: the same (caller, key) and request returns the same job; a different request under it is 409 tools.job.idempotency_conflict. Inline tools ignore it.
+   */
+  idempotency_key?: string;
+}
+
+/** tools.run@1.0.0 (owner: tools) */
+/**
+ * The answer of POST /api/v1/tools/{id}/run (tools.run-request@1; ADR-027). Finished: { state: succeeded, tool, result, took_ms } or { state: failed|cancelled, tool, error, took_ms }, with job set when the tool ran as a job. Not finished within wait_ms: { state: queued|running, tool, job, location }, sent with 202 and a Location header; follow the job there (GET, its events, its files; tools.job@1). result carries data (kind json, matching the descriptor's output schema), text (kind text) or files (kind file or files: the job's result files, downloaded from their url). took_ms runs from the request to the answer for an inline run, and from created_at to finished_at for a job. error is problem+json from the tool: tools.job.failed, tools.job.timeout, tools.job.cancelled, or a code the tool chose (tools.…). A request refused before the tool ran is a problem+json answer, not a run.
+ */
+export type ToolsRun =
+  | {
+      state: "succeeded";
+      tool: string;
+      result: {
+        /**
+         * Output data; matches the descriptor's output.schema when output.kind is json.
+         */
+        data?: {};
+        /**
+         * Output text (output.kind text).
+         */
+        text?: string;
+        /**
+         * Result files (output.kind file or files), exactly as the job lists them.
+         *
+         * @maxItems 100
+         */
+        files?: {
+          name: string;
+          mime: string;
+          size: number;
+          sha256: string;
+          /**
+           * media: a private OpenVibe.Media object (TOOLS_JOB_RESULTS=media); local: kept on the satellite until the job expires.
+           */
+          storage: "local" | "media";
+          /**
+           * The Media object, when storage is media.
+           */
+          media: {
+            media_id: string;
+            role?: string;
+            namespace?: string;
+            size_bytes?: number;
+            content_hash?: string;
+            mime_type?: string;
+            /**
+             * The object's Media lifecycle status when it was stored (ready).
+             */
+            status?: string;
+          } | null;
+          /**
+           * Present when storing the file in Media failed; the file stayed local.
+           */
+          media_error?: string;
+          /**
+           * Where the owner downloads it.
+           */
+          url: string;
+        }[];
+      };
+      took_ms: number;
+      job?: ToolsJob | null;
+    }
+  | {
+      state: "failed" | "cancelled";
+      tool: string;
+      error: Problem;
+      took_ms: number;
+      job?: ToolsJob | null;
+    }
+  | {
+      state: "queued" | "running";
+      tool: string;
+      job: ToolsJob;
+      /**
+       * The job (also the Location header): /api/v1/jobs/:id on the gateway.
+       */
+      location: string;
+    };
+
+/** tools.job@1.0.0 (owner: tools) */
+/**
+ * A Tools job as the jobs API answers it (OpenVibe.Tools apps/_shared/jobs/http.js, system.view; ADR-027): POST /api/v1/jobs (202 + Location, or 200 + Idempotent-Replayed: true), GET and DELETE /api/v1/jobs/:id, POST /api/v1/jobs/:id/retry, PUT and DELETE /api/v1/jobs/:id/references/:ref, the data of every SSE event on GET /api/v1/jobs/:id/events, and the job member of tools.run@1. A job is visible only to its owner (a person, a service/app principal, or one browser session); anyone else gets the same 404 tools.job.not_found as for a job that does not exist. result is null until the job succeeded; each result file is downloaded from its url (GET /api/v1/jobs/:id/files/:n, ?inline=1 for previews) and is stored as a private OpenVibe.Media object (storage media) or on the satellite until the job expires (storage local). expires_at is null while a reference keeps the result. error is problem+json: tools.job.failed, tools.job.timeout, tools.job.cancelled, or a code the tool chose (tools.…), with server paths removed.
+ */
+export interface ToolsJob {
+  id: string;
+  object: "tools.job";
+  /**
+   * The Tools satellite that runs the job (img, audio, docs…).
+   */
+  service: string;
+  /**
+   * The tool (tools.tool@1 id) whose run created the job, when it came through POST /api/v1/tools/{id}/run. Absent for a job submitted to POST /api/v1/jobs directly.
+   */
+  tool?: string;
+  /**
+   * Job type, e.g. img.process.
+   */
+  type: string;
+  type_version: number;
+  /**
+   * Terminal: succeeded, failed, cancelled.
+   */
+  state: "queued" | "running" | "succeeded" | "failed" | "cancelled";
+  progress: {
+    percent: number | null;
+    message: string | null;
+  };
+  attempts: number;
+  max_attempts: number;
+  /**
+   * DELETE asked a running job to stop; it ends cancelled.
+   */
+  cancel_requested: boolean;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  /**
+   * When the job, its events and its result files are pruned; null while a reference keeps the result.
+   */
+  expires_at: string | null;
+  result: {
+    /**
+     * @maxItems 100
+     */
+    files: {
+      name: string;
+      mime: string;
+      size: number;
+      sha256: string;
+      /**
+       * media: a private OpenVibe.Media object (TOOLS_JOB_RESULTS=media); local: kept on the satellite until the job expires.
+       */
+      storage: "local" | "media";
+      /**
+       * The Media object, when storage is media.
+       */
+      media: {
+        media_id: string;
+        role?: string;
+        namespace?: string;
+        size_bytes?: number;
+        content_hash?: string;
+        mime_type?: string;
+        /**
+         * The object's Media lifecycle status when it was stored (ready).
+         */
+        status?: string;
+      } | null;
+      /**
+       * Present when storing the file in Media failed; the file stayed local.
+       */
+      media_error?: string;
+      /**
+       * Where the owner downloads it.
+       */
+      url: string;
+    }[];
+    /**
+     * The tool's output data (dimensions, durations, page counts…); {} when it has none.
+     */
+    data: {};
+  } | null;
+  error: Problem | null;
+  /**
+   * Retrying may succeed (a timeout, a restart); POST links.retry makes a new job.
+   */
+  retryable: boolean;
+  /**
+   * The failed job this one retries.
+   */
+  retry_of: string | null;
+  /**
+   * The job that retried this failed one; asking again returns it.
+   */
+  retried_by: string | null;
+  /**
+   * What keeps the result (PUT /api/v1/jobs/:id/references/:ref), e.g. community:paste:p_123.
+   *
+   * @maxItems 50
+   */
+  references: {
+    ref: string;
+    created_at: string;
+  }[];
+  links: {
+    self: string;
+    events: string;
+    /**
+     * DELETE it while the job is queued or running.
+     */
+    cancel: string | null;
+    /**
+     * POST it when the job failed.
+     */
+    retry: string | null;
+    retried_by: string | null;
+  };
+}
+
+/** tools.job-request@1.0.0 (owner: tools) */
+/**
+ * Body of POST /api/v1/jobs on the Tools satellites that run jobs (img, audio, docs; capability tools.job.create; OpenVibe.Tools apps/_shared/jobs/http.js). JSON, or multipart/form-data with the same fields as text parts (input as JSON text) and the input files as file or files parts. The Idempotency-Key header wins over idempotency_key: the same (owner, key) and request returns the same job (200 + Idempotent-Replayed: true), a different request under it is 409 tools.job.idempotency_conflict. Types: img.process (input { tool: convert|compress|resize|crop, … }, one image), audio.process ({ tool, … } as /api/process takes them, one audio or video file), docs.process ({ tool, … }, one PDF, or several files for merge and img2pdf). A format host fills in its format (webp.openvibe.tools converts to WebP). Answers tools.job@1 (202 + Location). Refusals are problem+json: 400 tools.job.invalid (input not a JSON object or over 16 KB, wrong file count, the type's own validation) or tools.job.unknown_type, 401 token.* or tools.job.no_owner, 403 capability.denied, 413 tools.job.too_large, 429 tools.job.too_many_active (unfinished jobs per owner) or a rate limit, 503 tools.job.unavailable.
+ */
+export interface ToolsJobRequest {
+  /**
+   * Job type: img.process, audio.process, docs.process.
+   */
+  type: string;
+  /**
+   * The job type's input; { tool: <operation>, …options }. Default {}; at most 16 KB as JSON.
+   */
+  input?: {};
+  /**
+   * 8-200 printable ASCII characters. The Idempotency-Key header is used when both are present.
+   */
+  idempotency_key?: string;
 }
