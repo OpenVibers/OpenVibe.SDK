@@ -33,13 +33,100 @@ function verifyDelivery(rawBody, signatureHeader, secret) {
     return given.length === expected.length && crypto.timingSafeEqual(given, expected);
 }
 
+// v2 (replay window). Events also sends, on every attempt with the time it is sent:
+//   X-OpenVibe-Timestamp:    <unix seconds>
+//   X-OpenVibe-Signature-V2: t=<unix seconds>,v2=<hex HMAC-SHA256 of "<t>.<raw body>">
+// A v1 signature covers only the body, so a captured delivery verifies forever; v2 stops
+// verifying once the timestamp is more than `toleranceSec` (300) from the consumer's clock.
+
+const V2_TOLERANCE_SEC = 300;
+
+function v2Hex(rawBody, secret, timestamp) {
+    return crypto.createHmac('sha256', String(secret)).update(`${timestamp}.`).update(toBuffer(rawBody)).digest('hex');
+}
+
+/** `t=<ts>,v2=<hex HMAC-SHA256 of "<ts>.<raw body>">`, the value of X-OpenVibe-Signature-V2. */
+function signDeliveryV2(rawBody, secret, timestamp = Math.floor(Date.now() / 1000)) {
+    if (!Number.isSafeInteger(timestamp) || timestamp < 0) throw new TypeError('timestamp must be unix seconds');
+    return `t=${timestamp},v2=${v2Hex(rawBody, secret, timestamp)}`;
+}
+
 /**
- * Verify and parse one delivery: { event, seq, subscriptionId, attempt } or null when the
- * signature does not verify. `headers` is req.headers (or a Fetch Headers).
+ * The three signature headers Events puts on a delivery (X-OpenVibe-Signature,
+ * X-OpenVibe-Timestamp, X-OpenVibe-Signature-V2), for tests that post deliveries to a consumer.
  */
-function parseDelivery(rawBody, headers, secret) {
-    const get = (k) => (headers && typeof headers.get === 'function' ? headers.get(k) : headers && headers[k.toLowerCase()]);
-    if (!verifyDelivery(rawBody, get('x-openvibe-signature'), secret)) return null;
+function signDeliveryHeaders(rawBody, secret, { now = Date.now() } = {}) {
+    const timestamp = Math.floor(Number(now) / 1000);
+    return {
+        'X-OpenVibe-Signature': signDelivery(rawBody, secret),
+        'X-OpenVibe-Timestamp': String(timestamp),
+        'X-OpenVibe-Signature-V2': signDeliveryV2(rawBody, secret, timestamp),
+    };
+}
+
+/** One header from req.headers (any key case; arrays joined) or a Fetch Headers; undefined if absent. */
+function headerValue(headers, name) {
+    if (!headers) return undefined;
+    if (typeof headers.get === 'function') return headers.get(name) ?? undefined;
+    let v = headers[name];
+    if (v === undefined) {
+        const key = Object.keys(headers).find((k) => k.toLowerCase() === name);
+        v = key === undefined ? undefined : headers[key];
+    }
+    return Array.isArray(v) ? v.join(',') : v;
+}
+
+/**
+ * Constant-time check of a delivery's X-OpenVibe-Signature-V2 against the RAW request body, and
+ * of its timestamp: false when it is more than `toleranceSec` from `now` (ms) either way, or when
+ * X-OpenVibe-Timestamp is present and names another time. `headers` is req.headers (or a Fetch Headers).
+ */
+function verifyDeliveryV2(rawBody, headers, secret, { toleranceSec = V2_TOLERANCE_SEC, now = Date.now() } = {}) {
+    if (!Number.isFinite(toleranceSec) || toleranceSec < 0) throw new TypeError('toleranceSec must be a number of seconds >= 0');
+    const header = headerValue(headers, 'x-openvibe-signature-v2');
+    if (rawBody == null || typeof header !== 'string' || !secret) return false;
+    let t = null;
+    const given = [];
+    for (const part of header.split(',')) {
+        const i = part.indexOf('=');
+        if (i < 0) return false;
+        const k = part.slice(0, i).trim();
+        const v = part.slice(i + 1).trim();
+        if (k === 't') {
+            if (t !== null || !/^\d{1,12}$/.test(v)) return false;
+            t = Number(v);
+        } else if (k === 'v2') given.push(v);
+    }
+    if (t === null || !given.length) return false;
+    const stated = headerValue(headers, 'x-openvibe-timestamp');
+    if (stated !== undefined && String(stated).trim() !== String(t)) return false;
+    if (Math.abs(Number(now) / 1000 - t) > toleranceSec) return false;
+    const expected = Buffer.from(v2Hex(rawBody, secret, t));
+    let ok = false;
+    for (const v of given) {
+        const g = Buffer.from(v);
+        if (g.length === expected.length && crypto.timingSafeEqual(g, expected)) ok = true;
+    }
+    return ok;
+}
+
+/**
+ * Verify and parse one delivery: { event, seq, subscriptionId, attempt } or null when it does not
+ * verify. `headers` is req.headers (or a Fetch Headers).
+ *
+ *   X-OpenVibe-Signature-V2 present  it must verify and be within ±toleranceSec (default 300) of
+ *                                    `now`; a bad or stale v2 is null, never a fallback to v1
+ *   no v2 header                     v1 (X-OpenVibe-Signature) is accepted unless requireV2
+ *
+ * Set requireV2: true once OpenVibe.Events sends v2 to you: then a replayed v1-only delivery fails.
+ */
+function parseDelivery(rawBody, headers, secret, { requireV2 = false, toleranceSec, now } = {}) {
+    const get = (k) => headerValue(headers, k);
+    if (get('x-openvibe-signature-v2') !== undefined) {
+        if (!verifyDeliveryV2(rawBody, headers, secret, { toleranceSec, now })) return null;
+    } else if (requireV2 || !verifyDelivery(rawBody, get('x-openvibe-signature'), secret)) {
+        return null;
+    }
     let body;
     try { body = JSON.parse(toBuffer(rawBody).toString('utf8')); } catch { return null; }
     if (!body || !body.event) return null;
@@ -272,5 +359,5 @@ const { createOutbox, createInbox } = require('./outbox');
 
 module.exports = {
     createEventsClient, verifyDelivery, signDelivery, parseDelivery, createOutbox, createInbox,
-    projectKey, appSource, createAppEvents,
+    projectKey, appSource, createAppEvents, verifyDeliveryV2, signDeliveryV2, signDeliveryHeaders,
 };

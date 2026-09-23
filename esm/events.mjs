@@ -3,6 +3,6 @@ import cjs from '../src/events.js';
 
 export const {
     createEventsClient, verifyDelivery, signDelivery, parseDelivery, createOutbox, createInbox,
-    projectKey, appSource, createAppEvents,
+    projectKey, appSource, createAppEvents, verifyDeliveryV2, signDeliveryV2, signDeliveryHeaders,
 } = cjs;
 export default cjs;

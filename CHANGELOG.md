@@ -3,6 +3,35 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.4.0 (2026-09-23)
+
+Replay protection for OpenVibe.Events webhook deliveries (signature v2). Backward compatible:
+existing callers of `parseDelivery(raw, headers, secret)` and `verifyDelivery()` keep working, and
+v1-only deliveries are still accepted until you opt in to `requireV2`.
+
+- **Events sends v2.** Besides the unchanged `X-OpenVibe-Signature: sha256=<HMAC of the raw body>`,
+  every delivery attempt (retries included, each with a fresh time) carries
+  `X-OpenVibe-Timestamp: <unix seconds>` and
+  `X-OpenVibe-Signature-V2: t=<ts>,v2=<hex HMAC-SHA256 of "<ts>.<raw body>">`.
+- New `verifyDeliveryV2(rawBody, headers, secret, { toleranceSec = 300, now = Date.now() })`:
+  constant-time check of the v2 signature, false when the timestamp is more than `toleranceSec`
+  from `now` either way or when `X-OpenVibe-Timestamp` disagrees with `t`. Several `v2=` values
+  are allowed (any one may match); a bad `toleranceSec` throws.
+- `parseDelivery(rawBody, headers, secret, { requireV2 = false, toleranceSec, now })`: when a v2
+  header is present it must verify and be fresh, and a bad or stale v2 returns `null` (it never
+  falls back to v1); without a v2 header, v1 is accepted only while `requireV2` is false. Header
+  lookup on a plain object is now case-insensitive. **Behaviour change**: a delivery that carries
+  v2 is now refused when your clock is more than 300 s off Events' (keep NTP on), or when the v2
+  signature does not verify even if v1 does. Conversely, once v2 verifies, v1 is not consulted:
+  a test that blanks only `X-OpenVibe-Signature` on an Events delivery and expects a refusal must
+  drop or break `X-OpenVibe-Signature-V2` too.
+- New `signDeliveryV2(rawBody, secret, timestamp?)` and `signDeliveryHeaders(rawBody, secret,
+  { now })` (the three signature headers, for tests that post deliveries to a consumer).
+  `verifyDelivery` and `signDelivery` (v1) are unchanged.
+- **Mock Events** `deliverEvents()` / `startDeliveries()` send v1 and v2 headers, signed afresh on
+  every attempt, as production does.
+- Types and ESM entry points include the new functions.
+
 ## 0.3.1 (2026-09-23)
 
 The remaining gaps OpenVibe.Examples found, so its examples need no local stand-ins for Events or

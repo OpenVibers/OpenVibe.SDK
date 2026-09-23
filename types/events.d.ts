@@ -91,7 +91,27 @@ export declare function createAppEvents(client: OpenVibeClient, opts: { projectI
 type RawBody = string | Uint8Array | ArrayBufferView;
 export declare function signDelivery(rawBody: RawBody, secret: string): string;
 export declare function verifyDelivery(rawBody: RawBody, signatureHeader: string | undefined | null, secret: string): boolean;
-export declare function parseDelivery(rawBody: RawBody, headers: Record<string, any> | Headers, secret: string): { event: EventEnvelope; seq: number; subscriptionId: string | null; attempt: number } | null;
+/** `t=<ts>,v2=<hex HMAC-SHA256 of "<ts>.<raw body>">`, the value of X-OpenVibe-Signature-V2 (timestamp in unix seconds, default now). */
+export declare function signDeliveryV2(rawBody: RawBody, secret: string, timestamp?: number): string;
+/** X-OpenVibe-Signature, X-OpenVibe-Timestamp and X-OpenVibe-Signature-V2 for a delivery body, as Events sends them (now in ms). */
+export declare function signDeliveryHeaders(rawBody: RawBody, secret: string, opts?: { now?: number }): {
+    'X-OpenVibe-Signature': string;
+    'X-OpenVibe-Timestamp': string;
+    'X-OpenVibe-Signature-V2': string;
+};
+export interface DeliveryV2Options {
+    /** Seconds the timestamp may be away from `now`, either way. Default 300. */
+    toleranceSec?: number;
+    /** The current time in ms. Default Date.now(). */
+    now?: number;
+}
+/** Constant-time check of X-OpenVibe-Signature-V2 over the raw body, and of its timestamp (±toleranceSec). */
+export declare function verifyDeliveryV2(rawBody: RawBody, headers: Record<string, any> | Headers, secret: string, opts?: DeliveryV2Options): boolean;
+export interface ParseDeliveryOptions extends DeliveryV2Options {
+    /** Refuse deliveries without X-OpenVibe-Signature-V2 (v1-only). Default false. A present v2 header must always verify. */
+    requireV2?: boolean;
+}
+export declare function parseDelivery(rawBody: RawBody, headers: Record<string, any> | Headers, secret: string, opts?: ParseDeliveryOptions): { event: EventEnvelope; seq: number; subscriptionId: string | null; attempt: number } | null;
 
 /** The subset of a better-sqlite3 Database the outbox and inbox use. */
 export interface SqliteDatabase {

@@ -35,6 +35,7 @@ const { b64url, fromB64url, ulid, topicRegex, json, problem, redirect } = requir
 const { createDeveloper, DEFAULT_APP_CATALOG, PRJ_ID_RE } = require('./developer');
 const { createJobsService } = require('./jobs');
 const appRules = require('./apps');
+const { signDeliveryHeaders } = require('../events');
 
 const DEFAULT_ORIGINS = {
     network: 'https://openvibe.network',
@@ -593,8 +594,9 @@ function createMockPlatform(opts = {}) {
      * deliverEvents({ fetch, subscriptionId, timeoutMs }) plays the Events delivery worker once:
      * for each enabled subscription, POSTs every event published after it was created (in seq
      * order, one at a time) to its endpoint as { event, seq }, signed like Events signs deliveries
-     * (X-OpenVibe-Signature: sha256=<HMAC of the raw body with the subscription secret>, plus
-     * X-OpenVibe-Event-Id, -Event-Type, -Seq, -Subscription-Id, -Delivery-Attempt, -Hops,
+     * (X-OpenVibe-Signature: sha256=<HMAC of the raw body with the subscription secret>;
+     * X-OpenVibe-Timestamp and X-OpenVibe-Signature-V2: t=<ts>,v2=<HMAC of "<ts>.<raw body>">,
+     * signed afresh on every attempt; plus X-OpenVibe-Event-Id, -Event-Type, -Seq, -Subscription-Id, -Delivery-Attempt, -Hops,
      * traceparent). A 2xx moves on; anything else stops that subscription until the next call,
      * and after retry_policy.max_attempts (default 5) the delivery is dead and skipped.
      * `fetch` defaults to the global fetch, so the endpoint can be a real local HTTP server.
@@ -625,7 +627,7 @@ function createMockPlatform(opts = {}) {
                             'Content-Type': 'application/json', 'User-Agent': 'OpenVibe.Events/mock',
                             'X-OpenVibe-Event-Id': e.event.event_id, 'X-OpenVibe-Event-Type': e.event.event_type, 'X-OpenVibe-Seq': String(e.seq),
                             'X-OpenVibe-Subscription-Id': sub.id, 'X-OpenVibe-Delivery-Attempt': String(attempt), 'X-OpenVibe-Hops': '0',
-                            'X-OpenVibe-Signature': `sha256=${crypto.createHmac('sha256', String(sub.secret)).update(body).digest('hex')}`,
+                            ...signDeliveryHeaders(body, sub.secret),
                             traceparent: `00-${trace}-${crypto.randomBytes(8).toString('hex')}-01`,
                         },
                     });
