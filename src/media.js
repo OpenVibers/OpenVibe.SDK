@@ -3,10 +3,16 @@
  * openvibe-sdk/media: OpenVibe.Media files (Media API v1, /api/v1/:app/files) and public URL helpers.
  *
  * Credentials: the app's API key (Authorization: Bearer <app key>, server side only; it is a
- * secret) or a Network service token holding media.object.upload for the app's namespace
- * (accepted on upload only). Media refuses a user JWT here: a browser uploads through its own
- * app server, which names the user with X-OV-User-Id (the `actingUserId` option).
+ * secret), a Network service token for the app's namespace, or a developer app token on its
+ * project's tenant (`app` = the project id, prj_…). Tokens need media.object.upload to upload and
+ * delete, media.object.read to list and get. Media refuses a user JWT here: a browser uploads
+ * through its own app server, which names the user with X-OV-User-Id (the `actingUserId` option).
  * Browser-safe code (FormData/Blob), but the credentials it needs belong on a server.
+ *
+ * Sandbox app tokens land in the project's sandbox tenant (`<prj_…>-sandbox`, shown as `app_id`),
+ * whose files are never served publicly: Media answers them with `sandbox: true`, a signed,
+ * expiring `url` and `url_expires_at`. The client adds `signed_url` (that URL) and sets
+ * `public_url` to null for them; other files get `public_url` (the absolute `url`).
  */
 const { isOpenVibeError } = require('./core/errors');
 const { paginate, offsetPager } = require('./core/paginate');
@@ -58,11 +64,16 @@ function createMediaClient(client, { app, apiKey, actingUserId, baseUrl, publicO
         return client.json({ service: 'media', baseUrl, audience: 'openvibe.media', ...(apiKey ? { token: apiKey } : {}), ...opts, headers });
     };
     const orNull = (p) => p.catch((err) => { if (isOpenVibeError(err) && err.status === 404) return null; throw err; });
-    const withPublic = (meta) => (meta && meta.url ? { ...meta, public_url: urls.absolute(meta.url) } : meta);
+    const withPublic = (meta) => {
+        if (!meta || !meta.url) return meta;
+        if (meta.sandbox) return { ...meta, public_url: null, signed_url: urls.absolute(meta.url) };
+        return { ...meta, public_url: urls.absolute(meta.url) };
+    };
 
     const files = {
         /**
-         * Multipart upload (field `file`) -> { key, url, public_url, size, mime, sha256, … }.
+         * Multipart upload (field `file`) -> { key, url, public_url, size, mime, sha256, … }
+         * (sandbox files: { sandbox: true, url, url_expires_at, signed_url, public_url: null, … }).
          * Keys are content-addressed, so a repeat upload is deduplicated; retries are safe.
          */
         async upload(file, { filename, contentType, userId, actingUserId: acting, signal } = {}) {

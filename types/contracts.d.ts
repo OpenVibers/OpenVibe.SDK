@@ -1,4 +1,4 @@
-/* Copied verbatim from openvibe-contracts v0.26.0 generated/typescript/index.d.ts (the SDK does not
+/* Copied verbatim from openvibe-contracts v0.28.0 generated/typescript/index.d.ts (the SDK does not
  * require the package at runtime). test/types.test.js checks these against a Contracts checkout. */
 /* eslint-disable */
 
@@ -235,4 +235,77 @@ export interface ModuleRecord {
    * user:<subject> or svc:<service>
    */
   updated_by?: string;
+}
+
+/** codes.app-manifest@1.0.0 (owner: codes) */
+/**
+ * PROPOSAL (OpenVibe.Codes, roadmap Wave 20): an app release as the platform knows it. The app is a Network developer app (ADR-014): its id is the Network app id, its capabilities are only a request (the grants in Network are the authority), and trust tiers are metadata that never change a grant check. OpenVibe.Codes validates with this schema, loaded into openvibe-contracts' validator, until Contracts publishes it as codes.app-manifest@1.
+ */
+export interface AppManifest {
+  /**
+   * The Network app id (its client_id). Its principal subject is app:<id>.
+   */
+  id: string;
+  name: string;
+  /**
+   * Semantic version of this release.
+   */
+  version: string;
+  description?: string;
+  publisher: SubjectRef;
+  /**
+   * The Network project that owns the app. Tenancy in other services is keyed by it (ADR-014).
+   */
+  project_id: string;
+  /**
+   * The app's environment. Apps never change environment.
+   */
+  environment?: "sandbox" | "production";
+  /**
+   * Capability ids the app asks for (3+ segments). Only active public (or partner, by staff allowance) capabilities can ever be granted to apps.
+   *
+   * @maxItems 64
+   */
+  capabilities: string[];
+  events?: {
+    /**
+     * Event types (or a trailing .* family) the app subscribes to.
+     *
+     * @maxItems 64
+     */
+    consumes?: string[];
+  };
+  /**
+   * Informational copy of the redirect URIs registered in Network (Network's list is the authority).
+   *
+   * @maxItems 10
+   */
+  redirect_uris?:
+    | []
+    | [string]
+    | [string, string]
+    | [string, string, string]
+    | [string, string, string, string]
+    | [string, string, string, string, string]
+    | [string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string];
+  homepage?: string;
+  repository?: string;
+  /**
+   * SPDX license expression.
+   */
+  license?: string;
+  compatibility: {
+    /**
+     * Semver range of openvibe-contracts releases it was built against.
+     */
+    contracts: string;
+    /**
+     * Semver range of openvibe-sdk releases it uses.
+     */
+    sdk?: string;
+  };
 }

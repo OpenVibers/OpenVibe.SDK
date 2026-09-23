@@ -1,5 +1,5 @@
 import type { Problem } from './contracts';
-export type { SubjectRef, ServiceTokenClaims, EntityRef, Problem, ServiceManifest, Capability, EventEnvelope, ModuleNamespace, ModuleRecord } from './contracts';
+export type { SubjectRef, ServiceTokenClaims, EntityRef, Problem, ServiceManifest, Capability, EventEnvelope, ModuleNamespace, ModuleRecord, AppManifest } from './contracts';
 
 export type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 

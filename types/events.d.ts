@@ -42,6 +42,52 @@ export interface EventsClient {
 }
 export declare function createEventsClient(client: OpenVibeClient, opts?: { source?: string; baseUrl?: string }): EventsClient;
 
+/** 'prj_01JAB…' -> 'p01jab…' (the second segment of a project's event types); null if not prj_<ULID>. */
+export declare function projectKey(projectId: string): string | null;
+/** 'app_01JAB…' or 'app:app_01JAB…' -> 'app-01jab…' (the app's event source); null if not an app id. */
+export declare function appSource(appId: string): string | null;
+
+/** An app event: event_type may be project-relative ('order.shipped'); actor and subject default to the app. */
+export type AppEventInput = Omit<EventInput, 'actor' | 'subject'> & Partial<Pick<EventEnvelope, 'actor' | 'subject'>>;
+export interface AppEventsClient {
+    projectId: string;
+    /** app_<ULID> */
+    appId: string;
+    /** p<lowercased project ULID> */
+    projectKey: string;
+    /** app-<lowercased app ULID> */
+    source: string;
+    /** app.<projectKey>. */
+    prefix: string;
+    /** A project-relative type or pattern -> the full one ('order.*' -> 'app.<key>.order.*'; '*' -> 'app.<key>.*'). */
+    topic(name: string): string;
+    prepare(envelope: AppEventInput, opts?: { traceId?: string; now?: number }): EventEnvelope;
+    publish(envelope: AppEventInput, opts?: { traceparent?: string }): Promise<PublishResult>;
+    publish(envelopes: AppEventInput[], opts?: { traceparent?: string }): Promise<{ results: PublishResult[] }>;
+    /** topic is project-relative (default '*'); platformTopics are first-party patterns (public events only). */
+    pull(opts?: { topic?: string | string[]; platformTopics?: string[]; afterSeq?: number; limit?: number }): Promise<EventsPage>;
+    iterate(opts?: { topic?: string | string[]; platformTopics?: string[]; afterSeq?: number; limit?: number; maxPages?: number; onGap?: (gap: Gap) => void | Promise<void>; onPage?: (page: EventsPage) => void | Promise<void> }): AsyncGenerator<StoredEvent, void, unknown>;
+    get(eventId: string): Promise<StoredEvent | null>;
+    getCheckpoint(topic: string): Promise<{ consumer: string; topic: string; cursor: number; updated_at: string | null }>;
+    setCheckpoint(topic: string, cursor: number): Promise<{ consumer: string; topic: string; cursor: number }>;
+    subscriptions: {
+        /** topicPattern is project-relative (default '*'); the endpoint must be public https. */
+        create(input: Partial<CreateSubscription> & { endpoint: string }): Promise<Subscription>;
+        list(): Promise<Subscription[]>;
+        get(id: string): Promise<Subscription | null>;
+        disable(id: string): Promise<Subscription>;
+        enable(id: string): Promise<Subscription>;
+    };
+    subscribe(input: Partial<CreateSubscription> & { endpoint: string }): Promise<Subscription>;
+    /** The unscoped client underneath. */
+    events: EventsClient;
+}
+/**
+ * Events for one developer app of one project (token: events.app.publish | read | subscribe).
+ * onBehalfOf (usr_…, the token's on_behalf_of) makes that person the default actor.
+ */
+export declare function createAppEvents(client: OpenVibeClient, opts: { projectId: string; appId: string; onBehalfOf?: string; baseUrl?: string }): AppEventsClient;
+
 type RawBody = string | Uint8Array | ArrayBufferView;
 export declare function signDelivery(rawBody: RawBody, secret: string): string;
 export declare function verifyDelivery(rawBody: RawBody, signatureHeader: string | undefined | null, secret: string): boolean;

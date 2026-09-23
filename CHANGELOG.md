@@ -3,6 +3,53 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.3.1 (2026-09-23)
+
+The remaining gaps OpenVibe.Examples found, so its examples need no local stand-ins for Events or
+Media. Contract types re-copied from openvibe-contracts v0.28.0 (adds `codes.app-manifest@1` as
+`AppManifest`); CI checks them against that tag.
+
+- **Events, developer apps.** New `projectKey(projectId)` (`prj_01JAB…` -> `p01jab…`),
+  `appSource(appId)` (`app_01JAB…` -> `app-01jab…`) and `createAppEvents(client, { projectId,
+  appId, onBehalfOf? })`: the EventsClient calls with project-relative types and patterns
+  (`order.shipped` -> `app.<project_key>.order.shipped`, `*` -> `app.<project_key>.*`), the app's
+  source, and the app (or the `onBehalfOf` person) as actor and default subject; `pull`/`iterate`
+  take `platformTopics` for public first-party events; subscriptions and checkpoints are scoped the
+  same way. Types and ESM included.
+- **Media.** For a sandbox file (`sandbox: true` from Media) the client now sets `public_url: null`
+  and adds `signed_url` (Media's signed, expiring `url`); it used to put the signed URL in
+  `public_url`. Media's own fields (`url`, `sandbox`, `url_expires_at`, `app_id`) are passed
+  through unchanged. **Behaviour change** for code that read `public_url` of sandbox files.
+- **Mock Events** plays OpenVibe.Events' developer-app rules: app tokens judged on
+  `events.app.publish | read | subscribe` only (sandbox accepted there); `app.<project_key>.*`
+  types, `app-<ulid>` source, actor the app or its `on_behalf_of` user; reads, `get`, checkpoints
+  and subscriptions limited to the own project in the token's env plus public first-party events;
+  https endpoints that are not loopback, private or local names; events stored with `project_id`
+  and `env`, deliveries never cross projects or environments; first-party readers and subscribers
+  see no sandbox events and app events only through `app.*`; realtime streams no app events and
+  refuses app tokens. Envelopes are checked against the envelope patterns (3+ segment types,
+  source syntax), topic patterns against Events' syntax, and first-party services cannot publish
+  `app.*`. Not modelled: per-project quotas, revocation, DNS resolution of endpoints.
+- **Mock Media** follows Media's tenantAuth: `media.object.upload` uploads and deletes,
+  `media.object.read` lists and gets, for app keys, service tokens and app tokens alike (service
+  tokens used to be upload-only). A developer app reaches only `/api/v1/<its project_id>/files`;
+  its token's env picks the tenant, `prj_…` or `prj_…-sandbox` (created on first use, 1 GB and
+  100 MB, `mediaQuotaMb`), and Media's tenant-tagged keys are used. Sandbox app tokens are accepted
+  there without `acceptSandbox`, as in production (**behaviour change**: the mock used to refuse
+  them). Sandbox files answer with `sandbox: true`, a signed `url` and `url_expires_at`; the new
+  `GET /f/:key` serves files, sandbox ones only with a valid signature (404 otherwise). Projects no
+  longer get an API-key tenant in `mediaApps`.
+- **Mock Tools** answers `/api/v1/jobs` at `https://img.openvibe.tools`,
+  `https://audio.openvibe.tools` and `https://docs.openvibe.tools` as well as `origins.tools`
+  (`platform.toolsOrigins`, `DEFAULT_TOOLS_SATELLITES`, option `toolsSatellites`); a job is found
+  only on the origin that created it.
+- **Mock catalog and descriptor** follow openvibe-contracts v0.28.0: `DEFAULT_APP_CATALOG` is its
+  public + active capabilities (adds `events.app.*`, `codes.release.*`, `community.*`, `vip.*`),
+  and the default `contractsVersion` is 0.28.0.
+- Mock state: `state.events[]` entries carry `project_id` and `env`, `state.mediaTenants` is new,
+  checkpoints are stored as `{ cursor, updated_at }`; `publishEvent()` stores an event of publisher
+  `app:<id>` as that registered app's (project and env), or takes `{ projectId, env }`.
+
 ## 0.3.0 (2026-09-23)
 
 Developer apps (Network developer projects, ADR-014) and the gaps OpenVibe.Examples found.

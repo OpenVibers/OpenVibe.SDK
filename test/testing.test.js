@@ -33,7 +33,7 @@ run([
 
         const other = sdk.media.createMediaClient(client, { app: 'someone-else' });
         await assert.rejects(other.upload('x'), (err) => err.status === 404 || err.code === 'capability.namespace_denied');
-        await assert.rejects(media.files.list(), { status: 401 }, 'a service token only uploads; listing needs the app key');
+        await assert.rejects(media.files.list(), { status: 403, code: 'capability.denied' }, 'listing needs media.object.read');
     }],
 
     ['user modules with a Network user token', async () => {

@@ -7,6 +7,10 @@
  *   events.subscription.manage  subscriptions.*
  *   events.delivery.admin       deliveries(), replay()
  *
+ * Developer apps (Network ADR-014) use the same routes with an app token and the capabilities
+ * events.app.publish | events.app.read | events.app.subscribe; createAppEvents() fills in what
+ * Events requires of them (see below).
+ *
  * Browsers use openvibe-sdk/realtime (SSE) instead.
  */
 const crypto = require('node:crypto');
@@ -155,6 +159,118 @@ function createEventsClient(client, { source, baseUrl } = {}) {
     };
 }
 
+// ── Developer apps ───────────────────────────────────────────
+//
+// OpenVibe.Events rules for an app token (sub app:app_<ULID>, project_id prj_<ULID>, env):
+//   event_type  app.<project_key>.<name…>   project_key = 'p' + the project's ULID in lowercase
+//   source      app-<the app's ULID in lowercase>
+//   actor       { type: 'app', id: app_… } or the user the token acts for (on_behalf_of)
+//   reads       own project in the token's env + public first-party events; every topic pattern
+//               starts with a literal segment and app.* patterns name the own project_key
+//   webhooks    https endpoints on public addresses only
+// Realtime (SSE) never streams app events.
+
+const ULID = '[0-9A-HJKMNP-TV-Z]{26}';
+const PROJECT_ID_RE = new RegExp(`^prj_(${ULID})$`);
+const APP_ID_RE = new RegExp(`^(?:app:)?app_(${ULID})$`);
+const SEGMENT_RE = /^[a-z0-9_]+$/;
+
+/** 'prj_01JAB…' -> 'p01jab…' (the second segment of the project's event types); null if not a project id. */
+function projectKey(projectId) {
+    const m = PROJECT_ID_RE.exec(String(projectId || ''));
+    return m ? `p${m[1].toLowerCase()}` : null;
+}
+
+/** 'app_01JAB…' (or 'app:app_01JAB…') -> 'app-01jab…' (the app's event source); null if not an app id. */
+function appSource(appId) {
+    const m = APP_ID_RE.exec(String(appId || ''));
+    return m ? `app-${m[1].toLowerCase()}` : null;
+}
+
+/**
+ * An events client scoped to one developer app of one project:
+ *
+ *   const events = createAppEvents(client, { projectId: 'prj_…', appId: 'app_…' });
+ *   await events.publish({ event_type: 'order.shipped', subject: { type: 'order', id: 'o1' }, payload });
+ *     // -> app.<project_key>.order.shipped, source app-<ulid>, actor { type: 'app', id: 'app_…' }
+ *   await events.pull({ topic: 'order.*' })                      // app.<project_key>.order.*
+ *   await events.pull({ topic: '*', platformTopics: ['live.stream.*'] })   // + public first-party events
+ *   await events.subscribe({ topicPattern: '*', endpoint: 'https://hooks.example.com/ov' })
+ *
+ * Event types and topic patterns are relative to the project (`order.shipped`, `order.*`, `*`);
+ * a full `app.<project_key>.…` name is kept as it is, and a name under another project's key
+ * throws. `onBehalfOf` (a usr_… id, the token's on_behalf_of) makes that person the default actor.
+ * `subject` defaults to the app. First-party topics go in `platformTopics` (reads only).
+ */
+function createAppEvents(client, { projectId, appId, onBehalfOf, baseUrl } = {}) {
+    const key = projectKey(projectId);
+    if (!key) throw new TypeError('createAppEvents: projectId must be prj_<ULID>');
+    const source = appSource(appId);
+    if (!source) throw new TypeError('createAppEvents: appId must be app_<ULID>');
+    const app = String(appId).replace(/^app:/, '');
+    const prefix = `app.${key}.`;
+    const events = createEventsClient(client, { source, baseUrl });
+
+    /** A project-relative name or pattern -> the full one. */
+    function topic(name) {
+        const s = String(name == null ? '' : name).trim();
+        if (!s) throw new TypeError('an event type or topic pattern is required');
+        if (s === `app.${key}` || s.startsWith(prefix)) return s;
+        if (s === 'app' || s.startsWith('app.')) {
+            const other = s.split('.')[1];
+            if (other && /^p[0-9a-z]{26}$/.test(other)) throw new TypeError(`${s} names another project (this app's types are ${prefix}*)`);
+        }
+        return `${prefix}${s}`;
+    }
+    const topics = (t) => (Array.isArray(t) ? t : String(t).split(',')).map((x) => x.trim()).filter(Boolean).map(topic);
+    const readTopics = (t, platformTopics = []) => {
+        const extra = (Array.isArray(platformTopics) ? platformTopics : [platformTopics]).filter(Boolean).map(String);
+        for (const p of extra) if (p === '*' || p.startsWith('*') || p === 'app' || p.startsWith('app.')) throw new TypeError(`platformTopics are first-party patterns with a literal first segment, not ${p}`);
+        return [...topics(t), ...extra];
+    };
+
+    function prepare(envelope, opts) {
+        if (!envelope || typeof envelope !== 'object' || Array.isArray(envelope)) throw new TypeError('an event envelope must be an object');
+        if (envelope.source && envelope.source !== source) throw new TypeError(`source must be ${source}`);
+        const type = topic(envelope.event_type);
+        if (!type.slice(prefix.length).split('.').every((seg) => SEGMENT_RE.test(seg))) throw new TypeError(`${type}: segments are [a-z0-9_]+`);
+        const actor = envelope.actor || (onBehalfOf ? { type: 'user', id: onBehalfOf } : { type: 'app', id: app });
+        return events.prepare({ ...envelope, event_type: type, source, actor, subject: envelope.subject || { type: 'app', id: app } }, opts);
+    }
+
+    return {
+        projectId,
+        appId: app,
+        projectKey: key,
+        source,
+        prefix,
+        topic,
+        prepare,
+        /** Same as EventsClient.publish, with the app's type prefix, source and actor filled in. */
+        publish(input, opts) {
+            return events.publish(Array.isArray(input) ? input.map((e) => prepare(e)) : prepare(input), opts);
+        },
+        pull: ({ topic: t = '*', platformTopics, ...rest } = {}) => events.pull({ ...rest, topic: readTopics(t, platformTopics) }),
+        iterate: ({ topic: t = '*', platformTopics, ...rest } = {}) => events.iterate({ ...rest, topic: readTopics(t, platformTopics) }),
+        get: (eventId) => events.get(eventId),
+        getCheckpoint: (t) => events.getCheckpoint(topic(t)),
+        setCheckpoint: (t, cursor) => events.setCheckpoint(topic(t), cursor),
+        subscriptions: {
+            create: ({ topicPattern = '*', ...rest } = {}) => events.subscriptions.create({ ...rest, topicPattern: topic(topicPattern) }),
+            list: () => events.subscriptions.list(),
+            get: (id) => events.subscriptions.get(id),
+            disable: (id) => events.subscriptions.disable(id),
+            enable: (id) => events.subscriptions.enable(id),
+        },
+        subscribe: ({ topicPattern = '*', ...rest } = {}) => events.subscriptions.create({ ...rest, topicPattern: topic(topicPattern) }),
+        /** The underlying EventsClient (no scoping). */
+        events,
+    };
+}
+
 const { createOutbox, createInbox } = require('./outbox');
 
-module.exports = { createEventsClient, verifyDelivery, signDelivery, parseDelivery, createOutbox, createInbox };
+module.exports = {
+    createEventsClient, verifyDelivery, signDelivery, parseDelivery, createOutbox, createInbox,
+    projectKey, appSource, createAppEvents,
+};

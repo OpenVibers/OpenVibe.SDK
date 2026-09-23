@@ -16,9 +16,15 @@
  *            /api/v1/registry/*, /api/v1/projects/*, /api/modules/*, /internal/modules/*,
  *            /internal/identity/*
  *   Events   /api/v1/events (with retention gaps after pruneEvents()), /api/v1/subscriptions,
- *            /api/v1/checkpoints, /realtime/stream (SSE); deliverEvents() plays the delivery worker
- *   Media    /api/v1/:app/files (developer apps: the tenant is the project id)
- *   Tools    /api/v1/jobs (with { jobs: true })
+ *            /api/v1/checkpoints, /realtime/stream (SSE); deliverEvents() plays the delivery worker.
+ *            Developer apps as in Events (events.app.publish|read|subscribe, see ./apps.js):
+ *            app.<project_key>.* types, source app-<ulid>, actor the app or its on_behalf_of user,
+ *            reads scoped to the own project + public first-party events, https endpoints,
+ *            sandbox and production never mixed. Not modelled: app quotas, revocation, DNS checks.
+ *   Media    /api/v1/:app/files and /f/:key. Developer apps reach /api/v1/<project_id>/files only:
+ *            production tenant prj_…, sandbox tenant prj_…-sandbox whose files have signed URLs only
+ *   Tools    /api/v1/jobs (with { jobs: true }) at origins.tools and the img., audio. and docs.
+ *            satellites (platform.toolsOrigins)
  * Tokens are real RS256 JWTs signed with a key generated per platform, checked the way the real
  * services check them (audience, capability, namespace, sandbox refusal). It is a fake: no
  * persistence, simplified visibility rules, no Chat. Like the Network, it verifies the PKCE
@@ -26,8 +32,9 @@
  */
 const crypto = require('node:crypto');
 const { b64url, fromB64url, ulid, topicRegex, json, problem, redirect } = require('./util');
-const { createDeveloper, DEFAULT_APP_CATALOG } = require('./developer');
+const { createDeveloper, DEFAULT_APP_CATALOG, PRJ_ID_RE } = require('./developer');
 const { createJobsService } = require('./jobs');
+const appRules = require('./apps');
 
 const DEFAULT_ORIGINS = {
     network: 'https://openvibe.network',
@@ -37,10 +44,14 @@ const DEFAULT_ORIGINS = {
     tools: 'https://openvibe.tools',
 };
 
+/** The Tools satellites that run jobs (/api/v1/jobs); the mock answers them too. */
+const DEFAULT_TOOLS_SATELLITES = ['https://img.openvibe.tools', 'https://audio.openvibe.tools', 'https://docs.openvibe.tools'];
+
 function createMockPlatform(opts = {}) {
     const origins = { ...DEFAULT_ORIGINS, ...opts.origins };
+    const toolsOrigins = [origins.tools, ...(opts.toolsSatellites || DEFAULT_TOOLS_SATELLITES)].map((o) => new URL(o).origin);
     const issuer = opts.issuer || origins.network;
-    const contractsVersion = opts.contractsVersion || '0.26.0';
+    const contractsVersion = opts.contractsVersion || '0.28.0';
     const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
     const kid = 'mock-1';
     const jwk = { ...publicKey.export({ format: 'jwk' }), use: 'sig', alg: 'RS256', kid };
@@ -56,7 +67,8 @@ function createMockPlatform(opts = {}) {
     const oldestSeq = () => (events.length ? events[0].seq : lastSeq + 1);
     const subscriptions = new Map();
     const checkpoints = new Map();
-    const files = new Map();          // `${app}|${key}` -> meta
+    const files = new Map();          // `${tenant}|${key}` -> meta (tenant: app id, prj_…, prj_…-sandbox)
+    const mediaTenants = new Map();   // developer-project tenants, created on first use
     const mediaApps = new Map(Object.entries(opts.mediaApps || {}).map(([id, a]) => [id, { apiKey: (a && a.apiKey) || null }]));
     const streams = new Set();
     const stats = { tokenRequests: 0, requests: [], deliveries: [] };
@@ -340,17 +352,66 @@ function createMockPlatform(opts = {}) {
 
     // ── Events ──────────────────────────────────────────────
     function visible(viewer, e) {
+        if (e.project_id || (e.env || 'production') !== 'production') return false;     // never streamed
         if (e.event.visibility === 'public') return true;
         if (viewer.kind === 'service') return true;
         return e.event.visibility === 'subject' && viewer.kind === 'user' && (e.event.actor.id === viewer.subject || (e.event.subject.type === 'user' && e.event.subject.id === viewer.subject));
     }
-    function publishEvent(env, publisher) {
+    function publishEvent(env, publisher, { projectId = null, env: environment = 'production' } = {}) {
         const dup = events.find((e) => e.event.event_id === env.event_id);
         if (dup) return { event_id: env.event_id, seq: dup.seq, duplicate: true };
-        const stored = { seq: ++lastSeq, event: { priority: 'important', visibility: 'internal', ...env }, publisher };
+        const stored = { seq: ++lastSeq, event: { priority: 'important', visibility: 'internal', ...env }, publisher, project_id: projectId, env: environment };
         events.push(stored);
         for (const s of streams) s.push(stored);
         return { event_id: env.event_id, seq: stored.seq, duplicate: false };
+    }
+
+    /**
+     * Events' appOrService guard: an app token (sub app:…) is judged on `appCap` only (sandbox
+     * accepted) and becomes { kind: 'app', … }; anything else must hold `serviceCap`.
+     */
+    function eventsPrincipal(req, serviceCap, appCap, { requireService = false } = {}) {
+        const auth = req.headers.get('authorization') || '';
+        const claims = auth.startsWith('Bearer ') ? decode(auth.slice(7)) : null;
+        if (claims && /^app:/.test(String(claims.sub))) {
+            if (!(claims.aud || []).includes('openvibe.events')) return { res: problem(401, 'token.wrong_audience', 'not for openvibe.events') };
+            const app = appRules.appPrincipal(claims);
+            if (app.error) return { res: problem(401, 'token.invalid_claims', app.error) };
+            if (!appCap || !hasCap(claims, appCap)) return { res: problem(403, 'capability.denied', appCap ? `${appCap} not granted` : 'app tokens are not accepted on this route') };
+            return { principal: app, consumer: app.sub };
+        }
+        const who = principal(req, 'openvibe.events', serviceCap);
+        if (who.res) return who;
+        const service = /^svc:([a-z][a-z0-9-]{1,39})$/.exec(String(who.claims.sub));
+        if (requireService && !service) return { res: problem(403, 'capability.denied', 'only service principals may do this') };
+        return { principal: { kind: 'service', sub: who.claims.sub, service: service ? service[1] : null }, consumer: who.service };
+    }
+    const hasCap = (claims, id) => (claims.cap || []).some((c) => c === id || (c.endsWith('.*') && id.startsWith(c.slice(0, -1))));
+    const scopeError = (p, patterns) => {
+        if (p.kind !== 'app') return null;
+        for (const x of patterns) { const err = appRules.patternScopeError(x, p); if (err) return `${x}: ${err}`; }
+        return null;
+    };
+    /** Does this reader see this stored event (topic match aside)? */
+    const readable = (p, stored, pattern) => (p.kind === 'app' ? appRules.visibleToApp(stored, p) : appRules.serviceSees(pattern, stored));
+
+    function checkPublish(e, p) {
+        if (!e || typeof e !== 'object' || Array.isArray(e) || !/^evt_[0-9A-HJKMNP-TV-Z]{26}$/.test(e.event_id || '') || typeof e.event_type !== 'string'
+            || !/^[a-z][a-z0-9_]*(\.[a-z0-9_]+){2,}$/.test(e.event_type) || !e.actor || !e.subject || !e.timestamp || !/^[a-z][a-z0-9-]{1,39}$/.test(String(e.source))) {
+            return problem(422, 'events.invalid_envelope', 'envelope does not match events.event-envelope@1');
+        }
+        if (p.kind === 'app') {
+            if (e.source !== p.source) return problem(403, 'events.source_mismatch', `source must be your app's "${p.source}", not "${e.source}"`);
+            if (!e.event_type.startsWith(p.prefix)) return problem(403, 'events.type_not_allowed', `an app may publish ${p.prefix}<name> only, not ${e.event_type}`);
+            const a = e.actor || {};
+            if (!((a.type === 'app' && a.id === p.appId) || (p.onBehalfOf && a.type === 'user' && a.id === p.onBehalfOf))) {
+                return problem(403, 'events.actor_mismatch', `actor must be { type: 'app', id: '${p.appId}' }${p.onBehalfOf ? ' or the user the token acts for' : ''}`);
+            }
+            return null;
+        }
+        if (e.source !== p.service) return problem(403, 'events.source_mismatch', `source "${e.source}" is not the calling service "${p.service}"`);
+        if (e.event_type.startsWith('app.')) return problem(403, 'events.type_not_allowed', `${e.source} may not publish app.* events`);
+        return null;
     }
 
     async function eventsService(req, url) {
@@ -358,24 +419,33 @@ function createMockPlatform(opts = {}) {
         let r;
         if (path === '/realtime/stream' && req.method === 'GET') return realtimeStream(req, url);
         if (path === '/api/v1/events' && req.method === 'POST') {
-            const who = principal(req, 'openvibe.events', 'events.event.publish');
+            const who = eventsPrincipal(req, 'events.event.publish', 'events.app.publish', { requireService: true });
             if (who.res) return who.res;
+            const p = who.principal;
             const body = await req.json().catch(() => null);
-            const batch = body && Array.isArray(body.events) && body.event_id === undefined;
+            const batch = body && typeof body === 'object' && !Array.isArray(body) && Array.isArray(body.events) && body.event_id === undefined;
             const items = batch ? body.events : [body];
-            for (const e of items) {
-                if (!e || !/^evt_[0-9A-HJKMNP-TV-Z]{26}$/.test(e.event_id || '') || !e.event_type || !e.actor || !e.subject || !e.timestamp) return problem(422, 'events.invalid_envelope', 'envelope does not match events.event-envelope@1');
-                if (e.source !== who.service) return problem(403, 'events.source_mismatch', `source "${e.source}" is not the calling service "${who.service}"`);
+            if (batch && !items.length) return problem(400, 'events.bad_request', 'events must not be empty');
+            for (const [i, e] of items.entries()) {
+                const bad = checkPublish(e, p);
+                if (bad) return bad;
+                if (items.findIndex((x) => x.event_id === e.event_id) !== i) return problem(422, 'events.invalid_envelope', `events[${i}]: event_id repeated within the batch`);
             }
-            const results = items.map((e) => publishEvent(e, who.claims.sub));
+            const meta = p.kind === 'app' ? { projectId: p.projectId, env: p.env } : {};
+            const results = items.map((e) => publishEvent(e, p.sub, meta));
             return json(results.some((x) => !x.duplicate) ? 201 : 200, batch ? { results } : results[0]);
         }
         if (path === '/api/v1/events' && req.method === 'GET') {
-            const who = principal(req, 'openvibe.events', 'events.event.read');
+            const who = eventsPrincipal(req, 'events.event.read', 'events.app.read');
             if (who.res) return who.res;
-            const pats = (url.searchParams.get('topic') || '*').split(',').map(topicRegex);
+            const patterns = (url.searchParams.get('topic') || '*').split(',').map((x) => x.trim()).filter(Boolean);
+            if (!patterns.length || patterns.length > 20 || !patterns.every(appRules.isValidPattern)) return problem(400, 'events.bad_topic', 'topic must be 1..20 comma-separated patterns');
+            const scopeErr = scopeError(who.principal, patterns);
+            if (scopeErr) return problem(403, 'events.topic_not_allowed', scopeErr);
             const after = Number(url.searchParams.get('after_seq') || 0);
             const limit = Number(url.searchParams.get('limit') || 100);
+            if (!Number.isInteger(after) || after < 0 || !Number.isInteger(limit) || limit < 1 || limit > 1000) return problem(400, 'events.bad_request', 'after_seq must be >= 0 and limit 1..1000');
+            const pats = patterns.map((x) => [x, topicRegex(x)]);
             const out = [];
             const page = {};
             let from = after;
@@ -388,50 +458,80 @@ function createMockPlatform(opts = {}) {
                 if (e.seq <= from) continue;
                 if (out.length >= limit) break;
                 cursor = e.seq;
-                if (pats.some((re) => re.test(e.event.event_type))) out.push({ seq: e.seq, event: e.event });
+                if (pats.some(([x, re]) => re.test(e.event.event_type) && readable(who.principal, e, x))) out.push({ seq: e.seq, event: e.event });
             }
             if (out.length < limit) cursor = Math.max(cursor, lastSeq);
             return json(200, { ...page, events: out, next_after_seq: cursor, latest_seq: lastSeq });
         }
         if ((r = path.match(/^\/api\/v1\/events\/([^/]+)$/)) && req.method === 'GET') {
-            const who = principal(req, 'openvibe.events', 'events.event.read');
+            const who = eventsPrincipal(req, 'events.event.read', 'events.app.read');
             if (who.res) return who.res;
             const e = events.find((x) => x.event.event_id === decodeURIComponent(r[1]));
-            return e ? json(200, { seq: e.seq, event: e.event }) : problem(404, 'events.not_found', 'no such event');
+            const ok = e && (who.principal.kind === 'app' ? appRules.visibleToApp(e, who.principal) : (e.env || 'production') === 'production');
+            return ok ? json(200, { seq: e.seq, event: e.event }) : problem(404, 'events.not_found', 'no such event (or pruned by retention)');
         }
         if (path === '/api/v1/checkpoints') {
-            const who = principal(req, 'openvibe.events', 'events.event.read');
+            const who = eventsPrincipal(req, 'events.event.read', 'events.app.read');
             if (who.res) return who.res;
+            const b = req.method === 'GET' ? {} : await req.json().catch(() => ({}));
+            const topic = req.method === 'GET' ? url.searchParams.get('topic') || '' : b.topic;
+            if (!appRules.isValidPattern(topic)) return problem(400, 'events.bad_request', 'topic (pattern) is required');
+            if (req.method !== 'GET' && (!Number.isInteger(b.cursor) || b.cursor < 0)) return problem(400, 'events.bad_request', 'topic (pattern) and cursor (integer >= 0) are required');
+            const scopeErr = scopeError(who.principal, [topic]);
+            if (scopeErr) return problem(403, 'events.topic_not_allowed', scopeErr);
+            const k = `${who.consumer}|${topic}`;
             if (req.method === 'GET') {
-                const topic = url.searchParams.get('topic');
-                return json(200, { consumer: who.service, topic, cursor: checkpoints.get(`${who.service}|${topic}`) || 0 });
+                const cp = checkpoints.get(k);
+                return json(200, { consumer: who.consumer, topic, cursor: cp ? cp.cursor : 0, updated_at: cp ? cp.updated_at : null });
             }
-            const b = await req.json().catch(() => ({}));
-            checkpoints.set(`${who.service}|${b.topic}`, b.cursor);
-            return json(200, { consumer: who.service, topic: b.topic, cursor: b.cursor });
+            const cp = { cursor: b.cursor, updated_at: new Date().toISOString() };
+            checkpoints.set(k, cp);
+            return json(200, { consumer: who.consumer, topic, ...cp });
         }
         if (path.startsWith('/api/v1/subscriptions')) {
-            const who = principal(req, 'openvibe.events', 'events.subscription.manage');
+            const who = eventsPrincipal(req, 'events.subscription.manage', 'events.app.subscribe', { requireService: true });
             if (who.res) return who.res;
-            const view = (s, withSecret) => ({ id: s.id, consumer: s.consumer, topic_pattern: s.topic_pattern, endpoint: s.endpoint, enabled: s.enabled, retry_policy: s.retry_policy, ...(withSecret ? { secret: s.secret } : {}) });
+            const app = who.principal.kind === 'app' ? who.principal : null;
+            const view = (s, withSecret) => ({
+                id: s.id, consumer: s.consumer, topic_pattern: s.topic_pattern, endpoint: s.endpoint, enabled: s.enabled, retry_policy: s.retry_policy,
+                created_at: s.created_at, updated_at: s.updated_at, ...(s.project_id ? { project_id: s.project_id, env: s.env } : {}), ...(withSecret ? { secret: s.secret } : {}),
+            });
             if (path === '/api/v1/subscriptions' && req.method === 'POST') {
-                const b = await req.json().catch(() => ({}));
-                if (!b.topic_pattern || !b.endpoint) return problem(422, 'events.bad_request', 'topic_pattern and endpoint are required');
-                const dup = [...subscriptions.values()].find((s) => s.consumer === who.service && s.topic_pattern === b.topic_pattern && s.endpoint === b.endpoint);
-                if (dup) return problem(409, 'events.subscription_exists', 'already subscribed');
+                const b = await req.json().catch(() => ({})) || {};
+                const pattern = b.topic_pattern ?? b.topic;
+                if (!appRules.isValidPattern(pattern)) return problem(422, 'events.bad_topic', 'topic_pattern must be dot-separated segments of [a-z0-9_] or *');
+                if (app) {
+                    const err = appRules.patternScopeError(pattern, app);
+                    if (err) return problem(403, 'events.topic_not_allowed', err);
+                }
+                let endpoint;
+                if (app) {
+                    const ep = appRules.checkAppEndpoint(b.endpoint);
+                    if (!ep.ok) return problem(422, 'events.endpoint_not_allowed', ep.reason);
+                    endpoint = ep.url.toString();
+                } else {
+                    try { endpoint = new URL(b.endpoint).toString(); } catch { return problem(422, 'events.endpoint_not_allowed', 'endpoint must be an http(s) URL'); }
+                }
+                if (b.secret !== undefined && (typeof b.secret !== 'string' || b.secret.length < 32 || b.secret.length > 256)) return problem(422, 'events.bad_request', 'secret must be a string of 32..256 characters');
+                const rp = appRules.checkRetryPolicy(b.retry_policy);
+                if (!rp.ok) return problem(422, 'events.bad_request', rp.reason);
+                const dup = [...subscriptions.values()].find((s) => s.consumer === who.consumer && s.topic_pattern === pattern && s.endpoint === endpoint);
+                if (dup) return problem(409, 'events.subscription_exists', 'this consumer already subscribes that endpoint to that topic', { subscription_id: dup.id });
+                const at = new Date().toISOString();
                 const s = {
-                    id: `sub_${ulid()}`, consumer: who.service, topic_pattern: b.topic_pattern, endpoint: b.endpoint, enabled: true, retry_policy: b.retry_policy || null,
-                    secret: b.secret || `whsec_${crypto.randomBytes(32).toString('hex')}`,
+                    id: `sub_${ulid()}`, consumer: who.consumer, topic_pattern: pattern, endpoint, enabled: true, retry_policy: rp.value,
+                    secret: b.secret || `whsec_${crypto.randomBytes(32).toString('hex')}`, created_at: at, updated_at: at,
+                    project_id: app ? app.projectId : null, env: app ? app.env : 'production',
                     cursor: lastSeq, attempts: new Map(),     // deliverEvents(): events published after the subscription
                 };
                 subscriptions.set(s.id, s);
                 return json(201, view(s, true));
             }
-            if (path === '/api/v1/subscriptions' && req.method === 'GET') return json(200, { subscriptions: [...subscriptions.values()].filter((s) => s.consumer === who.service).map((s) => view(s)) });
+            if (path === '/api/v1/subscriptions' && req.method === 'GET') return json(200, { subscriptions: [...subscriptions.values()].filter((s) => s.consumer === who.consumer).map((s) => view(s)) });
             if ((r = path.match(/^\/api\/v1\/subscriptions\/([^/]+)(?:\/(enable|disable))?$/))) {
                 const s = subscriptions.get(decodeURIComponent(r[1]));
-                if (!s || s.consumer !== who.service) return problem(404, 'events.not_found', 'no such subscription');
-                if (r[2] && req.method === 'POST') s.enabled = r[2] === 'enable';
+                if (!s || s.consumer !== who.consumer) return problem(404, 'events.not_found', 'no such subscription');
+                if (r[2] && req.method === 'POST') { s.enabled = r[2] === 'enable'; s.updated_at = new Date().toISOString(); }
                 return json(200, view(s));
             }
         }
@@ -444,8 +544,15 @@ function createMockPlatform(opts = {}) {
         const auth = req.headers.get('authorization') || '';
         const claims = auth.startsWith('Bearer ') ? decode(auth.slice(7)) : null;
         if (auth.startsWith('Bearer ') && !claims) return problem(401, 'token.bad_signature', 'bad token');
-        if (claims && claims.env === 'sandbox' && !(acceptSandbox === true || acceptSandbox.has('openvibe.events'))) return problem(401, 'token.sandbox_refused', 'sandbox tokens are not accepted here');
-        const viewer = claims ? (claims.actor_type ? { kind: 'service' } : { kind: 'user', subject: claims.subject_id }) : { kind: 'anonymous' };
+        let viewer = { kind: 'anonymous' };
+        if (claims && claims.actor_type) {
+            // Like Events: principals (apps included) need events.event.read, which apps never hold,
+            // and sandbox tokens are refused here.
+            const who = principal(req, 'openvibe.events', 'events.event.read');
+            if (who.res) return who.res;
+            if (/^app:/.test(String(claims.sub)) && claims.env === 'sandbox') return problem(401, 'token.sandbox_refused', 'sandbox tokens are not accepted here');
+            viewer = { kind: 'service' };
+        } else if (claims) viewer = { kind: 'user', subject: claims.subject_id };
         const raw = req.headers.get('last-event-id') ?? url.searchParams.get('last_event_id');
         const last = raw != null && /^\d+$/.test(raw) ? Number(raw) : null;
         const enc = new TextEncoder();
@@ -501,7 +608,10 @@ function createMockPlatform(opts = {}) {
             const max = (sub.retry_policy && Number.isInteger(sub.retry_policy.max_attempts) && sub.retry_policy.max_attempts) || 5;
             for (const e of events) {
                 if (e.seq <= sub.cursor) continue;
-                if (!re.test(e.event.event_type)) { sub.cursor = e.seq; continue; }
+                const wanted = re.test(e.event.event_type) && (sub.project_id
+                    ? appRules.visibleToApp(e, { projectId: sub.project_id, env: sub.env })
+                    : appRules.serviceSees(sub.topic_pattern, e));
+                if (!wanted) { sub.cursor = e.seq; continue; }
                 const attempt = (sub.attempts.get(e.event.event_id) || 0) + 1;
                 sub.attempts.set(e.event.event_id, attempt);
                 const body = JSON.stringify({ event: e.event, seq: e.seq });
@@ -559,47 +669,126 @@ function createMockPlatform(opts = {}) {
     }
 
     // ── Media files ─────────────────────────────────────────
-    async function media(req, url) {
-        const r = url.pathname.match(/^\/api\/v1\/([^/]+)\/files(?:\/([^/]+))?$/);
-        if (!r) return json(404, { error: 'Not found' });
-        const appId = decodeURIComponent(r[1]);
-        const app = mediaApps.get(appId);
-        if (!app) return json(404, { error: 'Unknown app' });
-        const auth = req.headers.get('authorization') || '';
-        const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-        const byKey = Boolean(token) && app.apiKey && token === app.apiKey;
-        if (!byKey) {
-            if (req.method !== 'POST' || r[2]) return json(401, { error: 'Authentication required' });
-            const who = principal(req, 'openvibe.media', 'media.object.upload', appId);
-            if (who.res) return who.res;
+    // Like OpenVibe.Media's tenantAuth + files routes: upload and delete need media.object.upload,
+    // list and meta need media.object.read. A developer app reaches only /api/v1/<its project_id>/,
+    // where its token's env picks the tenant: production `prj_…`, sandbox `prj_…-sandbox` (created on
+    // first use). Sandbox files are never served publicly: their `url` is a signed, expiring
+    // /f/<key>?exp=&sig= URL (`sandbox: true`, `url_expires_at`); GET /f/<key> without a valid
+    // signature is 404, like a missing file.
+    const mediaQuota = { production: 1024, sandbox: 100, ...opts.mediaQuotaMb };
+    const mediaSigningKey = crypto.randomBytes(32);
+    const signedUrlTtlS = Math.min(3600, Math.max(30, Number(opts.mediaSignedUrlTtlS) || 300));
+    const mediaMac = (key, exp) => crypto.createHmac('sha256', mediaSigningKey).update(`getf\nfile:${key}\n${exp}`).digest('base64url');
+    const isSandboxTenant = (tenantId) => { const t = mediaTenants.get(tenantId); return Boolean(t && t.env === 'sandbox'); };
+    function mediaTenant(projectId, env) {
+        const id = env === 'sandbox' ? `${projectId}-sandbox` : projectId;
+        if (!mediaTenants.has(id)) mediaTenants.set(id, { id, project_id: projectId, env, quota_bytes: mediaQuota[env] * 1024 * 1024 });
+        return mediaTenants.get(id);
+    }
+    function fileView(f) {
+        const sandbox = isSandboxTenant(f.app_id);
+        let signed = null;
+        if (sandbox) {
+            const exp = Math.floor(Date.now() / 1000) + signedUrlTtlS;
+            signed = { url: `${origins.media}/f/${encodeURIComponent(f.key)}?exp=${exp}&sig=${mediaMac(f.key, exp)}`, expires_at: new Date(exp * 1000).toISOString() };
         }
-        const actingUser = byKey ? req.headers.get('x-ov-user-id') : null;
-        const view = (f) => ({ key: f.key, app_id: f.app_id, user_id: f.user_id, original_name: f.original_name, size: f.size, mime: f.mime, sha256: f.sha256, url: `/f/${f.key}`, created_at: f.created_at });
-        if (req.method === 'POST' && !r[2]) {
+        return {
+            key: f.key, app_id: f.app_id, user_id: f.user_id, original_name: f.original_name, size: f.size, mime: f.mime, sha256: f.sha256,
+            url: signed ? signed.url : `/f/${f.key}`, ...(sandbox ? { sandbox: true, url_expires_at: signed.expires_at } : {}), created_at: f.created_at,
+        };
+    }
+    const fileByKey = (key) => [...files.values()].find((f) => f.key === key) || null;
+
+    /** { tenant, actingUser } or { res }: the order of Media's tenantAuth. */
+    function mediaAuth(req, tenantPath, capability) {
+        const auth = req.headers.get('authorization') || '';
+        const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
+        const projectRoute = PRJ_ID_RE.test(tenantPath);
+        const claims = token.split('.').length === 3 ? decode(token) : null;
+        const svc = claims && claims.actor_type ? claims : null;
+        if (svc && svc.env === 'sandbox' && !projectRoute) {
+            return { res: problem(401, 'token.sandbox_refused', 'sandbox tokens are accepted only on developer-project tenant routes (/api/v1/<project_id>/files, /api/v2/<project_id>/objects)') };
+        }
+        if (svc && !(svc.aud || []).includes('openvibe.media')) return { res: problem(401, 'token.wrong_audience', 'not for openvibe.media') };
+        if (svc && (svc.actor_type === 'app' || /^app:/.test(String(svc.sub)))) {
+            if (!projectRoute) return { res: problem(403, 'capability.namespace_denied', 'app tokens reach only /<project_id>/ tenants') };
+            if (svc.project_id !== tenantPath) return { res: problem(403, 'capability.namespace_denied', `this app token belongs to ${svc.project_id || 'no project'}, not ${tenantPath}`) };
+            if (!hasCap(svc, capability)) return { res: problem(403, 'capability.denied', `${capability} not granted`) };
+            if (svc.ns && svc.ns.length && !svc.ns.includes(tenantPath)) return { res: problem(403, 'capability.namespace_denied', `namespace ${tenantPath} not granted`) };
+            return { tenant: mediaTenant(tenantPath, svc.env === 'sandbox' ? 'sandbox' : 'production'), principal: true };
+        }
+        if (svc && svc.env === 'sandbox') return { res: problem(401, 'token.sandbox_refused', 'only developer-app sandbox tokens are accepted, on their own project tenant') };
+        const app = mediaApps.get(tenantPath);
+        if (!app) return { res: json(404, { error: 'Unknown app' }) };
+        if (token && app.apiKey && token === app.apiKey) {
+            const raw = req.headers.get('x-ov-user-id');
+            const n = raw == null || raw === '' ? null : Number(String(raw).trim());
+            return { tenant: { id: tenantPath, project_id: null, env: null, quota_bytes: 0 }, actingUser: Number.isInteger(n) && n > 0 ? n : null };
+        }
+        if (token && [...mediaApps.entries()].some(([id, a]) => id !== tenantPath && a.apiKey && a.apiKey === token)) return { res: json(403, { error: 'API key not valid for this app' }) };
+        if (svc) {
+            const who = principal(req, 'openvibe.media', capability, tenantPath);
+            if (who.res) return who;
+            return { tenant: { id: tenantPath, project_id: null, env: null, quota_bytes: 0 }, principal: true };
+        }
+        return { res: json(401, { error: 'Authentication required' }) };
+    }
+
+    async function media(req, url) {
+        let r;
+        if (req.method === 'GET' && (r = url.pathname.match(/^\/f\/([^/]+)$/))) {
+            const f = fileByKey(decodeURIComponent(r[1]));
+            if (!f) return json(404, { error: 'Not found' });
+            const sandbox = isSandboxTenant(f.app_id);
+            if (sandbox) {
+                const exp = Number(url.searchParams.get('exp'));
+                const sig = Buffer.from(String(url.searchParams.get('sig') || ''));
+                const want = Buffer.from(Number.isInteger(exp) ? mediaMac(f.key, exp) : '');
+                if (!Number.isInteger(exp) || exp < Math.floor(Date.now() / 1000) || sig.length !== want.length || !crypto.timingSafeEqual(sig, want)) return json(404, { error: 'Not found' });
+            }
+            return new Response(f.bytes, { status: 200, headers: { 'Content-Type': f.mime, 'X-Robots-Tag': 'noindex', 'Cache-Control': sandbox ? 'private, no-store' : 'public, max-age=86400' } });
+        }
+        r = url.pathname.match(/^\/api\/v1\/([^/]+)\/files(?:\/([^/]+))?$/);
+        const routed = r && (req.method === 'GET' || (req.method === 'POST' && !r[2]) || (req.method === 'DELETE' && r[2]));
+        if (!routed) return json(404, { error: 'Not found' });
+        const capability = req.method === 'GET' ? 'media.object.read' : 'media.object.upload';
+        const who = mediaAuth(req, decodeURIComponent(r[1]), capability);
+        if (who.res) return who.res;
+        const { tenant } = who;
+        const mine = () => [...files.values()].filter((f) => f.app_id === tenant.id);
+        const used = () => mine().reduce((n, f) => n + f.size, 0);
+        if (req.method === 'POST') {
             const form = await req.formData();
             const file = form.get('file');
             if (!file || typeof file === 'string') return json(400, { error: 'No file uploaded (multipart field: file)' });
             const buf = Buffer.from(await file.arrayBuffer());
+            if (tenant.quota_bytes > 0 && used() + buf.length > tenant.quota_bytes) return json(413, { error: 'App file quota exceeded', quota_bytes: tenant.quota_bytes, used_bytes: used() });
             const sha256 = crypto.createHash('sha256').update(buf).digest('hex');
-            const name = String(file.name || 'file').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120) || 'file';
-            const key = `${sha256.slice(0, 12)}-${name}`;
-            const existing = files.get(`${appId}|${key}`);
-            if (existing) return json(200, { ...view(existing), deduplicated: true });
-            const f = { key, app_id: appId, user_id: actingUser ?? form.get('user_id') ?? null, original_name: file.name, size: buf.length, mime: file.type || 'application/octet-stream', sha256, created_at: new Date().toISOString(), bytes: buf };
-            files.set(`${appId}|${key}`, f);
-            return json(201, view(f));
+            const name = String(file.name || 'file').replace(/^.*[\\/]/, '').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120) || 'file';
+            // Keys are global; a project tenant's keys carry a tag of the tenant id, like Media's.
+            const tag = tenant.project_id ? `${crypto.createHash('sha256').update(`tenant:${tenant.id}`).digest('hex').slice(0, 8)}-` : '';
+            const key = `${sha256.slice(0, 12)}-${tag}${name}`;
+            const existing = fileByKey(key);
+            if (existing) {
+                if (existing.app_id !== tenant.id) return json(409, { error: 'Key conflict — rename the file and retry' });
+                return json(200, { ...fileView(existing), deduplicated: true });
+            }
+            const userId = who.actingUser != null ? who.actingUser : (form.get('user_id') ?? null);
+            const f = { key, app_id: tenant.id, user_id: userId, original_name: file.name || name, size: buf.length, mime: file.type || 'application/octet-stream', sha256, created_at: new Date().toISOString(), bytes: buf };
+            files.set(`${tenant.id}|${key}`, f);
+            return json(201, fileView(f));
         }
         if (req.method === 'GET' && !r[2]) {
-            const all = [...files.values()].filter((f) => f.app_id === appId);
-            const limit = Number(url.searchParams.get('limit') || 100);
-            const offset = Number(url.searchParams.get('offset') || 0);
-            return json(200, { files: all.slice(offset, offset + limit).map(view), used_bytes: all.reduce((n, f) => n + f.size, 0), quota_bytes: 0, limit, offset });
+            const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') || '100', 10) || 1, 1), 500);
+            const offset = Math.max(parseInt(url.searchParams.get('offset') || '0', 10) || 0, 0);
+            return json(200, { files: mine().slice(offset, offset + limit).map(fileView), used_bytes: used(), quota_bytes: tenant.quota_bytes, limit, offset });
         }
-        const f = files.get(`${appId}|${decodeURIComponent(r[2] || '')}`);
+        const f = files.get(`${tenant.id}|${decodeURIComponent(r[2])}`);
         if (!f) return json(404, { error: 'File not found' });
-        if (req.method === 'GET') return json(200, view(f));
-        if (req.method === 'DELETE') { files.delete(`${appId}|${f.key}`); return json(200, { message: 'File deleted' }); }
-        return json(404, { error: 'Not found' });
+        if (req.method === 'GET') return json(200, fileView(f));
+        if (who.actingUser != null && String(f.user_id) !== String(who.actingUser)) return json(403, { error: 'Not authorized to delete this file' });
+        files.delete(`${tenant.id}|${f.key}`);
+        return json(200, { message: 'File deleted' });
     }
 
     // ── Router ──────────────────────────────────────────────
@@ -611,13 +800,15 @@ function createMockPlatform(opts = {}) {
         if (origin === new URL(origins.network).origin) return network(req, url);
         if (origin === new URL(origins.events).origin) return eventsService(req, url);
         if (origin === new URL(origins.media).origin) return media(req, url);
-        if (origin === new URL(origins.tools).origin) return jobsService.handle(req, url);
+        if (toolsOrigins.includes(origin)) return jobsService.handle(req, url);
         throw new TypeError(`mock platform: no service at ${origin} (fetch failed)`);
     }
 
     return {
         fetch: fetchImpl,
         origins,
+        /** Every origin that answers /api/v1/jobs: origins.tools and the satellites (img., audio., docs.openvibe.tools). */
+        toolsOrigins,
         issuer,
         keys: { privateKey, publicKey, jwks },
         signUserToken,
@@ -635,17 +826,25 @@ function createMockPlatform(opts = {}) {
         addProject: (spec) => developer.addProject(spec).id,
         signAppToken,
         stats,
-        state: { events, subscriptions, modules, files, users, checkpoints, apps: developer.apps, projects: developer.projects, jobs: jobsService.jobs },
+        state: { events, subscriptions, modules, files, mediaTenants, users, checkpoints, apps: developer.apps, projects: developer.projects, jobs: jobsService.jobs },
         deliverEvents,
         startDeliveries,
         pruneEvents,
         /** End every open Tools job event stream (clients reconnect with Last-Event-ID). */
         dropJobStreams: () => jobsService.dropStreams(),
-        /** Store an event as if a producer had published it (for realtime/pull tests). */
-        publishEvent: (env, publisher = 'svc:mock') => publishEvent({ event_id: `evt_${ulid()}`, version: 1, timestamp: new Date().toISOString(), payload: {}, ...env }, publisher),
+        /**
+         * Store an event as if a producer had published it (for realtime/pull tests). A publisher
+         * `app:<id>` of a registered app stores it as that app's event (its project and env);
+         * otherwise pass { projectId, env } (env defaults to production).
+         */
+        publishEvent(env, publisher = 'svc:mock', meta) {
+            const app = !meta && /^app:/.test(publisher) ? developer.apps.get(publisher.slice(4)) : null;
+            const where = meta || (app ? { projectId: app.project_id, env: app.environment } : undefined);
+            return publishEvent({ event_id: `evt_${ulid()}`, version: 1, timestamp: new Date().toISOString(), payload: {}, ...env }, publisher, where);
+        },
         /** End every open realtime stream (clients reconnect with Last-Event-ID). */
         dropRealtime() { for (const s of [...streams]) s.close(); },
     };
 }
 
-module.exports = { createMockPlatform, DEFAULT_ORIGINS, DEFAULT_APP_CATALOG };
+module.exports = { createMockPlatform, DEFAULT_ORIGINS, DEFAULT_TOOLS_SATELLITES, DEFAULT_APP_CATALOG };

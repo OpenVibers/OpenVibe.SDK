@@ -44,7 +44,11 @@ export interface MockPlatformOptions {
     projects?: Record<string, MockProjectSpec>;
     /** Audiences a sandbox app may get tokens for (Network DEV_SANDBOX_AUDIENCES). Default: any. */
     sandboxAudiences?: string[];
-    /** Audiences or capability ids whose mock services accept env=sandbox tokens (or true). Default: none. */
+    /**
+     * Audiences or capability ids whose mock services accept env=sandbox tokens (or true). Default:
+     * none. Media (on /api/v1/<project_id>/files) and Events (on the events.app.* routes) accept
+     * sandbox app tokens regardless, as in production.
+     */
     acceptSandbox?: true | string[];
     /** Allowance of projects created through /api/v1/projects. Default: the whole catalog (Network: empty). */
     defaultAllowance?: string[];
@@ -54,7 +58,13 @@ export interface MockPlatformOptions {
     capabilities?: Capability[];
     services?: ServiceManifest[];
     realtimeRetryMs?: number;
-    /** Serve Tools jobs at origins.tools. */
+    /** Media quotas of developer-project tenants in MB (Media's defaults: production 1024, sandbox 100). */
+    mediaQuotaMb?: { production?: number; sandbox?: number };
+    /** Lifetime of signed sandbox file URLs, 30..3600 s (default 300, like Media). */
+    mediaSignedUrlTtlS?: number;
+    /** Tools satellites that also answer /api/v1/jobs. Default: DEFAULT_TOOLS_SATELLITES. */
+    toolsSatellites?: string[];
+    /** Serve Tools jobs at origins.tools and the satellites (each keeps its own jobs). */
     jobs?: boolean | { stepMs?: number; handlers?: Record<string, (ctx: MockJobContext) => Promise<{ data?: Record<string, unknown>; files?: Array<{ name?: string; mime?: string; bytes?: Uint8Array | string; data?: Uint8Array | string }> } | void>> };
     /** fetch used by deliverEvents() (default: the global fetch). */
     deliveryFetch?: FetchLike;
@@ -63,6 +73,8 @@ export interface DeliveryAttempt { subscription_id: string; event_id: string; se
 export interface MockPlatform {
     fetch: FetchLike;
     origins: Record<Origin, string>;
+    /** Every origin that answers /api/v1/jobs: origins.tools and the satellites. */
+    toolsOrigins: string[];
     issuer: string;
     keys: { privateKey: object; publicKey: object; jwks: { keys: object[]; public_key: string; algorithm: 'RS256' } };
     signUserToken(user: MockUser | string, opts?: { expiresInSec?: number; audience?: string[] }): string;
@@ -79,10 +91,19 @@ export interface MockPlatform {
     setAuthorization(opts: { subjectId?: string | null; decision?: 'allow' | 'deny' }): void;
     stats: { tokenRequests: number; requests: Array<{ method: string; url: string; headers: Record<string, string> }>; deliveries: DeliveryAttempt[] };
     state: {
-        events: Array<{ seq: number; event: EventEnvelope; publisher: string }>; subscriptions: Map<string, any>; modules: Map<string, any>; files: Map<string, any>;
-        users: Map<string, MockUser>; checkpoints: Map<string, number>; apps: Map<string, any>; projects: Map<string, any>; jobs: Map<string, any>;
+        /** project_id/env are set for developer-app events (null/'production' for first-party ones). */
+        events: Array<{ seq: number; event: EventEnvelope; publisher: string; project_id: string | null; env: 'sandbox' | 'production' }>;
+        subscriptions: Map<string, any>; modules: Map<string, any>;
+        /** `${tenant}|${key}`; tenant is a Media app id, prj_… or prj_…-sandbox. */
+        files: Map<string, any>;
+        mediaTenants: Map<string, { id: string; project_id: string; env: 'sandbox' | 'production'; quota_bytes: number }>;
+        users: Map<string, MockUser>; checkpoints: Map<string, { cursor: number; updated_at: string }>; apps: Map<string, any>; projects: Map<string, any>; jobs: Map<string, any>;
     };
-    publishEvent(envelope: Partial<EventEnvelope> & Pick<EventEnvelope, 'event_type' | 'source' | 'actor' | 'subject'>, publisher?: string): { event_id: string; seq: number; duplicate: boolean };
+    /**
+     * Store an event as if published. A publisher `app:<id>` of a registered app stores it as that
+     * app's event (its project and env); or pass { projectId, env }.
+     */
+    publishEvent(envelope: Partial<EventEnvelope> & Pick<EventEnvelope, 'event_type' | 'source' | 'actor' | 'subject'>, publisher?: string, meta?: { projectId?: string; env?: 'sandbox' | 'production' }): { event_id: string; seq: number; duplicate: boolean };
     /** Retention: drop stored events with seq <= throughSeq; returns how many. */
     pruneEvents(throughSeq: number): number;
     /** Play the Events delivery worker once (signed POSTs to subscription endpoints). */
@@ -93,5 +114,7 @@ export interface MockPlatform {
 }
 export declare function createMockPlatform(opts?: MockPlatformOptions): MockPlatform;
 export declare const DEFAULT_ORIGINS: Record<Origin, string>;
-/** Capability ids a developer app can be granted in openvibe-contracts v0.26.0 (public + active). */
+/** https://img.openvibe.tools, https://audio.openvibe.tools, https://docs.openvibe.tools */
+export declare const DEFAULT_TOOLS_SATELLITES: string[];
+/** Capability ids a developer app can be granted in openvibe-contracts v0.28.0 (public + active). */
 export declare const DEFAULT_APP_CATALOG: string[];

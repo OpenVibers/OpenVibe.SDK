@@ -6,7 +6,8 @@
  *
  * Deliberate differences from Network, so tests need no staff steps (each is an option):
  *   - sandbox apps get tokens for any audience (`sandboxAudiences` restricts it like
- *     DEV_SANDBOX_AUDIENCES); receivers still refuse them unless `acceptSandbox` opts them in
+ *     DEV_SANDBOX_AUDIENCES); Media and Events accept them on their app routes as in production,
+ *     other receivers refuse them unless `acceptSandbox` opts them in
  *   - projects created through the API start with every catalog capability in their allowance
  *     (`defaultAllowance: []` matches Network's empty default)
  *   - projects declared in options allow sandbox and production apps and any capability
@@ -22,10 +23,17 @@ const CODE_TTL_MS = 5 * 60 * 1000;
 const RANK = { viewer: 1, developer: 2, admin: 3, owner: 4 };
 const ENV_POLICIES = { sandbox: ['sandbox'], 'sandbox+production': ['sandbox', 'production'] };
 
-/** Capabilities that are public + active in openvibe-contracts v0.26.0 (grantable to apps). */
+/**
+ * Capabilities that are public + active in openvibe-contracts v0.28.0, the ones Network grants to
+ * apps (network.project.manage is public but planned, so not grantable).
+ */
 const DEFAULT_APP_CATALOG = [
-    'media.object.upload', 'media.object.read', 'tools.job.create', 'tools.job.read', 'tools.job.cancel',
-    'games.mod.read', 'games.world.announce', 'games.prop.place',
+    'codes.release.manage', 'codes.release.read', 'community.paste.create', 'community.post.create',
+    'events.app.publish', 'events.app.read', 'events.app.subscribe',
+    'games.mod.read', 'games.prop.place', 'games.world.announce',
+    'media.object.read', 'media.object.upload',
+    'tools.job.cancel', 'tools.job.create', 'tools.job.read',
+    'vip.perk.list', 'vip.plan.list',
 ];
 
 function createDeveloper(ctx) {
@@ -66,8 +74,6 @@ function createDeveloper(ctx) {
         if (owner) p.members.set(owner, 'owner');
         for (const [subject, role] of Object.entries(members || {})) p.members.set(subject, role);
         projects.set(pid, p);
-        // Media keys tenancy by project id; the real Media needs its operators to create the tenant.
-        if (ctx.mediaApps && !ctx.mediaApps.has(pid)) ctx.mediaApps.set(pid, { apiKey: null });
         return p;
     }
 

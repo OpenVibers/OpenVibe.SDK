@@ -9,6 +9,9 @@
  *       stepMs: 5,                                   // delay between lifecycle steps
  *       handlers: { 'img.process': async ({ input, files, progress, cancelled }) => ({ data, files: [{ name, mime, bytes }] }) },
  *   }
+ * Every Tools origin of the platform answers (origins.tools and the img., audio. and docs.
+ * satellites); like the real satellites, each keeps its own jobs: a job id is found only on the
+ * origin that created it.
  * Without a handler for a type, the job echoes: data { echo: input }, files = the uploaded files.
  * A handler that throws fails the job with { code: err.code || 'tools.job.failed', detail }.
  */
@@ -151,18 +154,18 @@ function createJobsService(ctx) {
             const key = req.headers.get('idempotency-key');
             const hash = sha256hex(JSON.stringify([type, input, files.map((f) => sha256hex(f.bytes))]));
             if (key) {
-                const prior = idem.get(`${who.owner}|${key}`);
+                const prior = idem.get(`${url.origin}|${who.owner}|${key}`);
                 if (prior) {
                     if (prior.hash !== hash) return problem(409, 'tools.job.idempotency_conflict', 'This Idempotency-Key was used for a different request');
                     return json(200, view(jobs.get(prior.id)), { Location: `/api/v1/jobs/${prior.id}`, 'Idempotent-Replayed': 'true', 'Cache-Control': 'no-store' });
                 }
             }
             const job = {
-                id: `job_${ulid()}`, owner: who.owner, type, input, files, state: 'queued', percent: null, message: null,
+                id: `job_${ulid()}`, origin: url.origin, owner: who.owner, type, input, files, state: 'queued', percent: null, message: null,
                 cancelRequested: false, createdAt: Date.now(), startedAt: null, finishedAt: null, result: null, error: null, events: [],
             };
             jobs.set(job.id, job);
-            if (key) idem.set(`${who.owner}|${key}`, { id: job.id, hash });
+            if (key) idem.set(`${url.origin}|${who.owner}|${key}`, { id: job.id, hash });
             emit(job, 'job.queued');
             runJob(job);
             return json(202, view(job), { Location: `/api/v1/jobs/${job.id}`, 'Cache-Control': 'no-store' });
@@ -173,7 +176,7 @@ function createJobsService(ctx) {
             const who = owner(req, action);
             if (who.res) return who.res;
             const job = jobs.get(decodeURIComponent(m[1]));
-            if (!job || job.owner !== who.owner) return problem(404, 'tools.job.not_found', 'No such job');
+            if (!job || job.owner !== who.owner || job.origin !== url.origin) return problem(404, 'tools.job.not_found', 'No such job');
             if (req.method === 'DELETE') {
                 if (job.state === 'succeeded' || job.state === 'failed') return problem(409, 'tools.job.already_finished', `The job already ${job.state}`);
                 if (job.state === 'queued') finish(job, 'cancelled');

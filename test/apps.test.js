@@ -175,19 +175,33 @@ run([
         await assert.rejects(auth.createServiceTokenClient({ clientId: PUBLIC_APP, clientSecret: 'x', fetch: platform.fetch }).getToken({ audience: 'openvibe.media' }), { code: 'unauthorized_client' }, 'public apps have no client credentials grant');
     }],
 
-    ['Media: an app uploads into its project namespace; sandbox tokens are refused unless Media opted in', async () => {
+    ['Media: an app uploads into its project namespace; production and sandbox tenants stay apart', async () => {
         const { platform } = setup();
         const client = createClient({ fetch: platform.fetch, tokenProvider: auth.createServiceTokenClient({ clientId: SERVER_APP, clientSecret: 'ovsec_server', fetch: platform.fetch }) });
         const file = await createMediaClient(client, { app: PRJ }).upload('hello', { filename: 'a.txt' });
         assert.ok(platform.state.files.has(`${PRJ}|${file.key}`));
-        await assert.rejects(createMediaClient(client, { app: 'prj_01K5WZX7S7Q4D2B8N3M6V1C9TZ' }).upload('x'), (e) => e.status === 404 || e.code === 'capability.namespace_denied');
+        assert.equal(file.app_id, PRJ);
+        assert.equal(file.sandbox, undefined);
+        assert.equal(file.url, `/f/${file.key}`);
+        assert.equal(file.public_url, `https://openvibe.media/f/${file.key}`);
+        assert.equal(await (await platform.fetch(file.public_url)).text(), 'hello', 'production files are public');
+        await assert.rejects(createMediaClient(client, { app: 'prj_01K5WZX7S7Q4D2B8N3M6V1C9TZ' }).upload('x'), { status: 403, code: 'capability.namespace_denied' });
 
+        // Media accepts sandbox app tokens on the project's own tenant (and nowhere else).
         const sandboxApp = platform.addApp({ project: PRJ, env: 'sandbox', grants: ['media.object.upload'] });
         const sandboxClient = createClient({ fetch: platform.fetch, tokenProvider: auth.createServiceTokenClient({ clientId: sandboxApp.id, clientSecret: sandboxApp.secret, fetch: platform.fetch }) });
-        await assert.rejects(createMediaClient(sandboxClient, { app: PRJ }).upload('x'), { code: 'token.sandbox_refused', status: 401 });
-        const opted = createMockPlatform({ acceptSandbox: ['media.object.upload'], apps: { [PUBLIC_APP]: { project: PRJ, secret: 's', type: 'confidential', grants: ['media.object.upload'] } } });
-        const optedClient = createClient({ fetch: opted.fetch, tokenProvider: auth.createServiceTokenClient({ clientId: PUBLIC_APP, clientSecret: 's', fetch: opted.fetch }) });
-        assert.ok((await createMediaClient(optedClient, { app: PRJ }).upload('x')).key);
+        const sbx = await createMediaClient(sandboxClient, { app: PRJ }).upload('hello', { filename: 'a.txt' });
+        assert.equal(sbx.app_id, `${PRJ}-sandbox`);
+        assert.equal(sbx.sandbox, true);
+        assert.notEqual(sbx.key, file.key, 'tenant-tagged keys never collide across tenants');
+        assert.match(sbx.url, /^https:\/\/openvibe\.media\/f\/[^?]+\?exp=\d+&sig=[\w-]+$/);
+        assert.ok(Date.parse(sbx.url_expires_at) > Date.now());
+        assert.equal(sbx.public_url, null);
+        assert.equal(sbx.signed_url, sbx.url);
+        assert.equal((await platform.fetch(`https://openvibe.media/f/${sbx.key}`)).status, 404, 'never served without a signature');
+        assert.equal((await platform.fetch(sbx.url.replace(/sig=[\w-]+/, 'sig=forged'))).status, 404);
+        assert.equal(await (await platform.fetch(sbx.signed_url)).text(), 'hello');
+        await assert.rejects(createMediaClient(sandboxClient, { app: 'demo' }).upload('x'), { status: 401, code: 'token.sandbox_refused' });
         const limited = createMockPlatform({ sandboxAudiences: ['openvibe.tools'], apps: { [PUBLIC_APP]: { project: PRJ, secret: 's', type: 'confidential', grants: ['media.object.upload'] } } });
         await assert.rejects(auth.createServiceTokenClient({ clientId: PUBLIC_APP, clientSecret: 's', fetch: limited.fetch }).getToken({ audience: 'openvibe.media' }), { code: 'invalid_target' });
     }],

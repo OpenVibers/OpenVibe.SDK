@@ -2,16 +2,23 @@ import type { OpenVibeClient } from './core';
 
 export interface MediaFile {
     key: string;
+    /** The tenant: the app id, a project id (prj_…) or its sandbox tenant (prj_…-sandbox). */
     app_id: string;
     user_id: string | number | null;
     original_name: string;
     size: number;
     mime: string;
     sha256: string;
-    /** Media-relative, e.g. /f/<key> */
+    /** Media-relative, e.g. /f/<key>; for a sandbox file an absolute signed, expiring URL. */
     url: string;
-    /** Absolute, added by the SDK. */
-    public_url: string;
+    /** Absolute public URL, added by the SDK; null for sandbox files (never served publicly). */
+    public_url: string | null;
+    /** Sandbox files only (Media): the tenant is a developer project's sandbox. */
+    sandbox?: true;
+    /** Sandbox files only (Media): when `url` stops working. */
+    url_expires_at?: string;
+    /** Sandbox files only, added by the SDK: the signed `url`. */
+    signed_url?: string;
     created_at: string;
     deduplicated?: boolean;
 }
@@ -45,6 +52,10 @@ export interface MediaClient {
     };
     upload: MediaClient['files']['upload'];
 }
-/** apiKey: the app's Media API key (server only). Without it the client's token (a service token with media.object.upload) is used. */
+/**
+ * apiKey: the app's Media API key (server only). Without it the client's token is used: a service
+ * token, or a developer app token with `app` = its project id (media.object.upload to upload and
+ * delete, media.object.read to list and get).
+ */
 export declare function createMediaClient(client: OpenVibeClient, opts: { app: string; apiKey?: string; actingUserId?: string | number; baseUrl?: string; publicOrigin?: string }): MediaClient;
 export declare const DEFAULT_PUBLIC_ORIGIN: string;
