@@ -12,7 +12,7 @@
 npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.1.0
 ```
 
-It has no runtime dependencies. It needs Node ≥ 20, or any browser with `fetch`, Web Crypto and `TextDecoder`. There is no build step. The package is CommonJS with ESM entry points (`import` works). Each subpath has its own `.d.ts`. `openvibe-contracts` is an optional peer dependency pinned to v0.6.0. The SDK doesn't need it at runtime and copies the contract types it uses.
+It has no runtime dependencies. It needs Node ≥ 20, or any browser with `fetch`, Web Crypto and `TextDecoder`. There is no build step. The package is CommonJS with ESM entry points (`import` works). Each subpath has its own `.d.ts`. It does not depend on `openvibe-contracts`: it copies the contract types it uses (built against Contracts v0.6.0+, checked in CI).
 
 ## Quick start
 
