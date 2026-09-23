@@ -11,6 +11,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22.22.1   # production services run Node 22
+          cache: npm
+      # better-sqlite3 (devDependency) backs the outbox/inbox tests; without an install they fail.
+      - run: npm ci --no-audit --no-fund
       # types.test.js compares types/contracts.d.ts with the pinned Contracts release
       - run: git clone --depth 1 --branch v0.28.0 https://github.com/OpenVibers/OpenVibe.Contracts.git ../OpenVibe.Contracts
       - run: npm test             # includes the pack test (npm pack + install into a temp project)
