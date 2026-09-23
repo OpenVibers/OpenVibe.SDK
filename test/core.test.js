@@ -216,4 +216,43 @@ run([
         for await (const x of paginate(async (c) => ({ items: [c], next: c < 3 ? c + 1 : null }), { cursor: 1 })) cursorPages.push(x);
         assert.deepEqual(cursorPages, [1, 2, 3]);
     }],
+
+    ["responseType 'response': the raw Response for streams and downloads; errors still throw", async () => {
+        let busy = 0;
+        const srv = await stubServer((req, res) => {
+            if (req.url === '/busy' && ++busy === 1) return problem(res, 503, 'service.unavailable', 'busy');
+            if (req.url === '/gone') return problem(res, 404, 'thing.not_found', 'no such thing');
+            if (req.url === '/stream') {
+                res.writeHead(200, { 'Content-Type': 'text/plain' });
+                res.write('part one;');
+                return setTimeout(() => res.end('part two'), 30);
+            }
+            if (req.url === '/forever') { res.writeHead(200, { 'Content-Type': 'text/plain' }); return res.write('start;'); }
+            return send(res, 200, Buffer.from([1, 2, 3]), { 'Content-Type': 'application/octet-stream' });
+        });
+        const client = createClient({ baseUrls: { x: srv.url }, ...fast });
+        const out = await client.request({ service: 'x', path: '/file', responseType: 'response' });
+        assert.ok(out.data instanceof Response);
+        assert.equal(out.response, out.data);
+        assert.equal(out.status, 200);
+        assert.ok(!out.data.bodyUsed, 'body unread');
+        assert.deepEqual([...new Uint8Array(await out.data.arrayBuffer())], [1, 2, 3]);
+
+        // The per-attempt timeout covers the headers only; the body may take longer.
+        const slow = await client.json({ service: 'x', path: '/stream', responseType: 'response', timeoutMs: 15 });
+        assert.equal(await slow.text(), 'part one;part two');
+
+        const retried = await client.request({ service: 'x', path: '/busy', responseType: 'response' });
+        assert.equal(retried.attempts, 2, 'a 503 is retried before any body is handed out');
+        await assert.rejects(client.request({ service: 'x', path: '/gone', responseType: 'response' }), (e) => e.code === 'thing.not_found' && e.status === 404, 'error bodies are read into OpenVibeError');
+
+        // The caller's signal still cancels the body after the call returned.
+        const ctrl = new AbortController();
+        const endless = await client.json({ service: 'x', path: '/forever', responseType: 'response', signal: ctrl.signal });
+        const reader = endless.body.getReader();
+        assert.equal(new TextDecoder().decode((await reader.read()).value), 'start;');
+        setTimeout(() => ctrl.abort(), 10);
+        await assert.rejects(reader.read());
+        await srv.close();
+    }],
 ]);

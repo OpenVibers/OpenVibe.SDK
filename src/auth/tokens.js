@@ -10,9 +10,15 @@
  * per audience (and scope), refreshed 60 s before expiry; concurrent callers share one request.
  * Plug it into createClient({ tokenProvider }) and every call gets a token for the audience of the
  * service it calls (openvibe.media, openvibe.events, …).
+ *
+ * Developer apps (client id app_<ULID>, confidential) use the same client: their tokens carry
+ * project_id, env and the approved capabilities for that audience. getTokenInfo() shows the
+ * granted `scope` and the token's claims, decoded but NOT verified (for display and diagnostics;
+ * the receiver is the one that verifies).
  */
 const { OpenVibeError } = require('../core/errors');
 const { DEFAULT_NETWORK } = require('../core/client');
+const { unverifiedClaims } = require('./browser');
 
 function createServiceTokenClient({
     network = DEFAULT_NETWORK, tokenUrl, clientId, clientSecret, audience, scope,
@@ -47,7 +53,8 @@ function createServiceTokenClient({
         if (!res.ok || !json || !json.access_token) {
             throw OpenVibeError.fromResponse({ status: res.status, body: json || { error: 'no_token', error_description: 'no access_token in the response' }, method: 'POST', url });
         }
-        cache.set(key, { token: json.access_token, exp: now() + (Number(json.expires_in) || 300) * 1000, scope: json.scope });
+        const scopeList = typeof json.scope === 'string' ? json.scope.split(/\s+/).filter(Boolean) : [];
+        cache.set(key, { token: json.access_token, exp: now() + (Number(json.expires_in) || 300) * 1000, scope: scopeList, audience: aud });
         return json.access_token;
     }
 
@@ -63,8 +70,29 @@ function createServiceTokenClient({
         return inflight.get(key);
     }
 
+    /**
+     * getTokenInfo({ audience?, scope? }) -> { accessToken, tokenType, audience, scope, expiresAt,
+     * unverifiedClaims }. `scope` is the capability list the token endpoint granted (it may be
+     * narrower than you asked for when you asked for none). `unverifiedClaims` is the JWT payload
+     * decoded WITHOUT verification: fine for showing project_id, env or cap, never for trusting them.
+     */
+    async function getTokenInfo(ctx = {}) {
+        const aud = ctx.audience || audience;
+        const accessToken = await getToken(ctx);
+        const hit = cache.get(keyOf(aud, scopeFor(aud, ctx.scope))) || {};
+        return {
+            accessToken,
+            tokenType: 'Bearer',
+            audience: aud,
+            scope: hit.scope ? [...hit.scope] : [],
+            expiresAt: hit.exp ? new Date(hit.exp).toISOString() : null,
+            unverifiedClaims: unverifiedClaims(accessToken),
+        };
+    }
+
     return {
         getToken,
+        getTokenInfo,
         async authHeaders(ctx) { return { Authorization: `Bearer ${await getToken(ctx)}` }; },
         /** Drop the cached token (one audience, or all): the next call fetches a new one. */
         invalidate(ctx = {}) {

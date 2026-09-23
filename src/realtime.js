@@ -169,18 +169,29 @@ function subscribe(topics, onEvent, opts = {}) {
     };
 }
 
-/** Minimal SSE parser over a ReadableStream<Uint8Array> (WHATWG event-stream rules). */
-async function readSse(body, dispatch, onRetry) {
-    if (!body || typeof body.getReader !== 'function') throw new TypeError('realtime: response has no readable body');
-    const reader = body.getReader();
+/**
+ * parseSSE(body, { onRetry }) -> async iterator of { event, data, id } (WHATWG event-stream rules).
+ *
+ *   for await (const { event, data, id } of parseSSE(res.body)) { … }
+ *
+ * `body` is a ReadableStream<Uint8Array> (fetch), or any async iterable of Uint8Array/string chunks
+ * (a Node stream). `event` defaults to 'message'; `id` is the id field of that event (undefined when
+ * it had none); comments are skipped; `retry: <ms>` is passed to onRetry. A line split across chunks,
+ * including a \r\n pair, is reassembled. Breaking out of the loop releases the stream.
+ */
+async function* parseSSE(body, { onRetry } = {}) {
+    if (!body || (typeof body.getReader !== 'function' && typeof body[Symbol.asyncIterator] !== 'function')) {
+        throw new TypeError('parseSSE: pass a ReadableStream or an async iterable body');
+    }
     const decoder = new TextDecoder();
     let buf = '';
     let type = '';
     let data = [];
     let id;
+    const out = [];
     const line = (l) => {
         if (l === '') {
-            if (data.length || type) dispatch(type || 'message', data.join('\n'), id);
+            if (data.length || type) out.push({ event: type || 'message', data: data.join('\n'), id });
             type = ''; data = []; id = undefined;
             return;
         }
@@ -192,27 +203,40 @@ async function readSse(body, dispatch, onRetry) {
         if (field === 'event') type = value;
         else if (field === 'data') data.push(value);
         else if (field === 'id' && !value.includes('\0')) id = value;
-        else if (field === 'retry' && /^\d+$/.test(value)) onRetry(Number(value));
+        else if (field === 'retry' && /^\d+$/.test(value) && onRetry) onRetry(Number(value));
     };
+    const reader = typeof body.getReader === 'function' ? body.getReader() : null;
+    const iter = reader ? null : body[Symbol.asyncIterator]();
     try {
         for (;;) {
-            const { value, done } = await reader.read();
+            const { value, done } = reader ? await reader.read() : await iter.next();
             if (done) break;
-            buf += decoder.decode(value, { stream: true });
+            buf += typeof value === 'string' ? value : decoder.decode(value, { stream: true });
             let m;
             while ((m = /\r\n|\r|\n/.exec(buf))) {
                 if (m[0] === '\r' && m.index === buf.length - 1) break;   // a \r\n may be split across chunks
                 line(buf.slice(0, m.index));
                 buf = buf.slice(m.index + m[0].length);
             }
+            while (out.length) yield out.shift();
         }
     } finally {
-        try { reader.releaseLock(); } catch { /* stream already gone */ }
+        if (reader) {
+            try { await reader.cancel(); } catch { /* stream already gone */ }
+            try { reader.releaseLock(); } catch { /* already released */ }
+        } else if (iter && typeof iter.return === 'function') {
+            try { await iter.return(); } catch { /* already closed */ }
+        }
     }
+}
+
+/** The realtime loop's reader: every parsed event goes to dispatch(type, data, id). */
+async function readSse(body, dispatch, onRetry) {
+    for await (const e of parseSSE(body, { onRetry })) dispatch(e.event, e.data, e.id);
 }
 
 function createRealtimeClient(client, defaults = {}) {
     return { subscribe: (topics, onEvent, opts = {}) => subscribe(topics, onEvent, { client, ...defaults, ...opts }) };
 }
 
-module.exports = { subscribe, createRealtimeClient, DEFAULT_ORIGIN };
+module.exports = { subscribe, createRealtimeClient, parseSSE, DEFAULT_ORIGIN };

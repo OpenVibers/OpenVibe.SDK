@@ -2,6 +2,6 @@
 import cjs from '../src/testing/index.js';
 
 export const {
-    createMockPlatform, DEFAULT_ORIGINS,
+    createMockPlatform, DEFAULT_ORIGINS, DEFAULT_APP_CATALOG,
 } = cjs;
 export default cjs;

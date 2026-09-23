@@ -2,6 +2,6 @@
 import cjs from '../src/realtime.js';
 
 export const {
-    subscribe, createRealtimeClient, DEFAULT_ORIGIN,
+    subscribe, createRealtimeClient, parseSSE, DEFAULT_ORIGIN,
 } = cjs;
 export default cjs;

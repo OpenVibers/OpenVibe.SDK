@@ -27,7 +27,7 @@ run([
     ['every subpath resolves by package name for require and import', async () => {
         const pkg = require('../package.json');
         for (const sub of Object.keys(pkg.exports)) {
-            if (sub === './package.json') continue;
+            if (sub === './package.json' || sub.endsWith('.mjs')) continue;     // the browser bundle: test/bundle.test.js
             const spec = sub === '.' ? 'openvibe-sdk' : `openvibe-sdk/${sub.slice(2)}`;
             const cjs = require(spec);
             const esm = await import(spec);

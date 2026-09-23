@@ -2,10 +2,11 @@
 /** Events: publish fills the envelope, pull cursor + gaps, subscriptions, webhook signatures. */
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
-const { stubServer, send, run } = require('./helpers');
+const { stubServer, send, run, waitFor } = require('./helpers');
 const { createClient, parseTraceparent } = require('../src/core');
 const { createServiceTokenClient } = require('../src/auth');
-const { createEventsClient, verifyDelivery, signDelivery, parseDelivery } = require('../src/events');
+const { createEventsClient, verifyDelivery, signDelivery, parseDelivery, createInbox } = require('../src/events');
+const { subscribe } = require('../src/realtime');
 const { createMockPlatform } = require('../src/testing');
 
 const actor = { type: 'service', id: 'live' };
@@ -129,5 +130,100 @@ run([
         const d = parseDelivery(raw, { 'x-openvibe-signature': sig, 'x-openvibe-subscription-id': 'sub_1', 'x-openvibe-delivery-attempt': '2' }, secret);
         assert.deepEqual(d, { event: { event_id: 'evt_1', event_type: 'media.vod.ready' }, seq: 7, subscriptionId: 'sub_1', attempt: 2 });
         assert.equal(parseDelivery(raw, new Headers({ 'X-OpenVibe-Signature': 'sha256=bad' }), secret), null);
+    }],
+
+    ['onPage runs only after every item of its page was handled: a crash mid-page keeps the old cursor', async () => {
+        const { platform, events } = setup();
+        for (let i = 1; i <= 6; i++) platform.publishEvent({ event_type: i === 3 ? 'live.other.thing' : 'media.vod.ready', source: 'media', actor, subject: { type: 'vod', id: String(i) } });
+        const log = [];
+        let saved = 0;
+        const consume = async (failAt) => {
+            for await (const { seq } of events.iterate({ topic: 'media.vod.*', afterSeq: saved, limit: 3, onPage: (p) => { log.push(`page ${p.next_after_seq}`); saved = p.next_after_seq; } })) {
+                if (seq === failAt) throw new Error(`crash at ${seq}`);
+                log.push(`item ${seq}`);
+            }
+        };
+        await assert.rejects(consume(2), /crash at 2/);
+        assert.deepEqual(log, ['item 1']);
+        assert.equal(saved, 0, 'a crash inside the first page saves nothing');
+        log.length = 0;
+        await assert.rejects(consume(5), /crash at 5/);
+        assert.deepEqual(log, ['item 1', 'item 2', 'item 4', 'page 4'], 'page 1 (seq 1-4; 3 did not match) was saved after its last item; page 2 never was');
+        assert.equal(saved, 4);
+        log.length = 0;
+        await consume(null);
+        assert.deepEqual(log, ['item 5', 'item 6', 'page 6'], 'resumed from the saved cursor: nothing skipped');
+        let pages = 0;
+        for await (const e of events.iterate({ topic: 'media.vod.*', limit: 2, onPage: () => { pages++; } })) { void e; break; }
+        assert.equal(pages, 0, 'breaking out before the page is done: no onPage');
+    }],
+
+    ['mock Events retention: pull and realtime report the pruned range as a gap', async () => {
+        const { platform, events } = setup();
+        for (let i = 1; i <= 5; i++) platform.publishEvent({ event_type: 'media.vod.ready', source: 'media', actor, subject: { type: 'vod', id: String(i) }, visibility: 'public' });
+        assert.equal(platform.pruneEvents(3), 3);
+        const page = await events.pull({ topic: 'media.vod.*', afterSeq: 1 });
+        assert.deepEqual(page.gap, { from_seq: 2, to_seq: 3 });
+        assert.deepEqual(page.events.map((e) => e.seq), [4, 5]);
+        assert.equal((await events.pull({ topic: 'media.vod.*', afterSeq: 3 })).gap, undefined);
+        const gaps = [];
+        const seqs = [];
+        for await (const e of events.iterate({ topic: 'media.vod.*', onGap: (g) => gaps.push(g) })) seqs.push(e.seq);
+        assert.deepEqual(gaps, [{ from_seq: 1, to_seq: 3 }]);
+        assert.deepEqual(seqs, [4, 5]);
+        const rtGaps = [];
+        const got = [];
+        const sub = subscribe('media.vod.*', (ev, { seq }) => got.push(seq), { client: createClient({ fetch: platform.fetch }), fetch: platform.fetch, transport: 'fetch', lastEventId: 1, onGap: (g) => rtGaps.push(g) });
+        await waitFor(() => got.length === 2);
+        sub.close();
+        assert.deepEqual(rtGaps, [{ reason: 'retention', from_seq: 2, to_seq: 3, latest_seq: 5 }]);
+        platform.publishEvent({ event_type: 'media.vod.ready', source: 'media', actor, subject: { type: 'vod', id: '6' } });
+        assert.equal((await events.pull({ afterSeq: 5 })).events[0].seq, 6, 'seqs keep counting after a prune');
+    }],
+
+    ['deliverEvents: signed deliveries to a local endpoint, retried in order, dead after max attempts', async () => {
+        const { platform, events } = setup();
+        const Database = require('better-sqlite3');
+        const inbox = createInbox(new Database(':memory:'));
+        inbox.ensureSchema();
+        let failNext = 1;
+        let secret;
+        const handled = [];
+        const srv = await stubServer((req, res, body) => {
+            const d = parseDelivery(body, req.headers, secret);
+            if (!d) return send(res, 401, { error: 'bad signature' });
+            if (failNext > 0) { failNext--; return send(res, 503, { error: 'busy' }); }
+            const r = inbox.once('webhook', d.event.event_id, () => handled.push([d.seq, d.attempt, req.headers['x-openvibe-event-type']]));
+            return send(res, 200, { duplicate: r.duplicate });
+        });
+        platform.publishEvent({ event_type: 'media.vod.ready', source: 'media', actor, subject: { type: 'vod', id: '0' } });   // before the subscription: not delivered
+        const sub = await events.subscribe({ topicPattern: 'media.vod.*', endpoint: `${srv.url}/hook`, retryPolicy: { max_attempts: 3 } });
+        secret = sub.secret;
+        for (let i = 1; i <= 3; i++) platform.publishEvent({ event_type: i === 2 ? 'live.x.y' : 'media.vod.ready', source: 'media', actor, subject: { type: 'vod', id: String(i) } });
+
+        const first = await platform.deliverEvents();
+        assert.deepEqual([first.delivered, first.failed, first.dead], [0, 1, 0], 'the first attempt failed: the subscription waits');
+        const second = await platform.deliverEvents();
+        assert.deepEqual([second.delivered, second.failed], [2, 0]);
+        assert.deepEqual(handled, [[2, 2, 'media.vod.ready'], [4, 1, 'media.vod.ready']], 'in seq order, attempt counted, non-matching skipped');
+        const req = srv.requests.at(-1);
+        assert.equal(req.headers['x-openvibe-subscription-id'], sub.id);
+        assert.match(req.headers['x-openvibe-signature'], /^sha256=[0-9a-f]{64}$/);
+        assert.match(req.headers.traceparent, /^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/);
+        assert.equal((await platform.deliverEvents()).attempts.length, 0, 'nothing new');
+
+        failNext = 99;
+        platform.publishEvent({ event_type: 'media.vod.ready', source: 'media', actor, subject: { type: 'vod', id: '9' } });
+        const outcomes = [];
+        for (let i = 0; i < 3; i++) outcomes.push((await platform.deliverEvents()).attempts.map((a) => a.outcome).join());
+        assert.deepEqual(outcomes, ['retry', 'retry', 'dead']);
+        assert.equal(platform.stats.deliveries.filter((a) => a.outcome === 'dead').length, 1);
+
+        failNext = 0;
+        const worker = platform.startDeliveries({ intervalMs: 5 });
+        platform.publishEvent({ event_type: 'media.vod.ready', source: 'media', actor, subject: { type: 'vod', id: '10' } });
+        await waitFor(() => handled.length === 3);
+        await worker.stop();
+        await srv.close();
     }],
 ]);

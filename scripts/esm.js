@@ -23,6 +23,8 @@ const ENTRIES = {
     'realtime.mjs': '../src/realtime.js',
     'media.mjs': '../src/media.js',
     'community.mjs': '../src/community.js',
+    'jobs.mjs': '../src/jobs.js',
+    'projects.mjs': '../src/projects.js',
     'testing.mjs': '../src/testing/index.js',
 };
 

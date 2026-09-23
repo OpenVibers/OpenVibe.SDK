@@ -31,4 +31,7 @@ export interface RealtimeSubscription {
 }
 export declare function subscribe(topics: string | string[], onEvent: (event: EventEnvelope, meta: { seq: number }) => void, opts?: SubscribeOptions): RealtimeSubscription;
 export declare function createRealtimeClient(client: OpenVibeClient, defaults?: Omit<SubscribeOptions, 'client'>): { subscribe(topics: string | string[], onEvent: (event: EventEnvelope, meta: { seq: number }) => void, opts?: SubscribeOptions): RealtimeSubscription };
+export interface SSEMessage { event: string; data: string; id: string | undefined; }
+/** WHATWG event-stream parser over a fetch body (or any async iterable of chunks). */
+export declare function parseSSE(body: ReadableStream<Uint8Array> | AsyncIterable<Uint8Array | string>, opts?: { onRetry?: (ms: number) => void }): AsyncGenerator<SSEMessage, void, unknown>;
 export declare const DEFAULT_ORIGIN: string;

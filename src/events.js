@@ -13,7 +13,6 @@ const crypto = require('node:crypto');
 const { isOpenVibeError } = require('./core/errors');
 const { newEventId } = require('./core/ids');
 const { startSpan } = require('./core/trace');
-const { paginate } = require('./core/paginate');
 
 // ── Webhook signatures ───────────────────────────────────────
 
@@ -97,18 +96,28 @@ function createEventsClient(client, { source, baseUrl } = {}) {
     }
 
     /**
-     * Async iterator over { seq, event } from afterSeq up to the current head. onGap({ from_seq,
-     * to_seq }) is called when retention already pruned part of the range. Keep the last page's
-     * next_after_seq (onPage) as your durable cursor: it moves past events that did not match.
+     * Async iterator over { seq, event } from afterSeq up to the current head.
+     *
+     *   onGap(gap)   called before a page's items when retention already pruned part of the range
+     *                ({ from_seq, to_seq }): nothing can replay it, so resync derived state.
+     *   onPage(page) called AFTER every item of that page was yielded and handled (your loop body
+     *                ran for the page's last item and asked for the next one). Save
+     *                page.next_after_seq there as your durable cursor: it also moves past events
+     *                that did not match your topics, and a crash (or a break/throw in your loop)
+     *                before onPage leaves the cursor on the last page you finished, so nothing is
+     *                skipped. Pages with no matching events still call onPage.
      */
-    function iterate({ topic, afterSeq = 0, limit, onGap, onPage } = {}) {
-        return paginate(async (cursor) => {
+    async function* iterate({ topic, afterSeq = 0, limit, onGap, onPage, maxPages = Infinity } = {}) {
+        let cursor = afterSeq;
+        for (let pages = 0; pages < maxPages; pages++) {
             const page = await pull({ topic, afterSeq: cursor, limit });
             if (page.gap && onGap) await onGap(page.gap);
+            for (const item of page.events || []) yield item;
             if (onPage) await onPage(page);
-            const next = page.next_after_seq < page.latest_seq ? page.next_after_seq : null;
-            return { items: page.events, next };
-        }, { cursor: afterSeq });
+            const next = page.next_after_seq;
+            if (next == null || next === cursor || !(next < page.latest_seq)) return;
+            cursor = next;
+        }
     }
 
     const subscriptions = {

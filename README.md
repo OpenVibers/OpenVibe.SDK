@@ -2,17 +2,17 @@
 
 > Supported browser and server clients for the OpenVibe platform.
 
-**Status:** alpha, v0.1.0 (roadmap Wave 2). Runs and is tested against local stub servers and the built-in mock platform. No OpenVibe service or app uses it in production yet.  
+**Status:** alpha, v0.3.0 (roadmap Wave 2; developer apps from Wave 20). Tested against local stub servers and the built-in mock platform only, never against the live platform. Several OpenVibe services pin v0.2.2; nothing uses 0.3.0 yet.  
 **Plan:** OpenVibe End-to-End Realignment & Implementation Plan, revision 3 (20 Sep 2026), §3.2; roadmap §30.  
 **License:** MIT ([LICENSE](LICENSE)). This package is a library that apps outside the network embed, so it uses MIT. The OpenVibe services themselves stay AGPL-3.0.
 
 **If a capability is not in the SDK, it is not public.** Apps call services through `openvibe-sdk` and never build internal routes themselves. A route with no SDK wrapper is internal, even when you can reach it, and it can change without notice. To make a capability public, first define it in OpenVibe.Contracts, then wrap it here.
 
 ```bash
-npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.1.0
+npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.3.0
 ```
 
-It has no runtime dependencies. It needs Node ≥ 20, or any browser with `fetch`, Web Crypto and `TextDecoder`. There is no build step. The package is CommonJS with ESM entry points (`import` works). Each subpath has its own `.d.ts`. It does not depend on `openvibe-contracts`: it copies the contract types it uses (built against Contracts v0.6.0+, checked in CI).
+It has no runtime dependencies. It needs Node ≥ 20, or any browser with `fetch`, Web Crypto and `TextDecoder`. There is no build step. The package is CommonJS with ESM entry points (`import` works). Each subpath has its own `.d.ts`. For a page with no bundler, `browser/openvibe-sdk.mjs` is one self-contained ES module of the browser-safe subpaths (see [Browser without a bundler](#browser-without-a-bundler)). It does not depend on `openvibe-contracts`: it copies the contract types it uses (from Contracts v0.26.0, checked in CI).
 
 ## Quick start
 
@@ -45,7 +45,7 @@ const sub = subscribe(['live.stream.*'], (event, { seq }) => render(event), {
 });
 ```
 
-**The token exchange happens on your server.** Every OpenVibe OAuth client is confidential: it has a client secret, and a secret must never reach a browser. The browser entry points contain no exchange code. A test scans every file a browser bundle can reach and fails on `client_secret`, `node:` imports, `require('crypto')` or `process.env`.
+**The token exchange happens on your server.** First-party clients and confidential developer apps have a client secret, and a secret must never reach a browser. A public developer app has no secret, but its server should still do the exchange and keep the token in an HttpOnly session. The browser entry points contain no exchange code. A test scans every file a browser bundle can reach (and the browser bundle itself) and fails on `client_secret`, `node:` imports, `require('crypto')` or `process.env`.
 
 ### Server service (service principal)
 
@@ -75,38 +75,79 @@ const claims = await verifyUserToken(t.access_token, { jwks: 'https://openvibe.n
 claims.subject_id;   // usr_…
 ```
 
-### External developer (an app outside the network)
+### External developer (a developer app)
 
-An app with only a client id, a secret and a capability grant (for example `media.object.upload` for its own namespace) authenticates, finds Media through the registry and uploads a file:
+Developer apps belong to a project on OpenVibe.Network ([developer projects](https://github.com/OpenVibers/OpenVibe.Network/blob/main/docs/developer-projects.md)). An app is a principal `app_<ULID>`: `confidential` (has a secret, may use client credentials) or `public` (no secret, authorization code + PKCE only), in `sandbox` or `production`. Its tokens last 5 minutes, carry one audience, the approved capabilities (`cap`), `project_id`, `env` and `ns: [project_id]`, and there are no refresh tokens.
+
+A server app with a secret and a grant (here `media.object.upload`) uploads into its project's Media namespace:
 
 ```js
 const sdk = require('openvibe-sdk');
 
-const client = sdk.createClient({
-    tokenProvider: sdk.auth.createServiceTokenClient({ clientId: 'my-app', clientSecret: process.env.OV_CLIENT_SECRET }),
-});
+const tokens = sdk.auth.createServiceTokenClient({ clientId: process.env.OV_CLIENT_ID, clientSecret: process.env.OV_CLIENT_SECRET });
+const client = sdk.createClient({ tokenProvider: tokens });
 await client.discover();                                   // origins + contracts version from https://openvibe.network/.well-known/openvibe
-const media = sdk.media.createMediaClient(client, { app: 'my-app' });
+const { scope, unverifiedClaims } = await tokens.getTokenInfo({ audience: 'openvibe.media' });   // what Network granted (display only)
+const media = sdk.media.createMediaClient(client, { app: unverifiedClaims.project_id });           // Media tenancy is the project id
 const file = await media.upload(fs.readFileSync('logo.png'), { filename: 'logo.png', contentType: 'image/png' });
 file.public_url;   // https://openvibe.media/f/<key>
 ```
 
-`test/testing.test.js` runs this flow end to end against `openvibe-sdk/testing`.
+"Sign in with OpenVibe" for an app: the code yields an app token that acts for the person (`on_behalf_of: usr_…`).
+
+```js
+const { startAuthorization, readCallback, exchangeCode, verifyAppToken } = require('openvibe-sdk/auth');
+
+// /login: capability ids as scope, and the audience the token is for.
+const { url, state, codeVerifier } = await startAuthorization({ clientId, redirectUri, audience: 'openvibe.media', scope: ['media.object.read'] });
+// /callback:
+const { code } = readCallback(req.url, { expectedState: state });
+const t = await exchangeCode({ clientId, clientSecret /* omit for a public app */, code, codeVerifier, redirectUri, audience: 'openvibe.media' });
+t.refresh_token;   // undefined: when it expires, the person signs in again
+
+// A service receiving app tokens verifies them offline:
+const claims = await verifyAppToken(token, { jwks: 'https://openvibe.network/api/.well-known/jwks', audience: 'openvibe.media' });
+claims.project_id; claims.env; claims.on_behalf_of;   // env=sandbox is refused (token.sandbox_refused) unless acceptSandbox: true
+```
+
+Manage projects, apps, secrets and grants with `openvibe-sdk/projects` and a Network user token:
+
+```js
+const projects = require('openvibe-sdk/projects').createProjectsClient(sdk.createClient({ token: userAccessToken }));
+const prj = await projects.create({ name: 'My app' });
+const app = await projects.apps.create(prj.id, { name: 'server', environment: 'sandbox', type: 'confidential' });
+app.credential.client_secret;   // shown ONCE: store it now
+await projects.grants.request(prj.id, app.id, 'media.object.upload');
+```
+
+Run a Tools job and follow it across disconnects and restarts:
+
+```js
+const jobs = require('openvibe-sdk/jobs').createJobsClient(client, { baseUrl: 'https://img.openvibe.tools' });
+const { job } = await jobs.submit({ type: 'img.process', input: { tool: 'convert', format: 'webp' }, files: [{ name: 'a.png', data: bytes }], idempotencyKey });
+for await (const e of jobs.events(job.id, { lastEventId: saved })) saveId(e.id);     // reconnects with Last-Event-ID
+const res = await jobs.file(job.id, 0);                                              // raw Response
+```
+
+`test/testing.test.js`, `test/apps.test.js`, `test/projects.test.js` and `test/jobs.test.js` run these flows end to end against `openvibe-sdk/testing`. What the live platform allows today (sandbox audiences, allowances, which capabilities are grantable) is in the Network doc above and in OpenVibe.Examples' README.
 
 ## API
 
 | Subpath | Where | What |
 |---|---|---|
 | `openvibe-sdk/core` | both | `createClient()`, `OpenVibeError`, `paginate()`, `offsetPager()`, trace and id helpers, `CONTRACTS_RANGE` |
-| `openvibe-sdk/auth` | server (browser build: PKCE only) | `createServiceTokenClient()`, `verifyUserToken()`, `exchangeCode()`, `refreshUserToken()`; `startAuthorization()`, `buildAuthorizeUrl()`, `createPkcePair()`, `pkceChallenge()`, `readCallback()` |
+| `openvibe-sdk/auth` | server (browser build: PKCE only) | `createServiceTokenClient()` (+ `getTokenInfo()`), `verifyUserToken()`, `verifyAppToken()`, `exchangeCode()`, `refreshUserToken()`; `startAuthorization()`, `buildAuthorizeUrl()`, `createPkcePair()`, `pkceChallenge()`, `readCallback()`, `decodeUnverified()`, `unverifiedClaims()` |
 | `openvibe-sdk/registry` | both | `createRegistryClient(client)`: `services({status})`, `service(id)`, `capabilities({owner})`, `capability(id)`, `namespaces()`, `contracts()`, `topics()`, `domain(host)`, `descriptor()` |
 | `openvibe-sdk/identity` | server | `createIdentityClient(client)`: `resolve({subjectId} \| {system,type,id})`, `resolveBatch({subjectIds} \| {system,type,ids})` |
 | `openvibe-sdk/modules` | both | `createModulesClient(client)`: `get`, `put(ns, data, {revision})`, `delete`, `list`, `update(ns, fn)`, `publicGet`; `forSubject.get/put/update` for services |
 | `openvibe-sdk/events` | server | `createEventsClient(client, {source})`: `publish`, `prepare`, `pull`, `iterate`, `get`, `get/setCheckpoint`, `subscriptions.create/list/get/disable/enable` (`subscribe`), `deliveries`, `replay`; `verifyDelivery`, `signDelivery`, `parseDelivery` |
-| `openvibe-sdk/realtime` | both | `subscribe(topics, onEvent, {lastEventId, onGap, …})`, `createRealtimeClient(client)` |
+| `openvibe-sdk/realtime` | both | `subscribe(topics, onEvent, {lastEventId, onGap, …})`, `createRealtimeClient(client)`, `parseSSE(body)` |
 | `openvibe-sdk/media` | both (credentials: server) | `createMediaClient(client, {app, apiKey?, actingUserId?})`: `files.upload/list/iterate/get/delete`; `mediaUrls(origin)` public URL helpers |
 | `openvibe-sdk/community` | both | `createCommunityClient(client, {actingSubject?, origin?, sourceRef?, staff?})`: `pastes.list/iterate/get/create/update/delete/fork/like/copy/versions/byUser/config`, `pastes.comments.list/create/delete`, `as(subject)` |
-| `openvibe-sdk/testing` | Node | `createMockPlatform()`: fake Network, Events and Media on an in-process `fetch` |
+| `openvibe-sdk/jobs` | both | `createJobsClient(client, {baseUrl?})`: `submit` (Idempotency-Key), `get`, `cancel`, `events` (SSE, reattaches), `wait`, `file` (raw Response); `isTerminal()` |
+| `openvibe-sdk/projects` | both (user token) | `createProjectsClient(client)`: `catalog`, `list`, `create`, `get`, `update`, `archive`, `setAllowance`, `setEnvironmentPolicy`, `members.*`, `apps.*`, `credentials.list/rotate/revoke`, `grants.list/request/approve/deny/revoke`, `quotas.*`, `audit`, `iterateAudit` |
+| `openvibe-sdk/testing` | Node | `createMockPlatform()`: fake Network (incl. developer apps and projects), Events, Media and Tools jobs on an in-process `fetch` |
+| `openvibe-sdk/browser/openvibe-sdk.mjs` | browser | one self-contained ES module: core + auth (browser), registry, modules, realtime, media, community, jobs, projects |
 
 Server-only subpaths are declared `"browser": null` in the exports map, so a bundler refuses them in a browser build and doesn't ship them by accident.
 
@@ -128,7 +169,8 @@ Server-only subpaths are declared `"browser": null` in the exports map, so a bun
   - Legacy `{ error: 'text' }` bodies become `http.<status>`.
   - Failures with no HTTP response use `sdk.timeout`, `sdk.deadline_exceeded`, `sdk.aborted`, `sdk.network_error` or `sdk.unknown_service`.
 - **Tracing.** Every call sends `traceparent` and `X-OpenVibe-Request-Id`. The request id stays the same across retries. `client.withContext({ traceparent, requestId })` or `client.fromRequest(req)` continues the caller's trace with a new span. The `traceparent` option also accepts a getter, for example one backed by AsyncLocalStorage.
-- **Pagination.** `paginate(fetchPage, { cursor })` is an async iterator over `{ items, next }` pages. The `iterate()` methods build on it: Events uses `after_seq`, and Media and Community use offsets.
+- **Pagination.** `paginate(fetchPage, { cursor })` is an async iterator over `{ items, next }` pages. Media and Community use offsets. Events `iterate()` walks `after_seq` and calls `onPage(page)` only after every item of that page was handled, so saving `page.next_after_seq` there is crash-safe.
+- **Streams and downloads.** `responseType: 'response'` resolves with the raw fetch `Response` (`data` and `response`, body unread). Error statuses are still read and thrown. The timeout covers the headers only, and `signal` still cancels the body. `parseSSE(res.body)` (from `openvibe-sdk/realtime`) iterates a `text/event-stream`.
 
 ### Auth details
 
@@ -140,27 +182,47 @@ Server-only subpaths are declared `"browser": null` in the exports map, so a bun
   - It rejects service-principal tokens (`token.not_user`).
 
   It returns the claims, including `subject_id`.
-- PKCE follows RFC 7636 S256. The verifier is 64 characters from the unreserved set, and the challenge is `BASE64URL(SHA-256(verifier))`. See the gaps below for what the Network does with it today.
+- `verifyAppToken(token, { jwks, issuer, audience, acceptSandbox })` checks a developer app's token the way openvibe-contracts v0.26 `verifyServiceToken()` does: the same signature and time rules, the audience (required), `actor_type: app`, the claim shape (`sub app:app_…`, `cap`, `jti`, `project_id prj_…`, `env`, optional `on_behalf_of usr_…`), and `env: sandbox` refused as `token.sandbox_refused` unless `acceptSandbox: true`. Opt in only when your service keeps sandbox traffic apart from real data. It does not check capabilities: test `claims.cap` for the one your route performs.
+- `exchangeCode({ code, codeVerifier, redirectUri, clientId, clientSecret?, audience?, scope? })`: without `clientSecret` (a public app) the PKCE verifier is required; `app_…` clients must send the verifier and an `audience`. App tokens come back without a `refresh_token`.
+- `startAuthorization()` / `buildAuthorizeUrl()` default `scope` to `'profile theme'` only for first-party sign-in (no `audience`). Apps pass `audience` and capability ids. Network refuses `prompt=none` for apps.
+- `createServiceTokenClient().getTokenInfo({ audience })` returns `{ accessToken, scope, expiresAt, unverifiedClaims }`. `decodeUnverified()` / `unverifiedClaims()` decode a JWT without verifying it: for display and diagnostics, never for authorization.
+- PKCE follows RFC 7636 S256. The verifier is 64 characters from the unreserved set, and the challenge is `BASE64URL(SHA-256(verifier))`. Network verifies the verifier whenever the authorization carried a challenge, and requires S256 from every developer app.
 
 ### Testing your app
 
 ```js
 const { createMockPlatform } = require('openvibe-sdk/testing');
 const platform = createMockPlatform({
-    clients: { 'my-app': { secret: 's', grants: [{ capability: 'media.object.upload', audience: 'openvibe.media', namespaces: ['my-app'] }] } },
+    clients: { 'my-service': { secret: 's', grants: [{ capability: 'media.object.upload', audience: 'openvibe.media', namespaces: ['my-app'] }] } },
+    apps: { 'app_01K5WZX7S7Q4D2B8N3M6V1C9TR': { env: 'production', type: 'confidential', secret: 's', redirectUris: ['http://localhost:3009/callback'], grants: ['media.object.upload'] } },
     mediaApps: { 'my-app': {} },
     users: [{ username: 'ana' }],
+    jobs: true,
 });
-const client = createClient({ fetch: platform.fetch, tokenProvider: createServiceTokenClient({ clientId: 'my-app', clientSecret: 's', fetch: platform.fetch }) });
+const client = createClient({ fetch: platform.fetch, tokenProvider: createServiceTokenClient({ clientId: 'app_01K5WZX7S7Q4D2B8N3M6V1C9TR', clientSecret: 's', fetch: platform.fetch }) });
 ```
 
-The mock answers at the real public origins with real RS256 tokens and checks audience, capability and namespace. It covers:
+The mock answers at the real public origins with real RS256 tokens and checks audience, capability, namespace and sandbox the way the services do. It covers:
 
-- **Network:** discovery, `/oauth/token` (client credentials, authorization code with PKCE, refresh), the JWKS, the registry, `/api/modules` and `/internal/modules`, and `/internal/identity`.
-- **Events:** publish with `event_id` dedupe, pull, checkpoints, subscriptions, and `/realtime/stream` SSE with `Last-Event-ID`.
+- **Network:** discovery, `/oauth/token` (client credentials, authorization code with PKCE, refresh; developer apps), `GET /oauth/authorize` (consents automatically as `setAuthorization({ subjectId })`, or declines with `{ decision: 'deny' }`), the JWKS, the registry, `/api/v1/projects` (projects, members, apps, credentials, grants, quotas, audit), `/api/modules` and `/internal/modules`, and `/internal/identity`.
+- **Developer apps:** `apps` / `projects` options, `addApp()`, `signAppToken()`. App tokens carry `sub app:…`, `cap`, `ns: [project_id]`, `project_id`, `env` and `on_behalf_of` (code flow); codes are single use, PKCE-bound and bound to the `audience` given at authorize; a sandbox app of a project with members can be authorized only by them. Each project gets a Media tenant named after its id.
+- **Sandbox:** mock services refuse `env: sandbox` tokens (`401 token.sandbox_refused`) unless `acceptSandbox` lists the audience or capability. Unlike Network, sandbox apps get tokens for any audience unless you pass `sandboxAudiences`, and projects created through the API start with the whole catalog as allowance unless you pass `defaultAllowance: []`.
+- **Events:** publish with `event_id` dedupe, pull (with a `gap` after `pruneEvents(seq)`), checkpoints, subscriptions, `/realtime/stream` SSE with `Last-Event-ID` and gap events, and a delivery worker: `deliverEvents()` / `startDeliveries()` POST signed deliveries to your local endpoint in order, retry, and mark them dead after `max_attempts`.
 - **Media:** the files API.
+- **Tools jobs** (`jobs: true | { stepMs, handlers }`): submit with Idempotency-Key replay, get, cancel, SSE with `Last-Event-ID` and `204` when finished, result files; `dropJobStreams()` simulates a dropped connection.
 
-Helpers: `signUserToken()`, `authorize()`, `publishEvent()`, `dropRealtime()`, and `stats` and `state` for assertions. It is a fake. It has no persistence and no delivery worker, and its visibility rules are simplified.
+Helpers: `signUserToken()`, `signServiceToken()`, `signAppToken()`, `authorize()`, `setAuthorization()`, `publishEvent()`, `pruneEvents()`, `deliverEvents()`, `dropRealtime()`, `dropJobStreams()`, and `stats` and `state` for assertions. It is a fake. It has no persistence, its visibility rules are simplified, and it has no Chat (no WebSocket mock).
+
+### Browser without a bundler
+
+```html
+<script type="module">
+  import { createClient, auth, registry } from '/vendor/openvibe-sdk.mjs';   // copied or served from node_modules/openvibe-sdk/browser/
+  const { url, state, codeVerifier } = await auth.startAuthorization({ clientId, redirectUri, audience: 'openvibe.media', scope: ['media.object.read'] });
+</script>
+```
+
+`browser/openvibe-sdk.mjs` is generated by `node scripts/browser-bundle.js` from the CommonJS sources reachable from `browser.js` (no dependencies, no transpiling) and checked in. It exports core at the top level and `auth` (browser build), `registry`, `modules`, `realtime`, `media`, `community`, `jobs` and `projects` as namespaces. `test/bundle.test.js` fails when it is stale, and the browser secret scan covers it.
 
 ## Versioning
 
@@ -171,11 +233,11 @@ Helpers: `signUserToken()`, `authorize()`, `publishEvent()`, `dropRealtime()`, a
 ## Not wrapped yet (intentionally)
 
 - **Community comments on other content, the forum and Pulse** are being built in Community right now. Only paste comments are wrapped. The rest is a TODO in `src/community.js` until those APIs settle.
-- **Media v2 objects** (`med_` ids, ADR-006) are being added to Media right now. This release wraps only the v1 files API that exists on Media's `main`, plus the public URL helpers. VOD, clip, thumbnail and admin-storage routes are not wrapped because apps reach them only through Live and Media's own servers. Media's own paste API is not wrapped because pastes moved to Community (ADR-011).
+- **Media v2 objects** (`med_` ids, ADR-006, `/api/v2/:app/objects`) exist on Media but are not wrapped yet. This release wraps only the v1 files API, plus the public URL helpers. VOD, clip, thumbnail and admin-storage routes are not wrapped because apps reach them only through Live and Media's own servers. Media's own paste API is not wrapped because pastes moved to Community (ADR-011).
 - **Media from the browser:** Media refuses user JWTs on `/api/v1/:app/files`, so a browser uploads through its own app server. That server holds the app key and names the user with `actingUserId`.
-- **PKCE enforcement:** the SDK sends `code_challenge` and `code_verifier`, but the Network's `/oauth/authorize` and `/oauth/token` don't verify them yet. The mock platform does. Security today rests on the client secret, which never leaves the server.
 - **Network coins, notifications and legacy-map writes** are internal service-to-service routes with no public capability, so they are not wrapped. Staff-only paste routes are also internal: admin stats, bulk, censor and the AI pass.
-- **Chat, Live, Billing, Games and Jobs** from the original charter come when those services publish their capabilities in Contracts.
+- **Chat, Live, Billing and Games** from the original charter come when those services publish their capabilities in Contracts. Chat has no app principal (`chat.message.send` is `first-party`), so there is no Chat client and no Chat mock.
+- **Tools job types** are not wrapped one by one: `openvibe-sdk/jobs` submits any `type` with its `input` and files; each satellite (img, audio, docs) documents its own types.
 - **Realtime over WebSocket and presence** don't exist in Events yet (ADR-005). SSE is the only transport.
 
 ## Development
@@ -184,6 +246,7 @@ Helpers: `signUserToken()`, `authorize()`, `publishEvent()`, `dropRealtime()`, a
 npm test                                 # every test/*.test.js: stub servers + mock platform, then npm pack + install
 fnm exec --using=22.22.1 npm test        # the Node version production runs
 node scripts/esm.js                      # regenerate esm/*.mjs after changing a module's exports
+node scripts/browser-bundle.js           # regenerate browser/openvibe-sdk.mjs after changing a browser-safe file
 ```
 
 Style: CommonJS, 4-space indent, single quotes, semicolons. Browser-safe files use only `fetch`, `Headers`, `FormData`, `Blob`, `URL`, `TextEncoder`/`TextDecoder` and `globalThis.crypto` (Web Crypto). Server-only files may use `node:` modules and are marked `"browser": null` in `package.json`.

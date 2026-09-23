@@ -184,6 +184,11 @@ function build(cfg, shared, ctx) {
      *           headers, token, auth, audience, idempotencyKey, idempotent, retries, timeoutMs,
      *           deadlineMs, signal, traceparent, requestId, responseType })
      *   -> { status, headers, data, requestId, traceId, traceparent, attempts }
+     *
+     * responseType 'response' (streams, downloads): a 2xx resolves with `data` and `response` set
+     * to the raw fetch Response, body unread. The timeout then covers the response headers only,
+     * and `signal` still cancels the body afterwards. An error status is read and thrown as
+     * usual, so the body you get is always a success.
      */
     async function request(opts = {}) {
         const method = String(opts.method || 'GET').toUpperCase();
@@ -247,7 +252,9 @@ function build(cfg, shared, ctx) {
             }
             const rid = res.headers.get('x-openvibe-request-id') || requestId;
             if (!res.ok) throw OpenVibeError.fromResponse({ status: res.status, body: data, requestId: rid, traceId: span.traceId, method, url, retryable });
-            return { status: res.status, headers: res.headers, data, requestId: rid, traceId: span.traceId, traceparent: span.traceparent, attempts: attempt + 1 };
+            const result = { status: res.status, headers: res.headers, data, requestId: rid, traceId: span.traceId, traceparent: span.traceparent, attempts: attempt + 1 };
+            if (opts.responseType === 'response') result.response = res;
+            return result;
         }
     }
 
@@ -299,6 +306,7 @@ async function attemptOnce(fetchImpl, url, { method, headers, body, credentials,
     let timedOut = false;
     const timer = setTimeout(() => { timedOut = true; ctrl.abort(); }, ms);
     const onAbort = () => ctrl.abort();
+    let keepSignal = false;
     if (signal) {
         if (signal.aborted) ctrl.abort();
         else signal.addEventListener('abort', onAbort, { once: true });
@@ -307,8 +315,11 @@ async function attemptOnce(fetchImpl, url, { method, headers, body, credentials,
         const init = { method, headers, body, signal: ctrl.signal };
         if (credentials) init.credentials = credentials;
         const res = await fetchImpl(url, init);
-        if (responseType === 'response') return { res, data: null };
-        return { res, data: await parseBody(res, responseType) };
+        if (responseType === 'response' && res.ok) {
+            keepSignal = true;       // the caller reads the body later: its signal must still cancel it
+            return { res, data: res };
+        }
+        return { res, data: await parseBody(res, responseType === 'response' ? undefined : responseType) };
     } catch (err) {
         if (signal && signal.aborted) throw new OpenVibeError({ ...meta, code: 'sdk.aborted', message: `${method} ${url.split('?')[0]}: aborted`, cause: err });
         if (timedOut) throw new OpenVibeError({ ...meta, code: 'sdk.timeout', retryable: true, message: `${method} ${url.split('?')[0]}: no response within ${ms} ms`, cause: err });
@@ -316,7 +327,7 @@ async function attemptOnce(fetchImpl, url, { method, headers, body, credentials,
         throw new OpenVibeError({ ...meta, code: 'sdk.network_error', retryable: true, message: `${method} ${url.split('?')[0]}: ${err && err.message ? err.message : 'network error'}`, cause: err });
     } finally {
         clearTimeout(timer);
-        if (signal) signal.removeEventListener('abort', onAbort);
+        if (signal && !keepSignal) signal.removeEventListener('abort', onAbort);
     }
 }
 

@@ -3,6 +3,7 @@ import cjs from '../src/auth/index.js';
 
 export const {
     createCodeVerifier, pkceChallenge, createPkcePair, createState, buildAuthorizeUrl, startAuthorization,
-    readCallback, base64url, createServiceTokenClient, verifyUserToken, exchangeCode, refreshUserToken,
+    readCallback, base64url, decodeUnverified, unverifiedClaims, createServiceTokenClient, verifyUserToken,
+    verifyAppToken, exchangeCode, refreshUserToken,
 } = cjs;
 export default cjs;

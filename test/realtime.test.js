@@ -2,7 +2,7 @@
 /** Realtime SSE: resume from Last-Event-ID after a drop, dedupe, gap callback, transports. */
 const assert = require('node:assert/strict');
 const { stubServer, run, waitFor } = require('./helpers');
-const { subscribe, createRealtimeClient } = require('../src/realtime');
+const { subscribe, createRealtimeClient, parseSSE } = require('../src/realtime');
 const { createClient } = require('../src/core');
 const { createMockPlatform } = require('../src/testing');
 
@@ -114,5 +114,35 @@ run([
         assert.equal(reconnect.headers['last-event-id'], '4');
         sub.close();
         await sub.done;
+    }],
+
+    ['parseSSE: WHATWG fields, comments, multi-line data, CRLF split across chunks, retry, async iterables', async () => {
+        const chunks = [': hello\r', '\nretry: 1500\r\nid: 7\r\nevent: job.progress\r\ndata: {"a":', '1}\r\n\r', '\ndata: line one\ndata: line two\n\nevent: ping\n\nid: 9\ndata:no-space\n\n'];
+        const body = new ReadableStream({ start(c) { for (const x of chunks) c.enqueue(new TextEncoder().encode(x)); c.close(); } });
+        const retries = [];
+        const got = [];
+        for await (const m of parseSSE(body, { onRetry: (ms) => retries.push(ms) })) got.push(m);
+        assert.deepEqual(retries, [1500]);
+        assert.deepEqual(got, [
+            { event: 'job.progress', data: '{"a":1}', id: '7' },
+            { event: 'message', data: 'line one\nline two', id: undefined },
+            { event: 'ping', data: '', id: undefined },
+            { event: 'message', data: 'no-space', id: '9' },
+        ]);
+        async function* strings() { yield 'data: a\n'; yield '\ndata: b\n\n'; }
+        const fromIterable = [];
+        for await (const m of parseSSE(strings())) fromIterable.push(m.data);
+        assert.deepEqual(fromIterable, ['a', 'b']);
+        await assert.rejects(parseSSE(null).next(), TypeError);
+    }],
+
+    ['parseSSE: breaking out cancels the underlying stream', async () => {
+        let cancelled = false;
+        const body = new ReadableStream({
+            pull(c) { c.enqueue(new TextEncoder().encode('data: x\n\n')); },
+            cancel() { cancelled = true; },
+        });
+        for await (const m of parseSSE(body)) { assert.equal(m.data, 'x'); break; }
+        assert.equal(cancelled, true);
     }],
 ]);

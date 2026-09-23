@@ -12,6 +12,6 @@ jobs:
         with:
           node-version: 22.22.1   # production services run Node 22
       # types.test.js compares types/contracts.d.ts with the pinned Contracts release
-      - run: git clone --depth 1 --branch v0.6.0 https://github.com/OpenVibers/OpenVibe.Contracts.git ../OpenVibe.Contracts
+      - run: git clone --depth 1 --branch v0.26.0 https://github.com/OpenVibers/OpenVibe.Contracts.git ../OpenVibe.Contracts
       - run: npm test             # includes the pack test (npm pack + install into a temp project)
       - run: node scripts/esm.js --check

@@ -24,7 +24,8 @@ export interface EventsClient {
     publish(envelope: EventInput, opts?: { traceparent?: string }): Promise<PublishResult>;
     publish(envelopes: EventInput[], opts?: { traceparent?: string }): Promise<{ results: PublishResult[] }>;
     pull(opts?: { topic?: string | string[]; afterSeq?: number; limit?: number }): Promise<EventsPage>;
-    iterate(opts?: { topic?: string | string[]; afterSeq?: number; limit?: number; onGap?: (gap: Gap) => void | Promise<void>; onPage?: (page: EventsPage) => void | Promise<void> }): AsyncGenerator<StoredEvent, void, unknown>;
+    /** onPage runs after every item of that page was yielded and handled: save page.next_after_seq there. */
+    iterate(opts?: { topic?: string | string[]; afterSeq?: number; limit?: number; maxPages?: number; onGap?: (gap: Gap) => void | Promise<void>; onPage?: (page: EventsPage) => void | Promise<void> }): AsyncGenerator<StoredEvent, void, unknown>;
     get(eventId: string): Promise<StoredEvent | null>;
     getCheckpoint(topic: string): Promise<{ consumer: string; topic: string; cursor: number; updated_at: string | null }>;
     setCheckpoint(topic: string, cursor: number): Promise<{ consumer: string; topic: string; cursor: number }>;

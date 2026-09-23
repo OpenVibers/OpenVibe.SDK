@@ -7,7 +7,8 @@ const { ulid, newEventId, newIdempotencyKey, isActingSubjectId } = require('./id
 const { paginate, offsetPager } = require('./paginate');
 const semver = require('./semver');
 
-const SDK_VERSION = '0.1.0';
+/** The package version (test/version.test.js keeps it equal to package.json). */
+const SDK_VERSION = '0.3.0';
 
 module.exports = {
     createClient,

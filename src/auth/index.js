@@ -5,7 +5,7 @@
  */
 const browser = require('./browser');
 const { createServiceTokenClient } = require('./tokens');
-const { verifyUserToken } = require('./jwt');
+const { verifyUserToken, verifyAppToken } = require('./jwt');
 const { exchangeCode, refreshUserToken } = require('./oauth');
 
-module.exports = { ...browser, createServiceTokenClient, verifyUserToken, exchangeCode, refreshUserToken };
+module.exports = { ...browser, createServiceTokenClient, verifyUserToken, verifyAppToken, exchangeCode, refreshUserToken };

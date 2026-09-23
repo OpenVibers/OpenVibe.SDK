@@ -3,9 +3,15 @@
  * openvibe-sdk/auth, browser entry: OAuth2 authorization code + PKCE (RFC 7636, S256).
  *
  * The browser builds the authorize URL and keeps the verifier (sessionStorage, or your server's
- * session). The code is then exchanged ON YOUR SERVER (openvibe-sdk/auth server entry,
- * exchangeCode()), because every OpenVibe OAuth client is a confidential client: its credentials
- * never reach a browser. This file holds no credentials and uses Web Crypto only.
+ * session). The code is then exchanged on your server (openvibe-sdk/auth server entry,
+ * exchangeCode()): a confidential client's credentials never reach a browser, and even a public
+ * developer app (no secret) is best served by keeping the token in an HttpOnly server session.
+ * This file holds no credentials and uses Web Crypto only.
+ *
+ * Two kinds of client use this flow:
+ *   first-party sign-in   scope 'profile theme' (the default); the exchange yields a user token
+ *   developer app         `audience` (openvibe.<service>) and `scope` = capability ids; the exchange
+ *                         yields a 5-minute app token acting for the person (no refresh token)
  */
 const { OpenVibeError } = require('../core/errors');
 const { randomBytes } = require('../core/ids');
@@ -44,15 +50,23 @@ function createState() {
 
 /**
  * GET <network>/oauth/authorize?response_type=code&client_id&redirect_uri&scope&state
- *     &code_challenge&code_challenge_method=S256[&prompt=none]
+ *     &code_challenge&code_challenge_method=S256[&audience][&prompt=none]
+ *
+ * `scope` defaults to 'profile theme' (first-party sign-in) only when no `audience` is given. A
+ * developer app passes `audience` and its capability ids as `scope`; without a scope the code may
+ * yield every capability the app holds for that audience. Network refuses prompt=none for apps
+ * (error=interaction_required): a person always chooses to continue.
  */
-function buildAuthorizeUrl({ network = DEFAULT_NETWORK, authorizeUrl, clientId, redirectUri, scope = 'profile theme', state, codeChallenge, codeChallengeMethod = 'S256', prompt } = {}) {
+function buildAuthorizeUrl({ network = DEFAULT_NETWORK, authorizeUrl, clientId, redirectUri, scope, audience, state, codeChallenge, codeChallengeMethod = 'S256', prompt } = {}) {
     if (!clientId || !redirectUri) throw new TypeError('clientId and redirectUri are required');
     const u = new URL(authorizeUrl || `${String(network).replace(/\/+$/, '')}/oauth/authorize`);
     u.searchParams.set('response_type', 'code');
     u.searchParams.set('client_id', clientId);
     u.searchParams.set('redirect_uri', redirectUri);
-    if (scope) u.searchParams.set('scope', Array.isArray(scope) ? scope.join(' ') : scope);
+    const s = scope === undefined && !audience ? 'profile theme' : scope;
+    const scopeText = Array.isArray(s) ? s.filter(Boolean).join(' ') : s;
+    if (scopeText) u.searchParams.set('scope', scopeText);
+    if (audience) u.searchParams.set('audience', audience);
     if (state) u.searchParams.set('state', state);
     if (codeChallenge) {
         u.searchParams.set('code_challenge', codeChallenge);
@@ -65,6 +79,7 @@ function buildAuthorizeUrl({ network = DEFAULT_NETWORK, authorizeUrl, clientId, 
 /**
  * Everything a sign-in button needs: { url, state, codeVerifier, codeChallenge }.
  * Store `state` and `codeVerifier` until the callback, then send the code and verifier to your server.
+ * A developer app passes { audience, scope: [capability ids] } and exchanges with the same audience.
  */
 async function startAuthorization(opts = {}) {
     const pair = await createPkcePair(opts.verifierLength);
@@ -92,4 +107,34 @@ function readCallback(location, { expectedState } = {}) {
     return { code, state };
 }
 
-module.exports = { createCodeVerifier, pkceChallenge, createPkcePair, createState, buildAuthorizeUrl, startAuthorization, readCallback, base64url };
+/**
+ * The header and claims of a JWT, decoded WITHOUT checking its signature, issuer, audience or
+ * expiry: { header, claims } or null when it is not a JWT. For display and logging only (who a
+ * token names, what it may do, when it expires). Never authorize anything with it: a receiver
+ * verifies tokens with verifyUserToken() / verifyAppToken() (server).
+ */
+function decodeUnverified(token) {
+    const parts = typeof token === 'string' ? token.split('.') : [];
+    if (parts.length !== 3) return null;
+    try {
+        const part = (p) => {
+            const b64 = p.replace(/-/g, '+').replace(/_/g, '/');
+            const bin = atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4));
+            return JSON.parse(new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0))));
+        };
+        const header = part(parts[0]);
+        const claims = part(parts[1]);
+        if (!header || typeof header !== 'object' || !claims || typeof claims !== 'object' || Array.isArray(claims)) return null;
+        return { header, claims };
+    } catch {
+        return null;
+    }
+}
+
+/** decodeUnverified(token).claims, or null. UNVERIFIED: see decodeUnverified(). */
+function unverifiedClaims(token) {
+    const d = decodeUnverified(token);
+    return d ? d.claims : null;
+}
+
+module.exports = { createCodeVerifier, pkceChallenge, createPkcePair, createState, buildAuthorizeUrl, startAuthorization, readCallback, base64url, decodeUnverified, unverifiedClaims };

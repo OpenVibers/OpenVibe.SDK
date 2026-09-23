@@ -7,6 +7,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { pathToFileURL } = require('node:url');
 const { run } = require('./helpers');
 
 const ROOT = path.join(__dirname, '..');
@@ -33,7 +34,9 @@ run([
         for (const [sub, entry] of Object.entries(pkg.exports)) {
             if (sub === './package.json') continue;
             const names = declared(path.join(ROOT, entry.types));
-            const runtime = Object.keys(require(path.join(ROOT, entry.default)));
+            const runtime = entry.default.endsWith('.mjs')
+                ? Object.keys(await import(pathToFileURL(path.join(ROOT, entry.default)).href)).filter((k) => k !== 'default')
+                : Object.keys(require(path.join(ROOT, entry.default)));
             for (const n of runtime) if (!names.has(n)) missing.push(`${sub}: ${n}`);
             const browser = entry.browser ? Object.keys(require(path.join(ROOT, entry.browser))) : [];
             for (const n of browser) if (!names.has(n)) missing.push(`${sub} (browser): ${n}`);

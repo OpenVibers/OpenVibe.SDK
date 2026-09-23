@@ -13,4 +13,6 @@ module.exports = {
     realtime: require('./src/realtime'),
     media: require('./src/media'),
     community: require('./src/community'),
+    jobs: require('./src/jobs'),
+    projects: require('./src/projects'),
 };

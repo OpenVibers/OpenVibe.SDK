@@ -5,61 +5,42 @@
  *   const { createMockPlatform } = require('openvibe-sdk/testing');
  *   const platform = createMockPlatform({
  *       clients: { demo: { secret: 's3cret', grants: [{ capability: 'media.object.upload', audience: 'openvibe.media', namespaces: ['demo'] }] } },
+ *       apps: { [appId]: { env: 'sandbox', type: 'confidential', secret: 's', grants: ['media.object.upload'] } },
  *       mediaApps: { demo: {} },
  *   });
  *   const client = createClient({ fetch: platform.fetch, tokenProvider: createServiceTokenClient({ clientId: 'demo', clientSecret: 's3cret', fetch: platform.fetch }) });
  *
  * `platform.fetch` answers like the real services at their public origins:
- *   Network  /.well-known/openvibe, /oauth/token (client_credentials, authorization_code with PKCE,
- *            refresh_token), /api/.well-known/jwks, /api/v1/registry/*, /api/modules/*,
- *            /internal/modules/*, /internal/identity/*
- *   Events   /api/v1/events, /api/v1/subscriptions, /api/v1/checkpoints, /realtime/stream (SSE)
- *   Media    /api/v1/:app/files
+ *   Network  /.well-known/openvibe, /oauth/authorize (auto-consent), /oauth/token (client_credentials,
+ *            authorization_code with PKCE, refresh_token; developer apps), /api/.well-known/jwks,
+ *            /api/v1/registry/*, /api/v1/projects/*, /api/modules/*, /internal/modules/*,
+ *            /internal/identity/*
+ *   Events   /api/v1/events (with retention gaps after pruneEvents()), /api/v1/subscriptions,
+ *            /api/v1/checkpoints, /realtime/stream (SSE); deliverEvents() plays the delivery worker
+ *   Media    /api/v1/:app/files (developer apps: the tenant is the project id)
+ *   Tools    /api/v1/jobs (with { jobs: true })
  * Tokens are real RS256 JWTs signed with a key generated per platform, checked the way the real
- * services check them (audience, capability, namespace). It is a fake: no persistence, no
- * delivery worker, simplified visibility rules. It is stricter than the Network on one point: it
- * verifies PKCE code_verifier when the authorization carried a challenge.
+ * services check them (audience, capability, namespace, sandbox refusal). It is a fake: no
+ * persistence, simplified visibility rules, no Chat. Like the Network, it verifies the PKCE
+ * code_verifier whenever the authorization carried a challenge, and requires one from apps.
  */
 const crypto = require('node:crypto');
+const { b64url, fromB64url, ulid, topicRegex, json, problem, redirect } = require('./util');
+const { createDeveloper, DEFAULT_APP_CATALOG } = require('./developer');
+const { createJobsService } = require('./jobs');
 
 const DEFAULT_ORIGINS = {
     network: 'https://openvibe.network',
     events: 'https://events.openvibe.network',
     media: 'https://openvibe.media',
     community: 'https://openvibe.community',
+    tools: 'https://openvibe.tools',
 };
-const ULID_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
-const b64url = (buf) => Buffer.from(buf).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
-const fromB64url = (s) => Buffer.from(String(s).replace(/-/g, '+').replace(/_/g, '/'), 'base64');
-
-function ulid() {
-    let t = Date.now();
-    let time = '';
-    for (let i = 0; i < 10; i++, t = Math.floor(t / 32)) time = ULID_ALPHABET[t % 32] + time;
-    let rand = '';
-    for (const b of crypto.randomBytes(16)) rand += ULID_ALPHABET[b & 31];
-    return time + rand;
-}
-
-function topicRegex(pattern) {
-    const seg = '[a-z0-9_]+';
-    const parts = String(pattern).split('.').map((p) => (p === '*' ? `${seg}(?:\\.${seg})*` : p.replace(/[^a-z0-9_]/g, '')));
-    return new RegExp(`^${parts.join('\\.')}$`);
-}
-
-function json(status, body, headers = {}) {
-    return new Response(body === null ? null : JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...headers } });
-}
-function problem(status, code, detail) {
-    return new Response(JSON.stringify({ type: `https://openvibe.network/problems/${code}`, title: String(status), status, code, detail, error: detail || code }), {
-        status, headers: { 'Content-Type': 'application/problem+json' },
-    });
-}
 
 function createMockPlatform(opts = {}) {
     const origins = { ...DEFAULT_ORIGINS, ...opts.origins };
     const issuer = opts.issuer || origins.network;
-    const contractsVersion = opts.contractsVersion || '0.6.0';
+    const contractsVersion = opts.contractsVersion || '0.26.0';
     const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
     const kid = 'mock-1';
     const jwk = { ...publicKey.export({ format: 'jwk' }), use: 'sig', alg: 'RS256', kid };
@@ -70,13 +51,17 @@ function createMockPlatform(opts = {}) {
     const codes = new Map();
     const refreshTokens = new Map();
     const modules = new Map();        // `${subject}|${ns}` -> record
-    const events = [];                // { seq, event, publisher }
+    const events = [];                // { seq, event, publisher }, oldest first; pruneEvents() drops the head
+    let lastSeq = 0;
+    const oldestSeq = () => (events.length ? events[0].seq : lastSeq + 1);
     const subscriptions = new Map();
     const checkpoints = new Map();
     const files = new Map();          // `${app}|${key}` -> meta
     const mediaApps = new Map(Object.entries(opts.mediaApps || {}).map(([id, a]) => [id, { apiKey: (a && a.apiKey) || null }]));
     const streams = new Set();
-    const stats = { tokenRequests: 0, requests: [] };
+    const stats = { tokenRequests: 0, requests: [], deliveries: [] };
+    const acceptSandbox = opts.acceptSandbox === true ? true : new Set(opts.acceptSandbox || []);
+    const authorization = { subjectId: null, decision: 'allow' };
     const namespaces = opts.namespaces || [{ namespace: 'demo.prefs', owner: 'demo', version: 1, writers: ['owner', 'user'], publicFields: ['theme'], quotaBytes: 4096, onOwnerRemoved: 'retain-readonly', schema: { type: 'object' } }];
     const capabilities = opts.capabilities || [];
 
@@ -117,13 +102,34 @@ function createMockPlatform(opts = {}) {
         return sign({ iss: issuer, sub: `svc:${clientId}`, actor_type: 'service', aud: [audience], cap, ns, iat: now(), exp: now() + expiresInSec, jti: `tok_${crypto.randomBytes(8).toString('hex')}` });
     }
 
-    /** { claims } of a verified caller, or { res } with the error to answer. */
+    /**
+     * An app token signed directly, without the token endpoint (e.g. to test a receiver). A
+     * registered app's project and env are used unless given.
+     */
+    function signAppToken(appId, { audience, capabilities: cap = [], projectId, env, onBehalfOf, expiresInSec = 300 } = {}) {
+        const app = developer.apps.get(appId);
+        const project = projectId || (app && app.project_id) || `prj_${ulid()}`;
+        return sign({
+            iss: issuer, sub: `app:${appId}`, actor_type: 'app', aud: [audience], cap, ns: [project], project_id: project,
+            env: env || (app && app.environment) || 'sandbox', ...(onBehalfOf ? { on_behalf_of: onBehalfOf } : {}),
+            iat: now(), exp: now() + expiresInSec, jti: `tok_${crypto.randomBytes(8).toString('hex')}`,
+        });
+    }
+
+    /**
+     * { claims, service } of a verified service or app principal, or { res } with the error to
+     * answer. App tokens with env=sandbox are refused (401 token.sandbox_refused) unless
+     * `acceptSandbox` lists this audience or capability (or is true).
+     */
     function principal(req, audience, capability, namespace) {
         const auth = req.headers.get('authorization') || '';
         if (!auth.startsWith('Bearer ')) return { res: problem(401, 'token.missing', 'no token') };
         const claims = decode(auth.slice(7));
-        if (!claims || claims.actor_type !== 'service') return { res: problem(401, 'token.bad_signature', 'not a valid service token') };
+        if (!claims || !['service', 'app', 'mod'].includes(claims.actor_type)) return { res: problem(401, 'token.bad_signature', 'not a valid service token') };
         if (!(claims.aud || []).includes(audience)) return { res: problem(401, 'token.wrong_audience', `not for ${audience}`) };
+        if (claims.env === 'sandbox' && !(acceptSandbox === true || acceptSandbox.has(audience) || acceptSandbox.has(capability))) {
+            return { res: problem(401, 'token.sandbox_refused', 'sandbox tokens are not accepted here') };
+        }
         const granted = (claims.cap || []).some((c) => c === capability || (c.endsWith('.*') && capability.startsWith(c.slice(0, -1))));
         if (!granted) return { res: problem(403, 'capability.denied', `${capability} not granted`) };
         if (namespace && claims.ns && claims.ns.length && !claims.ns.some((n) => n === namespace || (n.endsWith('.*') && namespace.startsWith(n.slice(0, -1))))) {
@@ -136,6 +142,9 @@ function createMockPlatform(opts = {}) {
         const claims = auth.startsWith('Bearer ') ? decode(auth.slice(7)) : null;
         return claims && !claims.actor_type ? claims : null;
     }
+
+    const developer = createDeveloper({ opts, issuer, sign, users, addUser, userOf, mediaApps, authorization });
+    const jobsService = createJobsService({ opts, decode, principal });
 
     // ── Network ─────────────────────────────────────────────
     function descriptor() {
@@ -155,6 +164,8 @@ function createMockPlatform(opts = {}) {
     async function tokenEndpoint(req) {
         stats.tokenRequests++;
         const p = new URLSearchParams(await req.text());
+        const appAnswer = developer.token(p);
+        if (appAnswer) return appAnswer;
         const client = clients.get(p.get('client_id') || '');
         if (!client || client.secret !== p.get('client_secret')) return json(401, { error: 'invalid_client', error_description: 'Invalid client credentials' });
         const grant = p.get('grant_type');
@@ -195,12 +206,37 @@ function createMockPlatform(opts = {}) {
         }
     }
 
-    function authorize({ clientId, redirectUri, subjectId, codeChallenge, codeChallengeMethod = 'S256', scope = 'profile theme' } = {}) {
+    /**
+     * What the Network does after the account chooser: returns an authorization code. For a
+     * developer app it checks what Network checks (registered redirect URI, S256 challenge,
+     * sandbox membership) and binds the code to `audience` when one is given.
+     */
+    function authorize({ clientId, redirectUri, subjectId, codeChallenge, codeChallengeMethod = 'S256', scope, audience } = {}) {
+        if (developer.isApp(clientId)) return developer.issueCode({ clientId, redirectUri, subjectId, codeChallenge, codeChallengeMethod, scope, audience });
         if (codeChallenge && codeChallengeMethod !== 'S256') throw new Error('mock authorize: only S256');
         const user = users.get(subjectId) || [...users.values()][0] || addUser();
         const code = crypto.randomBytes(16).toString('hex');
-        codes.set(code, { clientId, redirectUri, subjectId: user.subject_id, codeChallenge, scope, used: false });
+        codes.set(code, { clientId, redirectUri, subjectId: user.subject_id, codeChallenge, scope: scope === undefined ? 'profile theme' : scope, used: false });
         return code;
+    }
+
+    /** GET /oauth/authorize: consents automatically as setAuthorization()'s person (default: the first user). */
+    function authorizeRoute(url) {
+        const q = url.searchParams;
+        if (developer.isApp(q.get('client_id'))) return developer.authorizeRoute(url);
+        const client = clients.get(q.get('client_id') || '');
+        const redirectUri = q.get('redirect_uri') || '';
+        if (!client) return json(400, { error: 'invalid_request', error_description: 'Unknown client_id' });
+        if (!redirectUri || (client.redirectUris.length && !client.redirectUris.includes(redirectUri))) return json(400, { error: 'invalid_request', error_description: 'Invalid redirect_uri' });
+        const back = (params) => redirect(redirectUri, { ...params, state: q.get('state') });
+        if (q.get('response_type') !== 'code') return back({ error: 'unsupported_response_type' });
+        if (q.get('prompt') === 'none' && !authorization.subjectId && !users.size) return back({ error: 'login_required' });
+        if (authorization.decision === 'deny') return back({ error: 'access_denied', error_description: 'the person declined' });
+        const code = authorize({
+            clientId: client.id, redirectUri, subjectId: authorization.subjectId, codeChallenge: q.get('code_challenge') || undefined,
+            codeChallengeMethod: q.get('code_challenge_method') || 'S256', scope: q.get('scope') || undefined,
+        });
+        return back({ code });
     }
 
     function projection(u) {
@@ -231,6 +267,8 @@ function createMockPlatform(opts = {}) {
         let r;
         if (req.method === 'GET' && path === '/.well-known/openvibe') return json(200, descriptor());
         if (req.method === 'POST' && path === '/oauth/token') return tokenEndpoint(req);
+        if (req.method === 'GET' && path === '/oauth/authorize') return authorizeRoute(url);
+        if (path === '/api/v1/projects' || path.startsWith('/api/v1/projects/')) return developer.projectsApi(req, url);
         if (req.method === 'GET' && path === '/api/.well-known/jwks') return json(200, jwks);
         if (req.method === 'GET' && path.startsWith('/api/v1/registry')) {
             const sub = path.slice('/api/v1/registry'.length);
@@ -309,7 +347,7 @@ function createMockPlatform(opts = {}) {
     function publishEvent(env, publisher) {
         const dup = events.find((e) => e.event.event_id === env.event_id);
         if (dup) return { event_id: env.event_id, seq: dup.seq, duplicate: true };
-        const stored = { seq: events.length + 1, event: { priority: 'important', visibility: 'internal', ...env }, publisher };
+        const stored = { seq: ++lastSeq, event: { priority: 'important', visibility: 'internal', ...env }, publisher };
         events.push(stored);
         for (const s of streams) s.push(stored);
         return { event_id: env.event_id, seq: stored.seq, duplicate: false };
@@ -339,15 +377,21 @@ function createMockPlatform(opts = {}) {
             const after = Number(url.searchParams.get('after_seq') || 0);
             const limit = Number(url.searchParams.get('limit') || 100);
             const out = [];
-            let cursor = after;
+            const page = {};
+            let from = after;
+            if (after < oldestSeq() - 1) {                  // retention already pruned part of the range
+                page.gap = { from_seq: after + 1, to_seq: oldestSeq() - 1 };
+                from = oldestSeq() - 1;
+            }
+            let cursor = from;
             for (const e of events) {
-                if (e.seq <= after) continue;
+                if (e.seq <= from) continue;
                 if (out.length >= limit) break;
                 cursor = e.seq;
                 if (pats.some((re) => re.test(e.event.event_type))) out.push({ seq: e.seq, event: e.event });
             }
-            if (out.length < limit) cursor = Math.max(cursor, events.length);
-            return json(200, { events: out, next_after_seq: cursor, latest_seq: events.length });
+            if (out.length < limit) cursor = Math.max(cursor, lastSeq);
+            return json(200, { ...page, events: out, next_after_seq: cursor, latest_seq: lastSeq });
         }
         if ((r = path.match(/^\/api\/v1\/events\/([^/]+)$/)) && req.method === 'GET') {
             const who = principal(req, 'openvibe.events', 'events.event.read');
@@ -375,7 +419,11 @@ function createMockPlatform(opts = {}) {
                 if (!b.topic_pattern || !b.endpoint) return problem(422, 'events.bad_request', 'topic_pattern and endpoint are required');
                 const dup = [...subscriptions.values()].find((s) => s.consumer === who.service && s.topic_pattern === b.topic_pattern && s.endpoint === b.endpoint);
                 if (dup) return problem(409, 'events.subscription_exists', 'already subscribed');
-                const s = { id: `sub_${ulid()}`, consumer: who.service, topic_pattern: b.topic_pattern, endpoint: b.endpoint, enabled: true, retry_policy: b.retry_policy || null, secret: b.secret || `whsec_${crypto.randomBytes(32).toString('hex')}` };
+                const s = {
+                    id: `sub_${ulid()}`, consumer: who.service, topic_pattern: b.topic_pattern, endpoint: b.endpoint, enabled: true, retry_policy: b.retry_policy || null,
+                    secret: b.secret || `whsec_${crypto.randomBytes(32).toString('hex')}`,
+                    cursor: lastSeq, attempts: new Map(),     // deliverEvents(): events published after the subscription
+                };
                 subscriptions.set(s.id, s);
                 return json(201, view(s, true));
             }
@@ -396,6 +444,7 @@ function createMockPlatform(opts = {}) {
         const auth = req.headers.get('authorization') || '';
         const claims = auth.startsWith('Bearer ') ? decode(auth.slice(7)) : null;
         if (auth.startsWith('Bearer ') && !claims) return problem(401, 'token.bad_signature', 'bad token');
+        if (claims && claims.env === 'sandbox' && !(acceptSandbox === true || acceptSandbox.has('openvibe.events'))) return problem(401, 'token.sandbox_refused', 'sandbox tokens are not accepted here');
         const viewer = claims ? (claims.actor_type ? { kind: 'service' } : { kind: 'user', subject: claims.subject_id }) : { kind: 'anonymous' };
         const raw = req.headers.get('last-event-id') ?? url.searchParams.get('last_event_id');
         const last = raw != null && /^\d+$/.test(raw) ? Number(raw) : null;
@@ -405,7 +454,7 @@ function createMockPlatform(opts = {}) {
             start(controller) {
                 const send = (s) => { try { controller.enqueue(enc.encode(s)); } catch { streams.delete(conn); } };
                 conn = {
-                    lastSeq: last ?? events.length,
+                    lastSeq: last ?? lastSeq,
                     push(e) {
                         if (e.seq <= conn.lastSeq || !pats.some((re) => re.test(e.event.event_type)) || !visible(viewer, e)) return;
                         conn.lastSeq = e.seq;
@@ -415,9 +464,14 @@ function createMockPlatform(opts = {}) {
                 };
                 send(`retry: ${opts.realtimeRetryMs ?? 50}\n: connected ${viewer.kind}\n\n`);
                 if (last != null) {
-                    if (last > events.length) send(`event: gap\ndata: ${JSON.stringify({ reason: 'cursor_ahead', from_seq: events.length + 1, to_seq: last, latest_seq: events.length })}\n\n`);
+                    if (last > lastSeq) {
+                        send(`event: gap\ndata: ${JSON.stringify({ reason: 'cursor_ahead', from_seq: lastSeq + 1, to_seq: last, latest_seq: lastSeq })}\n\n`);
+                        conn.lastSeq = lastSeq;
+                    } else if (last < oldestSeq() - 1) {
+                        send(`event: gap\ndata: ${JSON.stringify({ reason: 'retention', from_seq: last + 1, to_seq: oldestSeq() - 1, latest_seq: lastSeq })}\n\n`);
+                    }
                     for (const e of events) conn.push(e);
-                    conn.lastSeq = Math.max(conn.lastSeq, events.length);
+                    conn.lastSeq = Math.max(conn.lastSeq, lastSeq);
                 }
                 streams.add(conn);
                 if (req.signal) req.signal.addEventListener('abort', () => conn.close(), { once: true });
@@ -425,6 +479,83 @@ function createMockPlatform(opts = {}) {
             cancel() { streams.delete(conn); },
         });
         return new Response(body, { status: 200, headers: { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-cache' } });
+    }
+
+    // ── Delivery worker ─────────────────────────────────────
+    /**
+     * deliverEvents({ fetch, subscriptionId, timeoutMs }) plays the Events delivery worker once:
+     * for each enabled subscription, POSTs every event published after it was created (in seq
+     * order, one at a time) to its endpoint as { event, seq }, signed like Events signs deliveries
+     * (X-OpenVibe-Signature: sha256=<HMAC of the raw body with the subscription secret>, plus
+     * X-OpenVibe-Event-Id, -Event-Type, -Seq, -Subscription-Id, -Delivery-Attempt, -Hops,
+     * traceparent). A 2xx moves on; anything else stops that subscription until the next call,
+     * and after retry_policy.max_attempts (default 5) the delivery is dead and skipped.
+     * `fetch` defaults to the global fetch, so the endpoint can be a real local HTTP server.
+     * -> { delivered, failed, dead, attempts: [{ subscription_id, event_id, seq, attempt, status, outcome, error? }] }
+     */
+    async function deliverEvents({ fetch: send = opts.deliveryFetch || globalThis.fetch, subscriptionId, timeoutMs = 5000 } = {}) {
+        const out = { delivered: 0, failed: 0, dead: 0, attempts: [] };
+        for (const sub of subscriptions.values()) {
+            if (!sub.enabled || (subscriptionId && sub.id !== subscriptionId)) continue;
+            const re = topicRegex(sub.topic_pattern);
+            const max = (sub.retry_policy && Number.isInteger(sub.retry_policy.max_attempts) && sub.retry_policy.max_attempts) || 5;
+            for (const e of events) {
+                if (e.seq <= sub.cursor) continue;
+                if (!re.test(e.event.event_type)) { sub.cursor = e.seq; continue; }
+                const attempt = (sub.attempts.get(e.event.event_id) || 0) + 1;
+                sub.attempts.set(e.event.event_id, attempt);
+                const body = JSON.stringify({ event: e.event, seq: e.seq });
+                const trace = /^[0-9a-f]{32}$/.test(e.event.trace_id || '') ? e.event.trace_id : crypto.randomBytes(16).toString('hex');
+                let status = null;
+                let error;
+                try {
+                    const res = await send(sub.endpoint, {
+                        method: 'POST', redirect: 'manual', signal: AbortSignal.timeout(timeoutMs), body,
+                        headers: {
+                            'Content-Type': 'application/json', 'User-Agent': 'OpenVibe.Events/mock',
+                            'X-OpenVibe-Event-Id': e.event.event_id, 'X-OpenVibe-Event-Type': e.event.event_type, 'X-OpenVibe-Seq': String(e.seq),
+                            'X-OpenVibe-Subscription-Id': sub.id, 'X-OpenVibe-Delivery-Attempt': String(attempt), 'X-OpenVibe-Hops': '0',
+                            'X-OpenVibe-Signature': `sha256=${crypto.createHmac('sha256', String(sub.secret)).update(body).digest('hex')}`,
+                            traceparent: `00-${trace}-${crypto.randomBytes(8).toString('hex')}-01`,
+                        },
+                    });
+                    status = res.status;
+                    try { await (res.body && res.body.cancel()); } catch { /* not needed */ }
+                } catch (err) {
+                    error = err && err.name === 'TimeoutError' ? 'timeout' : String((err && err.message) || err);
+                }
+                const ok = status >= 200 && status < 300;
+                const outcome = ok ? 'delivered' : attempt >= max ? 'dead' : 'retry';
+                const rec = { subscription_id: sub.id, event_id: e.event.event_id, seq: e.seq, attempt, status, outcome, ...(error ? { error } : {}) };
+                out.attempts.push(rec);
+                stats.deliveries.push(rec);
+                if (ok) { out.delivered++; sub.cursor = e.seq; continue; }
+                if (outcome === 'dead') { out.dead++; sub.cursor = e.seq; continue; }
+                out.failed++;
+                break;                                        // in order: retry this one next time
+            }
+        }
+        return out;
+    }
+
+    /** deliverEvents() every intervalMs until stop() (resolves after the round in flight). */
+    function startDeliveries({ intervalMs = 20, ...deliverOpts } = {}) {
+        let stopped = false;
+        let timer = null;
+        let current = Promise.resolve();
+        const tick = () => {
+            if (stopped) return;
+            current = deliverEvents(deliverOpts).catch(() => {}).then(() => { if (!stopped) timer = setTimeout(tick, intervalMs); });
+        };
+        tick();
+        return { async stop() { stopped = true; clearTimeout(timer); await current; } };
+    }
+
+    /** Retention: drop every stored event with seq <= throughSeq (pulls and resumes now see a gap). */
+    function pruneEvents(throughSeq) {
+        let n = 0;
+        while (events.length && events[0].seq <= throughSeq) { events.shift(); n++; }
+        return n;
     }
 
     // ── Media files ─────────────────────────────────────────
@@ -480,6 +611,7 @@ function createMockPlatform(opts = {}) {
         if (origin === new URL(origins.network).origin) return network(req, url);
         if (origin === new URL(origins.events).origin) return eventsService(req, url);
         if (origin === new URL(origins.media).origin) return media(req, url);
+        if (origin === new URL(origins.tools).origin) return jobsService.handle(req, url);
         throw new TypeError(`mock platform: no service at ${origin} (fetch failed)`);
     }
 
@@ -493,8 +625,22 @@ function createMockPlatform(opts = {}) {
         addClient,
         addUser,
         authorize,
+        /** Who /oauth/authorize signs in as ({ subjectId }) and whether they continue or decline ({ decision: 'deny' }). */
+        setAuthorization({ subjectId, decision } = {}) {
+            if (subjectId !== undefined) authorization.subjectId = subjectId;
+            if (decision !== undefined) authorization.decision = decision === 'deny' ? 'deny' : 'allow';
+        },
+        /** A developer app (see createDeveloper): -> { id, clientId, projectId, env, type, secret? } */
+        addApp: (spec) => developer.addApp(spec),
+        addProject: (spec) => developer.addProject(spec).id,
+        signAppToken,
         stats,
-        state: { events, subscriptions, modules, files, users, checkpoints },
+        state: { events, subscriptions, modules, files, users, checkpoints, apps: developer.apps, projects: developer.projects, jobs: jobsService.jobs },
+        deliverEvents,
+        startDeliveries,
+        pruneEvents,
+        /** End every open Tools job event stream (clients reconnect with Last-Event-ID). */
+        dropJobStreams: () => jobsService.dropStreams(),
         /** Store an event as if a producer had published it (for realtime/pull tests). */
         publishEvent: (env, publisher = 'svc:mock') => publishEvent({ event_id: `evt_${ulid()}`, version: 1, timestamp: new Date().toISOString(), payload: {}, ...env }, publisher),
         /** End every open realtime stream (clients reconnect with Last-Event-ID). */
@@ -502,4 +648,4 @@ function createMockPlatform(opts = {}) {
     };
 }
 
-module.exports = { createMockPlatform, DEFAULT_ORIGINS };
+module.exports = { createMockPlatform, DEFAULT_ORIGINS, DEFAULT_APP_CATALOG };

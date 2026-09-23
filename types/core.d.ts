@@ -74,6 +74,7 @@ export interface RequestOptions {
     traceparent?: string;
     requestId?: string;
     credentials?: RequestCredentials;
+    /** 'response': a 2xx resolves with the raw fetch Response (body unread) as `data` and `response`. */
     responseType?: 'json' | 'text' | 'arrayBuffer' | 'response';
 }
 
@@ -85,6 +86,8 @@ export interface ClientResponse<T = any> {
     traceId: string;
     traceparent: string;
     attempts: number;
+    /** Only with responseType 'response': the raw Response (same as data). */
+    response?: Response;
 }
 
 export interface Discovery {
