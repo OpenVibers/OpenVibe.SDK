@@ -3,6 +3,12 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.2.2 (2026-09-23)
+
+- No peer dependency on `openvibe-contracts`: the SDK never loads it at runtime, and a peer pinned
+  to one Contracts tarball made npm refuse any service on a newer Contracts release. The supported
+  Contracts range is documented in the README and checked by CI.
+
 ## 0.2.1 (2026-09-23)
 
 - Outbox: a refusal from the Network token endpoint (for example a grant not provisioned yet) is

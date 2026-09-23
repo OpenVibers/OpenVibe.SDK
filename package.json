@@ -1,6 +1,6 @@
 {
   "name": "openvibe-sdk",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Supported browser and server clients for the OpenVibe platform: auth, registry discovery, identity, user modules, events, realtime, media and community, with deadlines, safe retries, problem errors and trace propagation.",
   "main": "index.js",
   "types": "types/index.d.ts",
@@ -89,14 +89,6 @@
   },
   "engines": {
     "node": ">=20"
-  },
-  "peerDependencies": {
-    "openvibe-contracts": "https://codeload.github.com/OpenVibers/OpenVibe.Contracts/tar.gz/refs/tags/v0.6.0"
-  },
-  "peerDependenciesMeta": {
-    "openvibe-contracts": {
-      "optional": true
-    }
   },
   "sideEffects": false,
   "keywords": [
