@@ -2,6 +2,6 @@
 import cjs from '../src/media.js';
 
 export const {
-    createMediaClient, mediaUrls, DEFAULT_PUBLIC_ORIGIN,
+    createMediaClient, createObjectsClient, mediaUrls, DEFAULT_PUBLIC_ORIGIN,
 } = cjs;
 export default cjs;

@@ -3,6 +3,40 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.5.0 (2026-09-23)
+
+Media's object API v2 (`/api/v2/:app/objects`) and its jobs (`/api/v2/:app/jobs`), wrapped as
+`createObjectsClient()` in `openvibe-sdk/media`. Additive: nothing existing changes.
+
+- **`createObjectsClient({ app, baseUrl?, tokenClient | apiKey | client, … })`.** `tokenClient` is a
+  `createServiceTokenClient()` (a service or developer-app principal with `media.object.upload` and
+  `media.object.read` for namespace `app`; a developer app uses its project id as `app`). Options:
+  `actingUserId` (X-OV-User-Id, app key only), `subject` (X-OV-Subject), `multipartThreshold` (64 MiB),
+  `partSize` (16 MiB), `concurrency` (4), `hashMaxBytes` (256 MiB), `resumeRounds` (3).
+- **Discovery.** Without `baseUrl`, Media's origin comes from the platform descriptor
+  (`/.well-known/openvibe`). The descriptor gives an origin only for live services: when Media has
+  none (not registered, or only a `planned_origin`) the client throws `sdk.service_unavailable` and
+  never guesses. `objects.baseUrl()` says which origin is used.
+- **`upload(data, { kind, visibility, mimeType, filename, metadata, contentHash, multipart, onProgress, signal, … })`**
+  picks single or multipart by size. Single: init, then the bytes go to Media's presigned PUT URL (no
+  credential on that request), then complete. Multipart (above `multipartThreshold`, with
+  `multipart: true`, or when Media answers 413 `media.object.too_large` to a single part): parts go up
+  `concurrency` at a time with `X-Content-SHA256`; after each round the session is read back and the
+  missing parts are sent again; complete names every part's sha256. The whole object's sha256 is sent
+  for Media to verify up to `hashMaxBytes`. A part that cannot be sent ends in `sdk.upload_incomplete`
+  with `err.resume = { objectId, uploadId, missing }`.
+- **`resume({ objectId, uploadId }, data)`** continues a multipart session, e.g. from another process:
+  it reads the session with the client's credential, re-sends parts Media holds with a different sha256
+  and the missing ones, and completes.
+- **`get(id)`** (null on 404; `med_…` ids and legacy refs), **`signedUrl(id, { ttl })`** (`{ url,
+  expires_at, public }`: a signed link for private objects), **`delete(id)`** (true, or false on 404),
+  **`list(q)`** (one page) and **`iterate(q)`** (every object, newest first).
+- **`jobs.create({ type, objectId, params, idempotencyKey })`**, `get`, `list`, `approve` (a proposal ->
+  queued), `cancel` and `wait(id)` (polls until succeeded, failed or cancelled). Types today:
+  `thumbnail.regenerate`, `invariant.scan`, `object.split`, `object.remux`.
+- Types (`MediaObject`, `MediaJob`, `ObjectsClient`, `ObjectUploadOptions`), the ESM entry and the
+  browser bundle include it.
+
 ## 0.4.0 (2026-09-23)
 
 Replay protection for OpenVibe.Events webhook deliveries (signature v2). Backward compatible:

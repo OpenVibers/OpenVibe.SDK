@@ -1,6 +1,8 @@
 'use strict';
 /**
- * openvibe-sdk/media: OpenVibe.Media files (Media API v1, /api/v1/:app/files) and public URL helpers.
+ * openvibe-sdk/media: OpenVibe.Media files (Media API v1, /api/v1/:app/files), public URL helpers, and
+ * createObjectsClient() for the object API v2 (/api/v2/:app/objects: single and multipart uploads,
+ * signed links, jobs), see ./objects.js.
  *
  * Credentials: the app's API key (Authorization: Bearer <app key>, server side only; it is a
  * secret), a Network service token for the app's namespace, or a developer app token on its
@@ -16,6 +18,7 @@
  */
 const { isOpenVibeError } = require('./core/errors');
 const { paginate, offsetPager } = require('./core/paginate');
+const { createObjectsClient } = require('./objects');
 
 const DEFAULT_PUBLIC_ORIGIN = 'https://openvibe.media';
 const enc = encodeURIComponent;
@@ -105,4 +108,4 @@ function createMediaClient(client, { app, apiKey, actingUserId, baseUrl, publicO
     return { app, files, urls, upload: files.upload };
 }
 
-module.exports = { createMediaClient, mediaUrls, DEFAULT_PUBLIC_ORIGIN };
+module.exports = { createMediaClient, createObjectsClient, mediaUrls, DEFAULT_PUBLIC_ORIGIN };
