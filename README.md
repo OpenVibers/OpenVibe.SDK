@@ -2,7 +2,7 @@
 
 > Supported browser and server clients for the OpenVibe platform.
 
-**Status:** alpha, v0.4.0 (roadmap Wave 2; developer apps from Wave 20). Tested against local stub servers and the built-in mock platform only, never against the live platform. Several OpenVibe services pin v0.2.2; OpenVibe.Examples uses 0.3.0.  
+**Status:** alpha, v0.4.0 (roadmap Wave 2; developer apps from Wave 20). Tested against local stub servers and the built-in mock platform only, never against the live platform. Production services pin three releases (2026-09-23): v0.4.0 in Live, Deals, News, Reviews, Tips, Trade and VIP; v0.3.1 in Codes; v0.2.2 in Network, Media, Blog, Wiki, Coupons, Host, OpenRe.Stream and Games. OpenVibe.Examples uses v0.4.0. CI is green from `654d4b2` (it now runs `npm ci`); the runs for the v0.3.0, v0.3.1 and v0.4.0 commits failed because `better-sqlite3` was not installed.  
 **Plan:** OpenVibe End-to-End Realignment & Implementation Plan, revision 3 (20 Sep 2026), §3.2; roadmap §30.  
 **License:** MIT ([LICENSE](LICENSE)). This package is a library that apps outside the network embed, so it uses MIT. The OpenVibe services themselves stay AGPL-3.0.
 
