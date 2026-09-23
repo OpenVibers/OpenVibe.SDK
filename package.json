@@ -1,0 +1,105 @@
+{
+  "name": "openvibe-sdk",
+  "version": "0.1.0",
+  "description": "Supported browser and server clients for the OpenVibe platform: auth, registry discovery, identity, user modules, events, realtime, media and community, with deadlines, safe retries, problem errors and trace propagation.",
+  "main": "index.js",
+  "types": "types/index.d.ts",
+  "browser": "browser.js",
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "browser": "./browser.js",
+      "import": "./esm/index.mjs",
+      "default": "./index.js"
+    },
+    "./core": {
+      "types": "./types/core.d.ts",
+      "import": "./esm/core.mjs",
+      "default": "./src/core/index.js"
+    },
+    "./auth": {
+      "types": "./types/auth.d.ts",
+      "browser": "./src/auth/browser.js",
+      "import": "./esm/auth.mjs",
+      "default": "./src/auth/index.js"
+    },
+    "./auth/browser": {
+      "types": "./types/auth-browser.d.ts",
+      "import": "./esm/auth-browser.mjs",
+      "default": "./src/auth/browser.js"
+    },
+    "./registry": {
+      "types": "./types/registry.d.ts",
+      "import": "./esm/registry.mjs",
+      "default": "./src/registry.js"
+    },
+    "./identity": {
+      "types": "./types/identity.d.ts",
+      "browser": null,
+      "import": "./esm/identity.mjs",
+      "default": "./src/identity.js"
+    },
+    "./modules": {
+      "types": "./types/modules.d.ts",
+      "import": "./esm/modules.mjs",
+      "default": "./src/modules.js"
+    },
+    "./events": {
+      "types": "./types/events.d.ts",
+      "browser": null,
+      "import": "./esm/events.mjs",
+      "default": "./src/events.js"
+    },
+    "./realtime": {
+      "types": "./types/realtime.d.ts",
+      "import": "./esm/realtime.mjs",
+      "default": "./src/realtime.js"
+    },
+    "./media": {
+      "types": "./types/media.d.ts",
+      "import": "./esm/media.mjs",
+      "default": "./src/media.js"
+    },
+    "./community": {
+      "types": "./types/community.d.ts",
+      "import": "./esm/community.mjs",
+      "default": "./src/community.js"
+    },
+    "./testing": {
+      "types": "./types/testing.d.ts",
+      "browser": null,
+      "import": "./esm/testing.mjs",
+      "default": "./src/testing/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "browser.js",
+    "src/",
+    "esm/",
+    "types/",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node test/run.js",
+    "esm": "node scripts/esm.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "peerDependencies": {
+    "openvibe-contracts": "https://codeload.github.com/OpenVibers/OpenVibe.Contracts/tar.gz/refs/tags/v0.6.0"
+  },
+  "peerDependenciesMeta": {
+    "openvibe-contracts": {
+      "optional": true
+    }
+  },
+  "sideEffects": false,
+  "keywords": ["openvibe", "sdk", "oauth", "pkce", "events", "sse", "media"],
+  "repository": "github:OpenVibers/OpenVibe.SDK",
+  "license": "MIT"
+}
