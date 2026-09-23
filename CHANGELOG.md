@@ -3,6 +3,14 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.2.0 (2026-09-23)
+
+- `openvibe-sdk/events`: `createOutbox(db, { events })` and `createInbox(db)` — the transactional
+  outbox and exactly-once inbox on the service's own better-sqlite3 handle (ADR-004), so producers
+  no longer need the `openvibe-events` server package. `enqueue()` refuses to run outside a
+  transaction; the relay batches, backs off on transient failures and rejects only the row a
+  permanent 4xx refused. Still no runtime dependencies (`better-sqlite3` is a dev dependency).
+
 ## 0.1.0 (2026-09-22)
 
 First release (roadmap Wave 2, implementation plan §3.2). Built and tested against

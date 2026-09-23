@@ -1,6 +1,6 @@
 {
   "name": "openvibe-sdk",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Supported browser and server clients for the OpenVibe platform: auth, registry discovery, identity, user modules, events, realtime, media and community, with deadlines, safe retries, problem errors and trace propagation.",
   "main": "index.js",
   "types": "types/index.d.ts",
@@ -99,7 +99,18 @@
     }
   },
   "sideEffects": false,
-  "keywords": ["openvibe", "sdk", "oauth", "pkce", "events", "sse", "media"],
+  "keywords": [
+    "openvibe",
+    "sdk",
+    "oauth",
+    "pkce",
+    "events",
+    "sse",
+    "media"
+  ],
   "repository": "github:OpenVibers/OpenVibe.SDK",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "better-sqlite3": "^11.10.0"
+  }
 }

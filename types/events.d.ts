@@ -45,3 +45,35 @@ type RawBody = string | Uint8Array | ArrayBufferView;
 export declare function signDelivery(rawBody: RawBody, secret: string): string;
 export declare function verifyDelivery(rawBody: RawBody, signatureHeader: string | undefined | null, secret: string): boolean;
 export declare function parseDelivery(rawBody: RawBody, headers: Record<string, any> | Headers, secret: string): { event: EventEnvelope; seq: number; subscriptionId: string | null; attempt: number } | null;
+
+/** The subset of a better-sqlite3 Database the outbox and inbox use. */
+export interface SqliteDatabase {
+    prepare(sql: string): any;
+    exec(sql: string): any;
+    transaction<F extends (...args: any[]) => any>(fn: F): F;
+    readonly inTransaction: boolean;
+}
+export interface FlushStats { sent: number; failed: number; rejected: number; }
+export interface Outbox {
+    ensureSchema(): void;
+    /** Inside the caller's transaction; returns the complete envelope. */
+    enqueue(envelope: EventInput, opts?: { traceparent?: string }): EventEnvelope;
+    flush(): Promise<FlushStats>;
+    start(): void;
+    stop(): Promise<unknown>;
+    kick(): void;
+    pending(): number;
+    rejected(): number;
+    prune(olderThanMs?: number): number;
+}
+export declare function createOutbox(db: SqliteDatabase, opts: {
+    events: Pick<EventsClient, 'publish' | 'prepare'>;
+    table?: string; batchSize?: number; intervalMs?: number; backoffMs?: number[];
+    now?: () => number; onError?: (err: unknown, row?: unknown) => void; allowOutsideTransaction?: boolean;
+}): Outbox;
+export interface Inbox {
+    ensureSchema(): void;
+    once<T>(consumer: string, eventId: string, fn: () => T): { duplicate: true } | { duplicate: false; result: T };
+    seen(consumer: string, eventId: string): boolean;
+}
+export declare function createInbox(db: SqliteDatabase, opts?: { table?: string; now?: () => number }): Inbox;

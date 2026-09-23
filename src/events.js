@@ -146,4 +146,6 @@ function createEventsClient(client, { source, baseUrl } = {}) {
     };
 }
 
-module.exports = { createEventsClient, verifyDelivery, signDelivery, parseDelivery };
+const { createOutbox, createInbox } = require('./outbox');
+
+module.exports = { createEventsClient, verifyDelivery, signDelivery, parseDelivery, createOutbox, createInbox };
