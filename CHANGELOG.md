@@ -3,6 +3,10 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.9.0 (2026-09-24)
+
+`openvibe-sdk/auth` **`createRevocationStore(db?)`**: token cutoffs from Network's `network.user.token_valid_after` (Contracts 0.39.0), so a service refuses a person's older tokens as soon as they sign out everywhere, change their password or are banned. `apply(event)`, `isRevoked(claims)`, `cutoffFor(subject)`, `record()`; SQLite-backed or in memory. Additive.
+
 ## 0.8.0 (2026-09-24)
 
 `openvibe-sdk/frame`: **the OpenVibe Frame**, the navbar, footer and themes every OpenVibe site sits in, for any app, first-party or not. It covers:

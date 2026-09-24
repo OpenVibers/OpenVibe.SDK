@@ -209,6 +209,7 @@ Server-only subpaths are declared `"browser": null` in the exports map, so a bun
 - `startAuthorization()` / `buildAuthorizeUrl()` default `scope` to `'profile theme'` only for first-party sign-in (no `audience`). Apps pass `audience` and capability ids. Network refuses `prompt=none` for apps.
 - `createServiceTokenClient().getTokenInfo({ audience })` returns `{ accessToken, scope, expiresAt, unverifiedClaims }`. `decodeUnverified()` / `unverifiedClaims()` decode a JWT without verifying it: for display and diagnostics, never for authorization.
 - PKCE follows RFC 7636 S256. The verifier is 64 characters from the unreserved set, and the challenge is `BASE64URL(SHA-256(verifier))`. Network verifies the verifier whenever the authorization carried a challenge, and requires S256 from every developer app.
+- `createRevocationStore(db?)` keeps each person's token cutoff from Network's `network.user.token_valid_after` event (Contracts 0.39.0: sign out everywhere, a password change or reset, a ban, staff ending someone's sessions). Subscribe to the event, pass each delivery to `store.apply(event)` (`'revoked'` means the cutoff moved: close that person's sockets, drop their cached sessions), and after `verifyUserToken()` refuse the token when `store.isRevoked(claims)`. That is Network's rule, `iat * 1000 < valid_after`. With a better-sqlite3 handle the cutoffs survive restarts; the store only ever moves a cutoff forward and ignores anything not from `network`.
 
 ### Receiving event webhooks
 
