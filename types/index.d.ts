@@ -10,3 +10,4 @@ export * as community from './community';
 export * as jobs from './jobs';
 export * as tools from './tools';
 export * as projects from './projects';
+export * as vip from './vip';

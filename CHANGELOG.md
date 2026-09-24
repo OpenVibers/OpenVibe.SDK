@@ -3,6 +3,16 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.7.0 (2026-09-24)
+
+`openvibe-sdk/vip`: the consumer seam for products that honour OpenVibe.VIP memberships
+(`createVipClient`, `createVipCache`), published once here instead of the verbatim copies of VIP's
+`openvibe-vip/client` that Chat, Community and Blog carried. Server-only (`"browser": null`); the
+same API and fail-closed behaviour: VIP unreachable, a timeout, a refused token or a malformed answer
+is a denial, a refused token is invalidated and retried once, and the cache drops a member's answers
+for a creator on `vip.membership.changed` (and Billing's entitlement, cancellation and reversal
+events) instead of waiting out its TTL. Additive.
+
 ## 0.6.0 (2026-09-23)
 
 The OpenVibe.Tools platform API (ADR-027, openvibe-contracts v0.33.0) as `openvibe-sdk/tools`, and

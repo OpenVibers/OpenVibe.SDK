@@ -26,6 +26,7 @@ const ENTRIES = {
     'jobs.mjs': '../src/jobs.js',
     'tools.mjs': '../src/tools.js',
     'projects.mjs': '../src/projects.js',
+    'vip.mjs': '../src/vip.js',
     'testing.mjs': '../src/testing/index.js',
 };
 

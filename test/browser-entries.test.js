@@ -76,7 +76,7 @@ run([
             for (const [re, why] of FORBIDDEN) if (re.test(src)) problems.push(`${path.relative(ROOT, file)}: ${why}`);
         }
         assert.deepEqual(problems, []);
-        assert.deepEqual(blocked.sort(), ['./events', './identity', './testing']);
+        assert.deepEqual(blocked.sort(), ['./events', './identity', './testing', './vip']);
         const rel = [...scanned].map((f) => path.relative(ROOT, f));
         for (const must of ['browser.js', 'src/core/client.js', 'src/auth/browser.js', 'src/realtime.js', 'src/media.js', 'src/community.js', 'src/modules.js', 'src/registry.js', 'src/jobs.js', 'src/tools.js', 'src/core/form.js', 'src/projects.js', 'browser/openvibe-sdk.mjs']) {
             assert.ok(rel.includes(must), `${must} is scanned`);
