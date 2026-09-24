@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * openvibe-sdk/chrome — the OpenVibe network's shared chrome for any app: the universal navbar (one
+ * openvibe-sdk/frame — the OpenVibe Frame: the navbar, footer and themes every OpenVibe site sits in, for any app: the universal navbar (one
  * account menu, notifications, the site switcher, sign in and out), the shared footer (network
  * links, legal links, the "shipped X ago" line and an Updates link), the "shipped" views and the
  * theme loader. These are the same files every OpenVibe site runs, served by OpenVibe.Network from
@@ -9,8 +9,8 @@
  *
  * In the browser:
  *
- *   // mountChrome from the openvibe-sdk/chrome entry (CommonJS or ESM)
- *   const { navbar, footer } = await mountChrome({
+ *   // mountFrame from the openvibe-sdk/frame entry (CommonJS or ESM)
+ *   const { navbar, footer } = await mountFrame({
  *       service: 'myapp',                                          // your app's id (brand + analytics)
  *       brand: { name: 'My App' },                                 // optional brand override
  *       links: [{ label: 'Home', href: '/' }, { label: 'Docs', href: '/docs' }],
@@ -21,18 +21,18 @@
  *       footer: { links: [{ heading: 'My App', items: [{ name: 'About', url: '/about' }] }], updates: '/updates' },
  *   });
  *
- * Server-rendered apps put chromeTags(opts) in <head>/<body> instead (the same markup this module
+ * Server-rendered apps put frameTags(opts) in <head>/<body> instead (the same markup this module
  * would inject, as a string; the JSON config is escaped for a <script> element):
  *
- *   // chromeTags from the openvibe-sdk/chrome entry
- *   const t = chromeTags({ service: 'myapp', links: [...] });
+ *   // frameTags from the openvibe-sdk/frame entry
+ *   const t = frameTags({ service: 'myapp', links: [...] });
  *   html = `<head>${t.head}</head><body>${t.bodyStart}…${t.bodyEnd}</body>`;
  *
  * Your CSP must allow `script-src https://openvibe.network` and `connect-src https://openvibe.network`
  * (the navbar asks /api/auth/me and the notifications there; the shipped line reads
  * /api/v1/changelog). Signed-in state comes from the shared ov_token, else from sessionUrl. For
  * your own users to be recognised across the network, sign them in with OpenVibe (openvibe-sdk/auth).
- * The chrome is progressive: if openvibe.network is unreachable your page still renders.
+ * The Frame is progressive: if openvibe.network is unreachable your page still renders.
  */
 
 const DEFAULT_BASE = 'https://openvibe.network';
@@ -41,7 +41,7 @@ const FILES = { theme: 'theme-loader.js', navbar: 'navbar.js', footer: 'footer.j
 function baseOf(base) {
     const b = String(base || DEFAULT_BASE).replace(/\/+$/, '');
     const ok = /^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(b) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(b);
-    if (!ok) throw new TypeError(`openvibe-sdk/chrome: base must be an https origin (or http://localhost for development), got ${base}`);
+    if (!ok) throw new TypeError(`openvibe-sdk/frame: base must be an https origin (or http://localhost for development), got ${base}`);
     return b;
 }
 
@@ -53,8 +53,8 @@ function scriptUrls({ base } = {}) {
     return out;
 }
 
-/** The navbar and footer configurations mountChrome passes to OpenVibeNavbar.init / OpenVibeFooter.init. */
-function chromeConfig(opts = {}) {
+/** The navbar and footer configurations mountFrame passes to OpenVibeNavbar.init / OpenVibeFooter.init. */
+function frameConfig(opts = {}) {
     const o = opts || {};
     const b = baseOf(o.base);
     const navbar = {
@@ -85,9 +85,9 @@ const jsonForScript = (v) => JSON.stringify(v).replace(/</g, '\\u003c').replace(
 const attr = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 
 /** Markup for server-rendered pages: { head, bodyStart, bodyEnd } strings. */
-function chromeTags(opts = {}) {
+function frameTags(opts = {}) {
     const urls = scriptUrls(opts);
-    const cfg = chromeConfig(opts);
+    const cfg = frameConfig(opts);
     const head = [
         opts.theme === false ? '' : `<script src="${attr(urls.theme)}" defer></script>`,
         `<script src="${attr(urls.navbar)}" defer></script>`,
@@ -103,12 +103,12 @@ function chromeTags(opts = {}) {
 
 function loadScript(doc, src) {
     return new Promise((resolve) => {
-        const existing = doc.querySelector(`script[data-ov-chrome="${src}"]`);
+        const existing = doc.querySelector(`script[data-ov-frame="${src}"]`);
         if (existing) { if (existing.dataset.loaded) resolve(true); else existing.addEventListener('load', () => resolve(true)); return; }
         const s = doc.createElement('script');
         s.src = src;
         s.async = true;
-        s.setAttribute('data-ov-chrome', src);
+        s.setAttribute('data-ov-frame', src);
         s.addEventListener('load', () => { s.dataset.loaded = '1'; resolve(true); });
         s.addEventListener('error', () => resolve(false));
         (doc.head || doc.documentElement).appendChild(s);
@@ -116,15 +116,15 @@ function loadScript(doc, src) {
 }
 
 /**
- * Browser: load the shared chrome and mount it. Resolves { navbar, footer } (the initialised
+ * Browser: load the OpenVibe Frame and mount it. Resolves { navbar, footer } (the initialised
  * globals, or null for a part that could not load). Never throws for a network failure.
  */
-async function mountChrome(opts = {}) {
+async function mountFrame(opts = {}) {
     const doc = (opts && opts.document) || (typeof document !== 'undefined' ? document : null);
     const win = (opts && opts.window) || (typeof window !== 'undefined' ? window : null);
-    if (!doc || !win) throw new Error('openvibe-sdk/chrome: mountChrome runs in a browser; use chromeTags() on the server');
+    if (!doc || !win) throw new Error('openvibe-sdk/frame: mountFrame runs in a browser; use frameTags() on the server');
     const urls = scriptUrls(opts);
-    const cfg = chromeConfig(opts);
+    const cfg = frameConfig(opts);
     if (!doc.getElementById('navbar-mount')) {
         const m = doc.createElement('div');
         m.id = 'navbar-mount';
@@ -147,4 +147,4 @@ async function mountChrome(opts = {}) {
     return { navbar, footer };
 }
 
-module.exports = { mountChrome, chromeTags, chromeConfig, scriptUrls, DEFAULT_BASE };
+module.exports = { mountFrame, frameTags, frameConfig, scriptUrls, DEFAULT_BASE };

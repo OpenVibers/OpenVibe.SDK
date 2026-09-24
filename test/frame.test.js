@@ -1,8 +1,8 @@
 'use strict';
-// openvibe-sdk/chrome: any app mounts the network's shared navbar, footer, shipped line and themes,
+// openvibe-sdk/frame: any app mounts the network's shared navbar, footer, shipped line and themes,
 // with its own session endpoints; server-rendered apps get the same markup as strings.
 const assert = require('node:assert/strict');
-const { mountChrome, chromeTags, chromeConfig, scriptUrls } = require('../src/chrome');
+const { mountFrame, frameTags, frameConfig, scriptUrls } = require('../src/frame');
 
 const opts = {
     service: 'myapp',
@@ -14,15 +14,15 @@ const opts = {
 };
 
 // Config mapping
-const cfg = chromeConfig(opts);
+const cfg = frameConfig(opts);
 assert.equal(cfg.navbar.service, 'myapp');
 assert.equal(cfg.navbar.apiBase, 'https://openvibe.network');
 assert.equal(cfg.navbar.logoutUrl, '/auth/logout?next={path}');
 assert.deepEqual(cfg.navbar.menu.before[0], { label: 'My projects', href: '/projects' });
 assert.equal(cfg.footer.updates, '/updates');
 assert.equal(cfg.footer.brandName, 'My App');
-assert.equal(chromeConfig({ footer: false }).footer, null);
-assert.equal(chromeConfig({ shipped: false }).footer.shipped, false);
+assert.equal(frameConfig({ footer: false }).footer, null);
+assert.equal(frameConfig({ shipped: false }).footer.shipped, false);
 
 // URLs and base validation
 assert.equal(scriptUrls().navbar, 'https://openvibe.network/shared/navbar.js');
@@ -31,13 +31,13 @@ assert.throws(() => scriptUrls({ base: 'http://evil.example' }), /https origin/)
 assert.throws(() => scriptUrls({ base: 'javascript:alert(1)' }), /https origin/);
 
 // SSR tags: the config cannot break out of its <script>
-const t = chromeTags(opts);
+const t = frameTags(opts);
 assert.ok(t.head.includes('https://openvibe.network/shared/navbar.js') && t.head.includes('theme-loader.js') && t.head.includes('footer.js'));
 assert.equal(t.bodyStart, '<div id="navbar-mount"></div>');
 assert.ok(t.bodyEnd.includes('<footer id="ov-footer"></footer>'));
 assert.ok(!/<\/script><script>alert/.test(t.bodyEnd), 'a label cannot close the init script');
 assert.equal((t.bodyEnd.match(/<\/script>/g) || []).length, 1);
-assert.ok(!chromeTags({ theme: false }).head.includes('theme-loader'));
+assert.ok(!frameTags({ theme: false }).head.includes('theme-loader'));
 
 // Browser mount with a minimal DOM: scripts "load", globals appear, init receives the config.
 function fakeDom() {
@@ -67,7 +67,7 @@ function fakeDom() {
 
 (async () => {
     const d = fakeDom();
-    const r = await mountChrome({ ...opts, document: d.doc, window: d.win });
+    const r = await mountFrame({ ...opts, document: d.doc, window: d.win });
     assert.ok(r.navbar && r.footer);
     assert.equal(d.inits.navbar.sessionUrl, '/auth/me');
     assert.equal(d.inits.footer.mount, '#ov-footer');
@@ -77,8 +77,8 @@ function fakeDom() {
     // A failed load leaves that part null and never throws.
     const d2 = fakeDom();
     d2.doc.head.appendChild = function (c) { d2.nodes.push(c); setImmediate(() => (c.listeners.error || []).forEach((f) => f())); return c; };
-    const r2 = await mountChrome({ document: d2.doc, window: d2.win });
+    const r2 = await mountFrame({ document: d2.doc, window: d2.win });
     assert.deepEqual(r2, { navbar: null, footer: null });
-    await assert.rejects(() => mountChrome({ document: null, window: null }), /browser/);
-    console.log('chrome: all checks passed');
+    await assert.rejects(() => mountFrame({ document: null, window: null }), /browser/);
+    console.log('frame: all checks passed');
 })().catch((e) => { console.error(e); process.exit(1); });
