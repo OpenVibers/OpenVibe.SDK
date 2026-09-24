@@ -27,6 +27,7 @@ const ENTRIES = {
     'tools.mjs': '../src/tools.js',
     'projects.mjs': '../src/projects.js',
     'vip.mjs': '../src/vip.js',
+    'chrome.mjs': '../src/chrome.js',
     'testing.mjs': '../src/testing/index.js',
 };
 

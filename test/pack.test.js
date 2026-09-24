@@ -22,7 +22,7 @@ run([
             const out = execFileSync(npm, ['pack', '--json', '--pack-destination', tmp], { cwd: ROOT, env, encoding: 'utf8' });
             const info = JSON.parse(out)[0];
             const files = info.files.map((f) => f.path);
-            for (const must of ['package.json', 'index.js', 'browser.js', 'LICENSE', 'README.md', 'CHANGELOG.md', 'src/core/client.js', 'src/jobs.js', 'src/tools.js', 'src/core/form.js', 'src/projects.js', 'src/vip.js', 'esm/vip.mjs', 'types/vip.d.ts', 'esm/core.mjs', 'esm/jobs.mjs', 'esm/tools.mjs', 'types/tools.d.ts', 'types/core.d.ts', 'types/contracts.d.ts', 'types/bundle.d.ts', 'browser/openvibe-sdk.mjs']) {
+            for (const must of ['package.json', 'index.js', 'browser.js', 'LICENSE', 'README.md', 'CHANGELOG.md', 'src/core/client.js', 'src/jobs.js', 'src/tools.js', 'src/core/form.js', 'src/projects.js', 'src/vip.js', 'esm/vip.mjs', 'types/vip.d.ts', 'src/chrome.js', 'esm/chrome.mjs', 'types/chrome.d.ts', 'esm/core.mjs', 'esm/jobs.mjs', 'esm/tools.mjs', 'types/tools.d.ts', 'types/core.d.ts', 'types/contracts.d.ts', 'types/bundle.d.ts', 'browser/openvibe-sdk.mjs']) {
                 assert.ok(files.includes(must), `tarball contains ${must}`);
             }
             assert.ok(!files.some((f) => f.startsWith('test/') || f.startsWith('scripts/') || f.startsWith('.github/')), 'no tests or tooling in the tarball');
@@ -66,7 +66,7 @@ run([
                 })().catch((err) => { console.error(err); process.exit(1); });`;
             const res = execFileSync(process.execPath, ['-e', script], { cwd: app, encoding: 'utf8' });
             assert.match(res, new RegExp(`consumer ok: ${subpaths.length} subpaths \\+ the browser bundle`));
-            assert.equal(subpaths.length, 16);
+            assert.equal(subpaths.length, 17);
             assert.ok(!fs.existsSync(path.join(app, 'node_modules/openvibe-contracts')), 'the optional peer is not installed');
         } finally {
             fs.rmSync(tmp, { recursive: true, force: true });
