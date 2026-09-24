@@ -22,7 +22,7 @@ run([
             const out = execFileSync(npm, ['pack', '--json', '--pack-destination', tmp], { cwd: ROOT, env, encoding: 'utf8' });
             const info = JSON.parse(out)[0];
             const files = info.files.map((f) => f.path);
-            for (const must of ['package.json', 'index.js', 'browser.js', 'LICENSE', 'README.md', 'CHANGELOG.md', 'src/core/client.js', 'src/jobs.js', 'src/tools.js', 'src/core/form.js', 'src/projects.js', 'src/vip.js', 'esm/vip.mjs', 'types/vip.d.ts', 'src/chrome.js', 'esm/chrome.mjs', 'types/chrome.d.ts', 'esm/core.mjs', 'esm/jobs.mjs', 'esm/tools.mjs', 'types/tools.d.ts', 'types/core.d.ts', 'types/contracts.d.ts', 'types/bundle.d.ts', 'browser/openvibe-sdk.mjs']) {
+            for (const must of ['package.json', 'index.js', 'browser.js', 'LICENSE', 'README.md', 'CHANGELOG.md', 'src/core/client.js', 'src/jobs.js', 'src/tools.js', 'src/core/form.js', 'src/projects.js', 'src/vip.js', 'esm/vip.mjs', 'types/vip.d.ts', 'src/frame.js', 'esm/frame.mjs', 'types/frame.d.ts', 'esm/core.mjs', 'esm/jobs.mjs', 'esm/tools.mjs', 'types/tools.d.ts', 'types/core.d.ts', 'types/contracts.d.ts', 'types/bundle.d.ts', 'browser/openvibe-sdk.mjs']) {
                 assert.ok(files.includes(must), `tarball contains ${must}`);
             }
             assert.ok(!files.some((f) => f.startsWith('test/') || f.startsWith('scripts/') || f.startsWith('.github/')), 'no tests or tooling in the tarball');

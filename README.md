@@ -237,13 +237,13 @@ app.post('/internal/events', express.raw({ type: 'application/json' }), (req, re
 
 Turn `requireV2` on once Events sends v2 to you: a replayed v1-only delivery then fails. The lower-level checks are `verifyDeliveryV2(raw, headers, secret, { toleranceSec, now })` (constant-time; also refuses a `X-OpenVibe-Timestamp` that differs from `t`) and `verifyDelivery(raw, signatureHeader, secret)` (v1, unchanged). Keep your clock in sync (NTP): the window is ±300 s both ways. In tests, `signDeliveryHeaders(raw, secret, { now })` returns the three headers as Events sends them.
 
-### The shared chrome
+### The OpenVibe Frame
 
 Every OpenVibe site uses the same navbar and footer. Your app can use them too, so people move between it and the network without a jump:
 
 ```js
-// Browser (CommonJS or ESM: openvibe-sdk/chrome)
-const { navbar } = await mountChrome({
+// Browser (CommonJS or ESM: openvibe-sdk/frame)
+const { navbar } = await mountFrame({
     service: 'myapp',
     brand: { name: 'My App' },
     links: [{ label: 'Home', href: '/' }, { label: 'Docs', href: '/docs' }],
@@ -255,9 +255,9 @@ const { navbar } = await mountChrome({
 });
 ```
 
-For server-rendered pages, `chromeTags(opts)` returns `{ head, bodyStart, bodyEnd }`: put `head` in `<head>`, `bodyStart` first in `<body>` and `bodyEnd` last. Your CSP needs `script-src https://openvibe.network` and `connect-src https://openvibe.network`.
+For server-rendered pages, `frameTags(opts)` returns `{ head, bodyStart, bodyEnd }`: put `head` in `<head>`, `bodyStart` first in `<body>` and `bodyEnd` last. Your CSP needs `script-src https://openvibe.network` and `connect-src https://openvibe.network`.
 
-The chrome is progressive: if openvibe.network cannot be reached, your page still renders, and the part that failed resolves to `null`. Signed-in state comes from the shared `ov_token`, and otherwise from your `sessionUrl`. To have your users recognised across the network, sign them in with OpenVibe (`openvibe-sdk/auth`).
+The Frame is progressive: if openvibe.network cannot be reached, your page still renders, and the part that failed resolves to `null`. Signed-in state comes from the shared `ov_token`, and otherwise from your `sessionUrl`. To have your users recognised across the network, sign them in with OpenVibe (`openvibe-sdk/auth`).
 
 ### Tools
 

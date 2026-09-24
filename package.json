@@ -80,10 +80,10 @@
       "import": "./esm/projects.mjs",
       "default": "./src/projects.js"
     },
-    "./chrome": {
-      "types": "./types/chrome.d.ts",
-      "import": "./esm/chrome.mjs",
-      "default": "./src/chrome.js"
+    "./frame": {
+      "types": "./types/frame.d.ts",
+      "import": "./esm/frame.mjs",
+      "default": "./src/frame.js"
     },
     "./vip": {
       "types": "./types/vip.d.ts",

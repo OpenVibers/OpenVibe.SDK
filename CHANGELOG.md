@@ -5,7 +5,7 @@ release may change an API and says so here.
 
 ## 0.8.0 (2026-09-24)
 
-`openvibe-sdk/chrome`: the OpenVibe network's shared chrome for any app, first-party or not. It covers:
+`openvibe-sdk/frame`: **the OpenVibe Frame**, the navbar, footer and themes every OpenVibe site sits in, for any app, first-party or not. It covers:
 
 - the universal navbar: one account menu, notifications, the site switcher, and sign in and out through your own session endpoints (`sessionUrl`, `loginUrl`, `logoutUrl` with `{path}`/`{url}`);
 - the shared footer, with network and legal links, the "shipped X ago" line and an Updates link;
@@ -13,7 +13,7 @@ release may change an API and says so here.
 
 These are the same files every OpenVibe site runs, served by OpenVibe.Network from the published openvibe-shared release, so nothing is bundled into your app.
 
-`mountChrome(opts)` loads and mounts them in the browser. It never throws for a network failure; a part that cannot load resolves to `null`. `chromeTags(opts)` returns the same markup as strings for server-rendered pages, with the configuration escaped for its `<script>`. `chromeConfig` and `scriptUrls` are exported for custom setups. The base must be an https origin (or `http://localhost` in development). Browser-safe; no dependencies.
+`mountFrame(opts)` loads and mounts them in the browser. It never throws for a network failure; a part that cannot load resolves to `null`. `frameTags(opts)` returns the same markup as strings for server-rendered pages, with the configuration escaped for its `<script>`. `frameConfig` and `scriptUrls` are exported for custom setups. The base must be an https origin (or `http://localhost` in development). Browser-safe; no dependencies.
 
 ## 0.7.0 (2026-09-24)
 
