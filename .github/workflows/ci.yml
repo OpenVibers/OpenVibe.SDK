@@ -18,6 +18,9 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm test             # includes the pack test (npm pack + install into a temp project)
       - run: node scripts/esm.js --check
+      # Pin drift (WS-C task 5): an openvibe-* library pin that is not a published tag, or is more
+      # than one minor behind the latest release, fails.
+      - run: curl -fsSL https://raw.githubusercontent.com/OpenVibers/OpenVibe.Shared/main/scripts/pin-drift.js | node - "$GITHUB_WORKSPACE"
   # Secret scan (gitleaks) and dependency audit, shared by every OpenVibers repo (Track Q).
   security:
     uses: OpenVibers/OpenVibe.Shared/.github/workflows/security.yml@83c998b65424fb97e6f6de55ad9cc5981767e89c
