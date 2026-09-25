@@ -3,6 +3,10 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.10.0 (2026-09-25)
+
+**`openvibe-sdk/search`** (roadmap WS-F task 4): OpenVibe.Search's query API. `createSearchClient(client)` gives `query(text, { owner, type, lang, filter, facets, limit, cursor })` (one page: `results`, `next_cursor`, optional facet counts), `iterate(text, opts)` (every result across cursor pages, `max` to stop early), `suggest(text)` and `document(owner, type, id)` (null when missing or not yours to see). Anonymous callers get public documents; a signed-in person also gets restricted documents naming them; a first-party service with `search.query.delegate` passes `actingSubject`. Several values of one facet go as repeated `facet.<key>` parameters. In the browser bundle too. Additive.
+
 ## 0.9.1 (2026-09-24)
 
 The v0.9.0 tag reports `SDK_VERSION` 0.8.0 and ships a stale browser bundle; 0.9.1 is the same API with both right. Use 0.9.1.

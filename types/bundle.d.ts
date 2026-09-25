@@ -5,6 +5,7 @@ import * as modules from './modules';
 import * as realtime from './realtime';
 import * as media from './media';
 import * as community from './community';
+import * as search from './search';
 import * as jobs from './jobs';
 import * as tools from './tools';
 import * as projects from './projects';
@@ -17,12 +18,13 @@ export * as modules from './modules';
 export * as realtime from './realtime';
 export * as media from './media';
 export * as community from './community';
+export * as search from './search';
 export * as jobs from './jobs';
 export * as tools from './tools';
 export * as projects from './projects';
 
 declare const sdk: typeof core & {
     auth: typeof auth; registry: typeof registry; modules: typeof modules; realtime: typeof realtime;
-    media: typeof media; community: typeof community; jobs: typeof jobs; tools: typeof tools; projects: typeof projects;
+    media: typeof media; community: typeof community; search: typeof search; jobs: typeof jobs; tools: typeof tools; projects: typeof projects;
 };
 export default sdk;
