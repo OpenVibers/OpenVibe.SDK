@@ -3,6 +3,10 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.11.0 (2026-09-25)
+
+Two more clients (roadmap WS-F task 4). **`openvibe-sdk/chat`**: OpenVibe.Chat over REST as the token's person: `global.send/history/search`, `rooms.list/create/get/update/messages/send/deleteMessage/join/leave/read/members/setMember`, `dms.list/create/get/messages/send/deleteMessage/read/unread/blocks/block/unblock`, `exportMine()`; writes are never retried, a room or conversation you may not read is `null`. **`openvibe-sdk/ai`**: OpenVibe.AI's run API: `runs.create(workflow, input, { wait, version, idempotencyKey, target, attribution, onBehalfOf, options })`, `runs.get/list/cancel/retry/citations/addCitations`, `runs.waitFor(id)` (polls until succeeded, failed or cancelled), and the direct operations `chat/generate/summarize/classify/extract/enrich/embed`; a create is retried only with an idempotency key. Both in the browser bundle, ESM and types. Additive.
+
 ## 0.10.0 (2026-09-25)
 
 **`openvibe-sdk/search`** (roadmap WS-F task 4): OpenVibe.Search's query API. `createSearchClient(client)` gives `query(text, { owner, type, lang, filter, facets, limit, cursor })` (one page: `results`, `next_cursor`, optional facet counts), `iterate(text, opts)` (every result across cursor pages, `max` to stop early), `suggest(text)` and `document(owner, type, id)` (null when missing or not yours to see). Anonymous callers get public documents; a signed-in person also gets restricted documents naming them; a first-party service with `search.query.delegate` passes `actingSubject`. Several values of one facet go as repeated `facet.<key>` parameters. In the browser bundle too. Additive.

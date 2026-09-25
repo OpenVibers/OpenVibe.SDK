@@ -6,6 +6,7 @@ export const {
     startSpan, contextFromHeaders, ulid, newEventId, newIdempotencyKey, isActingSubjectId,
     satisfiesRange, compareVersions, CONTRACTS_RANGE, DEFAULT_NETWORK, SDK_VERSION, auth,
     registry, identity, modules, events, realtime, media,
-    community, search, jobs, tools, projects, vip,
+    community, search, chat, ai, jobs, tools,
+    projects, vip,
 } = cjs;
 export default cjs;

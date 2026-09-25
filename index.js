@@ -17,6 +17,8 @@ module.exports = {
     media: require('./src/media'),
     community: require('./src/community'),
     search: require('./src/search'),
+    chat: require('./src/chat'),
+    ai: require('./src/ai'),
     jobs: require('./src/jobs'),
     tools: require('./src/tools'),
     projects: require('./src/projects'),

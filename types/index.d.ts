@@ -8,6 +8,8 @@ export * as realtime from './realtime';
 export * as media from './media';
 export * as community from './community';
 export * as search from './search';
+export * as chat from './chat';
+export * as ai from './ai';
 export * as jobs from './jobs';
 export * as tools from './tools';
 export * as projects from './projects';
