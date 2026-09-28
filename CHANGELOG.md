@@ -8,6 +8,11 @@ release may change an API and says so here.
 
 
 
+## 0.22.0 (2026-09-28)
+
+- **`openvibe-sdk/placement`** (roadmap WS-Z9, the adaptive fabric): `plan(requirements, offers, { rateCards, states, current })` places a workload on the best eligible node or provider and explains it (platform.placement-result@1). Hard constraints first (capabilities, trust, residency, health, latency ceiling, capacity, cost ceiling; excluded candidates carry the reason), then the objective (cheapest, lowest-latency, balanced; private and first-party-only never leave first-party capacity; critical work stays with its authority). `marginalCost` prices work in a provider's real billing unit after its free allowance, forecast to the end of the period, with a reserve kept for high-priority work; owned capacity is ~free until its binding resource is busy, then work spills over. Hysteresis keeps a placement unless an alternative is clearly better (15% by default); failover is immediate. `rendezvous` (weighted highest-random-weight hashing), `pickTwo` (power of two choices), and Ed25519-signed route plans: `signPlan`, `verifyPlan`, `createPlanHolder` (keeps the last valid plan when a new one is bad, expired or older).
+- **`openvibe-sdk/govern`** (roadmap WS-Z1): weighted cost units (common.resource-cost@1) with quotas per subject and tier over minute, hour, day and month windows; `reserve` → `commit(actual)` or `release`, settled by any process; idempotency keys so a retried charge counts once; concurrency leases. Valkey holds the counters (atomic Lua); without Valkey they live in the process.
+
 ## 0.21.3 (2026-09-28)
 
 - `openvibe-sdk/testing` `createTestDb`: on the containers it also returns `url` and `directUrl`, the `DATABASE_URL` and `DATABASE_DIRECT_URL` of its schema, for a test that spawns a process of the service (OpenRe's transport workers); `null` on PGlite.

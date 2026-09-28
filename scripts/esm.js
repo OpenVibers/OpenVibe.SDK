@@ -25,6 +25,8 @@ const ENTRIES = {
     'community.mjs': '../src/community.js',
     'search.mjs': '../src/search.js',
     'limits.mjs': '../src/limits.js',
+    'govern.mjs': '../src/govern.js',
+    'placement.mjs': '../src/placement.js',
     'db.mjs': '../src/db/index.js',
     'valkey.mjs': '../src/valkey.js',
     'cache.mjs': '../src/cache.js',
