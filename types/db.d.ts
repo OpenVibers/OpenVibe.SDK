@@ -43,6 +43,8 @@ export interface Tx extends Queryable {
     /** A nested savepoint: rolls back alone when fn throws. */
     tx<T>(fn: (t: Tx) => Promise<T>): Promise<T>;
     prepare(text: string): Statement;
+    /** Run fn after the whole transaction commits (dropped if this savepoint or the transaction rolls back). */
+    afterCommit(fn: () => unknown): void;
 }
 export interface TxOptions { isolation?: 'read committed' | 'repeatable read' | 'serializable'; retries?: number; readOnly?: boolean }
 export interface MigrateResult { applied: { id: string; name: string; phase: string; ms: number }[]; pending: { id: string; name: string; phase: string }[]; held: { id: string; reason: string }[] }
@@ -53,11 +55,13 @@ export interface Db extends Queryable {
     tx<T>(fn: (t: Tx) => Promise<T>, opts?: TxOptions): Promise<T>;
     prepare(text: string): Statement;
     inTransaction(): boolean;
+    /** Run fn after the running transaction commits (dropped on rollback); outside one, on the next turn. */
+    afterCommit(fn: () => unknown): void;
     /** Run fn outside any ambient transaction. */
     detached<T>(fn: () => T): T;
     ready(): Promise<{ ok: true; detail: { store: string; pool: { total: number; idle: number; waiting: number } } } | { ok: false; error: string }>;
     migrate(o: { dir: string; windowDays?: number; dryRun?: boolean; now?: () => number; log?: { log(msg: string): void } }): Promise<MigrateResult>;
-    stats(): { queries: number; errors: number; slow: number; retries: number; tx: number; pool: { total: number; idle: number; waiting: number } };
+    stats(): { queries: number; errors: number; slow: number; retries: number; tx: number; open: number; pool: { total: number; idle: number; waiting: number } };
     close(): Promise<void>;
 }
 export interface CreateDbOptions {

@@ -141,3 +141,10 @@ It changes nothing in the SQLite file.
 - **Claim an Idempotency-Key before running the handler**, with `INSERT … ON CONFLICT DO NOTHING RETURNING`. That way two concurrent requests with the same key run once.
 - **Clean text PostgreSQL refuses.** SQLite text can hold NUL and unpaired surrogates. Clean them in the importer's `map`, and report each column that needed it.
 - **pub/sub without Valkey.** `createPubSub` has no local fallback when Valkey is down. A hub that must keep delivering on one process falls back to local delivery itself.
+- **News (2026-09-28)** added these:
+  - **`rowid` tiebreaks.** `ORDER BY created_at, rowid` meant insertion order. A random ULID `id` is not, within one millisecond. Add `seq bigint GENERATED ALWAYS AS IDENTITY UNIQUE` to the table and order by `seq`. The importer fills it in the source's row order.
+  - **Scalar `MAX(a, b)` / `MIN(a, b)`** are `GREATEST` / `LEAST`.
+  - **`ON CONFLICT … DO UPDATE SET x = COALESCE(excluded.x, x)`** is ambiguous in PostgreSQL. Qualify the target: `COALESCE(excluded.x, <table>.x)`.
+  - **Work after the commit.** A `setImmediate` after a synchronous better-sqlite3 transaction ran after the commit. Around an async transaction it does not. Use `db.afterCommit(fn)` (SDK ≥ 0.20).
+  - **The inbox.** `createInbox` (better-sqlite3) becomes `createPgInbox`, awaited. Its `idempotency_receipts` table goes in `migrations/0001_initial.sql` (`inboxSchema()`), not an unawaited `ensureSchema()`.
+  - **A script run as a child process in tests** cannot reach the test's PGlite. Call the function it wraps in-process, and `node --check` the script.

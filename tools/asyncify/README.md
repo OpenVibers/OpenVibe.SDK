@@ -35,6 +35,16 @@ What stays for a person:
 - `RETURNING` in place of `lastInsertRowid`;
 - the boot (open, migrate, `createApp` async) and the test helpers (`openvibe-sdk/testing` `createTestDb`).
 
+Also by hand: `db.transaction(fn)()` → `db.tx(fn)` (the codemod leaves it), scalar `MAX(a, b)` → `GREATEST`, `rowid` tiebreaks → an identity `seq` column, and a `setImmediate` meant to run after a commit → `db.afterCommit`. The lessons list in `docs/migrating-to-postgresql.md` §7 has the rest.
+
+## sqlite-schema-to-pg.js
+
+`toPg(sqliteDdl)` turns the SCHEMA string a service's `db.js` ran into the first migration: `INTEGER PRIMARY KEY AUTOINCREMENT` → identity, `TEXT` → `text COLLATE "C"`, `INTEGER` → `bigint`, `REAL` → `double precision`, `BLOB` → `bytea`, and no `IF NOT EXISTS`. It refuses triggers.
+
+## g1pass.py
+
+`g1pass.py <svc> <Name> <ENVPREFIX>`, run in a Blog-shaped service's checkout, makes the edits that are the same in every such service: config (`DATABASE_URL`, `DATABASE_DIRECT_URL`, `VALKEY_URL`), the PostgreSQL outbox, Valkey actor limits, readiness, and the test boot on `createTestDb`. Each edit checks its anchor and is skipped when already applied.
+
 ## awaitify-tests.py
 
 This is the earlier regex pass for test files (Wiki). `asyncify.js` over the server and the tests together supersedes it.

@@ -8,6 +8,12 @@ release may change an API and says so here.
 
 
 
+## 0.20.0 (2026-09-28)
+
+- **`db.afterCommit(fn)`** (and `t.afterCommit(fn)` on a transaction handle) runs `fn` once the running transaction commits. It never runs after a rollback, and a savepoint that rolls back drops the hooks added inside it. Hooks run in order, outside the transaction, with the connection already back in the pool; one that throws is logged and the rest still run. Outside a transaction, `fn` runs on the next turn. It replaces the better-sqlite3 pattern of a `setImmediate` after a synchronous transaction, for calls to other services that must see committed state (News' comment-thread visibility was the first user).
+- **`db.stats().open`**: transactions in progress on this handle.
+- `tools/asyncify` gains `sqlite-schema-to-pg.js` (a service's SQLite DDL → `migrations/0001_initial.sql`) and `g1pass.py` (the non-codemod edits of a Blog-shaped service). `asyncify.js` now treats `{ name: someAsyncFunction }` as an async method `name`. None of these are in the published package.
+
 ## 0.19.0 (2026-09-28)
 
 - **`openvibe-sdk/db` `runSqliteMigration({ service, sqlite, directUrl, migrations, tables, argv })`** is a service's `scripts/migrate-to-postgres.js` in one call. It:

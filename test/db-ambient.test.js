@@ -31,6 +31,32 @@ function cases(label, open) {
                 assert.equal(await count.get(), 1);
             } finally { await done(); }
         }],
+        [`${label}: afterCommit runs after the commit, in order, never after a rollback; a failed savepoint drops its hooks`, async () => {
+            const { db, done } = await open();
+            try {
+                const ins = db.prepare('INSERT INTO items (name, qty) VALUES (?, ?)');
+                const seen = [];
+                const committed = async (tag) => { seen.push([tag, db.inTransaction(), db.stats().open, await db.prepare('SELECT count(*)::int AS n FROM items').pluck().get()]); };
+                await db.tx(async (t) => {
+                    await ins.run('a', 1);
+                    db.afterCommit(() => committed('ambient'));
+                    t.afterCommit(() => committed('handle'));
+                    await assert.rejects(db.tx(async () => { db.afterCommit(() => committed('dropped')); throw new Error('inner'); }), /inner/);
+                    await db.tx(async () => { db.afterCommit(() => committed('kept')); });
+                    db.afterCommit(() => { throw new Error('a failing hook is logged'); });
+                    assert.deepEqual(seen, [], 'nothing runs inside the transaction');
+                    assert.equal(db.stats().open, 1);
+                });
+                assert.deepEqual(seen, [['ambient', false, 0, 1], ['handle', false, 0, 1], ['kept', false, 0, 1]]);
+                seen.length = 0;
+                await assert.rejects(db.tx(async () => { await ins.run('b', 2); db.afterCommit(() => committed('rolled back')); throw new Error('boom'); }), /boom/);
+                db.afterCommit(() => committed('outside'));
+                assert.deepEqual(seen, [], 'outside a transaction: the next turn');
+                await new Promise((r) => setImmediate(r));
+                await new Promise((r) => setTimeout(r, 20));
+                assert.deepEqual(seen, [['outside', false, 0, 1]]);
+            } finally { await done(); }
+        }],
         [`${label}: a db.tx inside is a savepoint; its failure undoes only itself`, async () => {
             const { db, done } = await open();
             try {

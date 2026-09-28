@@ -97,7 +97,7 @@ function createDb(o = {}) {
     const log = o.log || console;
     const service = o.service || process.env.OV_SERVICE || 'service';
     const slowMs = o.slowMs == null ? (o.pglite ? Infinity : 500) : o.slowMs;   // PGlite's first query includes its WASM start
-    const stats = { queries: 0, errors: 0, slow: 0, retries: 0, tx: 0 };
+    const stats = { queries: 0, errors: 0, slow: 0, retries: 0, tx: 0, open: 0 };
     let hist = null;
     if (o.registry && typeof o.registry.histogram === 'function') {
         try { hist = o.registry.histogram({ name: 'db_query_seconds', help: 'Database query time by kind', labelNames: ['kind'], buckets: [0.001, 0.005, 0.02, 0.1, 0.5, 2, 10] }); } catch { hist = null; }
@@ -131,20 +131,21 @@ function createDb(o = {}) {
     };
     const inScope = (scope, fn) => (als ? als.run(scope, fn) : fn());
 
-    async function tx(fn, opts = {}, conn = null, depth = 0) {
+    async function tx(fn, opts = {}, conn = null, depth = 0, hooks = null) {
         if (!conn) {
             const cur = current();
-            if (cur) { conn = cur.conn; depth = cur.depth; }   // ambient: a savepoint in the running transaction
+            if (cur) { conn = cur.conn; depth = cur.depth; hooks = cur.hooks; }   // ambient: a savepoint in the running transaction
         }
         if (conn) {
-            // Nested: a savepoint inside the running transaction.
+            // Nested: a savepoint inside the running transaction. Its after-commit hooks go with it if it rolls back.
             const name = `sp_${depth}`;
+            const mark = hooks.length;
             await timed(conn, `SAVEPOINT ${name}`, []);
             try {
-                const out = await inScope({ conn, depth: depth + 1, done: false }, () => fn(txApi(conn, depth + 1)));
+                const out = await inScope({ conn, depth: depth + 1, done: false, hooks }, () => fn(txApi(conn, depth + 1, hooks)));
                 await timed(conn, `RELEASE SAVEPOINT ${name}`, []);
                 return out;
-            } catch (err) { await timed(conn, `ROLLBACK TO SAVEPOINT ${name}`, []).catch(() => {}); throw err; }
+            } catch (err) { hooks.length = mark; await timed(conn, `ROLLBACK TO SAVEPOINT ${name}`, []).catch(() => {}); throw err; }
         }
         const iso = ISOLATION[opts.isolation || 'read committed'];
         if (!iso) throw new TypeError(`openvibe-sdk/db: isolation must be one of ${Object.keys(ISOLATION).join(', ')}`);
@@ -152,15 +153,23 @@ function createDb(o = {}) {
         for (let attempt = 0; ; attempt++) {
             const c = await adapter.acquire();
             stats.tx++;
-            const scope = { conn: c, depth: 1, done: false };
+            stats.open++;
+            const scope = { conn: c, depth: 1, done: false, hooks: [] };
+            let committed = false;
             try {
                 await timed(c, `BEGIN ISOLATION LEVEL ${iso}${opts.readOnly ? ' READ ONLY' : ''}`, []);
-                const out = await inScope(scope, () => fn(txApi(c, 1)));
+                const out = await inScope(scope, () => fn(txApi(c, 1, scope.hooks)));
                 scope.done = true;
                 await timed(c, 'COMMIT', []);
+                committed = true;
+                stats.open--;
+                adapter.release(c);
+                await runHooks(scope.hooks);
                 return out;
             } catch (err) {
+                if (committed) throw err;
                 scope.done = true;
+                stats.open--;
                 await timed(c, 'ROLLBACK', []).catch(() => {});
                 const code = err && (err.code || (err.cause && err.cause.code));
                 if (RETRYABLE.has(code) && attempt < retries) {
@@ -169,13 +178,26 @@ function createDb(o = {}) {
                     continue;
                 }
                 throw err;
-            } finally { adapter.release(c); }
+            } finally { if (!committed) adapter.release(c); }
         }
     }
 
-    function txApi(conn, depth) {
+    /** After-commit hooks run in order, outside the transaction; one that throws is logged and the rest still run. */
+    async function runHooks(hooks) {
+        for (const h of hooks) {
+            try { await h(); } catch (err) { log.warn(`[db] after-commit hook failed: ${err && err.message ? err.message : err}`); }
+        }
+    }
+    function afterCommit(hooks, fn) {
+        if (typeof fn !== 'function') throw new TypeError('openvibe-sdk/db: afterCommit(fn) needs a function');
+        if (hooks) { hooks.push(fn); return; }
+        setImmediate(() => runHooks([fn]));   // no transaction: nothing to wait for but the caller's own turn
+    }
+
+    function txApi(conn, depth, hooks) {
         const t = queryApi((text, values) => timed(conn, text, values), {});
-        t.tx = (fn) => tx(fn, {}, conn, depth);
+        t.tx = (fn) => tx(fn, {}, conn, depth, hooks);
+        t.afterCommit = (fn) => afterCommit(hooks, fn);
         t.sql = sql;
         t.prepare = (text) => prepare(t, text);
         return t;
@@ -188,6 +210,14 @@ function createDb(o = {}) {
     db.prepare = (text) => prepare(db, text);
     /** True while this code runs inside db.tx (ambient mode). */
     db.inTransaction = () => Boolean(current());
+    /**
+     * Run fn once the running transaction commits (never if it rolls back; a savepoint that rolls back drops the hooks
+     * added inside it). Outside a transaction, fn runs on the next turn. Hooks are awaited in order before db.tx
+     * resolves, with the connection already back in the pool: a hook that must not delay the caller starts its work
+     * and returns. For calls to other services that must see committed state (the setImmediate-after-a-synchronous-
+     * better-sqlite3-transaction pattern).
+     */
+    db.afterCommit = (fn) => { const cur = current(); afterCommit(cur ? cur.hooks : null, fn); };
     /** Run fn outside any ambient transaction (its queries take a pool connection). */
     db.detached = (fn) => (als ? als.exit(fn) : fn());
     db.store = adapter.store;

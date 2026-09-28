@@ -191,6 +191,10 @@ function main() {
             }
             // Every async function of the file (new or already) counts for callers.
             const all = new Set([...(asyncNames.local.get(f) || []), ...r.newlyAsyncNames]);
+            // { name: someAsyncFunction } exports the function under another name: that name is async too.
+            walk.full(parse(fs.readFileSync(f, 'utf8')), (n) => {
+                if (n.type === 'Property' && n.value && n.value.type === 'Identifier' && all.has(n.value.name) && n.key) all.add(n.key.name || n.key.value);
+            });
             walk.fullAncestor(parse(fs.readFileSync(f, 'utf8')), (node, _s, anc) => {
                 if ((node.type === 'FunctionDeclaration' || node.type === 'FunctionExpression' || node.type === 'ArrowFunctionExpression') && node.async) {
                     const parent = anc[anc.length - 2];
