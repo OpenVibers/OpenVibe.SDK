@@ -3,6 +3,16 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+
+## 0.16.0 (2026-09-28)
+
+- **`openvibe-sdk/openre`** (server): `createOpenReClient(client, { baseUrl?, publicUrl?, playbackTtlMs? })`, the client for OpenRe.Stream, the platform's streaming engine. Products stop carrying their own copy, starting with OpenVibe.Live.
+  - `streams`: `list`, `byExternalRef`, `create`, `get` (null when missing), `update`, `delete`, `keys`, `rotateKey`, `destinations` and `addDestination`.
+  - `destinations`: `update`, `delete`, `test`, `start`, `stop` and `logs`.
+  - `sessions`: `list`, `get` (null when missing), `playback` (cached 10 s), `end` and `outputs`.
+  - Also `outputLogs`, `workers` and `manageUrl`.
+  - Every call uses a service token for `openvibe.openre`. `{ subject }` names the person a call acts for (`X-OV-Subject`).
+
 ## 0.15.0 (2026-09-28)
 
 **The event outbox and inbox on PostgreSQL** (ADR-004 on ADR-035), in `openvibe-sdk/events`. The better-sqlite3 versions stay for services that have not moved yet.
