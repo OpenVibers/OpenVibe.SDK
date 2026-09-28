@@ -3,6 +3,10 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.13.0 (2026-09-28)
+
+**Deliveries are v2 only**, as OpenVibe.Events sends them since 2026-09-28 (the v1 header, a replayable HMAC of the body alone, is retired: shim C-60). `signDeliveryHeaders` returns `X-OpenVibe-Timestamp` and `X-OpenVibe-Signature-V2` only, and the mock platform's `deliverEvents` sends no `X-OpenVibe-Signature`. A consumer test that asserted the v1 header must drop that assertion. `signDelivery` and `verifyDelivery` stay for testing a legacy receiver, and `parseDelivery` still accepts a v1-only delivery unless `requireV2`, which every production consumer sets.
+
 ## 0.12.0 (2026-09-28)
 
 **`openvibe-sdk/limits`** (roadmap WS-R task 4): per-actor rate limits at a service's capability boundaries, where nginx can only limit by address. `createActorLimiter({ limits: { minute, hour, day } })` returns `limits(name, ownLimits)`, Express middleware that counts each actor in fixed windows and refuses past a limit with 429 problem+json (`rate_limited`, `Retry-After` from the tightest exceeded window) before the route runs.

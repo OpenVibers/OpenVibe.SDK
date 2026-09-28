@@ -164,7 +164,7 @@ run([
         assert.throws(() => signDeliveryV2(raw, secret, 1.5), TypeError);
         assert.match(signDeliveryV2(raw, secret), /^t=\d{10},v2=[0-9a-f]{64}$/, 'defaults to now');
         const all = signDeliveryHeaders(raw, secret, { now: now + 999 });
-        assert.deepEqual(all, { 'X-OpenVibe-Signature': signDelivery(raw, secret), 'X-OpenVibe-Timestamp': String(t), 'X-OpenVibe-Signature-V2': v2 });
+        assert.deepEqual(all, { 'X-OpenVibe-Timestamp': String(t), 'X-OpenVibe-Signature-V2': v2 }, 'v2 only, as Events sends since C-60');
     }],
 
     ['parseDelivery: a present v2 must verify and be fresh (no v1 fallback); requireV2 refuses v1-only', async () => {
@@ -173,13 +173,13 @@ run([
         const now = 1790000000000;
         const signed = signDeliveryHeaders(raw, secret, { now });
         const want = { event: { event_id: 'evt_2', event_type: 'media.vod.ready' }, seq: 9, subscriptionId: null, attempt: 1 };
-        const v1only = { 'x-openvibe-signature': signed['X-OpenVibe-Signature'] };
-        // Both headers (what Events sends): v2 decides.
+        const v1only = { 'x-openvibe-signature': signDelivery(raw, secret) };
+        // v2 (what Events sends): v2 decides.
         assert.deepEqual(parseDelivery(raw, signed, secret, { now }), want);
         assert.deepEqual(parseDelivery(raw, signed, secret, { now, requireV2: true }), want);
         assert.deepEqual(parseDelivery(raw, new Headers(signed), secret, { now, requireV2: true }), want);
-        assert.equal(parseDelivery(raw, signed, secret, { now: now + 301000 }), null, 'stale v2 with a valid v1: refused, never a v1 fallback');
-        assert.equal(parseDelivery(raw, { ...signed, 'X-OpenVibe-Signature-V2': `t=${now / 1000},v2=${'0'.repeat(64)}` }, secret, { now }), null, 'bad v2 with a valid v1: refused');
+        assert.equal(parseDelivery(raw, signed, secret, { now: now + 301000 }), null, 'stale v2: refused');
+        assert.equal(parseDelivery(raw, { ...signed, 'X-OpenVibe-Signature-V2': `t=${now / 1000},v2=${'0'.repeat(64)}` }, secret, { now }), null, 'bad v2: refused');
         assert.equal(parseDelivery(raw, { ...signed, 'X-OpenVibe-Signature-V2': '' }, secret, { now }), null, 'an empty v2 header is present and bad');
         assert.equal(parseDelivery(raw, { ...v1only, 'x-openvibe-signature-v2': signed['X-OpenVibe-Signature-V2'] }, secret, { now: now + 200000, toleranceSec: 100 }), null, 'toleranceSec is passed through');
         // No v2 header: v1 only while requireV2 is off.
@@ -188,6 +188,7 @@ run([
         assert.equal(parseDelivery(raw, { 'x-openvibe-signature': 'sha256=bad' }, secret), null);
         // A v2 delivery with a bad v1 still parses: v1 is not consulted once v2 is there.
         assert.deepEqual(parseDelivery(raw, { ...signed, 'X-OpenVibe-Signature': 'sha256=bad' }, secret, { now }), want);
+        assert.equal(parseDelivery(raw, { ...signed, 'X-OpenVibe-Signature-V2': `t=${now / 1000},v2=${'0'.repeat(64)}`, 'x-openvibe-signature': signDelivery(raw, secret) }, secret, { now }), null, 'a valid v1 never rescues a bad v2');
     }],
 
     ['onPage runs only after every item of its page was handled: a crash mid-page keeps the old cursor', async () => {
@@ -266,10 +267,10 @@ run([
         assert.deepEqual(handled, [[2, 2, 'media.vod.ready'], [4, 1, 'media.vod.ready']], 'in seq order, attempt counted, non-matching skipped');
         const req = srv.requests.at(-1);
         assert.equal(req.headers['x-openvibe-subscription-id'], sub.id);
-        assert.match(req.headers['x-openvibe-signature'], /^sha256=[0-9a-f]{64}$/);
+        assert.equal(req.headers['x-openvibe-signature'], undefined, 'no v1 header, like Events');
         assert.match(req.headers['x-openvibe-timestamp'], /^\d{10}$/);
         assert.equal(req.headers['x-openvibe-signature-v2'].split(',')[0], `t=${req.headers['x-openvibe-timestamp']}`);
-        assert.equal(verifyDeliveryV2(req.body, req.headers, secret), true, 'the mock sends v2 too');
+        assert.equal(verifyDeliveryV2(req.body, req.headers, secret), true, 'the mock sends v2');
         assert.match(req.headers.traceparent, /^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/);
         assert.equal((await platform.deliverEvents()).attempts.length, 0, 'nothing new');
 

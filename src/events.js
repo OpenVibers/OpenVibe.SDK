@@ -52,13 +52,13 @@ function signDeliveryV2(rawBody, secret, timestamp = Math.floor(Date.now() / 100
 }
 
 /**
- * The three signature headers Events puts on a delivery (X-OpenVibe-Signature,
- * X-OpenVibe-Timestamp, X-OpenVibe-Signature-V2), for tests that post deliveries to a consumer.
+ * The signature headers Events puts on a delivery (X-OpenVibe-Timestamp, X-OpenVibe-Signature-V2), for tests that
+ * post deliveries to a consumer. Events has sent v2 only since 2026-09-28 (the v1 header, a replayable HMAC of the
+ * body alone, is retired: shim C-60); signDelivery still makes a v1 value for anyone testing a legacy receiver.
  */
 function signDeliveryHeaders(rawBody, secret, { now = Date.now() } = {}) {
     const timestamp = Math.floor(Number(now) / 1000);
     return {
-        'X-OpenVibe-Signature': signDelivery(rawBody, secret),
         'X-OpenVibe-Timestamp': String(timestamp),
         'X-OpenVibe-Signature-V2': signDeliveryV2(rawBody, secret, timestamp),
     };
