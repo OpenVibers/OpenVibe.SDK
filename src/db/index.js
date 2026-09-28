@@ -13,10 +13,21 @@
  *   await db.tx(async (t) => { … }, { isolation: 'serializable' });   // 40001/40P01 retried
  *   await db.migrate({ dir: path.join(__dirname, 'migrations') });    // with DATABASE_DIRECT_URL
  *
+ * Ambient transactions (default on): inside db.tx(fn), plain db.* calls (and db.prepare statements, and library stores
+ * handed `db`) join the running transaction through AsyncLocalStorage, so code converted from better-sqlite3 need not
+ * thread the handle through every function. A db.tx inside it is a savepoint. Work that outlives the transaction (a
+ * promise it did not await) runs on the pool once it has ended; db.detached(fn) runs fn outside it on purpose.
+ * createDb({ ambient: false }) turns this off. The handle fn receives works either way.
+ *
+ *   const q = db.prepare('SELECT * FROM pages WHERE id = ?');   // better-sqlite3-shaped, async: get / all / run
+ *   const page = await q.get(id);
+ *
  * Rules the pooler imposes (ADR-007 2026-09-24 rule 1): no session state between transactions (no session SET,
  * no LISTEN, no advisory locks held across transactions) on DATABASE_URL. Migrations use DATABASE_DIRECT_URL.
  */
+const { AsyncLocalStorage } = require('node:async_hooks');
 const { sql, isSql } = require('./sql');
+const { prepare } = require('./prepare');
 
 const ISOLATION = { 'read committed': 'READ COMMITTED', 'repeatable read': 'REPEATABLE READ', serializable: 'SERIALIZABLE' };
 const RETRYABLE = new Set(['40001', '40P01']);   // serialization failure, deadlock
@@ -113,13 +124,24 @@ function createDb(o = {}) {
         }
     }
 
+    const als = o.ambient === false ? null : new AsyncLocalStorage();
+    const current = () => {
+        const cur = als && als.getStore();
+        return cur && !cur.done ? cur : null;
+    };
+    const inScope = (scope, fn) => (als ? als.run(scope, fn) : fn());
+
     async function tx(fn, opts = {}, conn = null, depth = 0) {
+        if (!conn) {
+            const cur = current();
+            if (cur) { conn = cur.conn; depth = cur.depth; }   // ambient: a savepoint in the running transaction
+        }
         if (conn) {
             // Nested: a savepoint inside the running transaction.
             const name = `sp_${depth}`;
             await timed(conn, `SAVEPOINT ${name}`, []);
             try {
-                const out = await fn(txApi(conn, depth + 1));
+                const out = await inScope({ conn, depth: depth + 1, done: false }, () => fn(txApi(conn, depth + 1)));
                 await timed(conn, `RELEASE SAVEPOINT ${name}`, []);
                 return out;
             } catch (err) { await timed(conn, `ROLLBACK TO SAVEPOINT ${name}`, []).catch(() => {}); throw err; }
@@ -130,12 +152,15 @@ function createDb(o = {}) {
         for (let attempt = 0; ; attempt++) {
             const c = await adapter.acquire();
             stats.tx++;
+            const scope = { conn: c, depth: 1, done: false };
             try {
                 await timed(c, `BEGIN ISOLATION LEVEL ${iso}${opts.readOnly ? ' READ ONLY' : ''}`, []);
-                const out = await fn(txApi(c, 1));
+                const out = await inScope(scope, () => fn(txApi(c, 1)));
+                scope.done = true;
                 await timed(c, 'COMMIT', []);
                 return out;
             } catch (err) {
+                scope.done = true;
                 await timed(c, 'ROLLBACK', []).catch(() => {});
                 const code = err && (err.code || (err.cause && err.cause.code));
                 if (RETRYABLE.has(code) && attempt < retries) {
@@ -151,12 +176,20 @@ function createDb(o = {}) {
     function txApi(conn, depth) {
         const t = queryApi((text, values) => timed(conn, text, values), {});
         t.tx = (fn) => tx(fn, {}, conn, depth);
+        t.sql = sql;
+        t.prepare = (text) => prepare(t, text);
         return t;
     }
 
-    const db = queryApi((text, values) => timed(null, text, values), {});
+    const db = queryApi((text, values) => { const cur = current(); return timed(cur ? cur.conn : null, text, values); }, {});
     db.sql = sql;
     db.tx = (fn, opts) => tx(fn, opts);
+    /** Async statements shaped like better-sqlite3's (get / all / run / pluck), with ? and @name / :name parameters. */
+    db.prepare = (text) => prepare(db, text);
+    /** True while this code runs inside db.tx (ambient mode). */
+    db.inTransaction = () => Boolean(current());
+    /** Run fn outside any ambient transaction (its queries take a pool connection). */
+    db.detached = (fn) => (als ? als.exit(fn) : fn());
     db.store = adapter.store;
     db.stats = () => ({ ...stats, pool: adapter.pool() });
     /** Readiness: a real round trip, and which store answered (never claimed from configuration). */

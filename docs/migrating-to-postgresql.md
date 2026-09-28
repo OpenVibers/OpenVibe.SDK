@@ -40,6 +40,7 @@ Create `migrations/0001_initial.sql` (`-- phase: expand`). It reproduces today's
 | `TEXT` holding JSON | `jsonb` (and stop calling `JSON.parse` on it: rows come back parsed) |
 | `TEXT` (UUID, ULID, slug) | `text` with the same `CHECK`s; `citext` or a `lower()` index where the code compared `COLLATE NOCASE` |
 | `REAL` | `double precision`; money stays integer cents (`bigint`), never float |
+| `SUM(int)`, `SUM(bigint)`, `AVG(…)` | PostgreSQL returns `numeric`, which the layer gives as a **string**. Cast sums that must stay numbers: `SUM(amount)::bigint` (found in the Tips migration) |
 | `BLOB` | `bytea` |
 | `CHECK (x IN (…))` | the same `CHECK` (or an enum type only if it never changes) |
 
@@ -51,13 +52,19 @@ Then:
 
 ## 3. The code: async from end to end
 
+**The short path (SDK ≥ 0.18).**
+- Keep the statements' shape. `db.prepare(text)` returns async `get`, `all`, `run` and `pluck`, with the same `?` and `@name` parameters, so `q.x.get(id)` becomes `await q.x.get(id)`.
+- Keep functions that run inside a transaction calling `db`. With ambient transactions, `db.transaction(fn)()` becomes `await db.tx(async () => fn())`, and every `db` call inside joins it.
+- What still needs a person is the SQL itself (the table below) and `lastInsertRowid`, which needs `RETURNING`.
+
+
 | better-sqlite3 | openvibe-sdk/db |
 |---|---|
 | `db.prepare(q).get(a)` | `await db.maybe(sql\`… ${a}\`)` (or `one` when absence is a bug) |
 | `db.prepare(q).all(a)` | `await db.many(sql\`…\`)` |
 | `db.prepare(q).run(a)` / `.changes` | `await db.exec(sql\`…\`)` returns the count |
 | `info.lastInsertRowid` | `INSERT … RETURNING id` with `db.one` |
-| `db.transaction(fn)()` | `await db.tx(async (t) => { … })`: pass `t` to every call inside, never `db` |
+| `db.transaction(fn)()` | `await db.tx(async (t) => { … })`: with ambient transactions (default) `db` calls inside join it; `t` also works |
 | `INSERT OR IGNORE` | `INSERT … ON CONFLICT DO NOTHING` |
 | `INSERT OR REPLACE` | `INSERT … ON CONFLICT (key) DO UPDATE SET …` (and `excluded.col` works) |
 | `datetime('now')`, `strftime(…)`, `CURRENT_TIMESTAMP` | `now()`, `to_char(…)`, `extract(epoch from …)` |
@@ -125,3 +132,12 @@ It changes nothing in the SQLite file.
    - the test counts;
    - `STATUS.json` (the database) and the README (Depends on: PostgreSQL and Valkey);
    - the roadmap plan's WS-X2 migration list.
+
+## 7. Lessons from the first migrations
+
+- **Tips (2026-09-28)** is the reference: its `postgres` branch has the schema, the importer script, `test/helpers/db.js` and the multi-process integration test. Copy them.
+- **Test roles on the shared containers.** End each per-run role's backends before dropping it, or PgBouncer keeps idle server connections and exhausts the container. `test/helpers/db.js` does this.
+- **Replays compare bytes.** Keep a replayed response (idempotency records) as `text`: `jsonb` reorders keys.
+- **Claim an Idempotency-Key before running the handler**, with `INSERT … ON CONFLICT DO NOTHING RETURNING`. That way two concurrent requests with the same key run once.
+- **Clean text PostgreSQL refuses.** SQLite text can hold NUL and unpaired surrogates. Clean them in the importer's `map`, and report each column that needed it.
+- **pub/sub without Valkey.** `createPubSub` has no local fallback when Valkey is down. A hub that must keep delivering on one process falls back to local delivery itself.

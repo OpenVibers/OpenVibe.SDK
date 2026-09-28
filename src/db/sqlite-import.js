@@ -77,7 +77,11 @@ function sortKeys(x) {
 }
 function canonical(v, udt) {
     if (v === null || v === undefined) return '\\N';
-    if (udt === 'json' || udt === 'jsonb') return JSON.stringify(sortKeys(typeof v === 'string' ? JSON.parse(v) : v));
+    if (udt === 'json' || udt === 'jsonb') {
+        // JSON null and SQL NULL compare equal: a jsonb 'null' reads back as JS null, like a missing value.
+        const parsed = typeof v === 'string' ? JSON.parse(v) : v;
+        return parsed === null ? '\\N' : JSON.stringify(sortKeys(parsed));
+    }
     if (udt === 'bytea') return Buffer.isBuffer(v) ? v.toString('hex') : Buffer.from(String(v)).toString('hex');
     if (udt === 'timestamptz' || udt === 'timestamp') return new Date(v).toISOString();
     if (udt.startsWith('_')) return JSON.stringify(v);

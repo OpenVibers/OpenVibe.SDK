@@ -5,6 +5,25 @@ release may change an API and says so here.
 
 
 
+
+## 0.18.0 (2026-09-28)
+
+This release makes the move from better-sqlite3 mostly mechanical: call sites keep their shape and gain `await`.
+
+- **`openvibe-sdk/db`: ambient transactions** (on by default; `createDb({ ambient: false })` turns them off).
+  - Inside `db.tx(fn)`, plain `db.*` calls join the running transaction through AsyncLocalStorage. So do `db.prepare` statements and library stores that were handed `db`. Their writes are visible inside the transaction, roll back with it, and never wait on it.
+  - A `db.tx` inside is a savepoint.
+  - A promise the transaction did not await runs on the pool once it has ended.
+  - `db.detached(fn)` leaves the transaction on purpose, and `db.inTransaction()` tells whether code is inside one.
+  - The handle `fn` receives works as before.
+- **`db.prepare(text)`**: async statements shaped like better-sqlite3's.
+  - Methods: `get` (a row or `undefined`), `all`, `run` (`{ changes, rows, lastInsertRowid }`; the id needs `RETURNING`) and `pluck()`.
+  - Parameters: `?`, or `@name`/`:name` from one object (a repeated name is one parameter).
+  - The compile to `$n` leaves `'…'` strings, `"…"` identifiers, dollar quotes, comments and `::` casts alone.
+- Tests: `test/db-ambient.test.js`, on PGlite and through PgBouncer.
+- `importSqlite` verification treats a JSON `null` and SQL NULL as equal. JSON text `'null'` imported into `jsonb` had failed its checksum (found in the Tips migration).
+- The guide gains a section of lessons from the Tips migration: `SUM(bigint)` returns a numeric string, test roles through PgBouncer, byte-exact replays, idempotency claims, NUL and surrogate cleaning, and pub/sub without Valkey.
+
 ## 0.17.0 (2026-09-28)
 
 - **`openvibe-sdk/geo`** (browser and server): `createGeoClient(client, { samples?, timeoutMs? })` finds the closest OpenVibe node (roadmap WS-X1 task 5).
