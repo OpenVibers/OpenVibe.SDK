@@ -340,6 +340,11 @@ function analyse(file, src, cfg, asyncNames) {
             }
             makeAsync(fn);
         }
+        if (parent && parent.type === 'ExpressionStatement' && node.callee.type === 'Identifier' && (asyncNames.original.get(file) || new Set()).has(node.callee.name)
+            && !/\bawait\s+$/.test(src.slice(Math.max(0, node.start - 12), node.start))) {
+            manual.push(`${file}:${node.loc.start.line}: ${node.callee.name}() was already async and is called without await: left fire-and-forget (add .catch if it can reject)`);
+            return;
+        }
         const wrap = parent && parent.type === 'MemberExpression' && parent.object === node;
         // Never a second await in front of one already there (a call the parser saw inside another's callee).
         if (!wrap && /\bawait\s+$/.test(src.slice(Math.max(0, node.start - 12), node.start))) return;
@@ -380,7 +385,13 @@ function main() {
     const ci = args.indexOf('--config');
     const cfg = ci >= 0 ? JSON.parse(fs.readFileSync(args[ci + 1], 'utf8')) : {};
     const files = args.filter((a, i) => a.endsWith('.js') && i !== ci + 1).map((f) => path.relative(process.cwd(), path.resolve(f)));
-    const asyncNames = { local: new Map(), api: new Map() };
+    const asyncNames = { local: new Map(), api: new Map(), original: new Map() };
+    // Functions that were async before this run: a bare statement calling one was fire-and-forget on purpose (a worker
+    // starting a job in its lane) and is left alone.
+    for (const f of files) {
+        const src = fs.readFileSync(f, 'utf8');
+        asyncNames.original.set(f, new Set([...src.matchAll(/async function\s+(\w+)/g), ...src.matchAll(/(?:const|let)\s+(\w+)\s*=\s*async\b/g)].map((m) => m[1])));
+    }
     let manual = [];
     for (let round = 0; round < 12; round++) {
         let changed = false;
