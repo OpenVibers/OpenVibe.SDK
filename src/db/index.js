@@ -47,6 +47,7 @@ const PARSERS = {
     1082: (v) => v,                               // date
     114: (v) => (v == null ? v : JSON.parse(v)),  // json
     3802: (v) => (v == null ? v : JSON.parse(v)), // jsonb
+    17: (v) => (v == null ? v : Buffer.from(String(v).slice(2), 'hex')),   // bytea ('\\x…' hex): a Buffer from both adapters
 };
 function normaliseTz(v) {
     // '2026-09-28 10:47:22.411+00' → '2026-09-28T10:47:22.411+00:00'

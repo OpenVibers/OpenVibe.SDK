@@ -71,6 +71,15 @@ function cases(label, open) {
                 assert.deepEqual(warnings.filter((w) => /already executing a query/.test(w)), [], 'no queued query on a busy client');
             } finally { process.off('warning', onWarning); await done(); }
         }],
+        [`${label}: bytea comes back as a Buffer`, async () => {
+            const { db, done } = await open();
+            try {
+                const v = await db.prepare("SELECT decode('00ff10', 'hex') AS b, ?::bytea AS p").get(Buffer.from([1, 2, 3]));
+                assert.ok(Buffer.isBuffer(v.b) && Buffer.isBuffer(v.p), `${typeof v.b} ${v.b && v.b.constructor && v.b.constructor.name}`);
+                assert.deepEqual([...v.b], [0, 255, 16]);
+                assert.deepEqual([...v.p], [1, 2, 3]);
+            } finally { await done(); }
+        }],
         [`${label}: a db.tx inside is a savepoint; its failure undoes only itself`, async () => {
             const { db, done } = await open();
             try {

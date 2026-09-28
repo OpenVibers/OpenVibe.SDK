@@ -8,6 +8,10 @@ release may change an API and says so here.
 
 
 
+## 0.20.4 (2026-09-28)
+
+- `openvibe-sdk/db`: `bytea` comes back as a `Buffer` from both adapters. PGlite returned a `Uint8Array`, so `Buffer.isBuffer` and `.toString('hex')` differed between tests and production. Found with openvibe-shared's config store on PostgreSQL. `test/db-ambient.test.js`.
+
 ## 0.20.3 (2026-09-28)
 
 - `importSqlite` reads the target tables of the connection's current schema, not only `public`. A per-run test schema from `createTestDb({ store: 'pg' })` works now, so a rehearsal can use the containers. Production is unchanged: its search path is `public`.
