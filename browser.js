@@ -19,4 +19,5 @@ module.exports = {
     jobs: require('./src/jobs'),
     tools: require('./src/tools'),
     projects: require('./src/projects'),
+    geo: require('./src/geo'),
 };

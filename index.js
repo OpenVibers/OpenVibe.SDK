@@ -23,4 +23,6 @@ module.exports = {
     tools: require('./src/tools'),
     projects: require('./src/projects'),
     vip: require('./src/vip'),
+    openre: require('./src/openre'),
+    geo: require('./src/geo'),
 };

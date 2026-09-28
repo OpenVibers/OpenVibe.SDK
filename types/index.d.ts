@@ -15,3 +15,4 @@ export * as tools from './tools';
 export * as projects from './projects';
 export * as vip from './vip';
 export * as openre from './openre';
+export * as geo from './geo';

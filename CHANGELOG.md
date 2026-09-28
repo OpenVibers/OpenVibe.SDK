@@ -4,6 +4,15 @@ All notable changes to `openvibe-sdk`. The package follows semver; while it is `
 release may change an API and says so here.
 
 
+
+## 0.17.0 (2026-09-28)
+
+- **`openvibe-sdk/geo`** (browser and server): `createGeoClient(client, { samples?, timeoutMs? })` finds the closest OpenVibe node (roadmap WS-X1 task 5).
+  - `nodes({ role?, region? })` reads Network's public node registry, `GET /api/v1/nodes` (`network.node-list-result@1`), without sending a token.
+  - `measure(nodes)` times each node's beacon several times (the best sample counts, since the first also pays for DNS and TLS) and returns the nodes fastest first.
+  - `nearest({ role?, region?, preferRegion? })` returns the fastest measured node that is up or degraded. When nothing can be measured, it falls back to `preferRegion`, then to the first healthy node, and returns `measured: false`.
+- The root export and the browser bundle include `geo`. The root export also includes `openre`.
+
 ## 0.16.0 (2026-09-28)
 
 - **`openvibe-sdk/openre`** (server): `createOpenReClient(client, { baseUrl?, publicUrl?, playbackTtlMs? })`, the client for OpenRe.Stream, the platform's streaming engine. Products stop carrying their own copy, starting with OpenVibe.Live.

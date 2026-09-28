@@ -35,6 +35,7 @@ const ENTRIES = {
     'jobs.mjs': '../src/jobs.js',
     'tools.mjs': '../src/tools.js',
     'projects.mjs': '../src/projects.js',
+    'geo.mjs': '../src/geo.js',
     'openre.mjs': '../src/openre.js',
     'vip.mjs': '../src/vip.js',
     'frame.mjs': '../src/frame.js',
