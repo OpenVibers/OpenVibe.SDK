@@ -82,3 +82,11 @@ export interface ImportReport { ok: boolean; tables: { table: string; source: st
 export function importSqlite(o: { sqlite: string | object; db: Db; tables?: Record<string, ImportTableOptions>; only?: string[]; truncate?: boolean; verify?: boolean; log?: { log(msg: string): void } }): Promise<ImportReport>;
 export const PARSERS: Record<number, (v: string) => unknown>;
 export const ISOLATION: Record<string, string>;
+/**
+ * A service's scripts/migrate-to-postgres.js in one call: migrate (or --pglite), import into emptied tables, clean
+ * text PostgreSQL refuses (reported), verify counts and checksums; resolves 0 when everything verified, else 1.
+ */
+export function runSqliteMigration(opts: {
+    service: string; sqlite: string; directUrl?: string; migrations: string;
+    tables?: Record<string, ImportTableOptions>; argv?: string[]; out?: (line: string) => void;
+}): Promise<0 | 1>;

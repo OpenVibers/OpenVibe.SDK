@@ -105,7 +105,7 @@ Anything held in a process that must be shared once there are two processes:
 
 ## 6. The one-time import, and the production switch
 
-Add `scripts/migrate-to-postgres.js`. It:
+Add `scripts/migrate-to-postgres.js`, a few lines around `runSqliteMigration` from `openvibe-sdk/db` (SDK ≥ 0.19; Wiki's is the example). It:
 1. runs the migrations with `DATABASE_DIRECT_URL`;
 2. runs `importSqlite({ sqlite: <the service's DB path>, db: owner, truncate: true, tables: { … dropColumns … } })`;
 3. prints the report and exits 1 unless `report.ok`.

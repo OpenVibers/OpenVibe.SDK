@@ -7,6 +7,17 @@ release may change an API and says so here.
 
 
 
+
+## 0.19.0 (2026-09-28)
+
+- **`openvibe-sdk/db` `runSqliteMigration({ service, sqlite, directUrl, migrations, tables, argv })`** is a service's `scripts/migrate-to-postgres.js` in one call. It:
+  - applies the migrations as the owner, or on an in-memory PGlite with `--pglite` for a rehearsal;
+  - imports with `importSqlite` into emptied tables;
+  - makes text PostgreSQL refuses storable (a NUL is dropped, an unpaired surrogate becomes U+FFFD, in text and inside JSON), and reports every column where that happened;
+  - verifies counts and checksums, prints the report (`--json` for all of it), and answers 0 only when everything verified.
+
+  It was generalised from Tips' script and first used by Wiki. `test/sqlite-cli.test.js`.
+
 ## 0.18.1 (2026-09-28)
 
 - **`db.prepare`:** a statement with one parameter takes a single array argument as that parameter's value (`WHERE id = ANY(?)`). Only statements with several parameters read a single array as the list of values (better-sqlite3's array form). Found converting OpenVibe.Wiki.
