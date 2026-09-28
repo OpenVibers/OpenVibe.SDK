@@ -9,12 +9,24 @@ def edit(p, pairs, required=True):
     if not os.path.exists(p): print('skip (missing)', p); return
     s = open(p).read(); o = s
     for a, b in pairs:
-        if b in s and a not in s: continue
+        if b in s: continue   # applied already (b may contain a)
         if a not in s:
             if required: raise SystemExit(f'{p}: anchor not found: {a[:90]}')
             continue
         s = s.replace(a, b, 1)
     if s != o: open(p, 'w').write(s); print('edited', p)
+# package.json: the PostgreSQL stack and the pins it needs
+pkg = json.load(open('package.json'))
+tag = lambda repo, v: f'https://codeload.github.com/OpenVibers/{repo}/tar.gz/refs/tags/{v}'
+d = pkg['dependencies']
+d['openvibe-sdk'] = tag('OpenVibe.SDK', os.environ.get('G1_SDK', 'v0.20.0'))
+if 'openvibe-publishing' in d: d['openvibe-publishing'] = tag('OpenVibe.Publishing', os.environ.get('G1_PUBLISHING', 'v1.0.0'))
+if 'openvibe-contracts' in d: d['openvibe-contracts'] = tag('OpenVibe.Contracts', os.environ.get('G1_CONTRACTS', 'v0.76.0'))
+d.setdefault('pg', '^8.23.0'); d.setdefault('iovalkey', '^0.4.0')
+pkg['dependencies'] = dict(sorted(d.items()))
+pkg.setdefault('devDependencies', {})['@electric-sql/pglite'] = '^0.5.8'
+pkg['scripts']['test:pg'] = f'{ENV}_TEST_STORE=pg node test/run.js'
+open('package.json', 'w').write(json.dumps(pkg, indent=2) + '\n'); print('package.json')
 # config
 edit('server/config.js', [(f"        dbPath: env.{ENV}_DB_PATH || './data/{svc}.db',", f"""        // PostgreSQL (ADR-035): DATABASE_URL serves (PgBouncer), DATABASE_DIRECT_URL migrates (owner role).
         db: {{ url: env.DATABASE_URL || '', directUrl: env.DATABASE_DIRECT_URL || '' }},
@@ -22,12 +34,14 @@ edit('server/config.js', [(f"        dbPath: env.{ENV}_DB_PATH || './data/{svc}.
         // The SQLite file of releases before the switch: read once by scripts/migrate-to-postgres.js.
         dbPath: env.{ENV}_DB_PATH || './data/{svc}.db',""")])
 # outbox
-s = open('server/events/outbox.js').read()
-edit('server/events/outbox.js', [
+if os.path.exists('server/events/outbox.js'):
+  edit('server/events/outbox.js', [
     ("const { createEventsClient, createOutbox } = require('openvibe-sdk/events');", "const { createEventsClient, createPgOutbox } = require('openvibe-sdk/events');"),
     ("    const outbox = createOutbox(db, {", "    // The PostgreSQL outbox: rows are written in the change's own transaction (enqueue(db, …) joins the ambient\n    // transaction); several processes relay one table safely (leases).\n    const outbox = createPgOutbox(db, {"),
-    ("    outbox.ensureSchema();\n", ""),
 ])
+s = open('server/events/outbox.js').read()
+s2 = re.sub(r"\n[ \t]*(await )?outbox\.ensureSchema\(\);[^\n]*", '', s)
+if s2 != s: open('server/events/outbox.js', 'w').write(s2); print('outbox: schema is the migration now')
 s = open('server/events/outbox.js').read()
 s2 = re.sub(r'outbox\.enqueue\((?!db, )', 'outbox.enqueue(db, ', s)
 if s2 != s: open('server/events/outbox.js', 'w').write(s2); print('enqueue(db, …)')
@@ -45,9 +59,9 @@ edit('server/http/actor-limits.js', [
     ("        now,\n", "        now,\n        // Shared across processes on Valkey (ADR-035) when VALKEY_URL is set; in-process otherwise.\n        ...(valkey ? { store: createValkeyLimitStore(valkey) } : {}),\n"),
 ])
 s = open('server/app.js').read()
-m = re.search(r"    ctx\.limits = createActorLimits\(\{ config, now: opts\.limitsNow \|\| \(\(\) => Date\.now\(\)\), registry: metrics\.registry, log \}\);", s)
+m = re.search(r"    ctx\.(limits|actorLimits) = createActorLimits\(\{ config, now: opts\.limitsNow \|\| \(\(\) => Date\.now\(\)\), registry: metrics\.registry, log \}\);", s)
 if m:
-    s = s.replace(m.group(0), "    // Valkey (ADR-035): shared, never-authoritative state (per-actor limit counters). Optional.\n    const valkey = opts.valkey !== undefined ? opts.valkey : (config.valkey.url ? require('openvibe-sdk/valkey').createValkey({ url: config.valkey.url, prefix: config.valkey.prefix, log }) : null);\n    ctx.valkey = valkey;\n    ctx.limits = createActorLimits({ config, now: opts.limitsNow || (() => Date.now()), registry: metrics.registry, log, valkey });")
+    s = s.replace(m.group(0), "    // Valkey (ADR-035): shared, never-authoritative state (per-actor limit counters). Optional.\n    const valkey = opts.valkey !== undefined ? opts.valkey : (config.valkey.url ? require('openvibe-sdk/valkey').createValkey({ url: config.valkey.url, prefix: config.valkey.prefix, log }) : null);\n    ctx.valkey = valkey;\n    ctx." + m.group(1) + " = createActorLimits({ config, now: opts.limitsNow || (() => Date.now()), registry: metrics.registry, log, valkey });")
     open('server/app.js', 'w').write(s); print('app valkey')
 # readiness
 s = open('server/observability.js').read(); o = s
@@ -118,6 +132,7 @@ VALKEY_URL=
 VALKEY_PREFIX=
 # The SQLite file of releases before PostgreSQL: read once by scripts/migrate-to-postgres.js.
 {ENV}_DB_PATH=./data/{svc}.db""")], required=False)
+os.makedirs('scripts', exist_ok=True)
 cfgmod = "require('../server/config')"
 open('scripts/migrate-to-postgres.js', 'w').write(f"""#!/usr/bin/env node
 'use strict';

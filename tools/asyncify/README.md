@@ -37,9 +37,25 @@ What stays for a person:
 
 Also by hand: `db.transaction(fn)()` → `db.tx(fn)` (the codemod leaves it), scalar `MAX(a, b)` → `GREATEST`, `rowid` tiebreaks → an identity `seq` column, and a `setImmediate` meant to run after a commit → `db.afterCommit`. The lessons list in `docs/migrating-to-postgresql.md` §7 has the rest.
 
+## The order for a Blog-shaped service
+
+```
+git checkout -b postgres
+python3 g1pass.py <svc> <Name> <ENV>          # package pins, config, outbox, limits, readiness, boot, CI, unit, env, import script
+npm install
+node gen-migration.js <Name> --publishing …   # migrations/0001_initial.sql from the SQLite SCHEMA
+python3 g1db.py <svc> <Name>                   # server/db.js: openDb / createStore / openStore
+node asyncify.js --config <svc>.json …         # await everything; wraps .map(async …) in Promise.all
+python3 sqlfix.py                              # the SQL rewrites, and CHECK lines for a person
+npm test && npm run test:pg                    # then rehearse: scripts/migrate-to-postgres.js --sqlite <copy> --pglite
+python3 g1docs.py <svc> <Name> <ENV>           # README and STATUS.json
+```
+
+`asyncify.js` now turns `xs.map(cb)` with a callback that becomes async (or an async function passed by name) into `(await Promise.all(xs.map(…)))`, recursively outwards. It reports `.map(async …)` that is not awaited as a whole, and callbacks of other array methods.
+
 ## sqlite-schema-to-pg.js
 
-`toPg(sqliteDdl)` turns the SCHEMA string a service's `db.js` ran into the first migration: `INTEGER PRIMARY KEY AUTOINCREMENT` → identity, `TEXT` → `text COLLATE "C"`, `INTEGER` → `bigint`, `REAL` → `double precision`, `BLOB` → `bytea`, and no `IF NOT EXISTS`. It refuses triggers.
+`toPg(sqliteDdl)` turns the SCHEMA string a service's `db.js` ran into the first migration: `INTEGER PRIMARY KEY AUTOINCREMENT` → identity, `TEXT` → `text COLLATE "C"`, `INTEGER` → `bigint`, `REAL` → `double precision`, `BLOB` → `bytea`, and no `IF NOT EXISTS`. An index on `x COLLATE NOCASE` is on `lower(x)`. An immutable-row trigger (`BEFORE UPDATE [OF …]/DELETE … RAISE(ABORT, msg)`) becomes PL/pgSQL. Any other trigger is refused. `gen-migration.js` runs it on `server/db.js` at HEAD (it evaluates a SCHEMA with `${…}`) and adds the Publishing and SDK tables.
 
 ## g1pass.py
 

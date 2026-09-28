@@ -107,14 +107,57 @@ function analyse(file, src, cfg, asyncNames) {
     const becameAsync = new Set();
     const newlyAsyncNames = new Set();
     const fnsToAsync = new Set();
-
-    // An async function passed by name to an array method (xs.map(asyncFn)) needs a hand fix too.
+    const wrappedMaps = new Set();
+    const isFnN = (x) => x && (x.type === 'FunctionDeclaration' || x.type === 'FunctionExpression' || x.type === 'ArrowFunctionExpression');
+    const inPromiseArg = (call) => { const p = ancestors.get(call) || []; const up = p[p.length - 1]; return up && up.type === 'CallExpression' && up.arguments[0] === call && up.callee.type === 'MemberExpression' && up.callee.object.name === 'Promise'; };
+    /** fn will contain an await: make it async; when it is a .map() callback, wrap that map in (await Promise.all(…)) and
+     * make its own enclosing function async too (recursively); another array method's callback needs a person. */
+    function makeAsync(fn) {
+        if (!fn || fnsToAsync.has(fn)) return;
+        fnsToAsync.add(fn);
+        const anc = ancestors.get(fn) || [];
+        const call = anc[anc.length - 1];
+        if (!(call && call.type === 'CallExpression' && call.arguments.includes(fn) && call.callee.type === 'MemberExpression' && ARRAY_CB.has(call.callee.property.name))) return;
+        if (call.callee.property.name !== 'map') { manual.push(`${file}:${call.loc.start.line}: a .${call.callee.property.name}() callback becomes async`); return; }
+        if (inPromiseArg(call) || wrappedMaps.has(call)) return;
+        wrappedMaps.add(call);
+        edits.push({ at: call.start, text: '(await Promise.all(' });
+        edits.push({ at: call.end, text: '))' });
+        makeAsync([...anc].reverse().find((x) => x !== fn && isFnN(x)));
+    }
+    // An async callback already there whose map result is not awaited as a whole is almost always a bug.
     walk.full(ast, (n) => {
-        if (n.type === 'CallExpression' && n.callee.type === 'MemberExpression' && ARRAY_CB.has(n.callee.property.name)
-            && n.arguments[0] && n.arguments[0].type === 'Identifier' && localAsync.has(n.arguments[0].name)) {
-            const gp = null;
-            manual.push(`${file}:${n.loc.start.line}: async function ${n.arguments[0].name} passed to .${n.callee.property.name}()`);
+        if (n.type === 'CallExpression' && n.callee.type === 'MemberExpression' && n.callee.property.name === 'map' && isFnN(n.arguments[0]) && n.arguments[0].async && !inPromiseArg(n)) {
+            const p = ancestors.get(n) || []; const up = p[p.length - 1];
+            if (!(up && up.type === 'VariableDeclarator')) manual.push(`${file}:${n.loc.start.line}: .map(async …) whose promises are not awaited together (Promise.all)`);
         }
+    });
+
+    // An async function passed by name to an array method: xs.map(asyncFn) / xs.map(api.asyncMethod) is wrapped in
+    // (await Promise.all(…)) like an async callback; any other array method needs a person.
+    const isFnNode = (x) => x.type === 'FunctionDeclaration' || x.type === 'FunctionExpression' || x.type === 'ArrowFunctionExpression';
+    walk.full(ast, (n) => {
+        if (n.type !== 'CallExpression' || n.callee.type !== 'MemberExpression' || !ARRAY_CB.has(n.callee.property.name) || !n.arguments[0]) return;
+        const arg = n.arguments[0];
+        let what = null;
+        if (arg.type === 'Identifier' && localAsync.has(arg.name) && !syncNames.has(arg.name)) what = `async function ${arg.name}`;
+        if (arg.type === 'MemberExpression' && !arg.computed && arg.object.type === 'Identifier' && apis[arg.object.name]) {
+            const set = asyncNames.api.get(apis[arg.object.name]);
+            if (set && set.has(arg.property.name) && !syncNames.has(arg.property.name)) what = `async method ${arg.object.name}.${arg.property.name}`;
+        }
+        if (!what) return;
+        const p = ancestors.get(n) || [];
+        const up = p[p.length - 1];
+        if (n.callee.property.name === 'map' && up && up.type === 'CallExpression' && up.callee.type === 'MemberExpression' && up.callee.object.name === 'Promise') return;
+        const outer = [...p].reverse().find(isFnNode);
+        if (n.callee.property.name === 'map' && outer && !wrappedMaps.has(n)) {
+            wrappedMaps.add(n);
+            edits.push({ at: n.start, text: '(await Promise.all(' });
+            edits.push({ at: n.end, text: '))' });
+            makeAsync(outer);
+            return;
+        }
+        manual.push(`${file}:${n.loc.start.line}: ${what} passed to .${n.callee.property.name}()`);
     });
     walk.fullAncestor(ast, (node, _s, anc) => {
         if (node.type !== 'CallExpression' || !asyncCall(node)) return;
@@ -135,11 +178,25 @@ function analyse(file, src, cfg, asyncNames) {
         const fn = fnIdx >= 0 ? parents[fnIdx] : null;
         if (fn) {
             const fnParent = parents[fnIdx - 1];
-            if (fnParent && fnParent.type === 'CallExpression' && fnParent.arguments.includes(fn) && fnParent.callee.type === 'MemberExpression' && ARRAY_CB.has(fnParent.callee.property.name)) {
-                manual.push(`${file}:${node.loc.start.line}: async call inside a .${fnParent.callee.property.name}() callback`);
-                return;
+            const inPromiseAll = (call) => { const p = ancestors.get(call) || []; const up = p[p.length - 1]; return up && up.type === 'CallExpression' && up.arguments[0] === call && up.callee.type === 'MemberExpression' && up.callee.object.name === 'Promise'; };
+            if (fnParent && fnParent.type === 'CallExpression' && fnParent.arguments.includes(fn) && fnParent.callee.type === 'MemberExpression' && ARRAY_CB.has(fnParent.callee.property.name)
+                && !(fnParent.callee.property.name === 'map' && inPromiseAll(fnParent))) {
+                // xs.map(cb) → (await Promise.all(xs.map(async cb))): same order, same length. Other array methods
+                // change meaning with an async callback (filter keeps every promise), so they stay for a person.
+                const outer = (() => { for (let i = fnIdx - 2; i >= 0; i--) if (isFn(parents[i])) return parents[i]; return null; })();
+                if (fnParent.callee.property.name === 'map' && outer) {
+                    if (!wrappedMaps.has(fnParent)) {
+                        wrappedMaps.add(fnParent);
+                        edits.push({ at: fnParent.start, text: '(await Promise.all(' });
+                        edits.push({ at: fnParent.end, text: '))' });
+                        makeAsync(outer);
+                    }
+                } else {
+                    manual.push(`${file}:${node.loc.start.line}: async call inside a .${fnParent.callee.property.name}() callback`);
+                    return;
+                }
             }
-            fnsToAsync.add(fn);
+            makeAsync(fn);
         }
         const wrap = parent && parent.type === 'MemberExpression' && parent.object === node;
         edits.push({ at: node.start, text: wrap ? '(await ' : 'await ' });
@@ -161,7 +218,8 @@ function analyse(file, src, cfg, asyncNames) {
 }
 
 function apply(src, edits) {
-    const sorted = edits.slice().sort((a, b) => b.at - a.at || (a.text === ')' ? -1 : 1));
+    // At one position, closing text goes in first so it ends up after what opens there.
+    const sorted = edits.slice().sort((a, b) => b.at - a.at || ((a.text[0] === ')' ? 0 : 1) - (b.text[0] === ')' ? 0 : 1)));
     let out = src;
     for (const e of sorted) out = out.slice(0, e.at) + e.text + out.slice(e.at);
     return out;

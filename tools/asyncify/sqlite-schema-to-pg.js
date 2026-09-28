@@ -7,13 +7,25 @@
  *   INTEGER  → bigint             (epoch milliseconds and counters; openvibe-sdk/db returns int8 as Number)
  *   REAL     → double precision,  BLOB → bytea
  *   CREATE … IF NOT EXISTS → CREATE … (a migration runs once)
- * Types only in column position (upper case, as SQLite schemas are written); comments are kept. Triggers
- * (RAISE(ABORT, …)) are refused: write them as PL/pgSQL by hand.
+ * Types only in column position (upper case, as SQLite schemas are written); comments are kept. An immutable-row
+ * trigger (BEFORE UPDATE/DELETE … RAISE(ABORT, msg)) becomes a PL/pgSQL function and trigger; any other trigger is
+ * refused (write it by hand).
  *
  *   const { toPg } = require('openvibe-sdk/tools/asyncify/sqlite-schema-to-pg');   (from a checkout)
  */
 function toPg(sql) {
-    if (/CREATE\s+TRIGGER/i.test(sql)) throw new Error('sqlite-schema-to-pg: triggers need writing as PL/pgSQL by hand');
+    // The one trigger shape services use: a row that must never change (BEFORE UPDATE/DELETE … RAISE(ABORT, msg)).
+    sql = sql.replace(/CREATE TRIGGER(?: IF NOT EXISTS)? (\w+) BEFORE (UPDATE(?: OF [\w\s,]+?)?|DELETE) ON (\w+)\s+BEGIN SELECT RAISE\(ABORT, '([^']*)'\); END;/g,
+        (m, name, op, table, msg) => `CREATE FUNCTION ${name}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION '${msg}'; END $$;\n`
+            + `CREATE TRIGGER ${name} BEFORE ${op.replace(/\s+/g, ' ')} ON ${table} FOR EACH ROW EXECUTE FUNCTION ${name}();`);
+    if (sql.split(';').some((st) => /CREATE\s+TRIGGER/i.test(st) && !/FOR EACH ROW EXECUTE FUNCTION/.test(st))) {
+        throw new Error('sqlite-schema-to-pg: a trigger other than the immutable-row shape needs writing as PL/pgSQL by hand');
+    }
+    // COLLATE NOCASE: in an index, the index is on lower(col) (queries compare lower(col) too: sqlfix.py); on a column
+    // definition it goes (a case-insensitive UNIQUE there needs a lower() unique index, written by hand).
+    sql = sql.replace(/(CREATE (?:UNIQUE )?INDEX[^;]*?\()([^;]*?)\)/g, (m, head, cols) => head + cols.replace(/(\w+) COLLATE NOCASE/g, 'lower($1)') + ')');
+    if (/^\s*\w+\s+TEXT\b[^\n]*COLLATE NOCASE[^\n]*UNIQUE|UNIQUE[^\n]*COLLATE NOCASE/m.test(sql)) throw new Error('sqlite-schema-to-pg: a case-insensitive UNIQUE column needs a unique index on lower(col), by hand');
+    sql = sql.replace(/^(\s*\w+\s+TEXT\b[^\n]*?) COLLATE NOCASE/gm, '$1');
     return sql
         .replace(/\bINTEGER PRIMARY KEY AUTOINCREMENT\b/g, 'bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY')
         .replace(/CREATE (UNIQUE )?INDEX IF NOT EXISTS/g, (m, u) => `CREATE ${u || ''}INDEX`)

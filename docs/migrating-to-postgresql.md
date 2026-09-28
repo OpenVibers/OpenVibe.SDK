@@ -148,3 +148,11 @@ It changes nothing in the SQLite file.
   - **Work after the commit.** A `setImmediate` after a synchronous better-sqlite3 transaction ran after the commit. Around an async transaction it does not. Use `db.afterCommit(fn)` (SDK ≥ 0.20).
   - **The inbox.** `createInbox` (better-sqlite3) becomes `createPgInbox`, awaited. Its `idempotency_receipts` table goes in `migrations/0001_initial.sql` (`inboxSchema()`), not an unawaited `ensureSchema()`.
   - **A script run as a child process in tests** cannot reach the test's PGlite. Call the function it wraps in-process, and `node --check` the script.
+- **Deals, Coupons, Trade and Reviews (2026-09-28)** added these:
+  - **Higher-order wrappers.** A helper that takes a function (`conflictGuard(fn)`, `unique(fn)`, `staffAction(fn)`, a batch) must `await fn()`. Otherwise its `try` catches nothing and the caller races the write. Match PostgreSQL's error codes (`23505` unique, `23503` foreign key) with `err.table` and `err.detail`, not SQLite's message.
+  - **Per-process counters around a transaction** (`batchDepth++ … finally batchDepth--`) break once requests interleave. Keep per-call state in `AsyncLocalStorage`.
+  - **Factories stay synchronous.** A factory that seeded a row at construction became `async`, and every caller got a promise. Write such rows lazily on first use.
+  - **SQL.** Name aliases are not allowed in `HAVING`: repeat the aggregate. A bare column next to `MAX()` in a `GROUP BY` takes its value from the max row in SQLite; use `DISTINCT ON … ORDER BY` instead. `SELECT DISTINCT` over a `LEFT JOIN` with `ORDER BY lower(x)` fails; use `WHERE … OR EXISTS (…)`. Cast a parameter tested only with `IS NULL` (`@p::bigint IS NULL`). Give a recursive CTE's seed the column's type and collation (`?::text COLLATE "C"`). `json_each(?)` becomes `jsonb_array_elements_text(?::jsonb)`.
+  - **Values.** `jsonb` columns come back as objects, so do not `JSON.parse` them.
+  - **Gauges.** A metrics `collect()` is synchronous. Read the database one scrape behind.
+  - **`npm run test:pg` finds races PGlite hides.** PGlite has one connection, so an unawaited write finished before the next read. On a pool it does not.
