@@ -1,7 +1,8 @@
 'use strict';
 /**
- * openvibe-sdk/events (server): transactional outbox and inbox on the service's own better-sqlite3
- * database (ADR-004). No dependency: the caller passes its database handle.
+ * openvibe-sdk/events (server): transactional outbox and inbox (ADR-004), on the service's own database:
+ * createOutbox/createInbox on better-sqlite3 (services not yet moved), createPgOutbox/createPgInbox on an
+ * openvibe-sdk/db handle (PostgreSQL, ADR-035; below). No dependency: the caller passes its database handle.
  *
  *   const events = createEventsClient(client, { source: 'live' });
  *   const outbox = createOutbox(db, { events });
@@ -207,4 +208,168 @@ function createInbox(db, { table = 'idempotency_receipts', now = () => Date.now(
     return { ensureSchema, once, seen };
 }
 
-module.exports = { createOutbox, createInbox, isPermanent };
+// ── PostgreSQL (ADR-035): the same outbox and inbox on an openvibe-sdk/db handle ─────────────────
+
+/** The outbox table's DDL, for a service migration (the runtime role cannot create tables). */
+function outboxSchema(table = 'event_outbox') {
+    if (!TABLE_RE.test(table)) throw new TypeError('bad outbox table name');
+    return `CREATE TABLE IF NOT EXISTS ${table} (
+    id              bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    event_id        text NOT NULL UNIQUE,
+    envelope        jsonb NOT NULL,
+    traceparent     text,
+    created_at      bigint NOT NULL,
+    attempts        integer NOT NULL DEFAULT 0,
+    next_attempt_at bigint NOT NULL DEFAULT 0,
+    sent_at         bigint,
+    seq             bigint,
+    rejected_at     bigint,
+    last_error      text
+);
+CREATE INDEX IF NOT EXISTS ${table}_due ON ${table} (next_attempt_at, id) WHERE sent_at IS NULL AND rejected_at IS NULL;
+CREATE INDEX IF NOT EXISTS ${table}_sent ON ${table} (sent_at) WHERE sent_at IS NOT NULL;`;
+}
+
+/** The inbox table's DDL, for a service migration. */
+function inboxSchema(table = 'idempotency_receipts') {
+    if (!TABLE_RE.test(table)) throw new TypeError('bad inbox table name');
+    return `CREATE TABLE IF NOT EXISTS ${table} (
+    consumer     text NOT NULL,
+    event_id     text NOT NULL,
+    processed_at bigint NOT NULL,
+    PRIMARY KEY (consumer, event_id)
+);`;
+}
+
+/**
+ * createPgOutbox(db, { events }) on an openvibe-sdk/db handle. enqueue takes the caller's transaction handle,
+ * so the event exists if and only if the change commits:
+ *
+ *   await db.tx(async (t) => {
+ *       await t.exec(sql`UPDATE streams SET is_live = true WHERE id = ${id}`);
+ *       await outbox.enqueue(t, { event_type: 'live.stream.started', actor, subject, payload });
+ *   });
+ *   outbox.kick();
+ *
+ * The relay claims due rows with a short lease (FOR UPDATE SKIP LOCKED), so any number of processes and hosts
+ * relay one table without double-sending; a relay that dies mid-batch leaves its rows to the next after the
+ * lease. Delivery stays at least once (Events answers a repeated event_id as a duplicate).
+ */
+function createPgOutbox(db, {
+    events, table = 'event_outbox', batchSize = 50, intervalMs = 1000, leaseMs = 60000,
+    backoffMs = [1000, 5000, 30000, 120000, 600000], now = () => Date.now(), onError = null,
+} = {}) {
+    if (!db || typeof db.query !== 'function' || typeof db.tx !== 'function') throw new TypeError('an openvibe-sdk/db handle is required');
+    if (!events || typeof events.publish !== 'function' || typeof events.prepare !== 'function') {
+        throw new TypeError('events must be an openvibe-sdk events client (createEventsClient)');
+    }
+    if (!TABLE_RE.test(table)) throw new TypeError('bad outbox table name');
+    let timer = null; let running = false; let flushing = null;
+    const backoff = (attempts) => backoffMs[Math.min(attempts, backoffMs.length - 1)];
+
+    async function enqueue(t, envelope, { traceparent } = {}) {
+        if (!t || typeof t.query !== 'function' || typeof t.tx !== 'function') throw new TypeError('outbox.enqueue(t, …): pass the transaction handle db.tx gives you');
+        const m = traceparent && TRACEPARENT_RE.exec(traceparent);
+        const env = events.prepare(envelope, { traceId: m ? m[1] : undefined, now: now() });
+        await t.query(`INSERT INTO ${table} (event_id, envelope, traceparent, created_at) VALUES ($1, $2, $3, $4)`, [env.event_id, JSON.stringify(env), m ? traceparent : null, now()]);
+        return env;
+    }
+
+    async function claim() {
+        const t = now();
+        return db.many(`UPDATE ${table} SET next_attempt_at = $1
+            WHERE id IN (SELECT id FROM ${table} WHERE sent_at IS NULL AND rejected_at IS NULL AND next_attempt_at <= $2
+                         ORDER BY id LIMIT $3 FOR UPDATE SKIP LOCKED)
+            RETURNING id, event_id, envelope, traceparent, attempts`, [t + leaseMs, t, batchSize]);
+    }
+
+    async function markFailure(row, err) {
+        const message = String((err && err.message) || err).slice(0, 500);
+        if (isPermanent(err)) await db.query(`UPDATE ${table} SET rejected_at = $1, attempts = attempts + 1, last_error = $2 WHERE id = $3`, [now(), message, row.id]);
+        else await db.query(`UPDATE ${table} SET attempts = attempts + 1, next_attempt_at = $1, last_error = $2 WHERE id = $3`, [now() + backoff(row.attempts), message, row.id]);
+        if (onError) { try { onError(err, row); } catch { /* reporting must not break the relay */ } }
+    }
+
+    async function publishRows(rows) {
+        const stats = { sent: 0, failed: 0, rejected: 0 };
+        const envelopes = rows.map((r) => (typeof r.envelope === 'string' ? JSON.parse(r.envelope) : r.envelope));
+        const traceparent = rows[0].traceparent || undefined;
+        try {
+            const out = rows.length === 1
+                ? { results: [await events.publish(envelopes[0], { traceparent })] }
+                : await events.publish(envelopes, { traceparent });
+            const byId = new Map(((out && out.results) || []).map((r) => [r.event_id, r]));
+            await db.query(`UPDATE ${table} AS o SET sent_at = $1, seq = v.seq, attempts = o.attempts + 1, last_error = NULL
+                FROM unnest($2::bigint[], $3::bigint[]) AS v(id, seq) WHERE o.id = v.id`,
+            [now(), rows.map((r) => r.id), rows.map((r) => (byId.get(r.event_id) && byId.get(r.event_id).seq) ?? null)]);
+            stats.sent += rows.length;
+        } catch (err) {
+            if (rows.length > 1 && isPermanent(err)) {
+                for (const row of rows) { const s = await publishRows([row]); stats.sent += s.sent; stats.failed += s.failed; stats.rejected += s.rejected; }
+            } else {
+                for (const row of rows) await markFailure(row, err);
+                if (isPermanent(err)) stats.rejected += rows.length; else stats.failed += rows.length;
+            }
+        }
+        return stats;
+    }
+
+    async function doFlush() {
+        const total = { sent: 0, failed: 0, rejected: 0 };
+        for (;;) {
+            const rows = await claim();
+            if (!rows.length) break;
+            const s = await publishRows(rows);
+            total.sent += s.sent; total.failed += s.failed; total.rejected += s.rejected;
+            if (s.failed || rows.length < batchSize) break;
+        }
+        return total;
+    }
+    function flush() { if (!flushing) flushing = doFlush().finally(() => { flushing = null; }); return flushing; }
+    function schedule(ms) {
+        if (!running) return;
+        clearTimeout(timer);
+        timer = setTimeout(async () => {
+            timer = null;
+            try { await flush(); } catch (err) { if (onError) { try { onError(err); } catch { /* ignore */ } } }
+            schedule(intervalMs);
+        }, ms);
+        if (timer.unref) timer.unref();
+    }
+    return {
+        schema: () => outboxSchema(table),
+        /** Create the table where the handle may (tests, PGlite); services put schema() in a migration. */
+        ensureSchema: () => db.query(outboxSchema(table)),
+        enqueue, flush,
+        start() { if (!running) { running = true; schedule(0); } },
+        stop() { running = false; clearTimeout(timer); timer = null; return flushing || Promise.resolve(); },
+        kick() { schedule(0); },
+        pending: () => db.value(`SELECT count(*) FROM ${table} WHERE sent_at IS NULL AND rejected_at IS NULL`),
+        rejected: () => db.value(`SELECT count(*) FROM ${table} WHERE rejected_at IS NOT NULL`),
+        prune: (olderThanMs = 7 * 24 * 60 * 60 * 1000) => db.exec(`DELETE FROM ${table} WHERE sent_at IS NOT NULL AND sent_at < $1`, [now() - olderThanMs]),
+    };
+}
+
+/**
+ * createPgInbox(db): run fn once per (consumer, eventId), in one transaction with its receipt.
+ *   const r = await inbox.once('network', event.event_id, async (t) => { … writes with t … });   // { duplicate, result }
+ */
+function createPgInbox(db, { table = 'idempotency_receipts', now = () => Date.now() } = {}) {
+    if (!db || typeof db.tx !== 'function') throw new TypeError('an openvibe-sdk/db handle is required');
+    if (!TABLE_RE.test(table)) throw new TypeError('bad inbox table name');
+    return {
+        schema: () => inboxSchema(table),
+        ensureSchema: () => db.query(inboxSchema(table)),
+        async once(consumer, eventId, fn) {
+            if (!consumer || !eventId) throw new TypeError('consumer and eventId are required');
+            return db.tx(async (t) => {
+                const n = await t.exec(`INSERT INTO ${table} (consumer, event_id, processed_at) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`, [String(consumer), String(eventId), now()]);
+                if (n === 0) return { duplicate: true };
+                return { duplicate: false, result: await fn(t) };
+            });
+        },
+        seen: async (consumer, eventId) => Boolean(await db.maybe(`SELECT 1 FROM ${table} WHERE consumer = $1 AND event_id = $2`, [String(consumer), String(eventId)])),
+    };
+}
+
+module.exports = { createOutbox, createInbox, createPgOutbox, createPgInbox, outboxSchema, inboxSchema, isPermanent };

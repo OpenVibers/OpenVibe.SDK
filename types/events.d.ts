@@ -144,3 +144,33 @@ export interface Inbox {
     seen(consumer: string, eventId: string): boolean;
 }
 export declare function createInbox(db: SqliteDatabase, opts?: { table?: string; now?: () => number }): Inbox;
+
+/** The PostgreSQL outbox (ADR-035) on an openvibe-sdk/db handle; several relays may share one table. */
+export interface PgOutbox {
+    schema(): string;
+    ensureSchema(): Promise<unknown>;
+    /** Pass the transaction handle db.tx gives you: the event exists if and only if the change commits. */
+    enqueue(t: import('./db').Tx, envelope: EventInput, opts?: { traceparent?: string }): Promise<EventEnvelope>;
+    flush(): Promise<FlushStats>;
+    start(): void;
+    stop(): Promise<unknown>;
+    kick(): void;
+    pending(): Promise<number | null>;
+    rejected(): Promise<number | null>;
+    prune(olderThanMs?: number): Promise<number>;
+}
+export declare function createPgOutbox(db: import('./db').Db, opts: {
+    events: Pick<EventsClient, 'publish' | 'prepare'>;
+    table?: string; batchSize?: number; intervalMs?: number; leaseMs?: number; backoffMs?: number[];
+    now?: () => number; onError?: (err: unknown, row?: unknown) => void;
+}): PgOutbox;
+export interface PgInbox {
+    schema(): string;
+    ensureSchema(): Promise<unknown>;
+    once<T>(consumer: string, eventId: string, fn: (t: import('./db').Tx) => Promise<T>): Promise<{ duplicate: true } | { duplicate: false; result: T }>;
+    seen(consumer: string, eventId: string): Promise<boolean>;
+}
+export declare function createPgInbox(db: import('./db').Db, opts?: { table?: string; now?: () => number }): PgInbox;
+/** DDL for a service migration. */
+export declare function outboxSchema(table?: string): string;
+export declare function inboxSchema(table?: string): string;

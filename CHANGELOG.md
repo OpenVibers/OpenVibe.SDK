@@ -3,6 +3,18 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.15.0 (2026-09-28)
+
+**The event outbox and inbox on PostgreSQL** (ADR-004 on ADR-035), in `openvibe-sdk/events`. The better-sqlite3 versions stay for services that have not moved yet.
+- **`createPgOutbox(db, { events })`:** takes an openvibe-sdk/db handle.
+  - `enqueue(t, envelope)` takes the transaction handle, so the event exists if and only if the change commits.
+  - The relay claims due rows with a lease (`FOR UPDATE SKIP LOCKED`), so any number of processes and hosts relay one table without sending an event twice. A relay that dies leaves its rows to the next one once the lease expires.
+  - Otherwise it behaves as before: backoff on transient failures, permanent refusals isolated per row, the seq kept, `pending`, `rejected` and `prune`.
+- **`createPgInbox(db)`:** `once(consumer, eventId, async (t) => …)` runs the handler once, in one transaction with its receipt, and a failed handler leaves no receipt.
+- **`outboxSchema()` and `inboxSchema()`:** the DDL to put in a service migration, since the runtime role cannot create tables.
+- **Quieter tests:** the slow-query log is off by default on PGlite, whose first query includes its WASM start.
+- **Tests:** `test/pg-outbox.test.js` runs on PGlite, and through PgBouncer with three relays sharing one table (60 events, none sent twice).
+
 ## 0.14.0 (2026-09-28)
 
 **The async data layer and Valkey modules** (ADR-035 and its amendment; roadmap WS-X2): every service moves to PostgreSQL 18 and Valkey, async-first.

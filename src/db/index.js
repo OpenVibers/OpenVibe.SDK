@@ -85,7 +85,7 @@ function queryApi(run, self) {
 function createDb(o = {}) {
     const log = o.log || console;
     const service = o.service || process.env.OV_SERVICE || 'service';
-    const slowMs = o.slowMs == null ? 500 : o.slowMs;
+    const slowMs = o.slowMs == null ? (o.pglite ? Infinity : 500) : o.slowMs;   // PGlite's first query includes its WASM start
     const stats = { queries: 0, errors: 0, slow: 0, retries: 0, tx: 0 };
     let hist = null;
     if (o.registry && typeof o.registry.histogram === 'function') {
