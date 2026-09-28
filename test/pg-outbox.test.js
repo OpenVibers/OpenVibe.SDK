@@ -50,6 +50,14 @@ function cases(label, open) {
                 await outbox.flush();
                 assert.equal(platform.state.events.length, 1, 'nothing republished');
                 assert.ok((await db.value(sql`SELECT seq FROM event_outbox WHERE event_id = ${env.event_id}`)) >= 1, 'the seq Events assigned is kept');
+                // Published in the order written (UPDATE … RETURNING alone has no order).
+                const written = [];
+                for (let i = 0; i < 12; i++) {
+                    written.push((await db.tx(async (t) => outbox.enqueue(t, { event_type: 'live.stream.started', actor, subject, payload: { stream_id: 100 + i } }))).event_id);
+                }
+                await db.exec(sql`UPDATE event_outbox SET attempts = attempts WHERE event_id = ${written[3]}`);   // a later row version for one of them
+                await outbox.flush();
+                assert.deepEqual(platform.state.events.slice(1).map((e) => e.event.event_id), written);
             } finally { await done(); }
         }],
         [`${label}: transient failures back off; a permanent refusal rejects only its row`, async () => {

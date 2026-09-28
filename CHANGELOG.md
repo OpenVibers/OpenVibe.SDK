@@ -8,6 +8,10 @@ release may change an API and says so here.
 
 
 
+## 0.21.1 (2026-09-28)
+
+- `openvibe-sdk/events` `createPgOutbox`: the relay publishes the rows it claimed in the order they were written. `UPDATE … RETURNING` gives no order, so a batch could reach Events out of order (a `media.clip.failed` before the `media.vod.ready` written before it). Found converting OpenVibe.Media.
+
 ## 0.21.0 (2026-09-28)
 
 - `openvibe-sdk/auth`: `createPgRevocationStore(db, { table })` keeps Network's per-person token cutoffs on PostgreSQL. `await load()` reads them into memory at boot, so `isRevoked()` and `cutoffFor()` stay synchronous on the request path; `apply()` and `record()` are async and write through before memory moves, never backwards (a later cutoff stored by another process wins). `revocationSchema(table)` is its table, for the service's migration (the SQLite store created its table at first use, which a PostgreSQL runtime role cannot do).

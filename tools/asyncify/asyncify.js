@@ -153,6 +153,30 @@ function analyse(file, src, cfg, asyncNames) {
         });
     });
 
+    // Lazy accessors: function objects() { return require('../objects/model'); } / const model = () => require('./model').
+    const lazyAccessors = new Map();
+    {
+        const resolveRel = (lit) => {
+            const base = path.relative(process.cwd(), path.resolve(path.dirname(file), lit));
+            return base.endsWith('.js') ? base : fs.existsSync(`${base}.js`) ? `${base}.js` : path.join(base, 'index.js');
+        };
+        const reqOf = (n) => (n && n.type === 'CallExpression' && n.callee.type === 'Identifier' && n.callee.name === 'require' && n.arguments[0]
+            && typeof n.arguments[0].value === 'string' && n.arguments[0].value.startsWith('.') ? resolveRel(n.arguments[0].value) : null);
+        const bodyReq = (f) => {
+            if (!f || f.params.length) return null;
+            if (f.body.type !== 'BlockStatement') return reqOf(f.body);
+            const st = f.body.body;
+            return st.length === 1 && st[0].type === 'ReturnStatement' ? reqOf(st[0].argument) : null;
+        };
+        for (const [name, f] of localFns) { const t = bodyReq(f); if (t && fs.existsSync(t)) lazyAccessors.set(name, t); }
+        // const m = objectsModel(): m is that module's API here.
+        walk.full(ast, (n) => {
+            if (n.type !== 'VariableDeclarator' || n.id.type !== 'Identifier' || !n.init || n.init.type !== 'CallExpression') return;
+            const c = n.init;
+            if (c.callee.type === 'Identifier' && lazyAccessors.has(c.callee.name) && !c.arguments.length) apis[n.id.name] = lazyAccessors.get(c.callee.name);
+        });
+    }
+
     // Local functions that await a parameter themselves: rejects(p, …) → 'rejects:0'.
     const promiseTakers = new Set();
     for (const [name, f] of localFns) {
@@ -173,7 +197,14 @@ function analyse(file, src, cfg, asyncNames) {
                 if (p.length >= 2 && (p[p.length - 2] === 'q' || p[p.length - 2] === 'stmts' || p[p.length - 2] === 'Q')) return true;
                 if (p.length && stmtNames.has(p[p.length - 1])) return true;
             }
-            if ((m === 'tx' || m === 'transaction') && p.length && ['store', 'db', 'this'].includes(p[p.length - 1])) return m === 'tx';
+            // x.tx(fn): openvibe-sdk/db's transaction on any handle (db, store.db, db.getDb(), a destructured one).
+            if (m === 'tx' && !syncNames.has('tx')) return true;
+            if (m === 'transaction' && p.length && ['store', 'db', 'this'].includes(p[p.length - 1])) return false;
+            // objects().safeSync(: a local lazy accessor (function objects() { return require('../objects/model'); }).
+            if (obj.type === 'CallExpression' && obj.callee.type === 'Identifier' && lazyAccessors.has(obj.callee.name) && obj.arguments.length === 0) {
+                const set = asyncNames.api.get(lazyAccessors.get(obj.callee.name));
+                if (set && set.has(m) && !syncNames.has(m)) return true;
+            }
             // require('./events').pasteCreated(: a module's function reached through an inline require.
             if (obj.type === 'CallExpression' && obj.callee.type === 'Identifier' && obj.callee.name === 'require' && obj.arguments[0] && typeof obj.arguments[0].value === 'string' && obj.arguments[0].value.startsWith('.')) {
                 const base = path.relative(process.cwd(), path.resolve(path.dirname(file), obj.arguments[0].value));

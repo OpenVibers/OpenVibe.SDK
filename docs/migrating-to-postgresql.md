@@ -177,3 +177,15 @@ It changes nothing in the SQLite file.
   - **Event handlers that became async** (a WebSocket dispatch) can overtake each other: queue them in arrival order.
   - **Fire-and-forget helpers** (`tell(fn) { try { fn(x) } catch {} }`) catch nothing once `fn` is async: await it.
   - **Tests**: `const x = createFoo(…)` instances, `require('./x').fn()` calls and a test's own `rejects(promise)` helper are handled by the codemod now; a boot helper that re-requires the server gets its database passed in (`createApp({ db })`); SQLite-only upgrade tests (a `migrate()` rebuilding an old table) go, the migration ledger replaces them.
+- **Media (2026-09-28)** added these:
+  - **SQLite functions the code calls**: `json_valid`, `json_extract`, `json_type`, `instr`, `date('now', …)`, `strftime('%Y-%m-%dT%H:%M:%fZ', 'now', …)`: the migration defines SQLite-compatible `json_valid`/`json_extract`/`json_type`/`instr`, `ov_now_iso(modifier)`, and `sqlfix.py` rewrites `date(…)` to `substr(datetime(…), 1, 10)`.
+  - **`SUM()` over bigint is `numeric`**, and the SDK returns numeric as exact text on purpose (money). Cast byte and count sums (`::bigint`); leave double-precision sums (durations) alone.
+  - **Integers as booleans**: `WHERE 0`, `CASE WHEN is_public THEN`: write `FALSE`, `is_public = 1`.
+  - **Your own `BEGIN`/`COMMIT` through `db.exec`** runs on whichever pooled connection answers: use `db.tx` (a nested `tx` is a savepoint; throw a marker to roll a dry run back).
+  - **A generator that awaits** becomes `async function*`: its loops need `for await`.
+  - **Callbacks a helper takes in an object** (`announce(app, event, { change, payload })`, `onRow`, `alsoInTx`) are awaited by hand; so are `x.start()` calls whose `start` became async (a fire-and-forget one needs `.catch`, or the rejection ends the process).
+  - **Lazy accessors** (`function objects() { return require('../objects/model'); }`, `const m = objectsModel()`), inline `require('./x').fn()`, factory instances and `db` passed as a parameter (config `fileApis`) are resolved by the codemod now.
+  - **Stores whose creation became async** (the Shared config store) get an `init()` at boot and keep a synchronous `get()`; anything they must answer synchronously (explicit keys) is cached on activation.
+  - **The SQLite outbox refused to enqueue outside a transaction**; the PostgreSQL one takes any handle. Keep the guard in the service (`db.inTransaction()`), or an event can be written after the change committed.
+  - **Tests**: one migrated database per test process through `node --import` (a preload), a script runner that runs operator scripts in the test process (a child process cannot reach an in-process PGlite), identities started at 100000 so tests' explicit small ids never collide, fault injection in JavaScript instead of `TEMP TRIGGER`s (the runtime role has no DDL under `test:pg`), and SQLite upgrade tests removed.
+  - **Read-only reports** run in a `SET TRANSACTION READ ONLY` transaction instead of opening a read-only SQLite file.

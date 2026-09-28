@@ -36,6 +36,7 @@ REPORT = [
     (r'\b(db|this\.db)\.exec\(', 'DDL at boot on the serving handle: the serving role cannot create tables; the table belongs in a migration'),
     (r'\b(SUM|AVG)\((?![^)]*\bCASE\b)[^)]*\)(?!\s*::)(?!, *0\)::)', 'SUM/AVG of a bigint column is numeric, returned as text: cast it (COALESCE(SUM(x), 0)::bigint) unless the column is double precision'),
     (r'(@\w+|[^\w]\?) IS (NOT )?NULL(?!::)', 'a parameter tested with IS NULL may need a cast (@p::bigint IS NULL) when PostgreSQL cannot infer its type'),
+    (r'COALESCE\(\?,', 'COALESCE(?, col): cast the parameter (?::text) when PostgreSQL cannot infer its type from the other arguments'),
     (r'UNIQUE constraint|constraint failed|SQLITE_[A-Z]', "SQLite error text → err.code ('23505' unique, '23503' foreign key, '23514' check) with err.table/err.constraint/err.detail"),
 ]
 changed = []
@@ -62,6 +63,9 @@ for p in files:
     if SQLITE_DATES:
         s = re.sub(r'\bCURRENT_TIMESTAMP\b', 'ov_now()', s)
         s = re.sub(r"strftime\('%Y-%m-%dT%H:%M:%fZ', ?'now'\)", 'ov_now_iso()', s)
+        s = re.sub(r"strftime\('%Y-%m-%dT%H:%M:%fZ', ?'now', ?('[^']*'|\?)\)", r'ov_now_iso(\1)', s)
+        s = re.sub(r"\bdate\('now', ?('[^']*'|\?)\)", r"substr(datetime('now', \1), 1, 10)", s)
+        s = re.sub(r"(?<![\w.])date\(([\w.]+)\)(?= AS | >| <| =|,|\))", r'substr(datetime(\1), 1, 10)', s)
     while 'INSERT OR IGNORE INTO' in s:
         i = s.index('INSERT OR IGNORE INTO'); q = s[i - 1] if s[i - 1] in '\'"`' else '`'
         j = s.index(q, i)
@@ -100,14 +104,14 @@ for p in files:
         body = lit.group(0)
         if not re.search(r'\bSELECT\b', body): return body
         q = '\\"' if body[0] == '"' else '"'
-        return re.sub(r'\bAS ([a-z]+[A-Z]\w*)\b', lambda m: f'AS {q}{m.group(1)}{q}', body)
+        return re.sub(r'\b(AS|as) ([a-z]+[A-Z]\w*)\b', lambda m: f'{m.group(1)} {q}{m.group(2)}{q}', body)
     s = re.sub(r'`[^`]*`|\'(?:[^\'\\\n]|\\.)*\'|"(?:[^"\\\n]|\\.)*"', quote_aliases, s)
     # Column names PostgreSQL reserves (SQLite does not): quoted inside SQL string literals ("window", "user").
     def quote_reserved(lit):
         body = lit.group(0)
         if not re.search(r'\b(SELECT|INSERT|UPDATE|DELETE|CREATE)\b', body): return body
         q = '\\"' if body[0] == '"' else '"'   # inside a double-quoted JS string the quotes are escaped
-        return re.sub(r"(?<![.\w\"$\\'])(window|user)(?![\w\"(\\'])", lambda m: q + m.group(1) + q, body)
+        return re.sub(r"(?<![.\w\"$\\'@:])(window|user)(?![\w\"(\\'])", lambda m: q + m.group(1) + q, body)
     s = re.sub(r'`[^`]*`|\'(?:[^\'\\\n]|\\.)*\'|"(?:[^"\\\n]|\\.)*"', quote_reserved, s)
     # better-sqlite3's db.inTransaction was a property; openvibe-sdk/db's is a function.
     s = re.sub(r'\b(db|this\.db|store\.db)\.inTransaction\b(?!\s*\()', r'\1.inTransaction()', s)
@@ -147,6 +151,9 @@ for p in files:
     s = re.sub(r"(SELECT name FROM sqlite_master WHERE type (?:= 'table'|IN \('table', ?'view'\))) AND name NOT (?:I)?LIKE 'sqlite_%'", r"\1", s)
     s = re.sub(r"SELECT name FROM sqlite_master WHERE type (?:= 'table'|IN \('table', ?'view'\))",
                "SELECT table_name AS name FROM information_schema.tables WHERE table_schema = current_schema()", s)
+    # SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ? / 'x' → the table in the current schema
+    s = re.sub(r"SELECT 1( AS \w+)? FROM sqlite_master WHERE type = 'table' AND name = (\?|'\w+')",
+               r"SELECT 1\1 FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = \2", s)
     s = re.sub(r"SELECT name FROM pragma_table_info\('(\w+)'\)",
                r"SELECT column_name AS name FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = '\1' ORDER BY ordinal_position", s)
     if s != o: open(p, 'w').write(s); changed.append(p)

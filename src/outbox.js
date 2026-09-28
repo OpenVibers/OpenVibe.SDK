@@ -277,10 +277,12 @@ function createPgOutbox(db, {
 
     async function claim() {
         const t = now();
-        return db.many(`UPDATE ${table} SET next_attempt_at = $1
+        const rows = await db.many(`UPDATE ${table} SET next_attempt_at = $1
             WHERE id IN (SELECT id FROM ${table} WHERE sent_at IS NULL AND rejected_at IS NULL AND next_attempt_at <= $2
                          ORDER BY id LIMIT $3 FOR UPDATE SKIP LOCKED)
             RETURNING id, event_id, envelope, traceparent, attempts`, [t + leaseMs, t, batchSize]);
+        // UPDATE … RETURNING has no order: publish in the order the rows were written.
+        return rows.sort((a, b) => Number(a.id) - Number(b.id));
     }
 
     async function markFailure(row, err) {

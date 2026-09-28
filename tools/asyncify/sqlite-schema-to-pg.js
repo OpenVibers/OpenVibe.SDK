@@ -14,18 +14,21 @@
  *   const { toPg } = require('openvibe-sdk/tools/asyncify/sqlite-schema-to-pg');   (from a checkout)
  */
 function toPg(sql) {
-    // The one trigger shape services use: a row that must never change (BEFORE UPDATE/DELETE … RAISE(ABORT, msg)).
-    // The condition (SQLite's WHEN, which may hold a subquery PostgreSQL does not allow in a trigger's WHEN) goes inside
-    // the function: IF cond THEN RAISE; the row passes otherwise (RETURN NEW for an update, OLD for a delete).
-    sql = sql.replace(/CREATE TRIGGER(?: IF NOT EXISTS)?\s+(\w+)\s+BEFORE\s+(UPDATE(?:\s+OF\s+[\w\s,]+?)?|DELETE)\s+ON\s+(\w+)(?:\s+WHEN\s+([\s\S]+?))?\s+BEGIN SELECT RAISE\(ABORT, '([^']*)'\); END;/g,
-        (m, name, op, table, when, msg) => {
-            const cond = when ? when.replace(/\s+/g, ' ').replace(/ IS NOT (OLD|NEW)\./g, ' IS DISTINCT FROM $1.') : 'TRUE';
-            const row = /^DELETE/.test(op) ? 'OLD' : 'NEW';
-            return `CREATE FUNCTION ${name}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF ${cond} THEN RAISE EXCEPTION '${msg}'; END IF; RETURN ${row}; END $$;\n`
-                + `CREATE TRIGGER ${name} BEFORE ${op.replace(/\s+/g, ' ')} ON ${table} FOR EACH ROW EXECUTE FUNCTION ${name}();`;
+    // A SQLite row trigger → a PL/pgSQL function and a trigger. Its WHEN condition (which may hold a subquery, not
+    // allowed in a PostgreSQL trigger's WHEN) goes inside the function as IF cond THEN body END IF; RAISE(ABORT, msg)
+    // becomes RAISE EXCEPTION; a BEFORE trigger lets the row pass (NEW, or OLD for a delete), an AFTER one returns NULL.
+    const cond = (c) => c.replace(/\s+/g, ' ').trim().replace(/ IS NOT (OLD|NEW)\./g, ' IS DISTINCT FROM $1.').replace(/(\b(?:OLD|NEW)\.\w+) IS (OLD|NEW)\./g, '$1 IS NOT DISTINCT FROM $2.');
+    sql = sql.replace(/CREATE TRIGGER(?: IF NOT EXISTS)?\s+(\w+)\s+(BEFORE|AFTER)\s+(INSERT|UPDATE(?:\s+OF\s+[\w\s,]+?)?|DELETE)\s+ON\s+(\w+)(?:\s+FOR EACH ROW)?(?:\s+WHEN\s+([\s\S]+?))?\s+BEGIN\s+([\s\S]+?)\s*END;/g,
+        (m, name, when, op, table, whenCond, body) => {
+            const stmts = body.replace(/SELECT RAISE\(ABORT, '([^']*)'\);?/g, "RAISE EXCEPTION '$1';")
+                .replace(/CURRENT_TIMESTAMP/g, 'ov_now()').trim().replace(/;?$/, ';');
+            const row = when === 'AFTER' ? 'NULL' : /^DELETE/.test(op) ? 'OLD' : 'NEW';
+            const inner = whenCond ? `IF ${cond(whenCond)} THEN ${stmts} END IF;` : stmts;
+            return `CREATE FUNCTION ${name}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN ${inner.replace(/\s+/g, ' ')} RETURN ${row}; END $$;\n`
+                + `CREATE TRIGGER ${name} ${when} ${op.replace(/\s+/g, ' ')} ON ${table} FOR EACH ROW EXECUTE FUNCTION ${name}();`;
         });
-    if (sql.split(';').some((st) => /CREATE\s+TRIGGER/i.test(st) && !/FOR EACH ROW[\s\S]*EXECUTE FUNCTION/.test(st))) {
-        throw new Error('sqlite-schema-to-pg: a trigger other than the immutable-row shape needs writing as PL/pgSQL by hand');
+    if (sql.split(';').some((st) => /CREATE\s+TRIGGER/i.test(st) && !/FOR EACH ROW[\s\S]*EXECUTE FUNCTION/.test(st) && !/\$\$/.test(st))) {
+        throw new Error('sqlite-schema-to-pg: a trigger this converter does not read needs writing as PL/pgSQL by hand');
     }
     // COLLATE NOCASE: in an index, the index is on lower(col) (queries compare lower(col) too: sqlfix.py); on a column
     // definition it goes (a case-insensitive UNIQUE there needs a lower() unique index, written by hand).
@@ -58,7 +61,7 @@ function toPg(sql) {
 /**
  * SQLite's text timestamps and date functions on PostgreSQL, for a service whose columns hold 'YYYY-MM-DD HH:MM:SS'
  * (UTC) text: the stored values, their comparisons and what the API returns stay exactly as they were. ov_now() is
- * CURRENT_TIMESTAMP's text (per statement, as SQLite), ov_now_iso() strftime('%Y-%m-%dT%H:%M:%fZ', 'now');
+ * CURRENT_TIMESTAMP's text (per statement, as SQLite), ov_now_iso([modifier]) strftime('%Y-%m-%dT%H:%M:%fZ', 'now'[, modifier]);
  * datetime(t [, modifier]) and julianday(t) read 'now', SQLite text and ISO 8601 (a zone, or none for UTC) and give
  * NULL for what they cannot read, as SQLite does. A modifier is an interval ('-7 days', '+1 hour').
  */
@@ -73,6 +76,7 @@ EXCEPTION WHEN others THEN RETURN NULL;
 END $$;
 CREATE FUNCTION ov_now() RETURNS text LANGUAGE sql STABLE AS $$ SELECT to_char(statement_timestamp() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') $$;
 CREATE FUNCTION ov_now_iso() RETURNS text LANGUAGE sql STABLE AS $$ SELECT to_char(statement_timestamp() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') $$;
+CREATE FUNCTION ov_now_iso(modifier text) RETURNS text LANGUAGE sql STABLE AS $$ SELECT to_char((statement_timestamp() AT TIME ZONE 'UTC') + modifier::interval, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') $$;
 CREATE FUNCTION datetime(t text, modifier text DEFAULT NULL) RETURNS text LANGUAGE plpgsql STABLE AS $$
 DECLARE ts timestamp := ov_ts(t);
 BEGIN
