@@ -13,6 +13,11 @@
  *
  *   const { toPg } = require('openvibe-sdk/tools/asyncify/sqlite-schema-to-pg');   (from a checkout)
  */
+/** Words PostgreSQL reserves that SQLite takes as plain column names. */
+const PG_ONLY_RESERVED = ['window', 'user', 'freeze', 'analyse', 'both', 'leading', 'trailing', 'symmetric', 'asymmetric', 'variadic',
+    'lateral', 'ilike', 'similar', 'verbose', 'tablesample', 'concurrently', 'overlaps', 'authorization', 'binary', 'collation',
+    'only', 'placing', 'array', 'fetch', 'current_role', 'session_user', 'current_user', 'current_catalog', 'current_schema'];
+
 function toPg(sql) {
     // A SQLite row trigger → a PL/pgSQL function and a trigger. Its WHEN condition (which may hold a subquery, not
     // allowed in a PostgreSQL trigger's WHEN) goes inside the function as IF cond THEN body END IF; RAISE(ABORT, msg)
@@ -36,7 +41,9 @@ function toPg(sql) {
     if (/^\s*\w+\s+TEXT\b[^\n]*COLLATE NOCASE[^\n]*UNIQUE|UNIQUE[^\n]*COLLATE NOCASE/m.test(sql)) throw new Error('sqlite-schema-to-pg: a case-insensitive UNIQUE column needs a unique index on lower(col), by hand');
     sql = sql.replace(/^(\s*\w+\s+TEXT\b[^\n]*?) COLLATE NOCASE/gm, '$1');
     // Column names PostgreSQL reserves (SQLite does not) are quoted: a column definition, and inside index/unique lists.
-    sql = sql.replace(/^(\s*)(window|user)(\s+[A-Z])/gm, '$1"$2"$3').replace(/([(,]\s*)(window|user)(\s*[,)])/g, '$1"$2"$3');
+    // The service's queries must quote them too (Billing's settings.freeze).
+    const R = PG_ONLY_RESERVED.join('|');
+    sql = sql.replace(new RegExp(`^(\\s*)(${R})(\\s+[A-Za-z])`, 'gim'), '$1"$2"$3').replace(new RegExp(`([(,]\\s*)(${R})(?=\\s*[,)])`, 'gi'), '$1"$2"');
     return sql
         .replace(/\bINTEGER PRIMARY KEY AUTOINCREMENT\b/g, 'bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY')
         // An INTEGER PRIMARY KEY that references another table is that row's key, not a counter.
@@ -88,4 +95,4 @@ END $$;
 CREATE FUNCTION julianday(t text) RETURNS double precision LANGUAGE sql STABLE AS $$ SELECT extract(epoch FROM ov_ts(t))::double precision / 86400.0 + 2440587.5 $$;
 `;
 
-module.exports = { toPg, SQLITE_DATE_FUNCTIONS };
+module.exports = { toPg, SQLITE_DATE_FUNCTIONS, PG_ONLY_RESERVED };

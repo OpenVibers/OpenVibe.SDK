@@ -23,7 +23,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
-const { toPg, SQLITE_DATE_FUNCTIONS } = require('./sqlite-schema-to-pg');
+const { toPg, SQLITE_DATE_FUNCTIONS, PG_ONLY_RESERVED } = require('./sqlite-schema-to-pg');
 
 const args = process.argv.slice(2);
 const Name = args[0];
@@ -104,7 +104,7 @@ function fromOpenedDb(expr) {
         if (!rows.length) continue;
         const cols = Object.keys(rows[0]).filter((c) => !tsDefault.has(`${t.name}.${c}`));
         const k = pk.get(t.name);
-        const q = (c) => (/^(window|user)$/.test(c) ? `"${c}"` : c);
+        const q = (c) => (PG_ONLY_RESERVED.includes(c.toLowerCase()) ? `"${c}"` : c);
         seeds += `INSERT INTO ${t.name} (${cols.map(q).join(', ')})${k && k.always && cols.includes(k.col) ? ' OVERRIDING SYSTEM VALUE' : ''} VALUES\n`
             + `${rows.map((r) => `    (${cols.map((c) => lit(r[c])).join(', ')})`).join(',\n')};\n`;
         if (k && cols.includes(k.col)) seeds += `SELECT setval(pg_get_serial_sequence('${t.name}', '${k.col}'), (SELECT MAX(${k.col}) FROM ${t.name}));\n`;
