@@ -28,6 +28,21 @@ const RETRYABLE_4XX = new Set([401, 408, 409, 425, 429]);
 
 // Only Events refusing the envelope is permanent. A failure to get a token (no grant yet, Network
 // restarting) says nothing about the event, so it is always retried.
+/**
+ * One relay pass at a time. A flush() while a pass runs gets the next pass, which starts after it (so it also covers rows
+ * committed after that pass claimed); every call in the meantime shares that next pass. flush.idle() settles with both.
+ */
+function serialFlush(pass) {
+    let current = null; let next = null;
+    const flush = () => {
+        if (!current) { current = pass().finally(() => { current = null; }); return current; }
+        if (!next) next = current.catch(() => {}).then(() => { next = null; return flush(); });
+        return next;
+    };
+    flush.idle = () => (next || current || Promise.resolve()).catch(() => {});
+    return flush;
+}
+
 function isPermanent(err) {
     const s = err && err.status;
     if (err && typeof err.url === 'string' && /\/oauth\/token(\?|$)/.test(err.url)) return false;
@@ -46,7 +61,6 @@ function createOutbox(db, {
     let stmts = null;
     let timer = null;
     let running = false;
-    let flushing = null;
 
     function ensureSchema() {
         db.exec(`CREATE TABLE IF NOT EXISTS ${table} (
@@ -140,11 +154,8 @@ function createOutbox(db, {
         return total;
     }
 
-    /** Publish due rows once. Concurrent callers share the flush in progress. */
-    function flush() {
-        if (!flushing) flushing = doFlush().finally(() => { flushing = null; });
-        return flushing;
-    }
+    /** Publish due rows once (serialFlush: a call during a pass also covers rows committed since that pass claimed). */
+    const flush = serialFlush(doFlush);
 
     function schedule(ms) {
         if (!running) return;
@@ -162,7 +173,7 @@ function createOutbox(db, {
         enqueue,
         flush,
         start() { if (!running) { running = true; schedule(0); } },
-        stop() { running = false; clearTimeout(timer); timer = null; return flushing || Promise.resolve(); },
+        stop() { running = false; clearTimeout(timer); timer = null; return flush.idle(); },
         /** Wake the relay now (e.g. right after the transaction commits). */
         kick() { schedule(0); },
         pending: () => q().pending.get().n,
@@ -264,7 +275,7 @@ function createPgOutbox(db, {
         throw new TypeError('events must be an openvibe-sdk events client (createEventsClient)');
     }
     if (!TABLE_RE.test(table)) throw new TypeError('bad outbox table name');
-    let timer = null; let running = false; let flushing = null;
+    let timer = null; let running = false;
     const backoff = (attempts) => backoffMs[Math.min(attempts, backoffMs.length - 1)];
 
     async function enqueue(t, envelope, { traceparent } = {}) {
@@ -327,7 +338,7 @@ function createPgOutbox(db, {
         }
         return total;
     }
-    function flush() { if (!flushing) flushing = doFlush().finally(() => { flushing = null; }); return flushing; }
+    const flush = serialFlush(doFlush);
     function schedule(ms) {
         if (!running) return;
         clearTimeout(timer);
@@ -344,7 +355,7 @@ function createPgOutbox(db, {
         ensureSchema: () => db.query(outboxSchema(table)),
         enqueue, flush,
         start() { if (!running) { running = true; schedule(0); } },
-        stop() { running = false; clearTimeout(timer); timer = null; return flushing || Promise.resolve(); },
+        stop() { running = false; clearTimeout(timer); timer = null; return flush.idle(); },
         kick() { schedule(0); },
         pending: () => db.value(`SELECT count(*) FROM ${table} WHERE sent_at IS NULL AND rejected_at IS NULL`),
         rejected: () => db.value(`SELECT count(*) FROM ${table} WHERE rejected_at IS NOT NULL`),

@@ -8,6 +8,11 @@ release may change an API and says so here.
 
 
 
+## 0.21.2 (2026-09-28)
+
+- `openvibe-sdk/events` outboxes (SQLite and PostgreSQL): a `flush()` called while a relay pass runs now gets the next pass, which starts when that one ends. It used to share the running pass, so it could return before the rows committed after that pass claimed were published (a caller's "flush, then assert both went out" saw one). Calls made during a pass share that next pass; `stop()` waits for both.
+- `scripts/test-services.sh`: PgBouncer closes idle server connections after 5 s and takes at most 120 per database, and PostgreSQL allows 200. Each test process has a role of its own, so the pools of a suite with many files ran PostgreSQL out of connections.
+
 ## 0.21.1 (2026-09-28)
 
 - `openvibe-sdk/events` `createPgOutbox`: the relay publishes the rows it claimed in the order they were written. `UPDATE … RETURNING` gives no order, so a batch could reach Events out of order (a `media.clip.failed` before the `media.vod.ready` written before it). Found converting OpenVibe.Media.

@@ -107,6 +107,24 @@ run([
         assert.equal(outbox.rejected(), 0);
         assert.equal(outbox.pending(), 1);
     }],
+    ['a flush called during a pass also publishes what was committed after that pass claimed', async () => {
+        const { events, db } = setup();
+        let release; const gate = new Promise((r) => { release = r; });
+        const sent = [];
+        const slow = { prepare: events.prepare, publish: async (input, o) => { await gate; sent.push(input.subject.id); return await events.publish(input, o); } };
+        const outbox = createOutbox(db, { events: slow });
+        outbox.ensureSchema();
+        db.transaction(() => outbox.enqueue({ event_type: 'live.stream.started', actor, subject }))();
+        const first = outbox.flush();
+        await new Promise((r) => setImmediate(r));
+        db.transaction(() => outbox.enqueue({ event_type: 'live.stream.started', actor, subject: { type: 'stream', id: '13', revision: 1 } }))();
+        const second = outbox.flush();
+        assert.equal(outbox.flush(), second, 'calls during a pass share the next one');
+        release();
+        await first; await second;
+        assert.deepEqual(sent.sort(), ['12', '13']);
+        assert.equal(outbox.pending(), 0);
+    }],
     ['inbox runs a handler exactly once and rolls back with it', async () => {
         const { db } = setup();
         const inbox = createInbox(db);
