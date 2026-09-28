@@ -2,6 +2,7 @@
 import cjs from '../src/testing/index.js';
 
 export const {
-    createMockPlatform, DEFAULT_ORIGINS, DEFAULT_TOOLS_SATELLITES, DEFAULT_APP_CATALOG,
+    createMockPlatform, DEFAULT_ORIGINS, DEFAULT_TOOLS_SATELLITES, DEFAULT_APP_CATALOG, createTestDb, createTestValkey,
+    pgAvailable, valkeyAvailable,
 } = cjs;
 export default cjs;

@@ -69,6 +69,7 @@ function cases(label, open) {
                 assert.deepEqual((await q.all({ name: 'x', min: 0 })).map((r) => r.name), ['x']);
                 assert.equal(await db.prepare('SELECT name FROM items WHERE qty = ?').get(99), undefined, 'no row is undefined, as in better-sqlite3');
                 assert.equal((await db.prepare('UPDATE items SET qty = qty + 1 WHERE qty > ?').run(0)).changes, 2);
+                assert.deepEqual(await db.prepare('SELECT name FROM items WHERE name = ANY(?) ORDER BY name').pluck().all(['x', 'y', 'zz']), ['x', 'y'], 'one parameter: an array is its value');
                 await assert.rejects(q.all({ name: 'x' }), /missing parameter @min/);
                 await assert.rejects(db.prepare('SELECT ? AS a').get(), /expected 1 parameter/);
             } finally { await done(); }

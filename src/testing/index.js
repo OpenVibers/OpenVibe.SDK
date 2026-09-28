@@ -872,4 +872,11 @@ function createMockPlatform(opts = {}) {
     };
 }
 
-module.exports = { createMockPlatform, DEFAULT_ORIGINS, DEFAULT_TOOLS_SATELLITES, DEFAULT_APP_CATALOG };
+// Test databases (PGlite, or the PostgreSQL + PgBouncer containers) and Valkey: loaded on first use.
+const lazyDb = (name) => (...args) => require('./db')[name](...args);
+
+module.exports = {
+    createMockPlatform, DEFAULT_ORIGINS, DEFAULT_TOOLS_SATELLITES, DEFAULT_APP_CATALOG,
+    createTestDb: lazyDb('createTestDb'), createTestValkey: lazyDb('createTestValkey'),
+    pgAvailable: lazyDb('pgAvailable'), valkeyAvailable: lazyDb('valkeyAvailable'),
+};

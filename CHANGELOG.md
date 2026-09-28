@@ -6,6 +6,17 @@ release may change an API and says so here.
 
 
 
+
+## 0.18.1 (2026-09-28)
+
+- **`db.prepare`:** a statement with one parameter takes a single array argument as that parameter's value (`WHERE id = ANY(?)`). Only statements with several parameters read a single array as the list of values (better-sqlite3's array form). Found converting OpenVibe.Wiki.
+- **`openvibe-sdk/testing`:**
+  - `createTestDb({ migrations, store, service })` gives a migrated database for one test run. It is PGlite by default. With `store: 'pg'` (or `OV_TEST_STORE=pg`) it runs on the containers, with roles and a schema of its own shaped as the host's `add-service.sh` makes them.
+  - Setup and teardown take an advisory lock, so parallel runs never race on the catalog ("tuple concurrently updated").
+  - `open()` gives a second pooled handle, and `close()` ends the roles' backends and drops them.
+  - `createTestValkey({ prefix })` gives the containers' Valkey under a prefix of its own.
+  - Every service's copied test helper is replaced by these.
+
 ## 0.18.0 (2026-09-28)
 
 This release makes the move from better-sqlite3 mostly mechanical: call sites keep their shape and gain `await`.

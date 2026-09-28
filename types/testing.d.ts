@@ -147,3 +147,19 @@ export declare const DEFAULT_ORIGINS: Record<Origin, string>;
 export declare const DEFAULT_TOOLS_SATELLITES: string[];
 /** Capability ids a developer app can be granted in openvibe-contracts v0.28.0 (public + active). */
 export declare const DEFAULT_APP_CATALOG: string[];
+
+import type { Db } from './db';
+import type { Valkey } from './valkey';
+export interface TestDb {
+    db: Db;
+    store: 'pglite' | 'postgresql';
+    schema?: string;
+    /** Another pooled handle on the same database (a second process); null on PGlite. */
+    open: ((o?: object) => Db) | null;
+    close(): Promise<void>;
+}
+/** A migrated database for one test run: PGlite, or (store 'pg') roles and a schema of its own on the containers. */
+export declare function createTestDb(opts?: { migrations?: string; store?: 'pglite' | 'pg' | string; service?: string; max?: number; log?: object }): Promise<TestDb>;
+export declare function createTestValkey(opts?: { prefix?: string }): Valkey | null;
+export declare function pgAvailable(): boolean;
+export declare function valkeyAvailable(): boolean;

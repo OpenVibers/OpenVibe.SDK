@@ -3,7 +3,7 @@
  * db.prepare(text): async statements shaped like better-sqlite3's, so a service moving from SQLite changes its
  * call sites by adding `await` (the SQL itself still has to be PostgreSQL). Parameters are written as SQLite code
  * wrote them and compiled once to PostgreSQL's $n:
- *   ?            positional, in order
+ *   ?            positional, in order (a statement with one parameter takes an array as its value: ANY(?))
  *   @name :name  named, bound from one plain object; a name used twice is one parameter
  * Question marks, @ and : inside '…' strings, "…" identifiers, dollar-quoted bodies and comments are left alone,
  * and so are :: casts.
@@ -71,7 +71,9 @@ function bind(stmt, args) {
             return o[k] === undefined ? null : o[k];
         });
     }
-    const flat = args.length === 1 && Array.isArray(args[0]) ? args[0] : args;
+    // One parameter: the one argument is its value, an array included (col = ANY(?)). Several: a single array
+    // argument is the list of values (better-sqlite3's array form), else the arguments are.
+    const flat = stmt.count !== 1 && args.length === 1 && Array.isArray(args[0]) ? args[0] : args;
     if (flat.length !== stmt.count) throw new TypeError(`openvibe-sdk/db prepare: expected ${stmt.count} parameter(s), got ${flat.length}`);
     return flat.map((v) => (v === undefined ? null : v));
 }

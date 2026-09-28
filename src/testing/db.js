@@ -1,0 +1,88 @@
+'use strict';
+/**
+ * A migrated database for one test run (ADR-035): what every service's test helper needs, in one place.
+ *
+ *   const { createTestDb } = require('openvibe-sdk/testing');
+ *   const { db, close } = await createTestDb({ migrations: path.join(__dirname, '..', 'migrations') });
+ *
+ *   store 'pglite' (default): real PostgreSQL in-process, migrated.
+ *   store 'pg' (OV_TEST_STORE=pg, or a service's own variable passed as `store`): the production-shaped containers
+ *     (scripts/test-services.sh up: OV_TEST_PG_URL through PgBouncer, OV_TEST_PG_DIRECT_URL). The run gets roles and
+ *     a schema of its own, shaped as OpenVibe.Host's roles/data/add-service.sh makes them: an owner that migrates on
+ *     the direct connection, and a runtime role (DML only, statement_timeout 15 s, lock_timeout 5 s) serving through
+ *     PgBouncer. Role setup and teardown take an advisory lock, so parallel runs never race on the catalog ("tuple
+ *     concurrently updated"). close() ends the roles' backends (PgBouncer keeps idle server connections) and drops them.
+ *   open(): another pooled handle on the same database (a second process).
+ *
+ *   createTestValkey({ prefix }): the containers' Valkey (OV_TEST_VALKEY_URL) under a prefix no other run uses, or null.
+ */
+const crypto = require('crypto');
+
+const quiet = { log() {}, warn() {}, error: (...a) => console.error(...a) };
+const SETUP_LOCK = 735_1_2026;
+const pgAvailable = () => !!(process.env.OV_TEST_PG_URL && process.env.OV_TEST_PG_DIRECT_URL);
+const valkeyAvailable = () => !!process.env.OV_TEST_VALKEY_URL;
+
+async function createTestDb({ migrations, store = process.env.OV_TEST_STORE || 'pglite', service = 'test', max = 4, log = quiet } = {}) {
+    const { createDb } = require('../db');
+    if (store !== 'pg') {
+        const db = createDb({ pglite: true, service: `${service}-test`, log });
+        if (migrations) await db.migrate({ dir: migrations, log });
+        return { db, store: 'pglite', open: null, close: () => db.close().catch(() => {}) };
+    }
+    if (!pgAvailable()) throw new Error('store pg needs OV_TEST_PG_URL and OV_TEST_PG_DIRECT_URL (openvibe-sdk scripts/test-services.sh up)');
+    const safe = String(service).replace(/[^a-z0-9]/g, '').slice(0, 12) || 'svc';
+    const name = `${safe}_t${process.pid}_${crypto.randomBytes(4).toString('hex')}`;
+    const owner = `${name}_owner`;
+    const pw = crypto.randomBytes(16).toString('hex');
+    const su = createDb({ url: process.env.OV_TEST_PG_DIRECT_URL, service: `${service}-test-admin`, max: 1, log });
+    const database = await su.value('SELECT current_database()');
+    await su.tx(async (t) => {
+        await t.query('SELECT pg_advisory_xact_lock($1)', [SETUP_LOCK]);
+        for (const stmt of [
+            `CREATE ROLE ${owner} LOGIN PASSWORD '${pw}'`,
+            `CREATE ROLE ${name} LOGIN PASSWORD '${pw}'`,
+            `GRANT CONNECT ON DATABASE ${database} TO ${owner}, ${name}`,
+            `CREATE SCHEMA ${name} AUTHORIZATION ${owner}`,
+            `ALTER ROLE ${owner} SET search_path = ${name}`,
+            `ALTER ROLE ${name} SET search_path = ${name}`,
+            `ALTER ROLE ${name} SET statement_timeout = '15s'`,
+            `ALTER ROLE ${name} SET lock_timeout = '5s'`,
+            `GRANT USAGE ON SCHEMA ${name} TO ${name}`,
+            `ALTER DEFAULT PRIVILEGES FOR ROLE ${owner} IN SCHEMA ${name} GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO ${name}`,
+            `ALTER DEFAULT PRIVILEGES FOR ROLE ${owner} IN SCHEMA ${name} GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO ${name}`,
+        ]) await t.query(stmt);
+    });
+    const as = (url, user) => { const u = new URL(url); u.username = user; u.password = pw; return u.toString(); };
+    async function drop() {
+        try {
+            await su.query('SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE usename = ANY($1)', [[name, owner]]);
+            await su.tx(async (t) => {
+                await t.query('SELECT pg_advisory_xact_lock($1)', [SETUP_LOCK]);
+                await t.query(`DROP SCHEMA IF EXISTS ${name} CASCADE`);
+                for (const r of [name, owner]) { await t.query(`DROP OWNED BY ${r}`); await t.query(`DROP ROLE ${r}`); }
+            });
+        } finally { await su.close(); }
+    }
+    let db;
+    try {
+        if (migrations) {
+            const ownerDb = createDb({ url: as(process.env.OV_TEST_PG_DIRECT_URL, owner), service: `${service}-test-migrate`, max: 1, log });
+            try { await ownerDb.migrate({ dir: migrations, log }); } finally { await ownerDb.close(); }
+        }
+        db = createDb({ url: as(process.env.OV_TEST_PG_URL, name), service: `${service}-test`, max, log });
+    } catch (e) { await drop().catch(() => {}); throw e; }   // a failed setup leaves nothing behind
+    return {
+        db, store: 'postgresql', schema: name,
+        open: (o = {}) => createDb({ url: as(process.env.OV_TEST_PG_URL, name), service: `${service}-test`, max, log, ...o }),
+        async close() { await db.close().catch(() => {}); await drop(); },
+    };
+}
+
+function createTestValkey({ prefix = 'test' } = {}) {
+    if (!valkeyAvailable()) return null;
+    const { createValkey } = require('../valkey');
+    return createValkey({ url: process.env.OV_TEST_VALKEY_URL, prefix: `ov:${prefix}-test:${crypto.randomBytes(4).toString('hex')}:`, log: quiet });
+}
+
+module.exports = { createTestDb, createTestValkey, pgAvailable, valkeyAvailable };
