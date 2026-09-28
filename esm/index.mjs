@@ -7,6 +7,6 @@ export const {
     satisfiesRange, compareVersions, CONTRACTS_RANGE, DEFAULT_NETWORK, SDK_VERSION, auth,
     registry, identity, modules, events, realtime, media,
     community, search, chat, ai, jobs, tools,
-    projects, vip,
+    projects, vip, openre, geo,
 } = cjs;
 export default cjs;
