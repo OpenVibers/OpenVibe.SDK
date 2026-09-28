@@ -12,12 +12,14 @@ m = re.search(r"\nfunction openStore\(dbPath, \{ now = \(\) => Date\.now\(\) \} 
 if not m: sys.exit('openStore(dbPath, { now }) with a returned object literal not found: convert by hand')
 props = [l for l in m.group(1).split('\n') if not re.match(r"\s+(db|now|tx: .*|close: .*),?$", l)]
 doc = s.rfind('/**', 0, m.start() + 1)
-head = s[:doc] if doc != -1 and s[doc:m.start()].count('*/') == 1 else s[:m.start() + 1]
+end = s.find('*/', doc) if doc != -1 else -1
+# openStore's own doc comment only: the comment must end right before the function (whitespace between).
+head = s[:doc] if doc != -1 and end != -1 and not s[end + 2:m.start() + 1].strip() else s[:m.start() + 1]
 tail = s[m.end():]
 head = re.sub(r"const Database = require\('better-sqlite3'\);\n", "const { createDb } = require('openvibe-sdk/db');\n", head)
 head = re.sub(r"\nconst SCHEMA = `[\s\S]*?`;\n", "\nconst MIGRATIONS = path.join(__dirname, '..', 'migrations');\nconst DEV_PGLITE = path.join(__dirname, '..', 'data', 'pglite');\n", head)
-head = re.sub(r"%s'?s? own SQLite database[:,] created on boot, idempotently\." % re.escape(Name),
-              f"{Name}' own PostgreSQL database (ADR-035, roadmap WS-X2): the schema is migrations/NNNN_*.sql, applied at boot.", head)
+head = re.sub(r"(%s'?s?) own SQLite database(?: \(WAL\))?[:,] created on boot, idempotently\." % re.escape(Name),
+              lambda x: x.group(1) + " own PostgreSQL database (ADR-035, roadmap WS-X2): the schema is migrations/NNNN_*.sql, applied at boot.", head)
 body = f"""/**
  * The serving handle (ADR-035): DATABASE_URL through PgBouncer; in development without it, an embedded PGlite database
  * in data/pglite. Migrations run first, as the owner (DATABASE_DIRECT_URL), or on the embedded handle.

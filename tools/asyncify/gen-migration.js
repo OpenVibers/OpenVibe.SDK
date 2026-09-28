@@ -7,6 +7,7 @@
  *
  *   node gen-migration.js <Name> [--publishing revisions:blog_post,citations:blog_post,index-hooks:blog,seo:blog_entity,…]
  *                               [--no-inbox] [--outbox-table t] [--inbox-table t] [--no-outbox] [--ensure a.js,b.js]
+ *                               [--from server/store.js]   (the module holding SCHEMA; default server/db.js)
  *     → migrations/0001_initial.sql
  *
  * It lists every `rowid` the server code still orders by: those tables need a `seq bigint GENERATED ALWAYS AS
@@ -26,11 +27,12 @@ const req = (m) => require(require.resolve(m, { paths: [process.cwd()] }));
 
 // The schema as the SQLite release ran it: server/db.js at HEAD (the conversion edits the working copy). A literal with
 // ${…} interpolations is evaluated by loading that file and reading its SCHEMA export.
-const src = execFileSync('git', ['show', 'HEAD:server/db.js'], { encoding: 'utf8' });
+const dbFile = (() => { const i = args.indexOf('--from'); return i >= 0 ? args[i + 1] : 'server/db.js'; })();
+const src = execFileSync('git', ['show', `HEAD:${dbFile}`], { encoding: 'utf8' });
 const m = /const SCHEMA = `([\s\S]*?)`;/.exec(src);
-if (!m) { console.error('server/db.js (HEAD) has no const SCHEMA = `…`;'); process.exit(1); }
+if (!m) { console.error(`${dbFile} (HEAD) has no const SCHEMA = \`…\`;`); process.exit(1); }
 if (m[1].includes('${')) {
-    const tmp = path.resolve('server', '.db-head-schema.js');
+    const tmp = path.resolve(path.dirname(dbFile), '.db-head-schema.js');
     fs.writeFileSync(tmp, src);
     try {
         const schema = require(tmp).SCHEMA;

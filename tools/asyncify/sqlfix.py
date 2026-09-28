@@ -33,10 +33,23 @@ REPORT = [
     (r'setImmediate|process\.nextTick', 'deferred work: after a commit → db.afterCommit'),
     (r'createInbox\b', 'createInbox → createPgInbox (awaited; receipts table in the migration)'),
     (r'\bPRAGMA\b|\.pragma\(', 'PRAGMA'),
+    (r'\b(db|this\.db)\.exec\(', 'DDL at boot on the serving handle: the serving role cannot create tables; the table belongs in a migration'),
+    (r'\b(SUM|AVG)\((?![^)]*\bCASE\b)[^)]*\)(?!\s*::)(?!, *0\)::)', 'SUM/AVG of a bigint column is numeric, returned as text: cast it (COALESCE(SUM(x), 0)::bigint) unless the column is double precision'),
     (r'(@\w+|[^\w]\?) IS (NOT )?NULL(?!::)', 'a parameter tested with IS NULL may need a cast (@p::bigint IS NULL) when PostgreSQL cannot infer its type'),
     (r'UNIQUE constraint|constraint failed|SQLITE_[A-Z]', "SQLite error text → err.code ('23505' unique, '23503' foreign key, '23514' check) with err.table/err.constraint/err.detail"),
 ]
 changed = []
+# Table columns from the service's migrations, so upsert right-hand sides can be qualified even for columns the INSERT
+# does not list (a counter bumped in place, a timestamp cleared).
+TABLE_COLS = {}
+import glob as _glob
+for mf in sorted(_glob.glob('migrations/*.sql')):
+    ddl = open(mf).read()
+    for tm in re.finditer(r'CREATE TABLE (?:IF NOT EXISTS )?(\w+) \(([\s\S]*?)\n\);', ddl):
+        cols = [c.group(1).strip('"') for c in re.finditer(r'^\s*("?\w+"?)\s+(?:text|bigint|integer|double|boolean|bytea|jsonb|timestamptz|numeric|real)', tm.group(2), re.M)]
+        TABLE_COLS.setdefault(tm.group(1), set()).update(cols)
+    for am in re.finditer(r'ALTER TABLE (\w+) ADD COLUMN (\w+)', ddl):
+        TABLE_COLS.setdefault(am.group(1), set()).add(am.group(2))
 for p in files:
     s = open(p).read(); o = s
     while 'INSERT OR IGNORE INTO' in s:
@@ -48,10 +61,15 @@ for p in files:
     s = re.sub(r'(?<![IN\w])LIKE (?=[@?:$\'(]|[a-z])', 'ILIKE ', s)
     s = s.replace('json_each(?)', 'jsonb_array_elements_text(?::jsonb)')
     s = re.sub(r'\bIFNULL\(', 'COALESCE(', s)
+    # SQLite's null-safe x IS ? / x IS NOT ? (a parameter) are IS [NOT] DISTINCT FROM in PostgreSQL.
+    s = re.sub(r'([\w.]+) IS NOT (\?|@\w+)', r'\1 IS DISTINCT FROM \2', s)
+    s = re.sub(r'([\w.]+) IS (\?|@\w+)', r'\1 IS NOT DISTINCT FROM \2', s)
     # assert.throws(() => db.prepare(…).run(…), re): the statement rejects now.
     s = re.sub(r"assert\.throws\(\(\) => ((?:t\.)?[\w.]*db\.prepare\((?:[^()]|\([^()]*\))*\)\.(?:run|get|all)\((?:[^()]|\([^()]*\))*\)), ", r"await assert.rejects(\1, ", s)
     # A jsonb column (the SDK outbox's envelope) comes back as an object.
     s = re.sub(r"JSON\.parse\((\w+)\.envelope\)", r"(typeof \1.envelope === 'string' ? JSON.parse(\1.envelope) : \1.envelope)", s)
+    # const f = db.transaction((a, b) => { … }) (called later as f(a, b)) → const f = (a, b) => db.tx(async () => { … })
+    s = re.sub(r'const (\w+) = (\w+(?:\.\w+)?)\.transaction\(\(([^()]*)\) => \{', r'const \1 = (\3) => \2.tx(async () => {', s)
     # db.transaction(fn)() → db.tx(fn) (balanced parentheses; the codemod then awaits it and makes fn async).
     out, i = [], 0
     while True:
@@ -78,6 +96,7 @@ for p in files:
     # PostgreSQL; qualify it with the table (columns of the INSERT list only; excluded.x and the targets stay).
     def qualify(m):
         table, cols, rest = m.group(1), [c.strip() for c in m.group(2).split(',')], m.group(3)
+        cols = sorted(set(cols) | TABLE_COLS.get(table, set()), key=len, reverse=True)
         k = rest.index('DO UPDATE SET') + len('DO UPDATE SET')
         head, sets = rest[:k], rest[k:]
         def fix_rhs(a):
@@ -92,6 +111,7 @@ for p in files:
     # openvibe-publishing 1.0: the index sequencer stamps through a handle (the ambient transaction joins through store.db).
     handle = 'store.db' if 'store.db' in s else 'db'
     s = re.sub(r'((?:store\.)?sequencer\.stamp\()(?!store\.db|db,|t,)', lambda m: m.group(1) + handle + ', ', s)
+    s = re.sub(r"(SELECT name FROM sqlite_master WHERE type (?:= 'table'|IN \('table', ?'view'\))) AND name NOT (?:I)?LIKE 'sqlite_%'", r"\1", s)
     s = re.sub(r"SELECT name FROM sqlite_master WHERE type (?:= 'table'|IN \('table', ?'view'\))",
                "SELECT table_name AS name FROM information_schema.tables WHERE table_schema = current_schema()", s)
     s = re.sub(r"SELECT name FROM pragma_table_info\('(\w+)'\)",

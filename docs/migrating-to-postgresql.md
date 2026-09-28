@@ -158,3 +158,10 @@ It changes nothing in the SQLite file.
   - **Values.** `jsonb` columns come back as objects, so do not `JSON.parse` them.
   - **Gauges.** A metrics `collect()` is synchronous. Read the database one scrape behind.
   - **`npm run test:pg` finds races PGlite hides.** PGlite has one connection, so an unawaited write finished before the next read. On a pool it does not.
+- **Events (2026-09-28)** added these:
+  - **A loop that read and then claimed in one synchronous step** (a delivery worker's "select due rows, mark them busy") can now run twice at once, from a timer and a kick, and send the same row twice. Serialize the passes: a call during a pass waits for one more pass after it.
+  - **Register before the first `await`.** A connection counted against a cap, or joined to an in-process fan-out, after its catch-up queries lets the cap overrun and loses what was published meanwhile. Take the slot and join first; buffer live rows until the catch-up ends, then send those it did not cover.
+  - **A function passed as an argument** (`flush(insertBatch)`) is async now; the codemod does not see through parameters. Await it by hand.
+  - **No DDL at boot.** A module that ran `CREATE TABLE IF NOT EXISTS` on the serving handle fails on production roles (`permission denied for schema`) while PGlite allows it. The table goes in the migration; `sqlfix.py` reports `db.exec(`.
+  - **Test boots that call `start()` directly** fall back to the development PGlite directory and share rows across runs. Pass every boot a `createTestDb` handle.
+  - **Redaction.** PostgreSQL has no `secure_delete`: an overwritten row version stays until vacuum. Lower the table's `autovacuum_vacuum_scale_factor` and say so in the README.

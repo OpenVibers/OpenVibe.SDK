@@ -15,12 +15,15 @@
  */
 function toPg(sql) {
     // The one trigger shape services use: a row that must never change (BEFORE UPDATE/DELETE … RAISE(ABORT, msg)).
-    // With an optional WHEN condition (x IS NOT y between OLD and NEW becomes IS DISTINCT FROM).
-    sql = sql.replace(/CREATE TRIGGER(?: IF NOT EXISTS)? (\w+) BEFORE (UPDATE(?: OF [\w\s,]+?)?|DELETE) ON (\w+)(?:\s+WHEN ([\s\S]+?))?\s+BEGIN SELECT RAISE\(ABORT, '([^']*)'\); END;/g,
-        (m, name, op, table, when, msg) => `CREATE FUNCTION ${name}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION '${msg}'; END $$;\n`
-            + `CREATE TRIGGER ${name} BEFORE ${op.replace(/\s+/g, ' ')} ON ${table} FOR EACH ROW`
-            + (when ? ` WHEN (${when.replace(/\s+/g, ' ').replace(/ IS NOT (OLD|NEW)\./g, ' IS DISTINCT FROM $1.')})` : '')
-            + ` EXECUTE FUNCTION ${name}();`);
+    // The condition (SQLite's WHEN, which may hold a subquery PostgreSQL does not allow in a trigger's WHEN) goes inside
+    // the function: IF cond THEN RAISE; the row passes otherwise (RETURN NEW for an update, OLD for a delete).
+    sql = sql.replace(/CREATE TRIGGER(?: IF NOT EXISTS)?\s+(\w+)\s+BEFORE\s+(UPDATE(?:\s+OF\s+[\w\s,]+?)?|DELETE)\s+ON\s+(\w+)(?:\s+WHEN\s+([\s\S]+?))?\s+BEGIN SELECT RAISE\(ABORT, '([^']*)'\); END;/g,
+        (m, name, op, table, when, msg) => {
+            const cond = when ? when.replace(/\s+/g, ' ').replace(/ IS NOT (OLD|NEW)\./g, ' IS DISTINCT FROM $1.') : 'TRUE';
+            const row = /^DELETE/.test(op) ? 'OLD' : 'NEW';
+            return `CREATE FUNCTION ${name}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF ${cond} THEN RAISE EXCEPTION '${msg}'; END IF; RETURN ${row}; END $$;\n`
+                + `CREATE TRIGGER ${name} BEFORE ${op.replace(/\s+/g, ' ')} ON ${table} FOR EACH ROW EXECUTE FUNCTION ${name}();`;
+        });
     if (sql.split(';').some((st) => /CREATE\s+TRIGGER/i.test(st) && !/FOR EACH ROW[\s\S]*EXECUTE FUNCTION/.test(st))) {
         throw new Error('sqlite-schema-to-pg: a trigger other than the immutable-row shape needs writing as PL/pgSQL by hand');
     }
