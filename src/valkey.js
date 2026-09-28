@@ -19,7 +19,8 @@ function createValkey({ url = process.env.VALKEY_URL, prefix = process.env.VALKE
     if (!client) {
         try { Valkey = require('iovalkey'); } catch { throw new Error('openvibe-sdk/valkey: install `iovalkey` in the service (npm i iovalkey)'); }
     }
-    const opts = { maxRetriesPerRequest: 3, enableAutoPipelining: true, connectTimeout: 5000, lazyConnect };
+    // enableReadyCheck off: a service's ACL user has no INFO (the check logged NOPERM on every connect); ready() pings.
+    const opts = { maxRetriesPerRequest: 3, enableAutoPipelining: true, connectTimeout: 5000, lazyConnect, enableReadyCheck: false };
     const c = client || new Valkey(url, opts);
     let lastError = null;
     c.on('error', (err) => { if (!lastError || lastError.message !== err.message) log.warn(`[valkey] ${err.message}`); lastError = err; });

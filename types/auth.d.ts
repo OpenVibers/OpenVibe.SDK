@@ -133,4 +133,20 @@ export interface RevocationStore {
 export interface RevocationStoreOptions { table?: string; now?: () => number; maxCache?: number }
 /** A better-sqlite3 handle keeps cutoffs across restarts; without one they live in memory. */
 export declare function createRevocationStore(db?: unknown, opts?: RevocationStoreOptions): RevocationStore;
+/** The same cutoffs on PostgreSQL: load() reads them into memory; apply()/record() write through (async). */
+export interface PgRevocationStore {
+    /** Read every stored cutoff into memory (at boot); resolves to how many. */
+    load(): Promise<number>;
+    apply(event: unknown): Promise<'revoked' | 'unchanged' | `ignored:${string}`>;
+    record(subject: string, validAfterMs: number, reason?: string | null): Promise<boolean>;
+    /** From memory: true when claims.iat (seconds) is before claims.subject_id's cutoff. */
+    isRevoked(claims: { iat?: number; subject_id?: string } | null | undefined): boolean;
+    cutoffFor(subject: string): number;
+    loaded(): boolean;
+    readonly EVENT_TYPE: 'network.user.token_valid_after';
+}
+/** An openvibe-sdk/db handle; the table comes from revocationSchema() in the service's migration. */
+export declare function createPgRevocationStore(db: unknown, opts?: { table?: string; now?: () => number }): PgRevocationStore;
+/** CREATE TABLE IF NOT EXISTS for createPgRevocationStore (default table ov_token_revocations). */
+export declare function revocationSchema(table?: string): string;
 export declare const TOKEN_VALID_AFTER: 'network.user.token_valid_after';

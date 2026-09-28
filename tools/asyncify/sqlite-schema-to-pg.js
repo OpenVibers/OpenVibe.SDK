@@ -45,7 +45,41 @@ function toPg(sql) {
         .replace(/^(\s*"?\w+"?\s+)TEXT\b/gm, '$1text COLLATE "C"')
         .replace(/^(\s*"?\w+"?\s+)INTEGER\b/gm, '$1bigint')
         .replace(/^(\s*"?\w+"?\s+)REAL\b/gm, '$1double precision')
-        .replace(/^(\s*"?\w+"?\s+)BLOB\b/gm, '$1bytea');
+        .replace(/^(\s*"?\w+"?\s+)BLOB\b/gm, '$1bytea')
+        // SQLite text timestamps stay text in the same format; their defaults use SQLITE_DATE_FUNCTIONS below.
+        .replace(/^(\s*"?\w+"?\s+)DATETIME\b/gm, '$1text COLLATE "C"')
+        .replace(/DEFAULT CURRENT_TIMESTAMP\b/g, 'DEFAULT ov_now()')
+        .replace(/DEFAULT \(datetime\('now'\)\)/g, 'DEFAULT ov_now()')
+        .replace(/DEFAULT \(strftime\('%Y-%m-%dT%H:%M:%fZ', ?'now'\)\)/g, 'DEFAULT ov_now_iso()');
 }
 
-module.exports = { toPg };
+/**
+ * SQLite's text timestamps and date functions on PostgreSQL, for a service whose columns hold 'YYYY-MM-DD HH:MM:SS'
+ * (UTC) text: the stored values, their comparisons and what the API returns stay exactly as they were. ov_now() is
+ * CURRENT_TIMESTAMP's text (per statement, as SQLite), ov_now_iso() strftime('%Y-%m-%dT%H:%M:%fZ', 'now');
+ * datetime(t [, modifier]) and julianday(t) read 'now', SQLite text and ISO 8601 (a zone, or none for UTC) and give
+ * NULL for what they cannot read, as SQLite does. A modifier is an interval ('-7 days', '+1 hour').
+ */
+const SQLITE_DATE_FUNCTIONS = `-- SQLite's text timestamps and date functions (openvibe-sdk tools/asyncify SQLITE_DATE_FUNCTIONS).
+CREATE FUNCTION ov_ts(t text) RETURNS timestamp LANGUAGE plpgsql STABLE AS $$
+BEGIN
+    IF t IS NULL THEN RETURN NULL; END IF;
+    IF t = 'now' THEN RETURN statement_timestamp() AT TIME ZONE 'UTC'; END IF;
+    IF t ~ '\\d\\d:\\d\\d(:\\d\\d(\\.\\d+)?)?\\s*(Z|[+-]\\d\\d(:?\\d\\d)?)$' THEN RETURN t::timestamptz AT TIME ZONE 'UTC'; END IF;
+    RETURN t::timestamp;
+EXCEPTION WHEN others THEN RETURN NULL;
+END $$;
+CREATE FUNCTION ov_now() RETURNS text LANGUAGE sql STABLE AS $$ SELECT to_char(statement_timestamp() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') $$;
+CREATE FUNCTION ov_now_iso() RETURNS text LANGUAGE sql STABLE AS $$ SELECT to_char(statement_timestamp() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') $$;
+CREATE FUNCTION datetime(t text, modifier text DEFAULT NULL) RETURNS text LANGUAGE plpgsql STABLE AS $$
+DECLARE ts timestamp := ov_ts(t);
+BEGIN
+    IF ts IS NULL THEN RETURN NULL; END IF;
+    IF modifier IS NOT NULL THEN ts := ts + modifier::interval; END IF;
+    RETURN to_char(ts, 'YYYY-MM-DD HH24:MI:SS');
+EXCEPTION WHEN others THEN RETURN NULL;
+END $$;
+CREATE FUNCTION julianday(t text) RETURNS double precision LANGUAGE sql STABLE AS $$ SELECT extract(epoch FROM ov_ts(t))::double precision / 86400.0 + 2440587.5 $$;
+`;
+
+module.exports = { toPg, SQLITE_DATE_FUNCTIONS };

@@ -26,7 +26,7 @@ REPORT = [
     (r'SELECT DISTINCT', 'SELECT DISTINCT with ORDER BY on an expression not selected fails; a DISTINCT over a LEFT JOIN is usually WHERE … OR EXISTS (…)'),
     (r'GROUP BY', 'GROUP BY: every selected bare column must be grouped (SQLite took a bare column from the MAX/MIN row: DISTINCT ON)'),
     (r'WITH RECURSIVE', 'recursive seed: cast ? to the column type and collation (?::text COLLATE "C")'),
-    (r"datetime\(|strftime\(|julianday\(", 'SQLite date functions'),
+    (r"datetime\(|strftime\(|julianday\(", 'SQLite date functions (with SQLITE_DATE_FUNCTIONS in the migration, datetime(t[, modifier]) and julianday(t) exist; strftime does not)'),
     (r'GROUP_CONCAT|json_extract|json_group_array|json_object\(', 'SQLite functions'),
     (r'lastInsertRowid', 'lastInsertRowid → RETURNING'),
     (r'\.transaction\(', 'db.transaction(fn)() → db.tx(fn)'),
@@ -50,8 +50,14 @@ for mf in sorted(_glob.glob('migrations/*.sql')):
         TABLE_COLS.setdefault(tm.group(1), set()).update(cols)
     for am in re.finditer(r'ALTER TABLE (\w+) ADD COLUMN (\w+)', ddl):
         TABLE_COLS.setdefault(am.group(1), set()).add(am.group(2))
+# A migration carrying SQLITE_DATE_FUNCTIONS (text timestamps kept as SQLite wrote them): CURRENT_TIMESTAMP in code
+# becomes ov_now() (PostgreSQL's would be a timestamptz, cast to other text), strftime's ISO 'now' ov_now_iso().
+SQLITE_DATES = any('CREATE FUNCTION ov_now()' in open(mf).read() for mf in _glob.glob('migrations/*.sql'))
 for p in files:
     s = open(p).read(); o = s
+    if SQLITE_DATES:
+        s = re.sub(r'\bCURRENT_TIMESTAMP\b', 'ov_now()', s)
+        s = re.sub(r"strftime\('%Y-%m-%dT%H:%M:%fZ', ?'now'\)", 'ov_now_iso()', s)
     while 'INSERT OR IGNORE INTO' in s:
         i = s.index('INSERT OR IGNORE INTO'); q = s[i - 1] if s[i - 1] in '\'"`' else '`'
         j = s.index(q, i)

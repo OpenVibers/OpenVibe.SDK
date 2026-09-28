@@ -8,6 +8,11 @@ release may change an API and says so here.
 
 
 
+## 0.21.0 (2026-09-28)
+
+- `openvibe-sdk/auth`: `createPgRevocationStore(db, { table })` keeps Network's per-person token cutoffs on PostgreSQL. `await load()` reads them into memory at boot, so `isRevoked()` and `cutoffFor()` stay synchronous on the request path; `apply()` and `record()` are async and write through before memory moves, never backwards (a later cutoff stored by another process wins). `revocationSchema(table)` is its table, for the service's migration (the SQLite store created its table at first use, which a PostgreSQL runtime role cannot do).
+- `openvibe-sdk/valkey`: the client no longer runs iovalkey's ready check (`INFO`), which a service's ACL user may not call; every connect logged NOPERM. `ready()` still pings.
+
 ## 0.20.4 (2026-09-28)
 
 - `openvibe-sdk/db`: `bytea` comes back as a `Buffer` from both adapters. PGlite returned a `Uint8Array`, so `Buffer.isBuffer` and `.toString('hex')` differed between tests and production. Found with openvibe-shared's config store on PostgreSQL. `test/db-ambient.test.js`.
