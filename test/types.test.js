@@ -50,7 +50,7 @@ run([
             path.join(ROOT, '../OpenVibe.Contracts/generated/typescript/index.d.ts'),
         ];
         const source = candidates.find((p) => fs.existsSync(p));
-        if (!source) { console.log('    skipped: no openvibe-contracts checkout next to this repository'); return; }
+        if (!source) { console.log('copied contract types: skipped (no openvibe-contracts checkout next to this repository)'); return; }
         const theirs = fs.readFileSync(source, 'utf8');
         const ours = fs.readFileSync(path.join(ROOT, 'types/contracts.d.ts'), 'utf8');
         const blocks = ours.split(/\n(?=\/\*\* [a-z]+\.[a-z-]+@)/).slice(1).map((b) => b.trim());
