@@ -338,6 +338,30 @@ The mock answers at the real public origins with real RS256 tokens and checks au
 
 Helpers: `signUserToken()`, `signServiceToken()`, `signAppToken()`, `authorize()`, `setAuthorization()`, `publishEvent(envelope, publisher, { projectId, env })` (a registered app's `app:<id>` publisher implies them), `pruneEvents()`, `deliverEvents()`, `dropRealtime()`, `dropJobStreams()`, `addTool()`, `addMediaObject()`, and `stats` and `state` for assertions. Its `fetch` rejects on an aborted signal, as `fetch` does. It is a fake. It has no persistence, its visibility rules are simplified, and it has no Chat (no WebSocket mock).
 
+### Data: PostgreSQL and Valkey (server)
+
+Every service stores its data in PostgreSQL 18 through PgBouncer, and shares caches, limits, queues and fan-out through Valkey (ADR-035). The data role on the host provides both; `roles/data/add-service.sh` in OpenVibe.Host sets `DATABASE_URL`, `DATABASE_DIRECT_URL`, `VALKEY_URL` and `VALKEY_PREFIX`.
+
+```js
+const { createDb, sql } = require('openvibe-sdk/db');
+const { createValkey } = require('openvibe-sdk/valkey');
+const { createCache } = require('openvibe-sdk/cache');
+const { createQueue } = require('openvibe-sdk/queue');
+
+const db = createDb({ service: 'wiki' });                          // DATABASE_URL; tests: createDb({ pglite: true })
+await createDb({ url: process.env.DATABASE_DIRECT_URL }).migrate({ dir: 'migrations' });
+const page = await db.maybe(sql`SELECT id, title FROM pages WHERE slug = ${slug}`);
+await db.tx(async (t) => { … }, { isolation: 'serializable' });
+
+const valkey = createValkey();                                     // null without VALKEY_URL: in-process fallbacks
+const cache = createCache({ valkey, namespace: 'pages' });
+const html = await cache.getOrSet(`page:${slug}`, 300, () => render(slug));
+const thumbs = createQueue({ valkey, name: 'thumbs' });
+thumbs.process(async (job) => { … }, { concurrency: 4 });
+```
+
+Install the drivers the service uses: `pg` and `iovalkey` (production), `@electric-sql/pglite` (tests), `better-sqlite3` (only for the one-time `importSqlite`).
+
 ### Browser without a bundler
 
 ```html

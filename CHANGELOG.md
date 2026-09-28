@@ -3,6 +3,27 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.14.0 (2026-09-28)
+
+**The async data layer and Valkey modules** (ADR-035 and its amendment; roadmap WS-X2): every service moves to PostgreSQL 18 and Valkey, async-first.
+- **`openvibe-sdk/db`:**
+  - **Queries:** `createDb({ url | pglite, service })` has `query`, `many`, `maybe`, `one`, `value` and `exec` on a safe `sql` tagged template: every value is a bind parameter, fragments nest, and `sql.ident`, `sql.set`, `sql.insert`, `sql.join` and `sql.json` help build them.
+  - **Transactions:** `tx(fn, { isolation, retries })` retries 40001 and 40P01 with backoff, and nested `t.tx()` calls are savepoints.
+  - **Health:** `ready()` reports the store that actually answered, with the pool state. There are metrics (`db_query_seconds`, pool gauges) and a slow-query log that shows text only, never values.
+  - **Adapters:** node-postgres, which production uses through PgBouncer in transaction mode, and PGlite for tests (real PostgreSQL in-process). Both return the same rows: int8 as Number (refused beyond 2^53), timestamps as ISO strings, dates as `YYYY-MM-DD`, numeric as exact text, json parsed.
+- **Migrations:** `db.migrate({ dir })` runs numbered SQL files labelled `expand`, `migrate` or `contract`. It records them in a ledger with checksums, refuses edited or out-of-order files, serialises runs with an advisory lock, holds a contract migration until its expand is 7 days old (the N-1 window), and supports `-- no-transaction`.
+- **`importSqlite()`:** the one-time move of a service's SQLite file into its PostgreSQL schema.
+  - Tables go parents first, and values are converted by target type (0/1 to boolean, text or epoch to timestamptz, JSON text to jsonb, JSON arrays to arrays).
+  - Identity values are kept and sequences advanced. A source column that would be lost is refused unless dropped on purpose.
+  - Streamed verification compares counts and content checksums.
+- **`openvibe-sdk/valkey`:** the shared connection. It is auto-pipelined, confined to `VALKEY_PREFIX`, has a `duplicate()` for blocking consumers, and `ready()`.
+- **`openvibe-sdk/cache`:** `getOrSet` loads a key once across processes (single-flight plus a short lock), with tags, TTLs and an in-process fallback. A cache error never fails the caller.
+- **`openvibe-sdk/queue`:** at-least-once jobs on Valkey streams. It has consumer groups, retries with exponential backoff, a dead-letter stream, delayed jobs, a 24-hour dedupe by id, and reclaiming of a job a dead or hung worker holds. It also has an in-process twin.
+- **`openvibe-sdk/pubsub`:** fan-out across processes and hosts, inside the prefix.
+- **`openvibe-sdk/limits`:** `createValkeyLimitStore(valkey)` makes every process and host count an actor together, in one atomic script per request. If Valkey fails, that request is counted in-process instead.
+- **Dependencies:** `pg`, `@electric-sql/pglite`, `iovalkey` and `better-sqlite3` are optional peers, loaded only by the module that needs them.
+- **Tests:** `scripts/test-services.sh up` starts PostgreSQL 18, PgBouncer and Valkey 9 in containers, and `test/db.test.js` and `test/valkey.test.js` run against them when their URLs are set. Otherwise they run on PGlite and the in-process stores, and print skip lines.
+
 ## 0.13.0 (2026-09-28)
 
 **Deliveries are v2 only**, as OpenVibe.Events sends them since 2026-09-28 (the v1 header, a replayable HMAC of the body alone, is retired: shim C-60). `signDeliveryHeaders` returns `X-OpenVibe-Timestamp` and `X-OpenVibe-Signature-V2` only, and the mock platform's `deliverEvents` sends no `X-OpenVibe-Signature`. A consumer test that asserted the v1 header must drop that assertion. `signDelivery` and `verifyDelivery` stay for testing a legacy receiver, and `parseDelivery` still accepts a v1-only delivery unless `requireV2`, which every production consumer sets.

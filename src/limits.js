@@ -16,6 +16,11 @@
  * yourself; return null to skip counting (a trusted internal caller). Counters live in this process (a restart
  * forgets them) and are capped (maxActors, oldest forgotten first), so memory stays bounded under a flood.
  * Each limit is { minute?, hour?, day? }; a route's own limits replace the defaults window by window.
+ *
+ * Shared counters (ADR-035): pass `store: createValkeyLimitStore(valkey)` and every process and host counts one
+ * actor together (one atomic script per request: check every window, then count). If Valkey errors, that
+ * request is counted by this process's own counters instead, so a Valkey outage never opens the gates nor
+ * blocks the service.
  */
 
 const WINDOWS = { minute: 60, hour: 3600, day: 86400 };
@@ -46,7 +51,7 @@ function problem(res, retryAfter, detail) {
  * @param {(e: {actor, name, window, limit}) => void} [opts.onLimited] called on every refusal (metrics, logs)
  * @returns {((name: string, limits?: object) => Function) & { stats(): object, reset(): void }}
  */
-function createActorLimiter({ limits = { minute: 120 }, actor = defaultActor, maxActors = 50000, now = () => Date.now(), onLimited = null } = {}) {
+function createActorLimiter({ limits = { minute: 120 }, actor = defaultActor, maxActors = 50000, now = () => Date.now(), onLimited = null, store = null, log = console } = {}) {
     for (const w of Object.keys(limits)) if (!WINDOWS[w]) throw new Error(`limits: unknown window ${w}`);
     const counters = new Map();   // `${name}|${actor}` -> { [window]: { start, count } }
     const stats = { allowed: 0, limited: 0, actors: 0 };
@@ -66,9 +71,29 @@ function createActorLimiter({ limits = { minute: 120 }, actor = defaultActor, ma
         const merged = { ...limits, ...own };
         for (const w of Object.keys(merged)) if (!WINDOWS[w]) throw new Error(`limits: unknown window ${w}`);
         const windows = Object.entries(merged).filter(([, max]) => Number.isFinite(max) && max >= 0);
+        const refuse = (res, who, worst) => {
+            stats.limited++;
+            if (onLimited) { try { onLimited({ actor: who, name, window: worst.window, limit: worst.max }); } catch { /* observers never block */ } }
+            return problem(res, Math.max(1, worst.retry), `${name}: at most ${worst.max} per ${worst.window} for each caller`);
+        };
         return function actorLimit(req, res, next) {
             const who = actor(req);
             if (who == null) return next();
+            if (store) {
+                const t = Math.floor(now() / 1000);
+                return store.hit(name, who, windows.map(([w, max]) => [w, max, WINDOWS[w]]), t).then((r) => {
+                    if (r && r.limited) return refuse(res, who, r);
+                    stats.allowed++;
+                    return next();
+                }, (err) => {
+                    stats.storeErrors = (stats.storeErrors || 0) + 1;
+                    if (stats.storeErrors === 1 || stats.storeErrors % 100 === 0) log.warn(`[limits] shared store failed (${err.message}); counting in this process`);
+                    return local(req, res, next, who);
+                });
+            }
+            return local(req, res, next, who);
+        };
+        function local(req, res, next, who) {
             const t = Math.floor(now() / 1000);
             const c = touch(`${name}|${who}`);
             let worst = null;
@@ -80,19 +105,56 @@ function createActorLimiter({ limits = { minute: 120 }, actor = defaultActor, ma
                     if (!worst || retry > worst.retry) worst = { window: w, max, retry };
                 }
             }
-            if (worst) {
-                stats.limited++;
-                if (onLimited) { try { onLimited({ actor: who, name, window: worst.window, limit: worst.max }); } catch { /* observers never block */ } }
-                return problem(res, Math.max(1, worst.retry), `${name}: at most ${worst.max} per ${worst.window} for each caller`);
-            }
+            if (worst) return refuse(res, who, worst);
             for (const [w] of windows) c[w].count++;
             stats.allowed++;
             return next();
-        };
+        }
     }
     middleware.stats = () => ({ ...stats });
     middleware.reset = () => { counters.clear(); stats.actors = 0; };
     return middleware;
 }
 
-module.exports = { createActorLimiter, defaultActor, WINDOWS };
+// Check every window, then count every window, atomically. KEYS: one counter per window.
+// ARGV: per window max, ttl (seconds), retry (seconds). Returns {0}, or the exceeded window with the longest
+// wait as {index (1-based), retry}, as the in-process counters decide.
+const HIT_SCRIPT = `
+local n = #KEYS
+local worst, wr = 0, -1
+for i = 1, n do
+  local c = tonumber(redis.call('GET', KEYS[i]) or '0')
+  if c >= tonumber(ARGV[(i - 1) * 3 + 1]) then
+    local r = tonumber(ARGV[(i - 1) * 3 + 3])
+    if r > wr then worst = i; wr = r end
+  end
+end
+if worst > 0 then return {worst, wr} end
+for i = 1, n do
+  if redis.call('INCR', KEYS[i]) == 1 then redis.call('EXPIRE', KEYS[i], ARGV[(i - 1) * 3 + 2]) end
+end
+return {0}`;
+
+/** A shared counter store on Valkey for createActorLimiter({ store }). */
+function createValkeyLimitStore(valkey) {
+    if (!valkey) return null;
+    const c = valkey.client;
+    if (typeof c.ovLimitHit !== 'function') c.defineCommand('ovLimitHit', { lua: HIT_SCRIPT });
+    return {
+        async hit(name, actor, windows, t) {
+            const keys = []; const args = [];
+            for (const [w, max, len] of windows) {
+                const start = Math.floor(t / len) * len;
+                keys.push(valkey.key('lim', name, w, String(start), actor));
+                args.push(String(max), String(len + 5), String(start + len - t));
+            }
+            if (!keys.length) return { limited: false };
+            const r = await c.ovLimitHit(keys.length, ...keys, ...args);
+            if (!r || Number(r[0]) === 0) return { limited: false };
+            const [w, max] = windows[Number(r[0]) - 1];
+            return { limited: true, window: w, max, retry: Number(r[1]) };
+        },
+    };
+}
+
+module.exports = { createActorLimiter, createValkeyLimitStore, defaultActor, WINDOWS };

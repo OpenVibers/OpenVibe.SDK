@@ -1,7 +1,7 @@
 {
   "name": "openvibe-sdk",
-  "version": "0.13.0",
-  "description": "Supported browser and server clients for the OpenVibe platform: auth (incl. developer apps), registry discovery, identity, user modules, events, realtime, media, community, search, chat, AI runs, Tools (registry, run API and jobs), VIP memberships and developer projects, with deadlines, safe retries, problem errors and trace propagation.",
+  "version": "0.14.0",
+  "description": "Supported browser and server clients for the OpenVibe platform: auth (incl. developer apps), registry discovery, identity, user modules, events, realtime, media, community, search, chat, AI runs, Tools (registry, run API and jobs), VIP memberships and developer projects, the async PostgreSQL data layer (db) and the Valkey cache, limits store, queue and pub/sub, with deadlines, safe retries, problem errors and trace propagation.",
   "main": "index.js",
   "types": "types/index.d.ts",
   "browser": "browser.js",
@@ -75,6 +75,36 @@
       "browser": null,
       "import": "./esm/limits.mjs",
       "default": "./src/limits.js"
+    },
+    "./db": {
+      "types": "./types/db.d.ts",
+      "browser": null,
+      "import": "./esm/db.mjs",
+      "default": "./src/db/index.js"
+    },
+    "./valkey": {
+      "types": "./types/valkey.d.ts",
+      "browser": null,
+      "import": "./esm/valkey.mjs",
+      "default": "./src/valkey.js"
+    },
+    "./cache": {
+      "types": "./types/cache.d.ts",
+      "browser": null,
+      "import": "./esm/cache.mjs",
+      "default": "./src/cache.js"
+    },
+    "./queue": {
+      "types": "./types/queue.d.ts",
+      "browser": null,
+      "import": "./esm/queue.mjs",
+      "default": "./src/queue.js"
+    },
+    "./pubsub": {
+      "types": "./types/pubsub.d.ts",
+      "browser": null,
+      "import": "./esm/pubsub.mjs",
+      "default": "./src/pubsub.js"
     },
     "./chat": {
       "types": "./types/chat.d.ts",
@@ -159,7 +189,30 @@
   "repository": "github:OpenVibers/OpenVibe.SDK",
   "license": "MIT",
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "better-sqlite3": "^11.10.0",
-    "openvibe-contracts": "https://codeload.github.com/OpenVibers/OpenVibe.Contracts/tar.gz/refs/tags/v0.49.0"
+    "iovalkey": "^0.4.0",
+    "openvibe-contracts": "https://codeload.github.com/OpenVibers/OpenVibe.Contracts/tar.gz/refs/tags/v0.49.0",
+    "pg": "^8.23.0"
+  },
+  "peerDependencies": {
+    "pg": "^8.23.0",
+    "@electric-sql/pglite": "^0.5.8",
+    "iovalkey": "^0.4.0",
+    "better-sqlite3": ">=11"
+  },
+  "peerDependenciesMeta": {
+    "pg": {
+      "optional": true
+    },
+    "@electric-sql/pglite": {
+      "optional": true
+    },
+    "iovalkey": {
+      "optional": true
+    },
+    "better-sqlite3": {
+      "optional": true
+    }
   }
 }

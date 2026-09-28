@@ -2,6 +2,6 @@
 import cjs from '../src/limits.js';
 
 export const {
-    createActorLimiter, defaultActor, WINDOWS,
+    createActorLimiter, createValkeyLimitStore, defaultActor, WINDOWS,
 } = cjs;
 export default cjs;

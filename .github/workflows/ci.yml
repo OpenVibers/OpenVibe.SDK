@@ -10,6 +10,8 @@ jobs:
     with:
       syntax-dirs: src scripts
       extra: node scripts/esm.js --check   # the generated ESM wrappers match src/
+      # db, cache, queue, pubsub and limits against PostgreSQL 18 + PgBouncer + Valkey 9 containers (ADR-035)
+      test: 'eval "$(scripts/test-services.sh up)" && npm test'
   # Secret scan (gitleaks) and dependency audit, shared by every OpenVibers repo.
   security:
     uses: OpenVibers/OpenVibe.Shared/.github/workflows/security.yml@66b76f868ea8228aad7811309eafef3726b036f3
