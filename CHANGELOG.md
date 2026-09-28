@@ -3,6 +3,14 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.12.0 (2026-09-28)
+
+**`openvibe-sdk/limits`** (roadmap WS-R task 4): per-actor rate limits at a service's capability boundaries, where nginx can only limit by address. `createActorLimiter({ limits: { minute, hour, day } })` returns `limits(name, ownLimits)`, Express middleware that counts each actor in fixed windows and refuses past a limit with 429 problem+json (`rate_limited`, `Retry-After` from the tightest exceeded window) before the route runs.
+- The actor is the verified principal (`svc:live`, `app:…`), else the signed-in person (`user:<subject>`), else `ip:<address>`; `actor(req)` overrides it, and null skips counting.
+- A route's limits replace the defaults window by window.
+- Counters are per process and bounded (`maxActors`, oldest dropped first), and `onLimited` observes refusals.
+Node only. Additive.
+
 ## 0.11.0 (2026-09-25)
 
 Two more clients (roadmap WS-F task 4). **`openvibe-sdk/chat`**: OpenVibe.Chat over REST as the token's person: `global.send/history/search`, `rooms.list/create/get/update/messages/send/deleteMessage/join/leave/read/members/setMember`, `dms.list/create/get/messages/send/deleteMessage/read/unread/blocks/block/unblock`, `exportMine()`; writes are never retried, a room or conversation you may not read is `null`. **`openvibe-sdk/ai`**: OpenVibe.AI's run API: `runs.create(workflow, input, { wait, version, idempotencyKey, target, attribution, onBehalfOf, options })`, `runs.get/list/cancel/retry/citations/addCitations`, `runs.waitFor(id)` (polls until succeeded, failed or cancelled), and the direct operations `chat/generate/summarize/classify/extract/enrich/embed`; a create is retried only with an idempotency key. Both in the browser bundle, ESM and types. Additive.

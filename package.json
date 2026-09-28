@@ -1,6 +1,6 @@
 {
   "name": "openvibe-sdk",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "Supported browser and server clients for the OpenVibe platform: auth (incl. developer apps), registry discovery, identity, user modules, events, realtime, media, community, search, chat, AI runs, Tools (registry, run API and jobs), VIP memberships and developer projects, with deadlines, safe retries, problem errors and trace propagation.",
   "main": "index.js",
   "types": "types/index.d.ts",
@@ -69,6 +69,12 @@
       "types": "./types/search.d.ts",
       "import": "./esm/search.mjs",
       "default": "./src/search.js"
+    },
+    "./limits": {
+      "types": "./types/limits.d.ts",
+      "browser": null,
+      "import": "./esm/limits.mjs",
+      "default": "./src/limits.js"
     },
     "./chat": {
       "types": "./types/chat.d.ts",
