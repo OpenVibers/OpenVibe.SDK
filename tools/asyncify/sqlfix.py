@@ -42,6 +42,7 @@ changed = []
 # Table columns from the service's migrations, so upsert right-hand sides can be qualified even for columns the INSERT
 # does not list (a counter bumped in place, a timestamp cleared).
 TABLE_COLS = {}
+ALWAYS_IDENTITY = {}   # table → its GENERATED ALWAYS identity column
 import glob as _glob
 for mf in sorted(_glob.glob('migrations/*.sql')):
     ddl = open(mf).read()
@@ -50,6 +51,9 @@ for mf in sorted(_glob.glob('migrations/*.sql')):
         TABLE_COLS.setdefault(tm.group(1), set()).update(cols)
     for am in re.finditer(r'ALTER TABLE (\w+) ADD COLUMN (\w+)', ddl):
         TABLE_COLS.setdefault(am.group(1), set()).add(am.group(2))
+    for tm in re.finditer(r'CREATE TABLE (?:IF NOT EXISTS )?(\w+) \(([\s\S]*?)\n\);', ddl):
+        for im in re.finditer(r'^\s*"?(\w+)"?\s+bigint GENERATED ALWAYS AS IDENTITY', tm.group(2), re.M):
+            ALWAYS_IDENTITY.setdefault(tm.group(1), im.group(1))
 # A migration carrying SQLITE_DATE_FUNCTIONS (text timestamps kept as SQLite wrote them): CURRENT_TIMESTAMP in code
 # becomes ov_now() (PostgreSQL's would be a timestamptz, cast to other text), strftime's ISO 'now' ov_now_iso().
 SQLITE_DATES = any('CREATE FUNCTION ov_now()' in open(mf).read() for mf in _glob.glob('migrations/*.sql'))
@@ -74,8 +78,6 @@ for p in files:
     s = re.sub(r"assert\.throws\(\(\) => ((?:t\.)?[\w.]*db\.prepare\((?:[^()]|\([^()]*\))*\)\.(?:run|get|all)\((?:[^()]|\([^()]*\))*\)), ", r"await assert.rejects(\1, ", s)
     # A jsonb column (the SDK outbox's envelope) comes back as an object.
     s = re.sub(r"JSON\.parse\((\w+)\.envelope\)", r"(typeof \1.envelope === 'string' ? JSON.parse(\1.envelope) : \1.envelope)", s)
-    # const f = db.transaction((a, b) => { … }) (called later as f(a, b)) → const f = (a, b) => db.tx(async () => { … })
-    s = re.sub(r'const (\w+) = (\w+(?:\.\w+)?)\.transaction\(\(([^()]*)\) => \{', r'const \1 = (\3) => \2.tx(async () => {', s)
     # db.transaction(fn)() → db.tx(fn) (balanced parentheses; the codemod then awaits it and makes fn async).
     out, i = [], 0
     while True:
@@ -89,6 +91,17 @@ for p in files:
         else:
             out.append(s[i:k]); i = k
     s = ''.join(out)
+    # const f = db.transaction((a, b) => { … }) (called later as f(a, b); an immediately invoked one was rewritten just
+    # above) → const f = (a, b) => db.tx(async () => { … })
+    s = re.sub(r'const (\w+) = (\w+(?:\.\w+)?)\.transaction\(\(([^()]*)\) => \{', r'const \1 = (\3) => \2.tx(async () => {', s)
+    # An unquoted alias is folded to lower case in PostgreSQL (AS totalViews comes back as totalviews): quote
+    # camelCase aliases inside SQL string literals.
+    def quote_aliases(lit):
+        body = lit.group(0)
+        if not re.search(r'\bSELECT\b', body): return body
+        q = '\\"' if body[0] == '"' else '"'
+        return re.sub(r'\bAS ([a-z]+[A-Z]\w*)\b', lambda m: f'AS {q}{m.group(1)}{q}', body)
+    s = re.sub(r'`[^`]*`|\'(?:[^\'\\\n]|\\.)*\'|"(?:[^"\\\n]|\\.)*"', quote_aliases, s)
     # Column names PostgreSQL reserves (SQLite does not): quoted inside SQL string literals ("window", "user").
     def quote_reserved(lit):
         body = lit.group(0)
@@ -114,6 +127,20 @@ for p in files:
         parts = re.split(r'(,\s*(?=\w+\s*=))', sets)
         return f'INSERT INTO {table} ({m.group(2)}){head}' + ''.join(fix_rhs(x) if not re.match(r',\s*$', x) else x for x in parts)
     s = re.sub(r'INSERT INTO (\w+) \(([^)]*)\)((?:(?!INSERT INTO)[^`\'"])*?DO UPDATE SET[^`\'"]*)', qualify, s)
+    # INSERT INTO t (id, …) VALUES with an explicit id into a GENERATED ALWAYS identity (tests, fixtures, imports):
+    # PostgreSQL refuses it without OVERRIDING SYSTEM VALUE.
+    def override(m):
+        table, cols = m.group(1), [c.strip().strip('"') for c in m.group(2).split(',')]
+        return m.group(0) + ' OVERRIDING SYSTEM VALUE' if ALWAYS_IDENTITY.get(table) in cols else m.group(0)
+    s = re.sub(r'INSERT INTO (\w+) \(([^)]*)\)(?! OVERRIDING)(?=\s*(?:VALUES|SELECT))', override, s)
+    # (await db.prepare('INSERT …').run(…)).lastInsertRowid: the id comes back through RETURNING.
+    s = re.sub(r"(prepare\()(`|'|\")(INSERT INTO (\w+)(?:(?!\2).)*?)(\2\)\s*\.run\((?:[^()]|\([^()]*\))*\)\)\s*\.lastInsertRowid)",
+               lambda m: m.group(0) if 'RETURNING' in m.group(3) else m.group(1) + m.group(2) + m.group(3) + ' RETURNING id' + m.group(5), s)
+    # Tests matching SQLite's constraint messages: PostgreSQL's say "duplicate key", "violates … constraint".
+    s = re.sub(r'/UNIQUE constraint failed[^/\n]*/|/UNIQUE/', '/duplicate key/', s)
+    s = re.sub(r'/CHECK constraint failed[^/\n]*/', '/violates check constraint/', s)
+    s = re.sub(r'/NOT NULL constraint failed[^/\n]*/', '/violates not-null constraint/', s)
+    s = re.sub(r'/FOREIGN KEY constraint failed[^/\n]*/', '/violates foreign key constraint/', s)
     # openvibe-publishing 1.0: the index sequencer stamps through a handle (the ambient transaction joins through store.db).
     handle = 'store.db' if 'store.db' in s else 'db'
     s = re.sub(r'((?:store\.)?sequencer\.stamp\()(?!store\.db|db,|t,)', lambda m: m.group(1) + handle + ', ', s)

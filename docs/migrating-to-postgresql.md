@@ -165,3 +165,15 @@ It changes nothing in the SQLite file.
   - **No DDL at boot.** A module that ran `CREATE TABLE IF NOT EXISTS` on the serving handle fails on production roles (`permission denied for schema`) while PGlite allows it. The table goes in the migration; `sqlfix.py` reports `db.exec(`.
   - **Test boots that call `start()` directly** fall back to the development PGlite directory and share rows across runs. Pass every boot a `createTestDb` handle.
   - **Redaction.** PostgreSQL has no `secure_delete`: an overwritten row version stays until vacuum. Lower the table's `autovacuum_vacuum_scale_factor` and say so in the README.
+- **Community (2026-09-28)** added these:
+  - **A schema changed by `migrate()` after `SCHEMA`.** `gen-migration.js --open "require('./server/db').openDb(':memory:')"` takes the schema the SQLite release's own boot leaves (every ALTER applied, tables in dependency order, boot seeds as INSERTs). Run it before converting any code.
+  - **SQLite text timestamps.** `DATETIME` columns hold `'YYYY-MM-DD HH:MM:SS'` text. Keep it: the migration gets `SQLITE_DATE_FUNCTIONS` (`ov_now()`, `datetime(t, modifier)`, `julianday(t)`), and `sqlfix.py` rewrites `CURRENT_TIMESTAMP` to `ov_now()` (PostgreSQL's would be a `timestamptz`, cast to different text).
+  - **Type affinity.** SQLite stores text in an `INTEGER` column without complaint (a Chat room id); PostgreSQL refuses. Check the production copy (`tools/asyncify/typecheck.js <file>` lists columns holding another storage class) and read the code that writes each id column.
+  - **`INTEGER PRIMARY KEY REFERENCES …`** is the other row's key, not a counter: `bigint PRIMARY KEY` (the converter does this now).
+  - **camelCase aliases** fold to lower case (`AS totalViews` comes back as `totalviews`): quote them (`sqlfix.py` does).
+  - **Explicit ids** into a `GENERATED ALWAYS` identity need `OVERRIDING SYSTEM VALUE` (`sqlfix.py` adds it where the migration says ALWAYS); `.lastInsertRowid` needs `RETURNING id`.
+  - **`IMMEDIATE` transactions.** A read-then-write that relied on SQLite's write lock (a vote recount) locks its row first: `SELECT … FOR UPDATE`.
+  - **Work kicked from inside a transaction** (`setImmediate(drain)`) runs before the commit now and misses the row: `db.afterCommit`, and a short delay when changes made together should go out as one pass.
+  - **Event handlers that became async** (a WebSocket dispatch) can overtake each other: queue them in arrival order.
+  - **Fire-and-forget helpers** (`tell(fn) { try { fn(x) } catch {} }`) catch nothing once `fn` is async: await it.
+  - **Tests**: `const x = createFoo(…)` instances, `require('./x').fn()` calls and a test's own `rejects(promise)` helper are handled by the codemod now; a boot helper that re-requires the server gets its database passed in (`createApp({ db })`); SQLite-only upgrade tests (a `migrate()` rebuilding an old table) go, the migration ledger replaces them.

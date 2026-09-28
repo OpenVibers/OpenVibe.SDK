@@ -59,9 +59,50 @@ function analyse(file, src, cfg, asyncNames) {
     const isFn = (n) => n.type === 'FunctionDeclaration' || n.type === 'FunctionExpression' || n.type === 'ArrowFunctionExpression';
     const stores = new Set(cfg.stores || []);
     const syncStoreMethods = new Set(cfg.syncStoreMethods || []);
-    const apis = cfg.apis || {};
+    const apis = { ...(cfg.apis || {}) };
     const syncNames = new Set(cfg.syncNames || []);
     const localAsync = new Set(asyncNames.local.get(file) || []);
+    // const store = require('./store'): in this file, `store` is that module's API (the same name can mean another
+    // module elsewhere, so a namespace require wins over the config's global apis entry).
+    walk.full(parse(src), (n) => {
+        if (n.type !== 'VariableDeclarator' || n.id.type !== 'Identifier' || !n.init || n.init.type !== 'CallExpression') return;
+        const c = n.init;
+        if (c.callee.type !== 'Identifier' || c.callee.name !== 'require' || !c.arguments[0] || typeof c.arguments[0].value !== 'string' || !c.arguments[0].value.startsWith('.')) return;
+        const base = path.relative(process.cwd(), path.resolve(path.dirname(file), c.arguments[0].value));
+        const target = base.endsWith('.js') ? base : fs.existsSync(`${base}.js`) ? `${base}.js` : path.join(base, 'index.js');
+        if (fs.existsSync(target)) apis[n.id.name] = target;
+    });
+    // const svc = createPasteService(…) with createPasteService imported from a local file (destructured): `svc` is that
+    // file's API here (a factory's instance; its methods are the file's inner functions).
+    {
+        const imported = new Map();
+        const tree = parse(src);
+        walk.full(tree, (n) => {
+            if (n.type !== 'VariableDeclarator' || n.id.type !== 'ObjectPattern' || !n.init || n.init.type !== 'CallExpression') return;
+            const c = n.init;
+            if (c.callee.type !== 'Identifier' || c.callee.name !== 'require' || !c.arguments[0] || typeof c.arguments[0].value !== 'string' || !c.arguments[0].value.startsWith('.')) return;
+            const base = path.relative(process.cwd(), path.resolve(path.dirname(file), c.arguments[0].value));
+            const target = base.endsWith('.js') ? base : fs.existsSync(`${base}.js`) ? `${base}.js` : path.join(base, 'index.js');
+            for (const prop of n.id.properties) {
+                if (prop.type === 'Property' && prop.value && prop.value.type === 'Identifier') imported.set(prop.value.name, target);
+            }
+        });
+        const factoryOf = (init) => {
+            let x = init;
+            if (x && x.type === 'AwaitExpression') x = x.argument;
+            if (x && x.type === 'LogicalExpression') x = x.right;   // opts.relay || createDiscordRelay(…)
+            if (x && x.type === 'AwaitExpression') x = x.argument;
+            return x && x.type === 'CallExpression' && x.callee.type === 'Identifier' && /^create[A-Z]/.test(x.callee.name) ? imported.get(x.callee.name) : null;
+        };
+        walk.full(tree, (n) => {
+            const pairs = n.type === 'VariableDeclarator' && n.id.type === 'Identifier' ? [[n.id.name, n.init]]
+                : n.type === 'AssignmentExpression' && n.left.type === 'Identifier' ? [[n.left.name, n.right]] : [];
+            for (const [name, init] of pairs) { const f = factoryOf(init); if (f && fs.existsSync(f)) apis[name] = f; }
+        });
+    }
+    // fileApis: { "server/comments/api.js": { "service": "server/comments/service.js" } } for a holder whose module
+    // differs by file (a factory's instance passed in under a generic name).
+    Object.assign(apis, (cfg.fileApis || {})[path.relative(process.cwd(), file)] || {});
     // const { seed } = require('./workflows/seed'): a function imported from a converted file is async when it is there.
     walk.full(ast, (n) => {
         if (n.type !== 'VariableDeclarator' || n.id.type !== 'ObjectPattern' || !n.init || n.init.type !== 'CallExpression') return;
@@ -112,6 +153,15 @@ function analyse(file, src, cfg, asyncNames) {
         });
     });
 
+    // Local functions that await a parameter themselves: rejects(p, …) → 'rejects:0'.
+    const promiseTakers = new Set();
+    for (const [name, f] of localFns) {
+        const params = f.params.map((q) => (q.type === 'Identifier' ? q.name : null));
+        walk.full(f.body, (x) => {
+            if (x.type === 'AwaitExpression' && x.argument.type === 'Identifier' && params.includes(x.argument.name)) promiseTakers.add(`${name}:${params.indexOf(x.argument.name)}`);
+        });
+    }
+
     function asyncCall(call) {
         const c = call.callee;
         if (c.type === 'MemberExpression' && !c.computed) {
@@ -124,6 +174,12 @@ function analyse(file, src, cfg, asyncNames) {
                 if (p.length && stmtNames.has(p[p.length - 1])) return true;
             }
             if ((m === 'tx' || m === 'transaction') && p.length && ['store', 'db', 'this'].includes(p[p.length - 1])) return m === 'tx';
+            // require('./events').pasteCreated(: a module's function reached through an inline require.
+            if (obj.type === 'CallExpression' && obj.callee.type === 'Identifier' && obj.callee.name === 'require' && obj.arguments[0] && typeof obj.arguments[0].value === 'string' && obj.arguments[0].value.startsWith('.')) {
+                const base = path.relative(process.cwd(), path.resolve(path.dirname(file), obj.arguments[0].value));
+                const set = asyncNames.api.get(base.endsWith('.js') ? base : `${base}.js`) || asyncNames.api.get(path.join(base, 'index.js'));
+                if (set && set.has(m) && !syncNames.has(m)) return true;
+            }
             // <x>.<store>.<method>(: a store reached through an object; a bare identifier only when listed in bareStores.
             if (p.length >= 2 && stores.has(p[p.length - 1]) && !syncStoreMethods.has(m)) return true;
             if (p.length === 1 && (cfg.bareStores || []).includes(p[0]) && !syncStoreMethods.has(m)) return true;
@@ -226,6 +282,8 @@ function analyse(file, src, cfg, asyncNames) {
         if (parent && parent.type === 'VariableDeclarator' && parent.init === node && parent.id.type === 'Identifier' && awaitedLater.has(parent.id.name)) return;
         // assert.rejects(promise) / doesNotReject(promise) take the promise itself.
         if (parent && parent.type === 'CallExpression' && parent.arguments[0] === node && parent.callee.type === 'MemberExpression' && ['rejects', 'doesNotReject'].includes(parent.callee.property.name)) return;
+        // So does a local helper that awaits that parameter itself (a test's rejects(p, status)).
+        if (parent && parent.type === 'CallExpression' && parent.callee.type === 'Identifier' && promiseTakers.has(`${parent.callee.name}:${parent.arguments.indexOf(node)}`)) return;
         // Returned directly from an arrow body or a return statement of an async fn is fine too, but awaiting is harmless.
         const fnIdx = (() => { for (let i = parents.length - 1; i >= 0; i--) if (isFn(parents[i])) return i; return -1; })();
         const fn = fnIdx >= 0 ? parents[fnIdx] : null;
@@ -252,6 +310,8 @@ function analyse(file, src, cfg, asyncNames) {
             makeAsync(fn);
         }
         const wrap = parent && parent.type === 'MemberExpression' && parent.object === node;
+        // Never a second await in front of one already there (a call the parser saw inside another's callee).
+        if (!wrap && /\bawait\s+$/.test(src.slice(Math.max(0, node.start - 12), node.start))) return;
         edits.push({ at: node.start, text: wrap ? '(await ' : 'await ' });
         if (wrap) edits.push({ at: node.end, text: ')' });
     });
