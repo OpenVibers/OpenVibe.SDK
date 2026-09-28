@@ -9,6 +9,7 @@ Rewrites:
   LIKE / NOT LIKE           → ILIKE / NOT ILIKE   (SQLite's LIKE ignores ASCII case)
   json_each(?)              → jsonb_array_elements_text(?::jsonb)   (a JSON text parameter; column "value")
   IFNULL(                   → COALESCE(
+  db.transaction(fn)()      → db.tx(fn);   db.inTransaction → db.inTransaction()
   sqlite_master table lists → information_schema.tables of the current schema
   pragma_table_info('t')    → information_schema.columns of t
   sequencer.stamp(doc)      → sequencer.stamp(store.db, doc)   (openvibe-publishing 1.0)
@@ -46,6 +47,21 @@ for p in files:
     s = re.sub(r'(?<![IN\w])LIKE (?=[@?:$\'(]|[a-z])', 'ILIKE ', s)
     s = s.replace('json_each(?)', 'jsonb_array_elements_text(?::jsonb)')
     s = re.sub(r'\bIFNULL\(', 'COALESCE(', s)
+    # db.transaction(fn)() → db.tx(fn) (balanced parentheses; the codemod then awaits it and makes fn async).
+    out, i = [], 0
+    while True:
+        j = s.find('.transaction(', i)
+        if j < 0: out.append(s[i:]); break
+        k, depth = j + len('.transaction('), 1
+        while k < len(s) and depth:
+            depth += {'(': 1, ')': -1}.get(s[k], 0); k += 1
+        if s[k:k + 2] == '()':
+            out.append(s[i:j] + '.tx(' + s[j + len('.transaction('):k]); i = k + 2
+        else:
+            out.append(s[i:k]); i = k
+    s = ''.join(out)
+    # better-sqlite3's db.inTransaction was a property; openvibe-sdk/db's is a function.
+    s = re.sub(r'\b(db|this\.db|store\.db)\.inTransaction\b(?!\s*\()', r'\1.inTransaction()', s)
     # ON CONFLICT … DO UPDATE SET x = x + 1 / COALESCE(excluded.x, x): a bare column on the right is ambiguous in
     # PostgreSQL; qualify it with the table (columns of the INSERT list only; excluded.x and the targets stay).
     def qualify(m):

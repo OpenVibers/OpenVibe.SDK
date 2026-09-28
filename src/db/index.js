@@ -108,7 +108,19 @@ function createDb(o = {}) {
     if (o.pglite) adapter = pgliteAdapter(o.pglite);
     else adapter = pgAdapter({ url: o.url || process.env.DATABASE_URL, max: o.max || 10, service, queryTimeoutMs: o.queryTimeoutMs || 15000, log });
 
-    async function timed(conn, text, values) {
+    // One query at a time per transaction connection: a transaction's statements are ordered anyway, and node-postgres
+    // deprecates queuing a query on a busy client (pg@9 refuses it). Promise.all over db calls inside a transaction
+    // (a list read concurrently) is therefore safe; outside one, each call takes its own pool connection.
+    const lanes = new WeakMap();
+    function timed(conn, text, values) {
+        if (!conn || typeof conn !== 'object') return timedRun(conn, text, values);
+        const prev = lanes.get(conn) || Promise.resolve();
+        const next = prev.then(() => timedRun(conn, text, values));
+        lanes.set(conn, next.then(() => {}, () => {}));
+        return next;
+    }
+
+    async function timedRun(conn, text, values) {
         const t0 = process.hrtime.bigint();
         try {
             const r = await adapter.run(conn, text, values);

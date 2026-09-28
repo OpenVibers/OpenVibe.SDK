@@ -57,6 +57,20 @@ function cases(label, open) {
                 assert.deepEqual(seen, [['outside', false, 0, 1]]);
             } finally { await done(); }
         }],
+        [`${label}: Promise.all over db calls inside a transaction runs them one at a time on its connection`, async () => {
+            const { db, done } = await open();
+            const warnings = [];
+            const onWarning = (w) => warnings.push(String(w && w.message));
+            process.on('warning', onWarning);
+            try {
+                const ins = db.prepare('INSERT INTO items (name, qty) VALUES (?, ?) RETURNING id');
+                const ids = await db.tx(async () => Promise.all([1, 2, 3, 4, 5].map(async (n) => (await ins.run(`p${n}`, n)).lastInsertRowid)));
+                assert.equal(new Set(ids).size, 5);
+                assert.equal(await db.prepare('SELECT count(*)::int FROM items').pluck().get(), 5);
+                await new Promise((r) => setImmediate(r));
+                assert.deepEqual(warnings.filter((w) => /already executing a query/.test(w)), [], 'no queued query on a busy client');
+            } finally { process.off('warning', onWarning); await done(); }
+        }],
         [`${label}: a db.tx inside is a savepoint; its failure undoes only itself`, async () => {
             const { db, done } = await open();
             try {

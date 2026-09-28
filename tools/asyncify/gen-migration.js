@@ -6,7 +6,7 @@
  * and outbox. Run in the service's checkout, after `npm install` of openvibe-publishing ≥ 1.0 and openvibe-sdk ≥ 0.18:
  *
  *   node gen-migration.js <Name> [--publishing revisions:blog_post,citations:blog_post,index-hooks:blog,seo:blog_entity,…]
- *                               [--no-inbox] [--outbox-table t] [--inbox-table t]
+ *                               [--no-inbox] [--outbox-table t] [--inbox-table t] [--no-outbox] [--ensure a.js,b.js]
  *     → migrations/0001_initial.sql
  *
  * It lists every `rowid` the server code still orders by: those tables need a `seq bigint GENERATED ALWAYS AS
@@ -43,6 +43,18 @@ let out = `-- phase: expand
 -- tools/asyncify/sqlite-schema-to-pg: text COLLATE "C" compares like SQLite, integers are bigint, identities keep their ids),
 -- then the openvibe-publishing stores and the openvibe-sdk inbox and outbox. Generated once on ${new Date().toISOString().slice(0, 10)}; never edited after it runs.
 ${toPg(m[1]).replace(/\n{3,}/g, '\n\n')}`;
+// --ensure a.js,b.js: modules whose ensureSchema(db) created more tables at boot; their SQL is captured and converted too.
+{
+    const i = args.indexOf('--ensure');
+    if (i >= 0) {
+        for (const f of args[i + 1].split(',')) {
+            const sqls = [];
+            const fake = { exec: (q) => sqls.push(q), prepare: () => ({ run() {}, get() {}, all: () => [] }), pragma() {}, function() {} };
+            req(path.resolve(f)).ensureSchema(fake);
+            out += `\n-- ${f} ensureSchema()\n${toPg(sqls.join('\n').replace(/^ {4}/gm, '')).trim()}\n`;
+        }
+    }
+}
 const SCHEMA_OF = { 'index-hooks': (x, p) => x.sequencerSchema(p), seo: (x, p) => x.redirectsSchema(p) };
 const opt = (name, def) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : def; };
 for (const [store, prefix] of pubs) {
@@ -53,7 +65,7 @@ const ev = req('openvibe-sdk/events');
 const inboxTable = opt('--inbox-table', 'idempotency_receipts');
 const outboxTable = opt('--outbox-table', 'event_outbox');
 if (!args.includes('--no-inbox')) out += `\n-- openvibe-sdk/events inbox: one receipt per (consumer, event) handled\n${ev.inboxSchema(inboxTable).trim()}\n`;
-out += `\n-- openvibe-sdk/events PostgreSQL outbox\n${ev.outboxSchema(outboxTable).trim()}\n`;
+if (!args.includes('--no-outbox')) out += `\n-- openvibe-sdk/events PostgreSQL outbox\n${ev.outboxSchema(outboxTable).trim()}\n`;
 // SQLite's own copies of the tables above (created by the packages at boot) would be defined twice.
 for (const t of [outboxTable, inboxTable]) {
     const re = new RegExp(`\\nCREATE TABLE ${t} \\([\\s\\S]*?\\n\\);\\n`, 'g');

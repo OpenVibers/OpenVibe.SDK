@@ -71,6 +71,25 @@ function analyse(file, src, cfg, asyncNames) {
         if (n.type === 'Property' && n.key && isPrepare(n.value)) stmtNames.add(n.key.name || n.key.value);
     });
 
+    // Higher-order helpers (conflictGuard(fn), waitFor(fn), once(id, fn), a route wrapper): when a local function is
+    // passed an async function, its calls of that parameter return promises, so they are awaited too.
+    const localFns = new Map();
+    walk.full(ast, (n) => {
+        if (n.type === 'FunctionDeclaration' && n.id) localFns.set(n.id.name, n);
+        if (n.type === 'VariableDeclarator' && n.id.type === 'Identifier' && n.init && ['FunctionExpression', 'ArrowFunctionExpression'].includes(n.init.type)) localFns.set(n.id.name, n.init);
+    });
+    const asyncParamCalls = new Set();
+    walk.full(ast, (n) => {
+        if (n.type !== 'CallExpression' || n.callee.type !== 'Identifier' || !localFns.has(n.callee.name)) return;
+        const target = localFns.get(n.callee.name);
+        n.arguments.forEach((arg, i) => {
+            const isAsyncFn = ['FunctionExpression', 'ArrowFunctionExpression'].includes(arg.type) && arg.async;
+            const p = target.params[i];
+            if (!isAsyncFn || !p || p.type !== 'Identifier') return;
+            walk.full(target.body, (c) => { if (c.type === 'CallExpression' && c.callee.type === 'Identifier' && c.callee.name === p.name) asyncParamCalls.add(c); });
+        });
+    });
+
     function asyncCall(call) {
         const c = call.callee;
         if (c.type === 'MemberExpression' && !c.computed) {
@@ -95,6 +114,7 @@ function analyse(file, src, cfg, asyncNames) {
             }
             if (p.length && (p[p.length - 1] === 'api' || p[p.length - 1] === 'svc' || p[p.length - 1] === 'self') && localAsync.has(m)) return true;
         }
+        if (asyncParamCalls.has(call)) return true;
         if (c.type === 'Identifier') {
             if ((cfg.asyncGlobals || []).includes(c.name)) return true;
             if (localAsync.has(c.name) && !syncNames.has(c.name)) return true;
@@ -159,6 +179,9 @@ function analyse(file, src, cfg, asyncNames) {
         }
         manual.push(`${file}:${n.loc.start.line}: ${what} passed to .${n.callee.property.name}()`);
     });
+    // Names awaited as a whole somewhere in the file (await first, await Promise.all([a, b]) excluded).
+    const awaitedLater = new Set();
+    walk.full(ast, (n) => { if (n.type === 'AwaitExpression' && n.argument && n.argument.type === 'Identifier') awaitedLater.add(n.argument.name); });
     walk.fullAncestor(ast, (node, _s, anc) => {
         if (node.type !== 'CallExpression' || !asyncCall(node)) return;
         const parents = anc.slice(0, -1);
@@ -171,6 +194,8 @@ function analyse(file, src, cfg, asyncNames) {
             if (gp && gp.type === 'CallExpression' && gp.callee.type === 'MemberExpression' && gp.callee.object.name === 'Promise') return;
         }
         if (parent && parent.type === 'CallExpression' && parent.callee.type === 'MemberExpression' && parent.callee.object.name === 'Promise') return;
+        // const p = asyncCall(); … await p: the promise is started now on purpose and awaited later.
+        if (parent && parent.type === 'VariableDeclarator' && parent.init === node && parent.id.type === 'Identifier' && awaitedLater.has(parent.id.name)) return;
         // assert.rejects(promise) / doesNotReject(promise) take the promise itself.
         if (parent && parent.type === 'CallExpression' && parent.arguments[0] === node && parent.callee.type === 'MemberExpression' && ['rejects', 'doesNotReject'].includes(parent.callee.property.name)) return;
         // Returned directly from an arrow body or a return statement of an async fn is fine too, but awaiting is harmless.

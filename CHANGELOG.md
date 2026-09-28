@@ -8,6 +8,10 @@ release may change an API and says so here.
 
 
 
+## 0.20.1 (2026-09-28)
+
+- **`openvibe-sdk/db`: one query at a time per transaction connection.** `await Promise.all(xs.map((x) => db.….get(x)))` inside a transaction used to put several queries on the transaction's client at once. node-postgres queues them, but warns that pg@9 will refuse. Such calls are now chained per connection, in call order. Outside a transaction, each call still takes its own pool connection and runs concurrently. `test/db-ambient.test.js` checks this on PGlite and through PgBouncer.
+
 ## 0.20.0 (2026-09-28)
 
 - **`db.afterCommit(fn)`** (and `t.afterCommit(fn)` on a transaction handle) runs `fn` once the running transaction commits. It never runs after a rollback, and a savepoint that rolls back drops the hooks added inside it. Hooks run in order, outside the transaction, with the connection already back in the pool; one that throws is logged and the rest still run. Outside a transaction, `fn` runs on the next turn. It replaces the better-sqlite3 pattern of a `setImmediate` after a synchronous transaction, for calls to other services that must see committed state (News' comment-thread visibility was the first user).
