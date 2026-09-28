@@ -156,6 +156,10 @@ export interface TestDb {
     schema?: string;
     /** Another pooled handle on the same database (a second process); null on PGlite. */
     open: ((o?: object) => Db) | null;
+    /** DATABASE_URL for a spawned process (the service role through PgBouncer); null on PGlite. */
+    url: string | null;
+    /** DATABASE_DIRECT_URL for a spawned process (the owner, direct: its boot's migrate); null on PGlite. */
+    directUrl: string | null;
     close(): Promise<void>;
 }
 /** A migrated database for one test run: PGlite, or (store 'pg') roles and a schema of its own on the containers. */

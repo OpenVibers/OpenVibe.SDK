@@ -81,7 +81,7 @@ for p in files:
     # assert.throws(() => db.prepare(…).run(…), re): the statement rejects now.
     s = re.sub(r"assert\.throws\(\(\) => ((?:t\.)?[\w.]*db\.prepare\((?:[^()]|\([^()]*\))*\)\.(?:run|get|all)\((?:[^()]|\([^()]*\))*\)), ", r"await assert.rejects(\1, ", s)
     # A jsonb column (the SDK outbox's envelope) comes back as an object.
-    s = re.sub(r"JSON\.parse\((\w+)\.envelope\)", r"(typeof \1.envelope === 'string' ? JSON.parse(\1.envelope) : \1.envelope)", s)
+    s = re.sub(r"(?<!\? )JSON\.parse\((\w+)\.envelope\)", r"(typeof \1.envelope === 'string' ? JSON.parse(\1.envelope) : \1.envelope)", s)
     # db.transaction(fn)() → db.tx(fn) (balanced parentheses; the codemod then awaits it and makes fn async).
     out, i = [], 0
     while True:

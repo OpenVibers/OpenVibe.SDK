@@ -28,7 +28,7 @@ async function createTestDb({ migrations, store = process.env.OV_TEST_STORE || '
     if (store !== 'pg') {
         const db = createDb({ pglite: true, service: `${service}-test`, log });
         if (migrations) await db.migrate({ dir: migrations, log });
-        return { db, store: 'pglite', open: null, close: () => db.close().catch(() => {}) };
+        return { db, store: 'pglite', url: null, directUrl: null, open: null, close: () => db.close().catch(() => {}) };
     }
     if (!pgAvailable()) throw new Error('store pg needs OV_TEST_PG_URL and OV_TEST_PG_DIRECT_URL (openvibe-sdk scripts/test-services.sh up)');
     const safe = String(service).replace(/[^a-z0-9]/g, '').slice(0, 12) || 'svc';
@@ -74,6 +74,9 @@ async function createTestDb({ migrations, store = process.env.OV_TEST_STORE || '
     } catch (e) { await drop().catch(() => {}); throw e; }   // a failed setup leaves nothing behind
     return {
         db, store: 'postgresql', schema: name,
+        // For a process of its own (a worker the test spawns): DATABASE_URL (through PgBouncer, the service role) and
+        // DATABASE_DIRECT_URL (the owner, for its boot's migrate, which finds everything applied).
+        url: as(process.env.OV_TEST_PG_URL, name), directUrl: as(process.env.OV_TEST_PG_DIRECT_URL, owner),
         open: (o = {}) => createDb({ url: as(process.env.OV_TEST_PG_URL, name), service: `${service}-test`, max, log, ...o }),
         async close() { await db.close().catch(() => {}); await drop(); },
     };

@@ -8,6 +8,11 @@ release may change an API and says so here.
 
 
 
+## 0.21.3 (2026-09-28)
+
+- `openvibe-sdk/testing` `createTestDb`: on the containers it also returns `url` and `directUrl`, the `DATABASE_URL` and `DATABASE_DIRECT_URL` of its schema, for a test that spawns a process of the service (OpenRe's transport workers); `null` on PGlite.
+- `tools/asyncify/sqlfix.py`: the outbox-envelope rewrite no longer nests on a second run.
+
 ## 0.21.2 (2026-09-28)
 
 - `openvibe-sdk/events` outboxes (SQLite and PostgreSQL): a `flush()` called while a relay pass runs now gets the next pass, which starts when that one ends. It used to share the running pass, so it could return before the rows committed after that pass claimed were published (a caller's "flush, then assert both went out" saw one). Calls made during a pass share that next pass; `stop()` waits for both.
