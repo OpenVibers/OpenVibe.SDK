@@ -8,6 +8,11 @@ release may change an API and says so here.
 
 
 
+## 0.20.3 (2026-09-28)
+
+- `importSqlite` reads the target tables of the connection's current schema, not only `public`. A per-run test schema from `createTestDb({ store: 'pg' })` works now, so a rehearsal can use the containers. Production is unchanged: its search path is `public`.
+- Rehearsal note: an embedded PGlite (`--pglite`) can break on very large rows. OpenVibe.AI's `runs` did, while the same import verified on PostgreSQL. When `--pglite` reports every table empty, rehearse on the containers instead (`docs/migrating-to-postgresql.md` §6).
+
 ## 0.20.2 (2026-09-28)
 
 - **`importSqlite` refuses a source table that has no target table.** Before, such a table was skipped without a word. A table that a module created at runtime and the migration forgot would have been dropped by the switch (found converting OpenVibe.AI: `subject_credentials`). SQLite's own tables and FTS5 virtual tables with their shadow tables are still skipped, because an index is rebuilt, not copied. Anything else not imported on purpose goes in the new `skipSource` option, also on `runSqliteMigration`. An audit of the eleven services already switched found nothing lost. `test/db.test.js`.

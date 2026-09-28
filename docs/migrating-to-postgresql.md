@@ -133,6 +133,8 @@ It changes nothing in the SQLite file.
    - `STATUS.json` (the database) and the README (Depends on: PostgreSQL and Valkey);
    - the roadmap plan's WS-X2 migration list.
 
+**Rehearsing on the containers.** An embedded PGlite can break on very large rows (OpenVibe.AI's run payloads). When `--pglite` reports every table empty, import into a schema of the containers: `createTestDb({ migrations, store: 'pg' })`, then `importSqlite({ sqlite, db: t.db })`.
+
 ## 7. Lessons from the first migrations
 
 - **Tips (2026-09-28)** is the reference: its `postgres` branch has the schema, the importer script, `test/helpers/db.js` and the multi-process integration test. Copy them.

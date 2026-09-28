@@ -62,6 +62,21 @@ function analyse(file, src, cfg, asyncNames) {
     const apis = cfg.apis || {};
     const syncNames = new Set(cfg.syncNames || []);
     const localAsync = new Set(asyncNames.local.get(file) || []);
+    // const { seed } = require('./workflows/seed'): a function imported from a converted file is async when it is there.
+    walk.full(ast, (n) => {
+        if (n.type !== 'VariableDeclarator' || n.id.type !== 'ObjectPattern' || !n.init || n.init.type !== 'CallExpression') return;
+        const c = n.init;
+        if (c.callee.type !== 'Identifier' || c.callee.name !== 'require' || !c.arguments[0] || typeof c.arguments[0].value !== 'string' || !c.arguments[0].value.startsWith('.')) return;
+        const base = path.relative(process.cwd(), path.resolve(path.dirname(file), c.arguments[0].value));
+        const set = asyncNames.api.get(base.endsWith('.js') ? base : `${base}.js`) || asyncNames.api.get(path.join(base, 'index.js'));
+        if (!set) return;
+        for (const prop of n.id.properties) {
+            if (prop.type !== 'Property' || !prop.key) continue;
+            const exported = prop.key.name || prop.key.value;
+            const local = prop.value && prop.value.type === 'Identifier' ? prop.value.name : exported;
+            if (set.has(exported) && !syncNames.has(exported)) localAsync.add(local);
+        }
+    });
     // const view = ops.providerView: an alias of an async module method is async too.
     walk.full(ast, (n) => {
         if (n.type !== 'VariableDeclarator' || n.id.type !== 'Identifier' || !n.init || n.init.type !== 'MemberExpression' || n.init.computed) return;

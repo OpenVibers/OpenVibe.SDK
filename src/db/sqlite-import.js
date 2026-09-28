@@ -96,17 +96,17 @@ async function schemaOf(db) {
                c.is_identity = 'YES' AS identity, c.is_generated = 'ALWAYS' AS generated
           FROM information_schema.columns c
           JOIN information_schema.tables t ON t.table_schema = c.table_schema AND t.table_name = c.table_name
-         WHERE c.table_schema = 'public' AND t.table_type = 'BASE TABLE' AND c.table_name <> 'ov_migrations'
+         WHERE c.table_schema = current_schema() AND t.table_type = 'BASE TABLE' AND c.table_name <> 'ov_migrations'
          ORDER BY c.table_name, c.ordinal_position`);
     const pks = await db.many(sql`
         SELECT tc.relname AS table_name, a.attname AS column_name, array_position(i.indkey::int2[], a.attnum) AS pos
           FROM pg_index i JOIN pg_class tc ON tc.oid = i.indrelid JOIN pg_namespace n ON n.oid = tc.relnamespace
           JOIN pg_attribute a ON a.attrelid = tc.oid AND a.attnum = ANY(i.indkey)
-         WHERE i.indisprimary AND n.nspname = 'public' ORDER BY 1, 3`);
+         WHERE i.indisprimary AND n.nspname = current_schema() ORDER BY 1, 3`);
     const fks = await db.many(sql`
         SELECT c.conrelid::regclass::text AS child, c.confrelid::regclass::text AS parent
           FROM pg_constraint c JOIN pg_namespace n ON n.oid = c.connamespace
-         WHERE c.contype = 'f' AND n.nspname = 'public'`);
+         WHERE c.contype = 'f' AND n.nspname = current_schema()`);
     const tables = new Map();
     for (const c of cols) {
         if (!tables.has(c.table_name)) tables.set(c.table_name, { name: c.table_name, columns: [], pk: [] });
