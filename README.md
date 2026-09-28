@@ -2,17 +2,23 @@
 
 > Supported browser and server clients for the OpenVibe platform.
 
-**Status:** alpha, v0.6.0 (roadmap Wave 2; developer apps from Wave 20; Media objects v2 from Wave 4; the Tools platform API from the 2026-09-23 tools program). v0.6.0 is not tagged yet: the install line below stays on v0.5.0 until it is. The Tools registry, run API and jobs facade it wraps are still being built in OpenVibe.Tools (see [Tools](#tools)). Tested against local stub servers and the built-in mock platform only, never against the live platform. Production services pin three releases (2026-09-23): v0.4.0 in Live, Deals, News, Reviews, Tips, Trade and VIP; v0.3.1 in Codes; v0.2.2 in Network, Media, Blog, Wiki, Coupons, Host, OpenRe.Stream and Games. OpenVibe.Examples uses v0.4.0. CI is green from `654d4b2` (it now runs `npm ci`); the runs for the v0.3.0, v0.3.1 and v0.4.0 commits failed because `better-sqlite3` was not installed.  
+**Status:** alpha, v0.12.0 (roadmap Wave 2; developer apps from Wave 20; Media objects v2 from Wave 4; the Tools platform API; Search, Chat and AI clients from WS-F task 4; per-actor limits from WS-R task 4). Every release is tagged (see [CHANGELOG.md](CHANGELOG.md)). Tested against local stub servers and the built-in mock platform only, never against the live platform. Services pin release tags; each repository's `STATUS.json` names the one it uses.  
 **Plan:** OpenVibe End-to-End Realignment & Implementation Plan, revision 3 (20 Sep 2026), §3.2; roadmap §30.  
 **License:** MIT ([LICENSE](LICENSE)). This package is a library that apps outside the network embed, so it uses MIT. The OpenVibe services themselves stay AGPL-3.0.
 
 **If a capability is not in the SDK, it is not public.** Apps call services through `openvibe-sdk` and never build internal routes themselves. A route with no SDK wrapper is internal, even when you can reach it, and it can change without notice. To make a capability public, first define it in OpenVibe.Contracts, then wrap it here.
 
 ```bash
-npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.5.0
+npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.12.0
 ```
 
-It has no runtime dependencies. It needs Node ≥ 20, or any browser with `fetch`, Web Crypto and `TextDecoder`. There is no build step. The package is CommonJS with ESM entry points (`import` works). Each subpath has its own `.d.ts`. For a page with no bundler, `browser/openvibe-sdk.mjs` is one self-contained ES module of the browser-safe subpaths (see [Browser without a bundler](#browser-without-a-bundler)). It does not depend on `openvibe-contracts` at runtime: it copies the contract types it uses (from Contracts v0.33.0, a devDependency the tests check them against).
+It has no runtime dependencies. It needs Node ≥ 20, or any browser with `fetch`, Web Crypto and `TextDecoder`. There is no build step. The package is CommonJS with ESM entry points (`import` works). Each subpath has its own `.d.ts`. For a page with no bundler, `browser/openvibe-sdk.mjs` is one self-contained ES module of the browser-safe subpaths (see [Browser without a bundler](#browser-without-a-bundler)). It does not depend on `openvibe-contracts` at runtime: it copies the contract types it uses (from Contracts v0.49.0, a devDependency the tests check them against).
+
+## Purpose
+
+The one supported way to call OpenVibe from an app, first-party or not: clients for each public
+capability, token handling, discovery and version checks, webhook verification, the outbox and inbox
+services use, the per-actor limiter, the OpenVibe Frame, and a mock platform to test against.
 
 ## Quick start
 
@@ -346,7 +352,7 @@ Helpers: `signUserToken()`, `signServiceToken()`, `signAppToken()`, `authorize()
 ## Versioning
 
 - `openvibe-sdk` follows semver. While it is 0.x, a minor release may break an API, and [CHANGELOG.md](CHANGELOG.md) says so. Pin a tag.
-- Each release states the openvibe-contracts range it was tested against (`CONTRACTS_RANGE`), and `discover()` checks it at runtime. Contract types are copied into `types/contracts.d.ts`. `test/types.test.js` fails if they differ from the pinned Contracts release, the `openvibe-contracts` devDependency (a release tarball pin, v0.33.0), which the tools tests also use to validate requests and answers. It is never a runtime or peer dependency.
+- Each release states the openvibe-contracts range it was tested against (`CONTRACTS_RANGE`), and `discover()` checks it at runtime. Contract types are copied into `types/contracts.d.ts`. `test/types.test.js` fails if they differ from the pinned Contracts release, the `openvibe-contracts` devDependency (a release tarball pin, v0.49.0), which the tools tests also use to validate requests and answers. It is never a runtime or peer dependency.
 - A new public capability ships as a minor release: first the contract, then the wrapper here, then the service's route. Removing a wrapper is a major release, after the capability's deprecation window in Contracts has passed.
 
 ## Not wrapped yet (intentionally)
@@ -355,9 +361,42 @@ Helpers: `signUserToken()`, `signServiceToken()`, `signAppToken()`, `authorize()
 - **Media:** the v1 files API, the object API v2 (`createObjectsClient`) and the public URL helpers are wrapped. Retention holds on v2 objects are not (app keys only). VOD, clip, thumbnail and admin-storage routes are not wrapped because apps reach them only through Live and Media's own servers. Media's own paste API is not wrapped because pastes moved to Community (ADR-011). The mock platform (`openvibe-sdk/testing`) models Media's v1 files only, not v2 objects.
 - **Media from the browser:** Media refuses user JWTs on `/api/v1/:app/files`, so a browser uploads through its own app server. That server holds the app key and names the user with `actingUserId`.
 - **Network coins, notifications and legacy-map writes** are internal service-to-service routes with no public capability, so they are not wrapped. Staff-only paste routes are also internal: admin stats, bulk, censor and the AI pass.
-- **Chat, Live, Billing and Games** from the original charter come when those services publish their capabilities in Contracts. Chat has no app principal (`chat.message.send` is `first-party`), so there is no Chat client and no Chat mock.
+- **Live, Billing and Games** from the original charter come when those services publish their capabilities in Contracts. Chat is wrapped over REST as the token's person (`openvibe-sdk/chat`, v0.11.0), but it has no app principal (`chat.message.send` is `first-party`) and the mock platform has no Chat.
 - **Tools** are not wrapped one by one: `openvibe-sdk/tools` runs any tool with `api: true` by id, and its descriptor (`tools.get(id)`) gives the input schema, files and limits. `openvibe-sdk/jobs` still submits any job `type` directly. The YouTube downloader is page-only (`api: false`), so it is not in the SDK.
 - **Realtime over WebSocket and presence** don't exist in Events yet (ADR-005). SSE is the only transport.
+
+## Capabilities
+
+The SDK implements no capability and holds no grant: every client calls with the token the app gives
+it, so the app needs the grant for what it calls (for example `media.object.upload`,
+`events.app.publish`, `search.query.delegate`, `ai.run.create`). What each subpath wraps, and the
+capability each call performs, is in the [API](#api) table; a capability with no wrapper is not public.
+
+## Acceptance
+
+`npm test` runs every `test/*.test.js` against local stub servers and the mock platform, then packs
+the package and installs it. What it proves: each client's requests and error handling (one test file
+per subpath), token verification, PKCE and revocation cutoffs (`jwt`, `pkce`, `auth-tokens`,
+`revocations`), webhook signatures and the outbox/inbox (`events`, `outbox`), the per-actor limiter
+(`limits`), that an external app authenticates, discovers Media from the registry and uploads through
+the mock platform (`testing`), that the ESM entries, types and browser bundle match the sources
+(`esm`, `types`, `bundle`, `browser-entries`), and that the packed tarball contains every entry point
+(`pack`).
+
+## Security
+
+Reporting a vulnerability: [SECURITY.md](SECURITY.md). Browser-safe files never touch a client secret
+(the browser secret scan covers the bundle); secrets and tokens are never logged; a write is retried
+only with an idempotency key; webhook verification checks signature v2 within ±300 s (`requireV2` refuses a
+v1-only delivery); the Frame loads only from an https origin (or `http://localhost` in development). The
+package has no runtime dependencies.
+
+## Deploy
+
+Nothing is deployed from this repository: it is a package. A release is a git tag (`vX.Y.Z`, with its
+[CHANGELOG.md](CHANGELOG.md) entry); services and apps pin the tag's tarball and ship it with their own
+deploys (`sudo ovhost deploy <service>` for OpenVibe services). A bad release is undone by pinning the
+previous tag.
 
 ## Development
 
@@ -370,9 +409,17 @@ node scripts/browser-bundle.js           # regenerate browser/openvibe-sdk.mjs a
 
 Style: CommonJS, 4-space indent, single quotes, semicolons. Browser-safe files use only `fetch`, `Headers`, `FormData`, `Blob`, `URL`, `TextEncoder`/`TextDecoder` and `globalThis.crypto` (Web Crypto). Server-only files may use `node:` modules and are marked `"browser": null` in `package.json`.
 
-## Owns / does not own
+## Owns
 
-Owns the supported client surface, version negotiation and feature detection, and the mock adapters for development. It doesn't own service implementations, and it doesn't own UI components (OpenVibe.Shared). It replaces the hand-written per-repo clients: Live's `media-client`, Community's proxies and Tools' fetch helpers.
+Owns the supported client surface, version negotiation and feature detection, and the mock adapters for development. It replaces the hand-written per-repo clients: Live's `media-client`, Community's proxies and Tools' fetch helpers.
+
+## Does not own
+
+Service implementations and their data (each service), the contracts (OpenVibe.Contracts, whose types it copies), and UI components (OpenVibe.Shared; the Frame module loads Shared's published files, it does not bundle them).
+
+## Depends on
+
+Nothing at runtime. `openvibe-contracts` v0.49.0 and `better-sqlite3` are devDependencies (type checks, the outbox and inbox tests). At run time the clients talk to OpenVibe.Network (tokens, registry, discovery) and the service each one wraps.
 
 ---
 

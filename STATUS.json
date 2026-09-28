@@ -3,7 +3,23 @@
   "stage": "alpha",
   "code": true,
   "wave": "W2",
-  "version": "0.6.0",
+  "version": "0.12.0",
   "plan": "OpenVibe End-to-End Realignment & Implementation Plan, revision 3 (20 Sep 2026), §3.2; roadmap §30",
-  "updated": "2026-09-23"
+  "deployed": false,
+  "deployment": "none: a package released as git tags; services and apps pin a tag",
+  "contracts": "openvibe-contracts v0.49.0 (devDependency; runtime contracts range >=0.5.0 <1.0.0)",
+  "features": [
+    "core client: retries, timeouts, problem+json errors, trace propagation",
+    "auth: service and app tokens, PKCE, offline verification, revocation cutoffs",
+    "registry discovery and contracts version checks",
+    "events: publish, pull, app events, webhook verification (v2), outbox and inbox",
+    "realtime SSE",
+    "media files and objects v2",
+    "community, search, chat, ai, jobs, tools, projects, modules, identity and vip clients",
+    "per-actor limiter for services (openvibe-sdk/limits)",
+    "the OpenVibe Frame for any app",
+    "mock platform for tests (openvibe-sdk/testing)",
+    "ESM entries, TypeScript types and a browser bundle"
+  ],
+  "updated": "2026-09-28"
 }
