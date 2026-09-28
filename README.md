@@ -362,6 +362,8 @@ thumbs.process(async (job) => { … }, { concurrency: 4 });
 
 Install the drivers the service uses: `pg` and `iovalkey` (production), `@electric-sql/pglite` (tests), `better-sqlite3` (only for the one-time `importSqlite`).
 
+Moving an existing service from SQLite: [docs/migrating-to-postgresql.md](docs/migrating-to-postgresql.md) (the schema mapping, the code idioms, per-process state to Valkey, tests, the rehearsed import and the production switch).
+
 ### Browser without a bundler
 
 ```html

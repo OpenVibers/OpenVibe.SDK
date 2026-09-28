@@ -163,7 +163,8 @@
     "types/",
     "README.md",
     "CHANGELOG.md",
-    "LICENSE"
+    "LICENSE",
+    "docs/"
   ],
   "scripts": {
     "test": "node test/run.js",
