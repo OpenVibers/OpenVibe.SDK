@@ -138,7 +138,9 @@ const tests = [
         const s = new Database(file);
         s.exec(`CREATE TABLE people (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL, is_admin INTEGER DEFAULT 0, settings TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, legacy_note TEXT);
                 CREATE TABLE notes (id INTEGER PRIMARY KEY, person_id INTEGER REFERENCES people(id), body TEXT, pinned INTEGER, posted INTEGER, tags TEXT);
-                CREATE TABLE loose (k TEXT, v TEXT);`);
+                CREATE TABLE loose (k TEXT, v TEXT);
+                CREATE TABLE forgotten (id INTEGER PRIMARY KEY, secret TEXT);
+                CREATE VIRTUAL TABLE docs_fts USING fts5(title);`);
         const ins = s.prepare('INSERT INTO people (id, username, is_admin, settings, created_at, legacy_note) VALUES (?, ?, ?, ?, ?, ?)');
         ins.run(3, 'ann', 1, '{"theme":"blue","n":[1,2]}', '2026-09-01 10:00:00', 'drop me');
         ins.run(7, 'bob', 0, null, '2026-09-02T11:30:00.000Z', null);
@@ -159,8 +161,13 @@ CREATE TABLE loose (k text, v text);` }), log: { log() {} } });
             // A source column with no target column is a problem until it is dropped on purpose.
             let r = await importSqlite({ sqlite: file, db, log: quiet });
             assert.equal(r.ok, false);
-            assert.match(r.problems[0].problem, /legacy_note/);
+            assert.ok(r.problems.some((p) => /legacy_note/.test(p.problem)), JSON.stringify(r.problems));
             r = await importSqlite({ sqlite: file, db, log: quiet, tables: { people: { dropColumns: ['legacy_note'] } } });
+            // A source table the target lacks would be dropped without a word: refused until skipped on purpose
+            // (an FTS5 index and its shadow tables are skipped: an index is rebuilt, not copied).
+            assert.equal(r.ok, false);
+            assert.deepEqual(r.problems.map((p) => p.table), ['forgotten']);
+            r = await importSqlite({ sqlite: file, db, log: quiet, truncate: true, skipSource: ['forgotten'], tables: { people: { dropColumns: ['legacy_note'] } } });
             assert.equal(r.ok, true, JSON.stringify(r.problems));
             assert.deepEqual(r.tables.map((t) => [t.table, t.rows]), [['loose', 2], ['people', 3], ['notes', 2]], 'parents before children');
             const ann = await db.one(sql`SELECT * FROM people WHERE id = 3`);
@@ -171,7 +178,7 @@ CREATE TABLE loose (k text, v text);` }), log: { log() {} } });
             const next = await db.one(sql`INSERT INTO people (username) VALUES ('new') RETURNING id`);
             assert.equal(next.id, 13, 'the identity continues after the imported maximum');
             // A second import onto the same rows fails loudly; truncate makes a rehearsal repeatable.
-            r = await importSqlite({ sqlite: file, db, log: quiet, truncate: true, tables: { people: { dropColumns: ['legacy_note'] } } });
+            r = await importSqlite({ sqlite: file, db, log: quiet, truncate: true, skipSource: ['forgotten'], tables: { people: { dropColumns: ['legacy_note'] } } });
             assert.equal(r.ok, true);
             // A transformation that differs between copy and check shows up as a failed verification.
             let flip = 0;

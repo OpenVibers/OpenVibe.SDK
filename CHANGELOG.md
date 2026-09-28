@@ -8,6 +8,10 @@ release may change an API and says so here.
 
 
 
+## 0.20.2 (2026-09-28)
+
+- **`importSqlite` refuses a source table that has no target table.** Before, such a table was skipped without a word. A table that a module created at runtime and the migration forgot would have been dropped by the switch (found converting OpenVibe.AI: `subject_credentials`). SQLite's own tables and FTS5 virtual tables with their shadow tables are still skipped, because an index is rebuilt, not copied. Anything else not imported on purpose goes in the new `skipSource` option, also on `runSqliteMigration`. An audit of the eleven services already switched found nothing lost. `test/db.test.js`.
+
 ## 0.20.1 (2026-09-28)
 
 - **`openvibe-sdk/db`: one query at a time per transaction connection.** `await Promise.all(xs.map((x) => db.….get(x)))` inside a transaction used to put several queries on the transaction's client at once. node-postgres queues them, but warns that pg@9 will refuse. Such calls are now chained per connection, in call order. Outside a transaction, each call still takes its own pool connection and runs concurrently. `test/db-ambient.test.js` checks this on PGlite and through PgBouncer.

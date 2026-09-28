@@ -130,9 +130,10 @@ async function schemaOf(db) {
  * @param {string[]} [o.only]        import only these target tables
  * @param {boolean} [o.truncate]     empty the target tables first (rehearsals)
  * @param {boolean} [o.verify]       compare counts and checksums (default true)
+ * @param {string[]} [o.skipSource]  source tables deliberately not imported (every other source table must have a target)
  * → { ok, tables: [{ table, source, rows, ms, checksum }], problems: [] }
  */
-async function importSqlite({ sqlite, db, tables: opts = {}, only = null, truncate = false, verify = true, log = console } = {}) {
+async function importSqlite({ sqlite, db, tables: opts = {}, only = null, truncate = false, verify = true, skipSource = [], log = console } = {}) {
     let Database;
     const src = typeof sqlite === 'string' ? (() => { try { Database = require('better-sqlite3'); } catch { throw new Error('importSqlite: install better-sqlite3 to read the SQLite file'); } return new Database(sqlite, { readonly: true, fileMustExist: true }); })() : sqlite;
     const report = { ok: true, tables: [], problems: [] };
@@ -140,6 +141,18 @@ async function importSqlite({ sqlite, db, tables: opts = {}, only = null, trunca
     try {
         const schema = (await schemaOf(db)).filter((t) => !only || only.includes(t.name));
         const srcTables = new Set(src.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((r) => r.name));
+        // Every source table must land somewhere: a table the target lacks would be dropped without a word (a table a
+        // module created at runtime and the migration forgot). Skipped: SQLite's own, FTS5 virtual tables and their
+        // shadow tables (an index is rebuilt, not copied), and skipSource.
+        if (!only) {
+            const virtuals = src.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND sql LIKE 'CREATE VIRTUAL TABLE%'").all().map((r) => r.name);
+            const targets = new Set(schema.map((t) => (opts[t.name] && opts[t.name].from) || t.name));
+            for (const name of srcTables) {
+                if (targets.has(name) || name.startsWith('sqlite_') || skipSource.includes(name)) continue;
+                if (virtuals.some((v) => name === v || name.startsWith(`${v}_`))) continue;
+                problem({ table: name, problem: 'a source table with no target table (add it to the migrations, or list it in skipSource)' });
+            }
+        }
         const plan = [];
         for (const t of schema) {
             const o = opts[t.name] || {};

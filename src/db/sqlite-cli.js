@@ -65,7 +65,7 @@ async function cleaningOptions(db, tables = {}) {
     return { tables: out, cleaned: () => [...cleaned].map(([column, values]) => ({ column, values: values.size })) };
 }
 
-async function runSqliteMigration({ service, sqlite, directUrl, migrations, tables = {}, argv = process.argv.slice(2), out = console.log } = {}) {
+async function runSqliteMigration({ service, sqlite, directUrl, migrations, tables = {}, skipSource = [], argv = process.argv.slice(2), out = console.log } = {}) {
     const { createDb, importSqlite } = require('./index');
     const opt = (name) => { const i = argv.indexOf(`--${name}`); return i >= 0 ? argv[i + 1] : null; };
     const flag = (name) => argv.includes(`--${name}`);
@@ -82,7 +82,7 @@ async function runSqliteMigration({ service, sqlite, directUrl, migrations, tabl
         await owner.migrate({ dir: migrations, log: quiet });
         const t0 = Date.now();
         const options = await cleaningOptions(owner, tables);
-        const report = await importSqlite({ sqlite: file, db: owner, truncate: true, tables: options.tables, log: quiet });
+        const report = await importSqlite({ sqlite: file, db: owner, truncate: true, tables: options.tables, skipSource, log: quiet });
         const cleaned = options.cleaned();
         if (flag('json')) out(JSON.stringify({ sqlite: file, into: owner.store, ...report, cleaned }, null, 2));
         else {

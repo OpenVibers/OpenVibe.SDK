@@ -15,10 +15,13 @@
  */
 function toPg(sql) {
     // The one trigger shape services use: a row that must never change (BEFORE UPDATE/DELETE … RAISE(ABORT, msg)).
-    sql = sql.replace(/CREATE TRIGGER(?: IF NOT EXISTS)? (\w+) BEFORE (UPDATE(?: OF [\w\s,]+?)?|DELETE) ON (\w+)\s+BEGIN SELECT RAISE\(ABORT, '([^']*)'\); END;/g,
-        (m, name, op, table, msg) => `CREATE FUNCTION ${name}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION '${msg}'; END $$;\n`
-            + `CREATE TRIGGER ${name} BEFORE ${op.replace(/\s+/g, ' ')} ON ${table} FOR EACH ROW EXECUTE FUNCTION ${name}();`);
-    if (sql.split(';').some((st) => /CREATE\s+TRIGGER/i.test(st) && !/FOR EACH ROW EXECUTE FUNCTION/.test(st))) {
+    // With an optional WHEN condition (x IS NOT y between OLD and NEW becomes IS DISTINCT FROM).
+    sql = sql.replace(/CREATE TRIGGER(?: IF NOT EXISTS)? (\w+) BEFORE (UPDATE(?: OF [\w\s,]+?)?|DELETE) ON (\w+)(?:\s+WHEN ([\s\S]+?))?\s+BEGIN SELECT RAISE\(ABORT, '([^']*)'\); END;/g,
+        (m, name, op, table, when, msg) => `CREATE FUNCTION ${name}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION '${msg}'; END $$;\n`
+            + `CREATE TRIGGER ${name} BEFORE ${op.replace(/\s+/g, ' ')} ON ${table} FOR EACH ROW`
+            + (when ? ` WHEN (${when.replace(/\s+/g, ' ').replace(/ IS NOT (OLD|NEW)\./g, ' IS DISTINCT FROM $1.')})` : '')
+            + ` EXECUTE FUNCTION ${name}();`);
+    if (sql.split(';').some((st) => /CREATE\s+TRIGGER/i.test(st) && !/FOR EACH ROW[\s\S]*EXECUTE FUNCTION/.test(st))) {
         throw new Error('sqlite-schema-to-pg: a trigger other than the immutable-row shape needs writing as PL/pgSQL by hand');
     }
     // COLLATE NOCASE: in an index, the index is on lower(col) (queries compare lower(col) too: sqlfix.py); on a column
@@ -26,6 +29,8 @@ function toPg(sql) {
     sql = sql.replace(/(CREATE (?:UNIQUE )?INDEX[^;]*?\()([^;]*?)\)/g, (m, head, cols) => head + cols.replace(/(\w+) COLLATE NOCASE/g, 'lower($1)') + ')');
     if (/^\s*\w+\s+TEXT\b[^\n]*COLLATE NOCASE[^\n]*UNIQUE|UNIQUE[^\n]*COLLATE NOCASE/m.test(sql)) throw new Error('sqlite-schema-to-pg: a case-insensitive UNIQUE column needs a unique index on lower(col), by hand');
     sql = sql.replace(/^(\s*\w+\s+TEXT\b[^\n]*?) COLLATE NOCASE/gm, '$1');
+    // Column names PostgreSQL reserves (SQLite does not) are quoted: a column definition, and inside index/unique lists.
+    sql = sql.replace(/^(\s*)(window|user)(\s+[A-Z])/gm, '$1"$2"$3').replace(/([(,]\s*)(window|user)(\s*[,)])/g, '$1"$2"$3');
     return sql
         .replace(/\bINTEGER PRIMARY KEY AUTOINCREMENT\b/g, 'bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY')
         // A bare INTEGER PRIMARY KEY is SQLite's rowid: code may insert without it or with an explicit value.
@@ -34,10 +39,10 @@ function toPg(sql) {
         .replace(/CREATE TABLE IF NOT EXISTS/g, 'CREATE TABLE')
         .replace(/\)\s*WITHOUT ROWID\s*;/g, ');')
         .replace(/CREATE VIEW IF NOT EXISTS/g, 'CREATE VIEW')
-        .replace(/^(\s*\w+\s+)TEXT\b/gm, '$1text COLLATE "C"')
-        .replace(/^(\s*\w+\s+)INTEGER\b/gm, '$1bigint')
-        .replace(/^(\s*\w+\s+)REAL\b/gm, '$1double precision')
-        .replace(/^(\s*\w+\s+)BLOB\b/gm, '$1bytea');
+        .replace(/^(\s*"?\w+"?\s+)TEXT\b/gm, '$1text COLLATE "C"')
+        .replace(/^(\s*"?\w+"?\s+)INTEGER\b/gm, '$1bigint')
+        .replace(/^(\s*"?\w+"?\s+)REAL\b/gm, '$1double precision')
+        .replace(/^(\s*"?\w+"?\s+)BLOB\b/gm, '$1bytea');
 }
 
 module.exports = { toPg };

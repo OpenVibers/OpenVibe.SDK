@@ -61,7 +61,14 @@ function analyse(file, src, cfg, asyncNames) {
     const syncStoreMethods = new Set(cfg.syncStoreMethods || []);
     const apis = cfg.apis || {};
     const syncNames = new Set(cfg.syncNames || []);
-    const localAsync = asyncNames.local.get(file) || new Set();
+    const localAsync = new Set(asyncNames.local.get(file) || []);
+    // const view = ops.providerView: an alias of an async module method is async too.
+    walk.full(ast, (n) => {
+        if (n.type !== 'VariableDeclarator' || n.id.type !== 'Identifier' || !n.init || n.init.type !== 'MemberExpression' || n.init.computed) return;
+        const holder = n.init.object.type === 'Identifier' ? n.init.object.name : null;
+        const set = holder && apis[holder] ? asyncNames.api.get(apis[holder]) : null;
+        if (set && set.has(n.init.property.name) && !syncNames.has(n.init.property.name)) localAsync.add(n.id.name);
+    });
 
     // Names that hold a prepared statement: const x = db.prepare(...), or { x: db.prepare(...) }.
     const stmtNames = new Set();
@@ -141,10 +148,16 @@ function analyse(file, src, cfg, asyncNames) {
         if (call.callee.property.name !== 'map') { manual.push(`${file}:${call.loc.start.line}: a .${call.callee.property.name}() callback becomes async`); return; }
         if (inPromiseArg(call) || wrappedMaps.has(call)) return;
         wrappedMaps.add(call);
-        edits.push({ at: call.start, text: '(await Promise.all(' });
-        edits.push({ at: call.end, text: '))' });
+        edits.push({ at: call.start, text: '(await Promise.all(', depth: 1 });
+        edits.push({ at: call.end, text: '))', depth: 1 });
         makeAsync([...anc].reverse().find((x) => x !== fn && isFnN(x)));
     }
+    // registry[k.list](): a computed call on a module API cannot be resolved here; a person awaits it if needed.
+    walk.full(ast, (n) => {
+        if (n.type !== 'CallExpression' || n.callee.type !== 'MemberExpression' || !n.callee.computed || n.callee.object.type !== 'Identifier' || !apis[n.callee.object.name]) return;
+        const p = ancestors.get(n) || []; const up = p[p.length - 1];
+        if (!(up && up.type === 'AwaitExpression')) manual.push(`${file}:${n.loc.start.line}: computed call ${n.callee.object.name}[…]() on a module API: await it if the method is async`);
+    });
     // An async callback already there whose map result is not awaited as a whole is almost always a bug.
     walk.full(ast, (n) => {
         if (n.type === 'CallExpression' && n.callee.type === 'MemberExpression' && n.callee.property.name === 'map' && isFnN(n.arguments[0]) && n.arguments[0].async && !inPromiseArg(n)) {
@@ -172,8 +185,8 @@ function analyse(file, src, cfg, asyncNames) {
         const outer = [...p].reverse().find(isFnNode);
         if (n.callee.property.name === 'map' && outer && !wrappedMaps.has(n)) {
             wrappedMaps.add(n);
-            edits.push({ at: n.start, text: '(await Promise.all(' });
-            edits.push({ at: n.end, text: '))' });
+            edits.push({ at: n.start, text: '(await Promise.all(', depth: 1 });
+            edits.push({ at: n.end, text: '))', depth: 1 });
             makeAsync(outer);
             return;
         }
@@ -212,8 +225,8 @@ function analyse(file, src, cfg, asyncNames) {
                 if (fnParent.callee.property.name === 'map' && outer) {
                     if (!wrappedMaps.has(fnParent)) {
                         wrappedMaps.add(fnParent);
-                        edits.push({ at: fnParent.start, text: '(await Promise.all(' });
-                        edits.push({ at: fnParent.end, text: '))' });
+                        edits.push({ at: fnParent.start, text: '(await Promise.all(', depth: 1 });
+                        edits.push({ at: fnParent.end, text: '))', depth: 1 });
                         makeAsync(outer);
                     }
                 } else {
@@ -244,7 +257,13 @@ function analyse(file, src, cfg, asyncNames) {
 
 function apply(src, edits) {
     // At one position, closing text goes in first so it ends up after what opens there.
-    const sorted = edits.slice().sort((a, b) => b.at - a.at || ((a.text[0] === ')' ? 0 : 1) - (b.text[0] === ')' ? 0 : 1)));
+    // At one position: closers go in before openers (so an opener ends up left of a closer), an outer closer before an
+    // inner one (it ends up right of it), an inner opener before an outer one (the outer ends up leftmost). A
+    // (await Promise.all( wrap is outer (depth 1) to the await of the call it starts with (depth 0).
+    const closer = (e) => e.text[0] === ')';
+    const sorted = edits.slice().sort((a, b) => b.at - a.at
+        || (closer(a) ? 0 : 1) - (closer(b) ? 0 : 1)
+        || (closer(a) ? (b.depth || 0) - (a.depth || 0) : (a.depth || 0) - (b.depth || 0)));
     let out = src;
     for (const e of sorted) out = out.slice(0, e.at) + e.text + out.slice(e.at);
     return out;

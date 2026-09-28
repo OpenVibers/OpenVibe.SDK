@@ -43,10 +43,15 @@ for p in files:
         i = s.index('INSERT OR IGNORE INTO'); q = s[i - 1] if s[i - 1] in '\'"`' else '`'
         j = s.index(q, i)
         s = s[:i] + 'INSERT INTO' + s[i + len('INSERT OR IGNORE INTO'):j] + ' ON CONFLICT DO NOTHING' + s[j:]
+    s = re.sub(r'(\w+\((?:[^()]|\([^()]*\))*\)) COLLATE NOCASE', r'lower(\1)', s)   # an expression: COALESCE(a, b) COLLATE NOCASE
     s = re.sub(r'([\w.]+) COLLATE NOCASE', r'lower(\1)', s)
     s = re.sub(r'(?<![IN\w])LIKE (?=[@?:$\'(]|[a-z])', 'ILIKE ', s)
     s = s.replace('json_each(?)', 'jsonb_array_elements_text(?::jsonb)')
     s = re.sub(r'\bIFNULL\(', 'COALESCE(', s)
+    # assert.throws(() => db.prepare(…).run(…), re): the statement rejects now.
+    s = re.sub(r"assert\.throws\(\(\) => ((?:t\.)?[\w.]*db\.prepare\((?:[^()]|\([^()]*\))*\)\.(?:run|get|all)\((?:[^()]|\([^()]*\))*\)), ", r"await assert.rejects(\1, ", s)
+    # A jsonb column (the SDK outbox's envelope) comes back as an object.
+    s = re.sub(r"JSON\.parse\((\w+)\.envelope\)", r"(typeof \1.envelope === 'string' ? JSON.parse(\1.envelope) : \1.envelope)", s)
     # db.transaction(fn)() → db.tx(fn) (balanced parentheses; the codemod then awaits it and makes fn async).
     out, i = [], 0
     while True:
@@ -60,6 +65,13 @@ for p in files:
         else:
             out.append(s[i:k]); i = k
     s = ''.join(out)
+    # Column names PostgreSQL reserves (SQLite does not): quoted inside SQL string literals ("window", "user").
+    def quote_reserved(lit):
+        body = lit.group(0)
+        if not re.search(r'\b(SELECT|INSERT|UPDATE|DELETE|CREATE)\b', body): return body
+        q = '\\"' if body[0] == '"' else '"'   # inside a double-quoted JS string the quotes are escaped
+        return re.sub(r"(?<![.\w\"$\\'])(window|user)(?![\w\"(\\'])", lambda m: q + m.group(1) + q, body)
+    s = re.sub(r'`[^`]*`|\'(?:[^\'\\\n]|\\.)*\'|"(?:[^"\\\n]|\\.)*"', quote_reserved, s)
     # better-sqlite3's db.inTransaction was a property; openvibe-sdk/db's is a function.
     s = re.sub(r'\b(db|this\.db|store\.db)\.inTransaction\b(?!\s*\()', r'\1.inTransaction()', s)
     # ON CONFLICT … DO UPDATE SET x = x + 1 / COALESCE(excluded.x, x): a bare column on the right is ambiguous in

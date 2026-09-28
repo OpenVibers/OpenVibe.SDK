@@ -53,11 +53,14 @@ if m:
     s = s.replace('function createApp(opts = {}) {', 'async function createApp(opts = {}) {', 1)
     open('server/app.js', 'w').write(s); print('app store')
 # limits + valkey
-edit('server/http/actor-limits.js', [
-    ("const { createActorLimiter, defaultActor } = require('openvibe-sdk/limits');", "const { createActorLimiter, createValkeyLimitStore, defaultActor } = require('openvibe-sdk/limits');"),
-    ("function createActorLimits({ config, now = () => Date.now(), registry = null, log = console }) {", "function createActorLimits({ config, now = () => Date.now(), registry = null, log = console, valkey = null }) {"),
-    ("        now,\n", "        now,\n        // Shared across processes on Valkey (ADR-035) when VALKEY_URL is set; in-process otherwise.\n        ...(valkey ? { store: createValkeyLimitStore(valkey) } : {}),\n"),
-])
+if os.path.exists('server/http/actor-limits.js'):
+    s = open('server/http/actor-limits.js').read(); o = s
+    if 'createValkeyLimitStore' not in s:
+        s = re.sub(r"const \{ createActorLimiter(, defaultActor)? \} = require\('openvibe-sdk/limits'\);",
+                   lambda m: "const { createActorLimiter, createValkeyLimitStore" + (m.group(1) or '') + " } = require('openvibe-sdk/limits');", s, 1)
+        s = re.sub(r"(function createActorLimits\(\{[^)]*?)( \}\) \{)", lambda m: m.group(1) + ', valkey = null' + m.group(2), s, 1)
+        s = s.replace("        now,\n", "        now,\n        // Shared across processes on Valkey (ADR-035) when VALKEY_URL is set; in-process otherwise.\n        ...(valkey ? { store: createValkeyLimitStore(valkey) } : {}),\n", 1)
+    if s != o: open('server/http/actor-limits.js', 'w').write(s); print('edited server/http/actor-limits.js')
 s = open('server/app.js').read()
 m = re.search(r"    ctx\.(limits|actorLimits) = createActorLimits\(\{ config, now: opts\.limitsNow \|\| \(\(\) => Date\.now\(\)\), registry: metrics\.registry, log \}\);", s)
 if m:
@@ -154,7 +157,7 @@ const {{ MIGRATIONS }} = require('../server/db');
 const TABLES = {{}};
 
 if (require.main === module) {{
-    const config = configLib.load();
+    const config = (configLib.load || configLib.loadConfig)();
     runSqliteMigration({{ service: '{svc}', sqlite: config.dbPath, directUrl: config.db.directUrl, migrations: MIGRATIONS, tables: TABLES }})
         .then((code) => process.exit(code), (err) => {{ console.error(`migrate-to-postgres failed: ${{err.message}}`); process.exit(1); }});
 }}

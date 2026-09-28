@@ -45,8 +45,8 @@ python3 g1pass.py <svc> <Name> <ENV>          # package pins, config, outbox, li
 npm install
 node gen-migration.js <Name> --publishing …   # migrations/0001_initial.sql from the SQLite SCHEMA
 python3 g1db.py <svc> <Name>                   # server/db.js: openDb / createStore / openStore
-node asyncify.js --config <svc>.json …         # await everything; wraps .map(async …) in Promise.all
-python3 sqlfix.py                              # the SQL rewrites, and CHECK lines for a person
+python3 sqlfix.py                              # the SQL rewrites (db.transaction(fn)() → db.tx(fn) too), and CHECK lines
+node asyncify.js --config <svc>.json …         # then await everything (db.tx included); wraps .map(async …) in Promise.all
 npm test && npm run test:pg                    # then rehearse: scripts/migrate-to-postgres.js --sqlite <copy> --pglite
 python3 g1docs.py <svc> <Name> <ENV>           # README and STATUS.json
 ```
