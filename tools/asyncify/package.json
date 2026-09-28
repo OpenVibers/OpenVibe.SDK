@@ -1,0 +1,10 @@
+{
+  "name": "openvibe-asyncify",
+  "private": true,
+  "description": "The mechanical half of moving a service from better-sqlite3 to openvibe-sdk/db (ADR-035). Not part of the published SDK package.",
+  "license": "MIT",
+  "dependencies": {
+    "acorn": "^8.15.0",
+    "acorn-walk": "^8.3.4"
+  }
+}

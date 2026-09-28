@@ -1,0 +1,58 @@
+{
+  "stores": [
+    "revisions",
+    "citations",
+    "taxonomy",
+    "scheduler",
+    "attachments",
+    "discussion",
+    "reviews",
+    "redirects",
+    "sequencer",
+    "outbox"
+  ],
+  "syncStoreMethods": [
+    "start",
+    "stop",
+    "slugify",
+    "enabled"
+  ],
+  "apis": {
+    "blogs": "server/domain/blogs.js",
+    "posts": "server/domain/posts.js",
+    "publication": "server/domain/publication.js",
+    "reading": "server/domain/reading.js",
+    "access": "server/domain/access.js",
+    "aiDrafts": "server/domain/ai-drafts.js",
+    "changelog": "server/changelog.js",
+    "effects": "server/domain/effects.js",
+    "people": "server/clients/network.js",
+    "worker": "server/worker.js",
+    "entitlements": "server/domain/access.js",
+    "ctx": "server/app.js",
+    "cl": "server/changelog.js"
+  },
+  "syncNames": [
+    "validHandle",
+    "themeVars",
+    "categoryVocabulary",
+    "actorRef",
+    "listOf",
+    "truthy",
+    "encodeCursor",
+    "decodeCursor",
+    "batchKey",
+    "subjectOf",
+    "start",
+    "stop"
+  ],
+  "asyncGlobals": [
+    "seedOfficialPost"
+  ],
+  "bareStores": [
+    "outbox"
+  ],
+  "asyncMethods": [
+    "events"
+  ]
+}
