@@ -20,6 +20,7 @@ const ENTRIES = {
     'identity.mjs': '../src/identity.js',
     'modules.mjs': '../src/modules.js',
     'events.mjs': '../src/events.js',
+    'sso.mjs': '../src/sso/index.js',
     'realtime.mjs': '../src/realtime.js',
     'media.mjs': '../src/media.js',
     'community.mjs': '../src/community.js',

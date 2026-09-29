@@ -173,4 +173,41 @@ export interface PgInbox {
 export declare function createPgInbox(db: import('./db').Db, opts?: { table?: string; now?: () => number }): PgInbox;
 /** DDL for a service migration. */
 export declare function outboxSchema(table?: string): string;
+export interface ServiceOutboxOptions {
+    db: import('./db').Db;
+    /** The service id and event source, e.g. 'trade'. */
+    source: string;
+    /** The relay runs only with eventsUrl and clientSecret; otherwise rows wait and status().enabled is false. */
+    eventsUrl?: string | null;
+    networkInternalUrl?: string;
+    clientId?: string | null;
+    clientSecret?: string | null;
+    table?: string;
+    intervalMs?: number;
+    now?: () => number;
+    fetch?: import('./core').FetchLike;
+    log?: Pick<Console, 'warn' | 'log'>;
+    /** emit refuses a type not in this list. */
+    eventTypes?: string[] | null;
+    /** emit refuses an envelope this rejects (e.g. openvibe-contracts validate). */
+    validate?: ((envelope: EventEnvelope) => { valid: boolean; errors?: Array<{ path?: string; message?: string }> }) | null;
+    autoDiscover?: boolean;
+    /** false: <source>.moderation.action withholds target.owner_subject. */
+    moderationOwnerSubject?: boolean;
+}
+export interface ServiceOutbox {
+    /** Inside the change's ambient openvibe-sdk/db transaction. */
+    emit(envelope: EventInput, opts?: { traceparent?: string }): Promise<EventEnvelope>;
+    emitIn(t: import('./db').Tx, envelope: EventInput, opts?: { traceparent?: string }): Promise<EventEnvelope>;
+    /** <source>.moderation.action. */
+    moderationAction(input: { action: string; target: { type: string; id: string | number; owner_subject?: string | null; [k: string]: unknown }; actorSubject?: string | null; reason?: string | null; details?: Record<string, unknown> }, opts?: { traceparent?: string }): Promise<EventEnvelope>;
+    outbox: PgOutbox;
+    events: EventsClient;
+    enabled: boolean;
+    start(): void;
+    stop(): Promise<unknown>;
+    kick(): Promise<void>;
+    status(): Promise<{ enabled: boolean; pending: number | null; rejected: number | null; last_error: string | null }>;
+}
+export declare function createServiceOutbox(opts: ServiceOutboxOptions): ServiceOutbox;
 export declare function inboxSchema(table?: string): string;

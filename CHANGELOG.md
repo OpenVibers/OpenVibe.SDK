@@ -8,6 +8,20 @@ release may change an API and says so here.
 
 
 
+## 0.25.0 (2026-09-29)
+
+- `openvibe-sdk/sso` (new, server): `createSsoClient({ site, baseUrl, clientId, clientSecret, networkUrl, networkInternalUrl,
+  secureCookies })` → `router(express)` (`/login`, `/callback`, `/fedcm`, `/logout`, `/me`, `/refresh`), `optionalAuth()`,
+  `requireAuth()`, `verify()`, `extractToken()`. A product site's sign-in with OpenVibe.Network in one call: state and PKCE
+  S256 on every sign-in, the code exchanged server-side, `next` limited to this site and the Network, offline verification
+  through the shared JWKS client. Replaces the copies in Blog, Coupons, Deals, Host, News and Trade (plan T1).
+- `openvibe-sdk/events` `createServiceOutbox({ db, source, eventsUrl, clientId, clientSecret, eventTypes, validate })`: a
+  service's events outbox in one call around `createPgOutbox` (`emit` joins the change's transaction, `emitIn(t, …)`,
+  `moderationAction`, `start`/`stop`/`kick`/`status`); the relay is off, and says so, without the events URL or the
+  client secret. Replaces the wrapper nine services copied (plan T1).
+- No floating promises (plan T0): the Valkey queue logs a job whose run rejects outside its handler (a malformed stream
+  entry was an unhandled rejection), and the mock jobs service fails a job whose background run throws.
+
 ## 0.24.0 (2026-09-29)
 
 - `openvibe-sdk/auth` `verifyServiceToken(token, { jwks | publicKey, issuer, audience, contracts, acceptSandbox, log })`:
