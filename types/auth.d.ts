@@ -143,8 +143,8 @@ export interface ContractsForServiceTokens {
 }
 export type ServiceTokenResult = { ok: true; claims: Record<string, unknown> } | { ok: false; code: string; reason: string };
 export interface VerifyServiceTokenOptions {
-    /** A JWKS URL (the process-wide client: last good keys, rotation, backoff) or a JWKS document. */
-    jwks?: string | { keys?: object[]; public_key?: string } | null;
+    /** A JWKS URL (the process-wide client: last good keys, rotation, backoff), a JWKS client the service already holds, or a JWKS document. */
+    jwks?: string | JwksClient | { keys?: object[]; public_key?: string } | null;
     /** A pinned PEM instead of a JWKS. */
     publicKey?: string | object | null;
     issuer?: string;

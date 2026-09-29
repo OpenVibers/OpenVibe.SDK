@@ -1,6 +1,6 @@
 'use strict';
 /**
- * verifyServiceToken(token, { jwks (a URL or a JWKS document) | publicKey, issuer, audience, contracts, acceptSandbox, log })
+ * verifyServiceToken(token, { jwks (a URL, a jwksClient or a JWKS document) | publicKey, issuer, audience, contracts, acceptSandbox, log })
  *   → { ok: true, claims } | { ok: false, code, reason }
  *
  * A Network service or app token (identity.service-token-claims@1), for a service that receives them. The SDK
@@ -31,7 +31,9 @@ async function verifyServiceToken(token, { jwks = null, publicKey = null, issuer
     const kid = headerKid(token);
     let keys;
     try {
-        keys = typeof jwks === 'string' ? await jwksClient(jwks, { log, ...(fetchImpl ? { fetch: fetchImpl } : {}) }).keysForKid(kid) : keysFromJwks(jwks);
+        keys = typeof jwks === 'string' ? await jwksClient(jwks, { log, ...(fetchImpl ? { fetch: fetchImpl } : {}) }).keysForKid(kid)
+            : typeof jwks.keysForKid === 'function' ? await jwks.keysForKid(kid)      // a client the service already holds
+                : keysFromJwks(jwks);
     } catch (err) {
         try { (log && (log.warn || log.error) || (() => {})).call(log, `[openvibe-sdk] service token not verified: ${(err && err.message) || err}`); } catch { /* */ }
         return { ok: false, code: 'token.unavailable', reason: 'signing key not loaded yet' };

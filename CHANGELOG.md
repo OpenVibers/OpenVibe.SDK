@@ -8,6 +8,12 @@ release may change an API and says so here.
 
 
 
+## 0.25.1 (2026-09-29)
+
+- `verifyServiceToken({ jwks })` also takes a JWKS client the service already holds (`jwksClient(url)`, or one a test
+  injects), so a service that built one for `openvibe-sdk/sso` verifies service tokens with the same keys, chosen by
+  `kid`, instead of taking the first key itself.
+
 ## 0.25.0 (2026-09-29)
 
 - `openvibe-sdk/sso` (new, server): `createSsoClient({ site, baseUrl, clientId, clientSecret, networkUrl, networkInternalUrl,

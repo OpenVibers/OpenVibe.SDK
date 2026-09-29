@@ -52,6 +52,15 @@ run([
             assert.equal(hits, 1);
         } finally { srv.close(); }
     }],
+    ['a JWKS client the service already holds: the key its kid names', async () => {
+        const asked = [];
+        const client = { keysForKid: async (kid) => { asked.push(kid); return [{ kid: 'old', key: a.publicKey }, { kid: 'new', key: b.publicKey }]; } };
+        assert.equal((await verifyServiceToken(sign(svc(), b.privateKey, 'new'), opts({ jwks: client }))).ok, true);
+        assert.equal((await verifyServiceToken(sign(svc(), stranger.privateKey, 'new'), opts({ jwks: client }))).code, 'token.bad_signature');
+        assert.deepEqual(asked, ['new', 'new']);
+        const down = { keysForKid: async () => { throw new Error('http://10.0.0.1/jwks unreachable'); } };
+        assert.deepEqual(Object.values(await verifyServiceToken(sign(svc(), b.privateKey, 'new'), opts({ jwks: down }))), [false, 'token.unavailable', 'signing key not loaded yet']);
+    }],
     ['misuse is a TypeError: no contracts module, no audience, no key source', async () => {
         await assert.rejects(verifyServiceToken('x.y.z', { jwks: doc, audience: 'openvibe.media' }), TypeError);
         await assert.rejects(verifyServiceToken('x.y.z', { jwks: doc, contracts }), TypeError);
