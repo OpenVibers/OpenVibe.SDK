@@ -35,7 +35,10 @@ function subscribe(topics, onEvent, opts = {}) {
     const fetchImpl = opts.fetch || (typeof globalThis.fetch === 'function' ? globalThis.fetch.bind(globalThis) : null);
     const ES = opts.EventSource !== undefined ? opts.EventSource : globalThis.EventSource;
 
-    const state = { lastSeq: lastEventId != null && lastEventId !== '' ? Number(lastEventId) : null, closed: false, transport: null, connected: false };
+    // The position to resume from is the last SSE id as Events sent it: an opaque cursor (ADR-042) or, from an older
+    // Events, a bare seq. Dedupe compares the numeric seq the message data carries.
+    const initial = lastEventId != null && lastEventId !== '' ? String(lastEventId) : null;
+    const state = { lastId: initial, lastSeq: initial != null && /^\d+$/.test(initial) ? Number(initial) : null, closed: false, transport: null, connected: false };
     const stop = new AbortController();
     let es = null;
     let retryMs = reconnectDelayMs;
@@ -53,11 +56,12 @@ function subscribe(topics, onEvent, opts = {}) {
         if (type !== 'message' || !data) return;
         let msg;
         try { msg = JSON.parse(data); } catch { report(new OpenVibeError({ code: 'sdk.bad_response', message: 'realtime: undecodable message' })); return; }
-        const seq = Number(id !== undefined && id !== '' ? id : msg && msg.seq);
+        const seq = Number(msg && msg.seq != null ? msg.seq : id);
         if (Number.isFinite(seq)) {
             if (state.lastSeq != null && seq <= state.lastSeq) return;      // already delivered
             state.lastSeq = seq;
         }
+        if (id !== undefined && id !== '') state.lastId = String(id);
         try { onEvent(msg && msg.event, { seq }); } catch (err) { report(err); }
     }
 
@@ -91,7 +95,7 @@ function subscribe(topics, onEvent, opts = {}) {
             stop.signal.addEventListener('abort', abort, { once: true });
             try {
                 const headers = { Accept: 'text/event-stream', 'Cache-Control': 'no-cache' };
-                if (state.lastSeq != null) headers['Last-Event-ID'] = String(state.lastSeq);
+                if (state.lastId != null) headers['Last-Event-ID'] = state.lastId;
                 const t = await bearer();
                 if (t) headers.Authorization = `Bearer ${t}`;
                 const init = { headers, signal: ctrl.signal, cache: 'no-store' };
@@ -130,7 +134,7 @@ function subscribe(topics, onEvent, opts = {}) {
         const open = () => {
             if (state.closed) return;
             const target = new URL(u.toString());
-            if (state.lastSeq != null) target.searchParams.set('last_event_id', String(state.lastSeq));
+            if (state.lastId != null) target.searchParams.set('last_event_id', state.lastId);
             es = new ES(target.toString(), { withCredentials });
             es.onopen = () => { failures = 0; state.connected = true; if (onOpen) { try { onOpen(); } catch (err) { report(err); } } };
             es.onmessage = (m) => dispatch('message', m.data, m.lastEventId);
@@ -160,7 +164,7 @@ function subscribe(topics, onEvent, opts = {}) {
             stop.abort();
             if (es) { try { es.close(); } catch { /* already closed */ } }
         },
-        get lastEventId() { return state.lastSeq; },
+        get lastEventId() { return state.lastId; },
         get transport() { return state.transport; },
         get connected() { return state.connected; },
         get closed() { return state.closed; },

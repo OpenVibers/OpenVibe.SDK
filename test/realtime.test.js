@@ -40,8 +40,30 @@ run([
         assert.equal(connections[1].lastEventId, '2');
         assert.equal(connections[0].auth, 'Bearer user-jwt');
         assert.equal(new URL(connections[0].url, 'http://x').searchParams.get('topics'), 'live.stream.*,network.notification.*');
-        assert.equal(sub.lastEventId, 5);
+        assert.equal(sub.lastEventId, '5', 'the raw SSE id, as Events sent it');
         assert.equal(opens, 2);
+        sub.close();
+        await sub.done;
+        await srv.close();
+    }],
+
+    ['cursor ids (ADR-042): resumes with the cursor Events sent, dedupes on the seq in the data', async () => {
+        const cur = (seq) => `c1.0.${Buffer.from([seq]).toString('base64url')}`;
+        const cframe = (seq) => `id: ${cur(seq)}\ndata: ${JSON.stringify({ seq, event: { event_type: 'live.stream.started', event_id: `e${seq}` } })}\n\n`;
+        const seen = [];
+        const srv = await stubServer((req, res) => {
+            seen.push(req.headers['last-event-id']);
+            res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+            res.write('retry: 10\n\n');
+            if (seen.length === 1) { res.write(cframe(1)); res.write(cframe(2)); res.end(); }
+            else { res.write(cframe(2)); res.write(cframe(3)); }
+        });
+        const got = [];
+        const sub = subscribe('live.*', (event, { seq }) => got.push([seq, event.event_id]), { url: srv.url, token: 't', reconnectDelayMs: 10 });
+        await waitFor(() => got.length === 3);
+        assert.deepEqual(got, [[1, 'e1'], [2, 'e2'], [3, 'e3']], 'the replayed event is not delivered twice');
+        assert.equal(seen[1], cur(2), 'the reconnect resumes from the cursor');
+        assert.equal(sub.lastEventId, cur(3));
         sub.close();
         await sub.done;
         await srv.close();

@@ -23,7 +23,8 @@ export interface SubscribeOptions {
 }
 export interface RealtimeSubscription {
     close(): void;
-    readonly lastEventId: number | null;
+    /** The last SSE id as Events sent it: an opaque cursor (ADR-042), or a seq from an older Events. Save it to resume. */
+    readonly lastEventId: string | null;
     readonly transport: 'eventsource' | 'fetch';
     readonly connected: boolean;
     readonly closed: boolean;

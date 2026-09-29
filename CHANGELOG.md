@@ -8,6 +8,13 @@ release may change an API and says so here.
 
 
 
+## 0.25.2 (2026-09-29)
+
+- `openvibe-sdk/realtime` follows Events' opaque cursors (ADR-042): it resumes from the last SSE id exactly as Events
+  sent it (a cursor, or a seq from an older Events) and dedupes on the `seq` in the message data. With cursor ids the
+  previous release parsed the id as a number, so its resume position and repeat filter stopped advancing.
+  `subscription.lastEventId` is now that raw id (a string).
+
 ## 0.25.1 (2026-09-29)
 
 - `verifyServiceToken({ jwks })` also takes a JWKS client the service already holds (`jwksClient(url)`, or one a test
