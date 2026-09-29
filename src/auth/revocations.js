@@ -28,6 +28,7 @@ function createRevocationStore(db = null, { table = 'ov_token_revocations', now 
     let q = null;
     function ready() {
         if (!db || q) return q;
+        // floating-ok: better-sqlite3 db.exec is synchronous
         db.exec(`CREATE TABLE IF NOT EXISTS ${table} (
             subject_id     TEXT PRIMARY KEY,
             valid_after_ms INTEGER NOT NULL,

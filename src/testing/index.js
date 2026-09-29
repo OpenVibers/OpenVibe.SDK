@@ -565,6 +565,7 @@ function createMockPlatform(opts = {}) {
         let conn;
         const body = new ReadableStream({
             start(controller) {
+                // floating-ok: controller.enqueue is synchronous
                 const send = (s) => { try { controller.enqueue(enc.encode(s)); } catch { streams.delete(conn); } };
                 conn = {
                     lastSeq: last ?? lastSeq,

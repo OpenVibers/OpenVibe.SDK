@@ -101,7 +101,9 @@ function valkeyQueue(valkey, name, group, maxLen, log) {
                     continue;
                 }
                 if (!res) continue;
-                for (const [, entries] of res) for (const [id, raw] of entries) run(id, raw);
+                // Fire-and-forget on purpose (concurrency is bounded by `active`); a malformed entry
+                // (raw null) rejects in fieldsOf(), so log it instead of leaving an unhandled rejection.
+                for (const [, entries] of res) for (const [id, raw] of entries) run(id, raw).catch((err) => log.warn(`[queue ${name}] job ${id} failed outside the handler: ${err.message}`));
             }
         }
 
@@ -110,7 +112,7 @@ function valkeyQueue(valkey, name, group, maxLen, log) {
             if (stopped || active >= concurrency) return;
             try {
                 const [, entries] = await c.xautoclaim(key, group, consumer, visibilityMs, '0-0', 'COUNT', Math.max(1, concurrency - active));
-                for (const [id, raw] of entries || []) if (raw) run(id, raw);
+                for (const [id, raw] of entries || []) if (raw) run(id, raw).catch((err) => log.warn(`[queue ${name}] reclaimed job ${id} failed outside the handler: ${err.message}`));
             } catch { /* the next tick tries again */ }
         }, Math.max(1000, Math.floor(visibilityMs / 2)));
         promote.unref(); reclaim.unref();

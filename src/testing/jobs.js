@@ -148,7 +148,12 @@ function createJobsService(ctx) {
         jobs.set(job.id, job);
         if (key) idem.set(`${origin}|${owner}|${key}`, { id: job.id, hash });
         emit(job, 'job.queued');
-        runJob(job);
+        // The run goes to the background on purpose (the POST answers 202 while it works); a throw that
+        // escapes runJob must fail the job, never become an unhandled rejection in the host test.
+        runJob(job).catch((err) => {
+            try { finish(job, 'failed', { error: problemBody(500, 'tools.job.failed', String((err && err.message) || err)) }); }
+            catch { Object.assign(job, { state: 'failed', finishedAt: Date.now(), error: problemBody(500, 'tools.job.failed', String((err && err.message) || err)) }); }
+        });
         return { job, replayed: false };
     }
 
@@ -176,11 +181,13 @@ function createJobsService(ctx) {
                     push(e) {
                         if (e.seq <= conn.last) return;
                         conn.last = e.seq;
+                        // floating-ok: controller.enqueue is synchronous
                         try { controller.enqueue(enc.encode(`id: ${e.seq}\nevent: ${e.event}\ndata: ${JSON.stringify(e.data)}\n\n`)); } catch { streams.delete(conn); return; }
                         if (TERMINAL.has(e.data.state) && e.event !== 'job.progress') setImmediate(close);
                     },
                     close,
                 };
+                // floating-ok: controller.enqueue is synchronous
                 controller.enqueue(enc.encode(`retry: ${stepMs}\n\n`));
                 streams.add(conn);
                 for (const e of job.events) conn.push(e);

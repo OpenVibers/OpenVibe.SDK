@@ -63,6 +63,7 @@ function createOutbox(db, {
     let running = false;
 
     function ensureSchema() {
+        // floating-ok: better-sqlite3 db.exec is synchronous
         db.exec(`CREATE TABLE IF NOT EXISTS ${table} (
             id              INTEGER PRIMARY KEY AUTOINCREMENT,
             event_id        TEXT NOT NULL UNIQUE,
@@ -135,6 +136,7 @@ function createOutbox(db, {
                     stats.sent += s.sent; stats.failed += s.failed; stats.rejected += s.rejected;
                 }
             } else {
+                // floating-ok: markFailure here is the better-sqlite3 one above (synchronous .run)
                 for (const row of rows) markFailure(row, err);
                 if (isPermanent(err)) stats.rejected += rows.length; else stats.failed += rows.length;
             }
@@ -189,6 +191,7 @@ function createInbox(db, { table = 'idempotency_receipts', now = () => Date.now(
     let claim = null;
 
     function ensureSchema() {
+        // floating-ok: better-sqlite3 db.exec is synchronous
         db.exec(`CREATE TABLE IF NOT EXISTS ${table} (
             consumer     TEXT NOT NULL,
             event_id     TEXT NOT NULL,

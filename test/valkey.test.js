@@ -53,6 +53,36 @@ const tests = [
         assert.equal((await q.dead())[0].error, 'always');
         await w.stop();
     }],
+    ['valkey queue: a malformed stream entry is logged, never an unhandled rejection', async () => {
+        const warns = []; const unhandled = [];
+        const onUnhandled = (err) => unhandled.push(err);
+        process.on('unhandledRejection', onUnhandled);
+        let rejectRead = null;
+        const multi = () => { const m = {}; for (const fn of ['xack', 'xdel', 'xadd', 'zadd']) m[fn] = () => m; m.exec = async () => []; return m; };
+        let reads = 0;
+        const client = {
+            defineCommand() {}, ovQueuePromote: async () => 0, xgroup: async () => 'OK',
+            xautoclaim: async () => { throw new Error('nothing pending'); },
+            multi, set: async () => 'OK', zadd: async () => 1, xlen: async () => 0, zcard: async () => 0, xpending: async () => [0],
+        };
+        const reader = {
+            async xreadgroup() {
+                if (++reads === 1) return [['q:badentry', [['1-1', null]]]]; // ioredis gives null fields for an undecodable entry
+                await new Promise((resolve, reject) => { rejectRead = reject; });
+            },
+            disconnect() { if (rejectRead) rejectRead(new Error('disconnect')); },
+        };
+        const v = { client, key: (...p) => p.join(':'), duplicate: () => reader };
+        const q = createQueue({ valkey: v, name: 'badentry', log: { log() {}, warn: (m) => warns.push(m), error() {} } });
+        try {
+            const w = q.process(async () => { throw new Error('must not run'); }, { concurrency: 2, blockMs: 200 });
+            assert.ok(await until(async () => warns.length > 0), 'the malformed entry was logged');
+            assert.match(warns[0], /badentry.*1-1.*failed outside the handler/);
+            await sleep(100);
+            assert.deepEqual(unhandled, [], 'no unhandled rejection escaped the worker');
+            await w.stop();
+        } finally { process.off('unhandledRejection', onUnhandled); }
+    }],
     ['memory pubsub', async () => {
         const ps = createPubSub();
         const got = [];
