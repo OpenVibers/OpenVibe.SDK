@@ -63,6 +63,51 @@ export interface VerifyUserTokenOptions {
 }
 export declare function verifyUserToken(token: string, opts: VerifyUserTokenOptions): Promise<UserTokenClaims>;
 
+/** One JWKS key usable for RS256 verification. */
+export interface JwksKey { kid: string | null; key: import('node:crypto').KeyObject; }
+/** A JWKS client's state, for readiness endpoints. */
+export interface JwksStatus {
+    url: string;
+    /** Keys are loaded (possibly stale): tokens can be verified. */
+    ready: boolean;
+    keys: number;
+    fetchedAt: number | null;
+    /** Past the TTL; still served while a refresh runs or fails. */
+    stale: boolean;
+    failures: number;
+    lastError: string | null;
+    nextTryAt: number | null;
+}
+export interface JwksClientOptions {
+    fetch?: typeof fetch;
+    /** Receives state changes (first failure, recovery), never per request. */
+    log?: { warn?(msg: string): void; info?(msg: string): void; error?(msg: string): void; log?(msg: string): void } | null;
+    /** Fresh for this long (default 6 h); after it the last keys are served while one refresh runs. */
+    ttlMs?: number;
+    /** Unknown-kid refetches are spaced at least this far apart (default 30 s). */
+    minRefetchMs?: number;
+    timeoutMs?: number;
+    now?: () => number;
+}
+export interface JwksClient {
+    url: string;
+    /** The current keys: fresh ones, or the last good ones while a refresh runs or fails. */
+    keys(): Promise<JwksKey[]>;
+    /** Refetches when a token names a key the client does not have (a rotation), throttled. */
+    keysForKid(kid: string | null | undefined): Promise<JwksKey[]>;
+    refresh(): Promise<JwksKey[]>;
+    status(): JwksStatus;
+    /** Refresh in the background (an unref'd timer). */
+    start(opts?: { intervalMs?: number }): JwksClient;
+    stop(): void;
+}
+/** A new JWKS client (tests; services normally use jwksClient()). */
+export declare function createJwksClient(url: string, opts?: JwksClientOptions): JwksClient;
+/** The process-wide client for a JWKS URL (verifyUserToken/verifyAppToken share it). */
+export declare function jwksClient(url: string, opts?: JwksClientOptions): JwksClient;
+/** Every JWKS client this process uses, for /api/ready. */
+export declare function jwksStatus(): JwksStatus[];
+
 /** A developer app's token (identity.service-token-claims@1 with actor_type app). */
 export type AppTokenClaims = ServiceTokenClaims & {
     sub: `app:app_${string}`;
