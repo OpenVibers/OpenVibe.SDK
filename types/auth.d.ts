@@ -50,6 +50,8 @@ export interface UserTokenClaims {
     [claim: string]: unknown;
 }
 export interface VerifyUserTokenOptions {
+    /** Receives the JWKS client's state changes (the first failure, the recovery). */
+    log?: JwksClientOptions['log'];
     /** JWKS document, or its URL (fetched and cached 6 h, refetched on an unknown kid). */
     jwks?: { keys?: object[]; public_key?: string } | string;
     /** PEM string or a crypto KeyObject instead of a JWKS. */
@@ -120,6 +122,8 @@ export type AppTokenClaims = ServiceTokenClaims & {
     on_behalf_of?: string;
 };
 export interface VerifyAppTokenOptions {
+    /** Receives the JWKS client's state changes (the first failure, the recovery). */
+    log?: JwksClientOptions['log'];
     jwks?: { keys?: object[]; public_key?: string } | string;
     publicKey?: string | object;
     issuer?: string;

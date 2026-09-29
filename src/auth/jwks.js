@@ -29,7 +29,7 @@ const BACKOFF_MS = [1000, 2000, 4000, 8000, 16000, 32000, 64000, 128000, 300000]
 function keysFromJwks(doc) {
     const out = [];
     for (const jwk of (doc && Array.isArray(doc.keys) ? doc.keys : [])) {
-        if (jwk.kty !== 'RSA' || (jwk.use && jwk.use !== 'sig') || (jwk.alg && jwk.alg !== 'RS256')) continue;
+        if (!jwk || typeof jwk !== 'object' || jwk.kty !== 'RSA' || (jwk.use && jwk.use !== 'sig') || (jwk.alg && jwk.alg !== 'RS256')) continue;
         try { out.push({ kid: jwk.kid || null, key: crypto.createPublicKey({ key: jwk, format: 'jwk' }) }); } catch { /* skip unusable key */ }
     }
     if (!out.length && doc && typeof doc.public_key === 'string') {
@@ -83,6 +83,8 @@ function createJwksClient(url, { fetch: fetchImpl = globalThis.fetch, log = null
     async function keysForKid(kid) {
         const have = await keys();
         if (!kid || have.some((k) => k.kid === kid)) return have;
+        // A legacy document without kids (Network's public_key) can never name one: refetching would change nothing.
+        if (have.every((k) => k.kid == null)) return have;
         // An unknown kid: a rotation, or garbage. Unknown-kid refetches are spaced minRefetchMs apart, never inside a
         // backoff, and one already running is joined.
         if (st.inflight) return await st.inflight;

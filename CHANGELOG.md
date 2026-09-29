@@ -8,6 +8,14 @@ release may change an API and says so here.
 
 
 
+## 0.23.1 (2026-09-29)
+
+- The release version is whole again: `SDK_VERSION` and the browser bundle say 0.23.1 (0.23.0 shipped them at 0.22.0,
+  so version, bundle and pack tests failed on its tree).
+- JWKS: a malformed entry in `keys` (null, a non-object) is skipped instead of marking the whole key set failed; a
+  legacy document with only `public_key` no longer refetches every 30 s for a token that names a kid.
+- Types: `log` is declared on the verify options (it is passed to the JWKS client).
+
 ## 0.23.0 (2026-09-29)
 
 - **JWKS client** (`openvibe-sdk/auth`: `jwksClient(url, opts)`, `createJwksClient`, `jwksStatus()`), now behind `verifyUserToken`/`verifyAppToken` for a JWKS URL (plan T0/T1: one refresher instead of hand-written copies that swallowed errors). Keys stay fresh for 6 h; after that the last good keys are served while one refresh runs in the background, and a failed fetch keeps them and backs off (1 s doubling to 5 min) instead of rejecting sign-ins or hammering Network. A token with an unknown `kid` refetches at once (a rotation is honoured immediately); unknown-kid refetches are spaced 30 s apart, so a flood of made-up kids costs one fetch per 30 s. Only state changes are logged (`log` option: the first failure, the recovery). `status()` / `jwksStatus()` report readiness, staleness, failures and the next try for `/api/ready`; `start({ intervalMs })` refreshes in the background on an unref'd timer. Before: an expired cache plus a failed fetch rejected every token with 503, and each unknown kid forced a refetch.

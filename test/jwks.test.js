@@ -88,6 +88,17 @@ run([
         assert.equal(w.fetches, 3);
     }],
 
+    ['a malformed entry is skipped; a kid-less legacy document never refetches for a kid', async () => {
+        const w = world(); w.doc = { keys: [null, 'x', K1] };
+        const c = w.client();
+        assert.deepEqual(kids(await c.keys()), ['k1'], 'null and non-objects are skipped, the good key kept');
+        const { publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+        const w2 = world(); w2.doc = { public_key: publicKey.export({ type: 'spki', format: 'pem' }) };
+        const c2 = w2.client();
+        await c2.keysForKid('k1'); w2.t += 31_000; await c2.keysForKid('k1');
+        assert.equal(w2.fetches, 1, 'no refetch: a document without kids can never name one');
+    }],
+
     ['start() refreshes in the background without holding the process open', async () => {
         const w = world(), c = w.client();
         c.start({ intervalMs: 60_000 });
