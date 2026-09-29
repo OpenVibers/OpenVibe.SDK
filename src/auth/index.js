@@ -6,8 +6,9 @@
 const browser = require('./browser');
 const { createServiceTokenClient } = require('./tokens');
 const { verifyUserToken, verifyAppToken } = require('./jwt');
+const { verifyServiceToken } = require('./service');
 const { createJwksClient, jwksClient, jwksStatus } = require('./jwks');
 const { exchangeCode, refreshUserToken } = require('./oauth');
 const { createRevocationStore, createPgRevocationStore, revocationSchema, TOKEN_VALID_AFTER } = require('./revocations');
 
-module.exports = { ...browser, createServiceTokenClient, verifyUserToken, verifyAppToken, createJwksClient, jwksClient, jwksStatus, exchangeCode, refreshUserToken, createRevocationStore, createPgRevocationStore, revocationSchema, TOKEN_VALID_AFTER };
+module.exports = { ...browser, createServiceTokenClient, verifyUserToken, verifyAppToken, verifyServiceToken, createJwksClient, jwksClient, jwksStatus, exchangeCode, refreshUserToken, createRevocationStore, createPgRevocationStore, revocationSchema, TOKEN_VALID_AFTER };

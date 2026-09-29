@@ -137,6 +137,28 @@ export interface VerifyAppTokenOptions {
 }
 export declare function verifyAppToken(token: string, opts: VerifyAppTokenOptions): Promise<AppTokenClaims>;
 
+/** The subset of openvibe-contracts verifyServiceToken needs (pass the service's own pinned module). */
+export interface ContractsForServiceTokens {
+    serviceAuth: { verifyServiceToken(token: string, opts: { publicKey: unknown; issuer?: string; audience?: string; acceptSandbox?: boolean }): ServiceTokenResult };
+}
+export type ServiceTokenResult = { ok: true; claims: Record<string, unknown> } | { ok: false; code: string; reason: string };
+export interface VerifyServiceTokenOptions {
+    /** A JWKS URL (the process-wide client: last good keys, rotation, backoff) or a JWKS document. */
+    jwks?: string | { keys?: object[]; public_key?: string } | null;
+    /** A pinned PEM instead of a JWKS. */
+    publicKey?: string | object | null;
+    issuer?: string;
+    /** Required: the audience your service answers for (openvibe.<service>). */
+    audience: string;
+    /** Required: your pinned openvibe-contracts module; every token rule is its verifyServiceToken. */
+    contracts: ContractsForServiceTokens;
+    acceptSandbox?: boolean;
+    log?: JwksClientOptions['log'];
+    fetch?: FetchLike;
+}
+/** A service or app token: the SDK picks the key (the kid's, else each), your contracts module applies every rule. */
+export declare function verifyServiceToken(token: string, opts: VerifyServiceTokenOptions): Promise<ServiceTokenResult>;
+
 export interface UserTokenResponse {
     access_token: string;
     /** Absent for developer-app tokens: sign in again when they expire. */

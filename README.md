@@ -162,7 +162,7 @@ Until OpenVibe.Tools serves the gateway facade (Tools S6), point the jobs client
 | Subpath | Where | What |
 |---|---|---|
 | `openvibe-sdk/core` | both | `createClient()`, `OpenVibeError`, `paginate()`, `offsetPager()`, trace and id helpers, `CONTRACTS_RANGE` |
-| `openvibe-sdk/auth` | server (browser build: PKCE only) | `createServiceTokenClient()` (+ `getTokenInfo()`), `verifyUserToken()`, `verifyAppToken()`, `exchangeCode()`, `refreshUserToken()`; `startAuthorization()`, `buildAuthorizeUrl()`, `createPkcePair()`, `pkceChallenge()`, `readCallback()`, `decodeUnverified()`, `unverifiedClaims()` |
+| `openvibe-sdk/auth` | server (browser build: PKCE only) | `createServiceTokenClient()` (+ `getTokenInfo()`), `verifyUserToken()`, `verifyAppToken()`, `verifyServiceToken()`, `exchangeCode()`, `refreshUserToken()`; `startAuthorization()`, `buildAuthorizeUrl()`, `createPkcePair()`, `pkceChallenge()`, `readCallback()`, `decodeUnverified()`, `unverifiedClaims()` |
 | `openvibe-sdk/registry` | both | `createRegistryClient(client)`: `services({status})`, `service(id)`, `capabilities({owner})`, `capability(id)`, `namespaces()`, `contracts()`, `topics()`, `domain(host)`, `descriptor()` |
 | `openvibe-sdk/identity` | server | `createIdentityClient(client)`: `resolve({subjectId} \| {system,type,id})`, `resolveBatch({subjectIds} \| {system,type,ids})` |
 | `openvibe-sdk/modules` | both | `createModulesClient(client)`: `get`, `put(ns, data, {revision})`, `delete`, `list`, `update(ns, fn)`, `publicGet`; `forSubject.get/put/update` for services |
@@ -216,6 +216,7 @@ Server-only subpaths are declared `"browser": null` in the exports map, so a bun
   - It rejects service-principal tokens (`token.not_user`).
 
   It returns the claims, including `subject_id`.
+- `verifyServiceToken(token, { jwks, issuer, audience, contracts })` checks a service or app token for a service that receives them: the SDK chooses the key (the `kid`'s, else each; the shared JWKS client or a pinned PEM), and every rule is your own pinned openvibe-contracts `serviceAuth.verifyServiceToken` (pass the module as `contracts`). No key answers `{ ok: false, code: 'token.unavailable' }` with a fixed reason, never the internal JWKS URL.
 - `verifyAppToken(token, { jwks, issuer, audience, acceptSandbox })` checks a developer app's token the way openvibe-contracts (v0.26 and later) `verifyServiceToken()` does: the same signature and time rules, the audience (required), `actor_type: app`, the claim shape (`sub app:app_…`, `cap`, `jti`, `project_id prj_…`, `env`, optional `on_behalf_of usr_…`), and `env: sandbox` refused as `token.sandbox_refused` unless `acceptSandbox: true`. Opt in only when your service keeps sandbox traffic apart from real data. It does not check capabilities: test `claims.cap` for the one your route performs.
 - `exchangeCode({ code, codeVerifier, redirectUri, clientId, clientSecret?, audience?, scope? })`: without `clientSecret` (a public app) the PKCE verifier is required; `app_…` clients must send the verifier and an `audience`. App tokens come back without a `refresh_token`.
 - `startAuthorization()` / `buildAuthorizeUrl()` default `scope` to `'profile theme'` only for first-party sign-in (no `audience`). Apps pass `audience` and capability ids. Network refuses `prompt=none` for apps.

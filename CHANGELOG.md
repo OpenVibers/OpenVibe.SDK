@@ -8,6 +8,17 @@ release may change an API and says so here.
 
 
 
+## 0.24.0 (2026-09-29)
+
+- `openvibe-sdk/auth` `verifyServiceToken(token, { jwks | publicKey, issuer, audience, contracts, acceptSandbox, log })`:
+  a service or app token for a service that receives them. The SDK picks the key (the one the `kid` names, else each,
+  from the shared JWKS client or a pinned PEM); every rule is the service's own pinned openvibe-contracts
+  `serviceAuth.verifyServiceToken`, passed in as `contracts`, so the SDK carries no copy of the rules. No key is
+  `token.unavailable` with the fixed reason 'signing key not loaded yet' (the fetch error goes to `log`). Replaces the
+  hand-written kid-and-contracts loop in AI, Search, Sources, Games and Codes (plan T1).
+- `verifyUserToken` refuses a typed token (`typ` or `purpose` set: Network's realtime ticket, a FedCM assertion) as
+  `token.not_user`: it is never a session, whatever its issuer and audience say. Network's session tokens carry neither.
+
 ## 0.23.1 (2026-09-29)
 
 - The release version is whole again: `SDK_VERSION` and the browser bundle say 0.23.1 (0.23.0 shipped them at 0.22.0,
