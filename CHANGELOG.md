@@ -8,6 +8,24 @@ release may change an API and says so here.
 
 
 
+## 0.26.0 (2026-10-01)
+
+- `openvibe-sdk/service` (new, server; plan T1): the service kit. `gracefulStop({ name, server, stop, close, drainMs = 4000,
+  deadlineMs = 5000, deadlineExitCode = 1, signals = true, exit, log, beforeDrain, handles })` → `{ stop(signal?),
+  stopping() }` and `within(ms, promise)`: OpenVibe.Network's and OpenVibe.Community's `server/graceful.js` (stop steps,
+  then `server.close` with `Connection: close` on requests in flight, idle connections closed every 50 ms and event streams
+  destroyed, then close steps, exit 0; one stop per process), plus the exit code of a blown deadline (the 5 s family and
+  Media exit 0), `beforeDrain` and `handles` (closed last; a failure exits 1). Its deadline timer is not `unref()`'d, so a
+  step stuck on a promise ends in the deadline's exit code rather than a quiet exit 0. The error layer: `createServiceError(name)`,
+  `ServiceError`, `asServiceError(err, { publishing, map })`, `run(fn, status)`, `wrap(fn)`, `sendError(res, req, err, log)`,
+  `jsonBody({ limit = '512kb' })` (malformed: 400 `request.invalid_json`; too large: 413 `request.too_large`),
+  `privateNoStore(res)` and the opt-in `jsonErrors()`, with Reviews/Wiki's defaults and `extra` spread (or `extra: 'details'`
+  for Tips/VIP). `createReadiness`, `skip`, `safeReason`, `createRegistry`, `instrument`, `metricsHandler`, `isLoopbackDirect`,
+  `releaseInfo`, `createRelease` (openvibe-shared) and `problem`, `sendProblem` (openvibe-contracts) are re-exported, required on
+  first use from the service's own packages: the SDK gains no dependency. Recipe per family: `docs/service.md`.
+- `scripts/esm.js`: a getter on a CommonJS entry (a lazy re-export) becomes an ESM function that reads it on call, so
+  importing `openvibe-sdk/service` loads neither package.
+
 ## 0.25.2 (2026-09-29)
 
 - `openvibe-sdk/realtime` follows Events' opaque cursors (ADR-042): it resumes from the last SSE id exactly as Events

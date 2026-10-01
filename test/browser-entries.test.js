@@ -76,12 +76,12 @@ run([
             for (const [re, why] of FORBIDDEN) if (re.test(src)) problems.push(`${path.relative(ROOT, file)}: ${why}`);
         }
         assert.deepEqual(problems, []);
-        assert.deepEqual(blocked.sort(), ['./cache', './db', './events', './govern', './identity', './limits', './openre', './placement', './pubsub', './queue', './sso', './testing', './valkey', './vip']);
+        assert.deepEqual(blocked.sort(), ['./cache', './db', './events', './govern', './identity', './limits', './openre', './placement', './pubsub', './queue', './service', './sso', './testing', './valkey', './vip']);
         const rel = [...scanned].map((f) => path.relative(ROOT, f));
         for (const must of ['browser.js', 'src/core/client.js', 'src/auth/browser.js', 'src/realtime.js', 'src/media.js', 'src/community.js', 'src/modules.js', 'src/registry.js', 'src/jobs.js', 'src/tools.js', 'src/core/form.js', 'src/projects.js', 'browser/openvibe-sdk.mjs']) {
             assert.ok(rel.includes(must), `${must} is scanned`);
         }
-        for (const never of ['src/auth/tokens.js', 'src/auth/jwt.js', 'src/auth/oauth.js', 'src/events.js', 'src/identity.js', 'src/sso/index.js', 'src/service-outbox.js', 'src/testing/index.js']) {
+        for (const never of ['src/auth/tokens.js', 'src/auth/jwt.js', 'src/auth/oauth.js', 'src/events.js', 'src/identity.js', 'src/sso/index.js', 'src/service/index.js', 'src/service-outbox.js', 'src/testing/index.js']) {
             assert.ok(!rel.includes(never), `${never} is not reachable from a browser entry`);
         }
         console.log(`    scanned ${scanned.size} files`);

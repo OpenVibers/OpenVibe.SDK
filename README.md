@@ -181,6 +181,7 @@ Until OpenVibe.Tools serves the gateway facade (Tools S6), point the jobs client
 | `openvibe-sdk/geo` | both | `createGeoClient(client, {samples?, timeoutMs?})`: `nodes({role, region})` from Network's public node registry, `measure(nodes)` (beacon round trips, fastest first), `nearest({role, region, preferRegion})` → `{node, rtt_ms, measured}` (up/degraded nodes only; falls back to preferRegion when nothing can be measured) |
 | `openvibe-sdk/openre` | server | `createOpenReClient(client, {baseUrl?, publicUrl?})`: OpenRe.Stream, the streaming engine. `streams` (`byExternalRef`, `create`, `get`, `update`, `rotateKey`, `destinations`, `addDestination`), `destinations` (`test`, `start`, `stop`, `logs`), `sessions` (`get`, `playback` cached 10 s, `end`, `outputs`), `workers`, `manageUrl`; `{subject}` acts for a person (X-OV-Subject) |
 | `openvibe-sdk/vip` | server | `createVipClient({baseUrl?, tokenClient \| getToken, fetch?, timeoutMs?})`: `evaluate({subject, resource, owner, fallback, mode})`, `checkEntitlement({subject, creator, product, mode})`, `isMember(subject, creator)`; every failure is a denial. `createVipCache({vip, ttlMs, denyTtlMs, unavailableTtlMs})`: `entitlement`, `peekEntitlement`, `evaluate`, `invalidate`, `handleEvent` (`vip.membership.changed` and Billing's entitlement events drop a member's answers at once), `clear`, `bounds` |
+| `openvibe-sdk/service` | server | the service kit: `gracefulStop({name, server, stop, close, drainMs, deadlineMs, deadlineExitCode, beforeDrain, handles})` → `{stop, stopping}`, `within(ms, p)`; `createServiceError(name)`, `ServiceError`, `asServiceError`, `run`, `wrap`, `sendError`, `jsonBody({limit})`, `privateNoStore`, `jsonErrors()`; re-exports (loaded on first use) of openvibe-shared `createReadiness`, `skip`, `safeReason`, `createRegistry`, `instrument`, `metricsHandler`, `isLoopbackDirect`, `releaseInfo`, `createRelease` and openvibe-contracts `problem`, `sendProblem` |
 | `openvibe-sdk/testing` | Node | `createMockPlatform()`: fake Network (incl. developer apps and projects), Events, Media, Tools jobs and the Tools platform API on an in-process `fetch` |
 | `openvibe-sdk/browser/openvibe-sdk.mjs` | browser | one self-contained ES module: core + auth (browser), registry, modules, realtime, media, community, jobs, tools, projects |
 
@@ -343,6 +344,39 @@ The mock answers at the real public origins with real RS256 tokens and checks au
 - **Tools platform API** (`tools: true | { descriptors, handlers, mediaObjects, stepMs }`) on `origins.tools`: `GET /api/v1/tools[/:id[/schema]]` and `POST /api/v1/tools/:id/run`, answering as openvibe-contracts v0.33.0 says. The default tools are `dns` (sync), `jsonminify` (a client tool with a server engine), `png` (a job), `port` (a probe needing `tools.net.probe`), `yt` (page-only) and `protectpdf` (unavailable). `descriptors` adds or replaces tools, and `handlers` answers them (`{ data }` or `{ text }` inline, a job handler for job tools). Also: `addTool()`, `addMediaObject()` (what `{ media_id }` reads) and `state.tools`. The mock checks caller tiers, the refusal codes, the file count and type, and the input's top-level fields. Idempotent job runs, `wait_ms` and file references work. It has no browser sessions, so job tools need a token. It has no quotas either: to test a 429, wrap `platform.fetch`.
 
 Helpers: `signUserToken()`, `signServiceToken()`, `signAppToken()`, `authorize()`, `setAuthorization()`, `publishEvent(envelope, publisher, { projectId, env })` (a registered app's `app:<id>` publisher implies them), `pruneEvents()`, `deliverEvents()`, `dropRealtime()`, `dropJobStreams()`, `addTool()`, `addMediaObject()`, and `stats` and `state` for assertions. Its `fetch` rejects on an aborted signal, as `fetch` does. It is a fake. It has no persistence, its visibility rules are simplified, and it has no Chat (no WebSocket mock).
+
+### Service kit (server)
+
+`openvibe-sdk/service` is the layer every service wrote around the shared pieces: a graceful stop and the error
+wrappers around the problem body. It does not reimplement readiness, metrics, `/release.json` or the problem body:
+those are re-exported from `openvibe-shared` (`/ready`, `/metrics`, `/release`) and `openvibe-contracts` (`http`),
+loaded from the service's own `node_modules` on first use (the SDK depends on neither; without the package the name
+throws an error that says which to install).
+
+```js
+const svc = require('openvibe-sdk/service');
+const ApiError = svc.createServiceError('ApiError');               // new ApiError(404, 'post.not_found', detail?, extra?)
+const o = { name: 'Blog API' };                                    // log prefix; extra: 'details' for Tips/VIP
+
+router.get('/api/posts/:id', svc.run(async (req) => posts.get(req.params.id), 200, o));
+router.post('/api/posts', svc.jsonBody({ limit: '512kb' }), svc.run(create, 201, o));   // bad JSON: 400 request.invalid_json
+app.use(svc.jsonErrors(o));                                        // opt-in, last: 404 + error mapping
+
+const server = app.listen(port);
+const lifecycle = svc.gracefulStop({
+    name: 'Blog', server,
+    stop: [() => worker.stop()],                                   // nothing new starts
+    close: [() => outbox.stop(), () => db.close()],                // after the HTTP drain
+    deadlineExitCode: 0,                                           // the 5 s family exits 0 on a blown deadline
+});
+```
+
+Errors follow Reviews/Wiki: a 5xx other than 503 is logged; the code is the error's, else `internal.error` at 500 and
+`request.invalid` otherwise; a 500's detail is `'Internal error'`, never the message. On a signal `gracefulStop` runs
+the stop steps, `beforeDrain`, then closes the server (`Connection: close` on requests in flight, idle keep-alive
+connections closed every 50 ms, event streams destroyed), the close steps and `handles`, and exits 0; past `deadlineMs`
+it exits `deadlineExitCode`. `stopping()` turns true at once, for a readiness check. The recipe per service family is
+[docs/service.md](docs/service.md).
 
 ### Data: PostgreSQL and Valkey (server)
 
