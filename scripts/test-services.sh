@@ -9,14 +9,20 @@
 # integration cases print "<label>: skipped (…)" and the suite still runs on PGlite and the memory stores.
 # Every test process gets a role of its own, so PgBouncer holds a pool per role: idle server connections close after
 # 5 s and one database takes at most 120, or a service with many test files runs PostgreSQL out of connections.
+# ovsdk-pg gets a 1 GB /dev/shm: Docker's 64 MB default overflows when parallel test databases resize shared memory (53100).
 set -euo pipefail
 NET=ovsdk-test; PW=ovtestpw
 case "${1:-up}" in
 up)
   docker network inspect $NET >/dev/null 2>&1 || docker network create $NET >/dev/null
+  if docker inspect ovsdk-pg >/dev/null 2>&1 && [ "$(docker inspect -f '{{.HostConfig.ShmSize}}' ovsdk-pg)" -lt 1073741824 ]; then
+    # A reused ovsdk-pg from before --shm-size has the 64 MB default; remove it and PgBouncer (which points at it) so both start again.
+    docker rm -f ovsdk-pg ovsdk-pgbouncer >/dev/null 2>&1 || true
+  fi
   if ! docker ps --format '{{.Names}}' | grep -qx ovsdk-pg; then
     docker rm -f ovsdk-pg >/dev/null 2>&1 || true
     docker run -d --name ovsdk-pg --network $NET -p 127.0.0.1:55432:5432 \
+      --shm-size=1g \
       -e POSTGRES_USER=ov -e POSTGRES_PASSWORD=$PW -e POSTGRES_DB=ovtest -e POSTGRES_HOST_AUTH_METHOD=scram-sha-256 -e POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256 \
       postgres:18-alpine -c max_connections=200 >/dev/null
   fi
