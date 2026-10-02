@@ -1,4 +1,4 @@
-/* Copied verbatim from openvibe-contracts v0.49.0 generated/typescript/index.d.ts (the SDK does not
+/* Copied verbatim from openvibe-contracts v0.84.0 generated/typescript/index.d.ts (the SDK does not
  * require the package at runtime; it is a devDependency for the tests). test/types.test.js checks
  * these against it. */
 /* eslint-disable */
@@ -27,6 +27,10 @@ export type SubjectRef =
   | {
       type: "service" | "system";
       id: string;
+    }
+  | {
+      type: "agent";
+      id: string;
     };
 
 /** identity.service-token-claims@1.2.0 (owner: network) */
@@ -51,7 +55,7 @@ export type ServiceTokenClaims = {
    */
   cap: string[];
   /**
-   * Namespace constraints, e.g. live.* or mod.example.*
+   * Namespace constraints, e.g. live.* or mod.example.*. A developer app token carries its project_id (the whole project, as issued before namespaces were rows) and app.<project_id>.*: on Media, app.<project_id> and app.<project_id>.sandbox are the project's production and sandbox namespaces, with children below them.
    */
   ns?: string[];
   iat: number;
@@ -111,7 +115,7 @@ export interface Problem {
   [k: string]: unknown | undefined;
 }
 
-/** registry.service-manifest@1.0.0 (owner: network) */
+/** registry.service-manifest@1.1.0 (owner: network) */
 /**
  * What a service is, where it lives and what it offers. The ecosystem registry is built from these, not from hard-coded route maps.
  */
@@ -149,7 +153,7 @@ export interface ServiceManifest {
     repo?: string;
   };
   /**
-   * How the network presents the service as a site people visit (the navigation, the network home page, legal pages). A service without it is not a site.
+   * How the network presents the service as a site people visit (the navigation, the network home page, legal pages). A service without it is not a site. 1.1.0 (plan T11 lane D) adds the optional showcase fields copied from the OpenVibe.Sites catalog (tld, accent, description, pillars, faq, keywords, vision, highlight, launch, relationships; defined in registry.product@1): a site carrying tld is the catalog home of its domain (its publicOrigin host, or host), so that domain has no manifests/products file.
    */
   site?: {
     /**
@@ -171,6 +175,1745 @@ export interface ServiceManifest {
      * Only while the manifest has no publicOrigin.
      */
     host?: string;
+    /**
+     * The product's short name used everywhere (frame service names, /shared paths), e.g. food for openvibe.food. Not unique: a moved product keeps it on both addresses.
+     */
+    tld?: string;
+    /**
+     * Brand colour, lower-case hex.
+     */
+    accent?: string;
+    /**
+     * The catalog's description, verbatim.
+     */
+    description?: string;
+    /**
+     * Feature pillars, in display order.
+     *
+     * @maxItems 8
+     */
+    pillars?:
+      | []
+      | [
+          {
+            title: string;
+            text: string;
+          }
+        ]
+      | [
+          {
+            title: string;
+            text: string;
+          },
+          {
+            title: string;
+            text: string;
+          }
+        ]
+      | [
+          {
+            title: string;
+            text: string;
+          },
+          {
+            title: string;
+            text: string;
+          },
+          {
+            title: string;
+            text: string;
+          }
+        ]
+      | [
+          {
+            title: string;
+            text: string;
+          },
+          {
+            title: string;
+            text: string;
+          },
+          {
+            title: string;
+            text: string;
+          },
+          {
+            title: string;
+            text: string;
+          }
+        ]
+      | [
+          {
+            title: string;
+            text: string;
+          },
+          {
+            title: string;
+            text: string;
+          },
+          {
+            title: string;
+            text: string;
+          },
+          {
+            title: string;
+            text: string;
+          },
+          {
+            title: string;
+            text: string;
+          }
+        ]
+      | [
+          {
+            title: string;
+            text: string;
+          },
+          {
+            title: string;
+            text: string;
+          },
+          {
+            title: string;
+            text: string;
+          },
+          {
+            title: string;
+            text: string;
+          },
+          {
+            title: string;
+            text: string;
+          },
+          {
+            title: string;
+            text: string;
+          }
+        ]
+      | [
+          {
+            title: string;
+            text: string;
+          },
+          {
+            title: string;
+            text: string;
+          },
+          {
+            title: string;
+            text: string;
+          },
+          {
+            title: string;
+            text: string;
+          },
+          {
+            title: string;
+            text: string;
+          },
+          {
+            title: string;
+            text: string;
+          },
+          {
+            title: string;
+            text: string;
+          }
+        ]
+      | [
+          {
+            title: string;
+            text: string;
+          },
+          {
+            title: string;
+            text: string;
+          },
+          {
+            title: string;
+            text: string;
+          },
+          {
+            title: string;
+            text: string;
+          },
+          {
+            title: string;
+            text: string;
+          },
+          {
+            title: string;
+            text: string;
+          },
+          {
+            title: string;
+            text: string;
+          },
+          {
+            title: string;
+            text: string;
+          }
+        ];
+    /**
+     * @maxItems 20
+     */
+    faq?:
+      | []
+      | [
+          {
+            question: string;
+            answer: string;
+          }
+        ]
+      | [
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          }
+        ]
+      | [
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          }
+        ]
+      | [
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          }
+        ]
+      | [
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          }
+        ]
+      | [
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          }
+        ]
+      | [
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          }
+        ]
+      | [
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          }
+        ]
+      | [
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          }
+        ]
+      | [
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          }
+        ]
+      | [
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          }
+        ]
+      | [
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          }
+        ]
+      | [
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          }
+        ]
+      | [
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          }
+        ]
+      | [
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          }
+        ]
+      | [
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          }
+        ]
+      | [
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          }
+        ]
+      | [
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          }
+        ]
+      | [
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          }
+        ]
+      | [
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          },
+          {
+            question: string;
+            answer: string;
+          }
+        ];
+    /**
+     * Comma-separated search keywords, verbatim.
+     */
+    keywords?: string;
+    /**
+     * The product page's vision section (badge, call to action, design preview, steps, choices, features, connections), kept verbatim from the catalog: a presentation payload the showcase renders as it is, not a domain contract.
+     */
+    vision?: {
+      [k: string]: unknown | undefined;
+    };
+    /**
+     * A featured block on the product page.
+     */
+    highlight?: {
+      title: string;
+      text: string;
+      /**
+       * @maxItems 10
+       */
+      points?:
+        | []
+        | [string]
+        | [string, string]
+        | [string, string, string]
+        | [string, string, string, string]
+        | [string, string, string, string, string]
+        | [string, string, string, string, string, string]
+        | [string, string, string, string, string, string, string]
+        | [string, string, string, string, string, string, string, string]
+        | [string, string, string, string, string, string, string, string, string]
+        | [string, string, string, string, string, string, string, string, string, string];
+      cta?: {
+        label: string;
+        url: string;
+        note?: string;
+      };
+      more?: {
+        label: string;
+        url: string;
+        note?: string;
+      };
+    };
+    /**
+     * What a person still has to do or decide before the product launches. Absent once nothing blocks it.
+     */
+    launch?: string;
+    /**
+     * How the product relates to services, repositories and other pages.
+     */
+    relationships?: {
+      /**
+       * The service manifest (manifests/services/<id>.json) that serves or will serve this product, when one exists.
+       */
+      service?: string;
+      /**
+       * The repository planned or used for the product (under github.com/OpenVibers).
+       */
+      plannedRepo?: string;
+      /**
+       * No repository exists for the product yet.
+       */
+      noRepo?: true;
+      /**
+       * The sentence introducing links.
+       */
+      linksLead?: string;
+      /**
+       * Where to go instead (a closed, moved or status address).
+       *
+       * @maxItems 10
+       */
+      links?:
+        | []
+        | [
+            {
+              label: string;
+              url: string;
+              note?: string;
+            }
+          ]
+        | [
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            }
+          ]
+        | [
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            }
+          ]
+        | [
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            }
+          ]
+        | [
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            }
+          ]
+        | [
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            }
+          ]
+        | [
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            }
+          ]
+        | [
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            }
+          ]
+        | [
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            }
+          ]
+        | [
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            }
+          ];
+      /**
+       * What already works elsewhere on the network while the product is not launched.
+       *
+       * @maxItems 10
+       */
+      meanwhile?:
+        | []
+        | [
+            {
+              label: string;
+              url: string;
+              note?: string;
+            }
+          ]
+        | [
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            }
+          ]
+        | [
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            }
+          ]
+        | [
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            }
+          ]
+        | [
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            }
+          ]
+        | [
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            }
+          ]
+        | [
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            }
+          ]
+        | [
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            }
+          ]
+        | [
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            }
+          ]
+        | [
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            },
+            {
+              label: string;
+              url: string;
+              note?: string;
+            }
+          ];
+      /**
+       * The status API a status page reads.
+       */
+      statusApi?: string;
+    };
   };
   capabilities: string[];
   eventsProduced: string[];
@@ -178,6 +1921,223 @@ export interface ServiceManifest {
   namespacesOwned: string[];
   contractRanges?: {
     [k: string]: string | undefined;
+  };
+  /**
+   * How the service starts, stops, recovers and is rolled back (roadmap WS-P task 1), taken from its code and its systemd units, never from intent. A part that does not apply is { "none": "<why>" }. `ovhost validate` refuses a host service whose lifecycle lacks a field, whose shutdown deadline exceeds its unit's TimeoutStopSec, or whose installed openvibe-contracts is outside contracts.range.
+   */
+  lifecycle?: {
+    /**
+     * The endpoint that says the process is alive, and what a 200 from it proves. Readiness (can it serve?) is `ready`.
+     */
+    liveness:
+      | {
+          /**
+           * A path on internalOrigin; the same as `health`.
+           */
+          endpoint: string;
+          /**
+           * What a 200 proves, and what it does not check.
+           */
+          means: string;
+        }
+      | {
+          /**
+           * Why there is none.
+           */
+          none: string;
+        };
+    /**
+     * What happens between the stop signal and the process exiting.
+     */
+    shutdown:
+      | {
+          /**
+           * The signal the unit sends (KillSignal=, systemd's default SIGTERM) and the process handles.
+           */
+          signal: "SIGTERM" | "SIGINT" | "SIGQUIT" | "SIGHUP";
+          /**
+           * The longest the process takes from the signal to exiting, as its own code bounds it (a forced-exit timer); 0 when it exits at once. Must not exceed the unit's TimeoutStopSec, after which systemd kills it mid-drain.
+           */
+          deadlineSeconds: number;
+          /**
+           * What it stops, finishes, flushes or closes before exiting, in order.
+           *
+           * @minItems 1
+           */
+          drains: [string, ...string[]];
+          /**
+           * Worker units the service owns that drain on their own (ovhost never restarts them): how long a stop signal lets them run.
+           */
+          workers?: {
+            /**
+             * The longest a worker keeps running after the stop signal, as its code bounds it.
+             */
+            deadlineSeconds: number;
+            /**
+             * What a worker keeps serving, and what it ends, before exiting.
+             *
+             * @minItems 1
+             */
+            drains: [string, ...string[]];
+          };
+          /**
+           * Anything the fields above do not say (a gap the code has, a handler that is missing).
+           */
+          note?: string;
+        }
+      | {
+          /**
+           * Why there is none.
+           */
+          none: string;
+        };
+    /**
+     * Work a stop or a crash interrupted that the next start picks up.
+     */
+    startupRecovery:
+      | {
+          /**
+           * Each thing the process resumes at boot.
+           *
+           * @minItems 1
+           */
+          resumes: [
+            {
+              /**
+               * outbox: unsent events; jobs: queued or interrupted background work; sessions: client connections or media sessions; consumer: an event or change feed redelivered or read from a stored cursor; schedule: timed work that fell due; state: in-memory state rebuilt from storage.
+               */
+              kind: "outbox" | "jobs" | "sessions" | "consumer" | "schedule" | "state";
+              /**
+               * What is resumed, and how.
+               */
+              what: string;
+            },
+            ...{
+              /**
+               * outbox: unsent events; jobs: queued or interrupted background work; sessions: client connections or media sessions; consumer: an event or change feed redelivered or read from a stored cursor; schedule: timed work that fell due; state: in-memory state rebuilt from storage.
+               */
+              kind: "outbox" | "jobs" | "sessions" | "consumer" | "schedule" | "state";
+              /**
+               * What is resumed, and how.
+               */
+              what: string;
+            }[]
+          ];
+        }
+      | {
+          /**
+           * Why there is none.
+           */
+          none: string;
+        };
+    /**
+     * When a release is rolled back, for how long that happens by itself, and what makes going back unsafe.
+     */
+    rollback:
+      | {
+          /**
+           * What triggers a rollback: automatic (readiness not reached after the restart) and manual.
+           *
+           * @minItems 1
+           */
+          conditions: [string, ...string[]];
+          /**
+           * How long after a deploy the rollback is automatic, and what bounds a manual one.
+           */
+          window: string;
+          /**
+           * Changes a previous release cannot live with (forward-only migrations, table rebuilds, authority switches), or { none } with the reason.
+           */
+          blockers:
+            | [string, ...string[]]
+            | {
+                /**
+                 * Why there is none.
+                 */
+                none: string;
+              };
+        }
+      | {
+          /**
+           * Why there is none.
+           */
+          none: string;
+        };
+    /**
+     * The openvibe-contracts versions the service accepts.
+     */
+    contracts:
+      | {
+          /**
+           * The accepted versions, the same range as contractRanges['openvibe-contracts'].
+           */
+          range: string;
+          /**
+           * Where the range comes from, when it is not the obvious one.
+           */
+          note?: string;
+        }
+      | {
+          /**
+           * Why there is none.
+           */
+          none: string;
+        };
+    /**
+     * What the service claims so that one owner acts at a time, and how a stale owner is fenced.
+     */
+    leases:
+      | {
+          /**
+           * Each thing claimed, with its holder, expiry and fencing.
+           *
+           * @minItems 1
+           */
+          claims: [
+            {
+              /**
+               * What is claimed.
+               */
+              what: string;
+              /**
+               * Who holds the claim (a process, a worker id, a row).
+               */
+              holder: string;
+              /**
+               * When the claim lapses and how it is renewed.
+               */
+              expires: string;
+              /**
+               * How a stale owner is kept from acting after its claim lapsed.
+               */
+              fencing: string;
+            },
+            ...{
+              /**
+               * What is claimed.
+               */
+              what: string;
+              /**
+               * Who holds the claim (a process, a worker id, a row).
+               */
+              holder: string;
+              /**
+               * When the claim lapses and how it is renewed.
+               */
+              expires: string;
+              /**
+               * How a stale owner is kept from acting after its claim lapsed.
+               */
+              fencing: string;
+            }[]
+          ];
+        }
+      | {
+          /**
+           * Why there is none.
+           */
+          none: string;
+        };
   };
   notes?: string;
 }
@@ -203,6 +2163,10 @@ export interface Capability {
    * Current route(s) that perform this action today, e.g. 'POST /api/v1/:app/files'.
    */
   implementedBy?: string[];
+  /**
+   * The action has an external side effect (money, sending as the person, publishing, applying, deleting, physical control): an agent needs its owner's confirmation unless a standing rule covers it (roadmap WS-Z2).
+   */
+  sensitive?: boolean;
 }
 
 /** events.event-envelope@1.0.0 (owner: events) */
@@ -216,6 +2180,7 @@ export interface EventEnvelope {
   version: number;
   source: string;
   actor: SubjectRef;
+  on_behalf_of?: SubjectRef;
   timestamp: string;
   priority?: "critical" | "important" | "low";
   visibility?: "public" | "subject" | "internal";
@@ -229,7 +2194,7 @@ export interface EventEnvelope {
 
 /** modules.namespace@1.0.0 (owner: network) */
 /**
- * Policy for one user-module namespace: portable per-subject summaries and preferences stored by OpenVibe.Network. Never domain truth, money or authoritative game inventory (roadmap 4.3-4.5). The person's account decides what happens to their records in every namespace: when an account is removed, Network deletes all of its records; when two accounts are merged, the surviving account keeps its own record in a namespace where both have one (the other is deleted), and a record only the absorbed account had moves to the survivor. Each of these changes is announced as network.module.updated (reason subject_removed or subject_merged). That is separate from onOwnerRemoved, which says what happens to a namespace's records when the service that owns the namespace is retired.
+ * Policy for one user-module namespace: portable per-subject summaries and preferences stored by OpenVibe.Network. Never domain truth, money or authoritative game inventory (roadmap 4.3-4.5). The person's account decides what happens to their records in every namespace: when an account is removed, Network deletes all of its records; when two accounts are merged (ADR-029), in a namespace where both have a record the survivor keeps its own and gains only the top-level fields it lacks from the other (its own values always win), a record only the absorbed account had moves to the survivor, and the absorbed account's records are deleted. Each of these changes is announced as network.module.updated (reason subject_removed or subject_merged). That is separate from onOwnerRemoved, which says what happens to a namespace's records when the service that owns the namespace is retired.
  */
 export interface ModuleNamespace {
   namespace: string;

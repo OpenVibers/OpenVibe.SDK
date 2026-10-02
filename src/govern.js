@@ -138,10 +138,16 @@ function valkeyStore(valkey) {
 
 // ── The governor ─────────────────────────────────────────────────────────────
 
-function createGovernor({ policy = {}, valkey = null, now = () => Date.now(), reservationTtlMs = 6 * 3600e3, onRefused = null, onUsage = null } = {}) {
+/**
+ * `service` names the service that spends ('openvibe.ai'); every usage record carries it (platform.usage-sample@1 requires it).
+ * `provider`, `resource` and `region` are defaults for the records; reserve() can override each.
+ */
+function createGovernor({ policy = {}, valkey = null, now = () => Date.now(), reservationTtlMs = 6 * 3600e3, onRefused = null, onUsage = null,
+    service = null, provider = null, resource = null, region = null, log = console } = {}) {
     const store = valkey ? valkeyStore(valkey) : memoryStore();
+    if (!service) log.warn('[govern] createGovernor() without `service`: usage records lack the service platform.usage-sample@1 requires');
 
-    async function reserve({ subject, tier = 'user', unit, amount, key, project = null }) {
+    async function reserve({ subject, tier = 'user', unit, amount, key, project = null, operation, provider: prov, resource: res, region: reg, trace_id, route_epoch }) {
         if (!UNITS.includes(unit)) throw new TypeError(`govern: unknown unit ${unit}`);
         if (!(amount >= 0)) throw new TypeError('govern: amount must be ≥ 0');
         if (!key || String(key).length < 8) throw new TypeError('govern: an idempotency key of 8+ characters is required');
@@ -155,7 +161,13 @@ function createGovernor({ policy = {}, valkey = null, now = () => Date.now(), re
             if (onRefused) onRefused({ subject, tier, unit, amount, ...out });
             return out;
         }
-        if (onUsage && !r.replay) onUsage({ subject, project, unit, amount: Number(amount), state: 'reserved', idempotency_key: key, at: new Date(t).toISOString() });
+        if (onUsage && !r.replay) {
+            // A platform.usage-sample@1 reading: pass-through only, no money fields (rating is Billing's).
+            const record = { id, idempotency_key: key, service, project, subject, resource: res ?? resource, provider: prov ?? provider, region: reg ?? region,
+                operation: operation || 'reserve', quantity: Number(amount), unit, at: new Date(t).toISOString(), route_epoch, trace_id, source: 'openvibe-sdk/govern' };
+            for (const k of Object.keys(record)) if (record[k] == null) delete record[k];
+            onUsage(record);
+        }
         return { ok: true, id, replay: Boolean(r.replay) };
     }
 
