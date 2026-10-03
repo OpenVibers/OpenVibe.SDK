@@ -28,6 +28,8 @@ const ENTRIES = {
     'limits.mjs': '../src/limits.js',
     'govern.mjs': '../src/govern.js',
     'placement.mjs': '../src/placement.js',
+    'usage.mjs': '../src/usage.js',
+    'telemetry.mjs': '../src/telemetry.js',
     'db.mjs': '../src/db/index.js',
     'valkey.mjs': '../src/valkey.js',
     'cache.mjs': '../src/cache.js',

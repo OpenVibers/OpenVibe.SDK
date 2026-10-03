@@ -22,7 +22,7 @@
  */
 const crypto = require('crypto');
 
-const TRUST_ORDER = ['first-party', 'partner', 'community', 'external'];
+const TRUST_ORDER = ['first-party', 'user-owned', 'partner', 'community', 'external'];
 const HEALTH_OK = new Set(['up', 'degraded']);
 
 // ── Cost ─────────────────────────────────────────────────────────────────────
