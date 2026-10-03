@@ -1,6 +1,6 @@
 {
   "name": "openvibe-sdk",
-  "version": "0.26.0",
+  "version": "0.27.0",
   "description": "Supported browser and server clients for the OpenVibe platform: auth (incl. developer apps), registry discovery, identity, user modules, events, realtime, media, community, search, chat, AI runs, Tools (registry, run API and jobs), VIP memberships and developer projects, the async PostgreSQL data layer (db) and the Valkey cache, limits store, queue and pub/sub, with deadlines, safe retries, problem errors and trace propagation.",
   "main": "index.js",
   "types": "types/index.d.ts",
@@ -105,6 +105,36 @@
       "browser": null,
       "import": "./esm/telemetry.mjs",
       "default": "./src/telemetry.js"
+    },
+    "./cost": {
+      "types": "./types/cost.d.ts",
+      "browser": null,
+      "import": "./esm/cost.mjs",
+      "default": "./src/cost.js"
+    },
+    "./runtime": {
+      "types": "./types/runtime.d.ts",
+      "browser": null,
+      "import": "./esm/runtime.mjs",
+      "default": "./src/runtime.js"
+    },
+    "./storage": {
+      "types": "./types/storage.d.ts",
+      "browser": null,
+      "import": "./esm/storage.mjs",
+      "default": "./src/storage.js"
+    },
+    "./delivery": {
+      "types": "./types/delivery.d.ts",
+      "browser": null,
+      "import": "./esm/delivery.mjs",
+      "default": "./src/delivery.js"
+    },
+    "./node": {
+      "types": "./types/node.d.ts",
+      "browser": null,
+      "import": "./esm/node.mjs",
+      "default": "./src/node.js"
     },
     "./db": {
       "types": "./types/db.d.ts",
