@@ -16,3 +16,5 @@ export * as projects from './projects';
 export * as vip from './vip';
 export * as openre from './openre';
 export * as geo from './geo';
+export * as usage from './usage';
+export * as telemetry from './telemetry';

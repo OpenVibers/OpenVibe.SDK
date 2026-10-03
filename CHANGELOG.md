@@ -9,6 +9,26 @@ release may change an API and says so here.
 
 ## Unreleased
 
+- **`openvibe-sdk/usage` (new, server; plan T1):** `platform.usage-sample@1` readings in one place.
+  `usageSample(fields)` builds the record — `id`, `idempotency_key`, `service`, `operation`, `quantity`, `unit` and
+  every optional dimension pass through, `at` defaults to now (ISO) and `source` to `openvibe-sdk/usage`, null fields
+  are stripped and no money field is invented (`cost_estimate`, `free_allowance_used`, `vibes_charged` are the
+  caller's; rating is Billing's). `usageKey(service, ...parts)` joins an idempotency key with `:` (the service alone
+  when there are no parts; a non-empty service is enforced). `validateUsageSample(record)` → `{ ok, errors }`
+  (`openvibe-contracts` is required lazily on first use; a missing package never claims validity: `ok: false`,
+  `errors: []`). `openvibe-sdk/govern` now builds its `onUsage` record with `usageSample()`: the record is unchanged.
+- **`openvibe-sdk/telemetry` (new, server; plan T1):** `platform.telemetry-sample@1`, the universal operation
+  observation. `telemetrySample(fields)` and `validateTelemetrySample(record)` as in usage;
+  `createTelemetry({ service, instance?, sink, intervalMs = 15000, now?, log?, maxBuffered = 1000 })` →
+  `{ record(name, value, labels), gauge(name, value, labels), count(name, labels), flush(), stop() }`: a collector
+  that buffers samples and flushes them to `await sink(samples)` every `intervalMs` (an unref'd timer) and on
+  `stop()` (clears the timer, flushes once — a `gracefulStop` stop step). `record` builds
+  `{ service, instance, operation, at, latency_ms, ...labels }`; a value that is not a number goes to `extra[name]`
+  as a scalar. A sink that rejects is logged once and its samples kept for the next flush; past `maxBuffered` the
+  oldest sample is dropped, with a warning at most once a minute. The SDK holds no network code: the sink is the service's.
+- **`openvibe-sdk/placement`:** `TRUST_ORDER` gains `user-owned` (between `first-party` and `partner`; the T1 trust
+  classes): a `user-owned` offer is eligible under `trust: ['user-owned']` and for workloads that name no trust list.
+
 - The devDependency `openvibe-contracts` moves to v0.86.0 (it adds a `node` principal to
   `identity.service-token-claims`); the copied types and the lockfile integrity hash follow.
 - **`openvibe-sdk/govern` emits a full usage record** (plan T5). `createGovernor({ service, provider?, resource?, region? })`; `reserve()` takes optional `operation`, `provider`, `resource`, `region`, `trace_id` and `route_epoch`, which override the defaults. `onUsage` now gets a `platform.usage-sample@1` reading: `id` (the reservation id), `idempotency_key`, `service`, `project`, `subject`, `resource`, `provider`, `region`, `operation` (default `reserve`), `quantity`, `unit`, `at`, `route_epoch`, `trace_id`, `source` (`openvibe-sdk/govern`); absent values are left out. **Changed:** `amount` is now `quantity` and `state` is gone (the schema allows neither; only new reservations are emitted). No money fields: rating is Billing's. A governor created without `service` still works and logs one warning (`log`, default `console`). Tested against openvibe-contracts 0.86.0.

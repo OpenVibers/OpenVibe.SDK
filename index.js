@@ -25,4 +25,6 @@ module.exports = {
     vip: require('./src/vip'),
     openre: require('./src/openre'),
     geo: require('./src/geo'),
+    usage: require('./src/usage'),
+    telemetry: require('./src/telemetry'),
 };

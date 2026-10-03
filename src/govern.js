@@ -18,6 +18,8 @@
  */
 const crypto = require('crypto');
 
+const { usageSample } = require('./usage');
+
 const WINDOWS = { minute: 60e3, hour: 3600e3, day: 86400e3, month: 30 * 86400e3 };
 const UNITS = ['browser-second', 'ai-token', 'ai-usd', 'gpu-second', 'video-minute', 'bandwidth-byte', 'storage-byte-day', 'event',
     'watch-check', 'bot-control-second', 'job-run', 'upload-byte', 'download-byte'];
@@ -163,10 +165,8 @@ function createGovernor({ policy = {}, valkey = null, now = () => Date.now(), re
         }
         if (onUsage && !r.replay) {
             // A platform.usage-sample@1 reading: pass-through only, no money fields (rating is Billing's).
-            const record = { id, idempotency_key: key, service, project, subject, resource: res ?? resource, provider: prov ?? provider, region: reg ?? region,
-                operation: operation || 'reserve', quantity: Number(amount), unit, at: new Date(t).toISOString(), route_epoch, trace_id, source: 'openvibe-sdk/govern' };
-            for (const k of Object.keys(record)) if (record[k] == null) delete record[k];
-            onUsage(record);
+            onUsage(usageSample({ id, idempotency_key: key, service, project, subject, resource: res ?? resource, provider: prov ?? provider, region: reg ?? region,
+                operation: operation || 'reserve', quantity: Number(amount), unit, at: new Date(t).toISOString(), route_epoch, trace_id, source: 'openvibe-sdk/govern' }));
         }
         return { ok: true, id, replay: Boolean(r.replay) };
     }

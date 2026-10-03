@@ -94,6 +94,18 @@
       "import": "./esm/placement.mjs",
       "default": "./src/placement.js"
     },
+    "./usage": {
+      "types": "./types/usage.d.ts",
+      "browser": null,
+      "import": "./esm/usage.mjs",
+      "default": "./src/usage.js"
+    },
+    "./telemetry": {
+      "types": "./types/telemetry.d.ts",
+      "browser": null,
+      "import": "./esm/telemetry.mjs",
+      "default": "./src/telemetry.js"
+    },
     "./db": {
       "types": "./types/db.d.ts",
       "browser": null,

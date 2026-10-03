@@ -3,7 +3,7 @@
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const { run } = require('./helpers');
-const { plan, marginalCost, rendezvous, pickTwo, signPlan, verifyPlan, createPlanHolder, ownedLoadCost } = require('../src/placement');
+const { plan, excluded, marginalCost, rendezvous, pickTwo, signPlan, verifyPlan, createPlanHolder, ownedLoadCost } = require('../src/placement');
 
 const T = Date.parse('2026-09-16T00:00:00Z');   // half of September gone
 const period = { period_start: '2026-09-01T00:00:00Z', period_end: '2026-10-01T00:00:00Z' };
@@ -43,6 +43,15 @@ run([
     ['an unpriced paid provider is never assumed free', async () => {
         const r = plan(req(), [provider('mystery', 'rc_missing')], { now: T });
         assert.equal(r.selected, null);
+    }],
+    ['a user-owned offer is eligible under trust: [\'user-owned\'], and for workloads that name no trust list', async () => {
+        const own = node('usr-node', 0.2, { trust: 'user-owned' });
+        assert.equal(excluded(req({ trust: ['user-owned'] }), own), null, 'user-owned trust is accepted');
+        assert.equal(excluded(req(), own), null, 'a workload that names no trust list accepts every TRUST_ORDER class');
+        assert.match(excluded(req({ trust: ['partner'] }), own), /partner/, 'a narrower trust list still refuses it');
+        const r = plan(req({ objective: 'cheapest', trust: ['user-owned'] }), [own, provider('ext', 'rc')], { rateCards: [card('rc', 'ext', 1e9, 0)], now: T });
+        assert.equal(r.selected, 'usr-node');
+        assert.match(r.candidates.find((c) => c.id === 'ext').excluded_because, /user-owned/);
     }],
     ['hysteresis: stay unless clearly better; fail over at once when the current one drops out', async () => {
         const a = node('a', 0.3, { latency_ms: { start_p95: 50 } }); const b = node('b', 0.3, { latency_ms: { start_p95: 46 } });
