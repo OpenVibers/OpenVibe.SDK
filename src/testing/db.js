@@ -21,6 +21,30 @@ const crypto = require('crypto');
 const quiet = { log() {}, warn() {}, error: (...a) => console.error(...a) };
 const SETUP_LOCK = 735_1_2026;
 const pgAvailable = () => !!(process.env.OV_TEST_PG_URL && process.env.OV_TEST_PG_DIRECT_URL);
+// A run's schema and roles carry the time they were made (base 36 ms) so a later run can drop what a killed one left: a
+// test process ended by a time budget never reaches close(), and 4,382 schemas (364,277 tables, 19 GB) had piled up in
+// the containers' database by 2026-10-03.
+const ORPHAN_MS = 6 * 3600e3;
+const runName = (safe, now = Date.now()) => `${safe}_t${now.toString(36)}_${crypto.randomBytes(4).toString('hex')}`;
+/** The time a run's name was made, or null (an older name without one). */
+function runTime(name) { const m = /_t([0-9a-z]{8,9})_[0-9a-f]{8}$/.exec(String(name)); if (!m) return null; const t = parseInt(m[1], 36); return t > 1.6e12 && t < 4e12 ? t : null; }
+/** Schemas of runs older than ORPHAN_MS whose roles have no backend: dropped with their roles (under the setup lock). */
+async function sweepOrphans(su, { now = Date.now(), maxAge = ORPHAN_MS } = {}) {
+    const schemas = (await su.query("SELECT nspname FROM pg_namespace WHERE nspname ~ '_t[0-9a-z]{8,9}_[0-9a-f]{8}$'")).rows.map((r) => r.nspname);
+    const old = schemas.filter((n) => { const t = runTime(n); return t && now - t > maxAge; });
+    let dropped = 0;
+    for (const name of old.slice(0, 200)) {
+        const busy = await su.value('SELECT count(*) FROM pg_stat_activity WHERE usename = ANY($1)', [[name, `${name}_owner`]]);
+        if (+busy) continue;
+        await su.tx(async (t) => {
+            await t.query('SELECT pg_advisory_xact_lock($1)', [SETUP_LOCK]);
+            await t.query(`DROP SCHEMA IF EXISTS ${name} CASCADE`);
+            for (const r of [name, `${name}_owner`]) { if (await t.value('SELECT count(*) FROM pg_roles WHERE rolname = $1', [r]) > 0) { await t.query(`DROP OWNED BY ${r}`); await t.query(`DROP ROLE ${r}`); } }
+        });
+        dropped++;
+    }
+    return dropped;
+}
 const valkeyAvailable = () => !!process.env.OV_TEST_VALKEY_URL;
 
 async function createTestDb({ migrations, store = process.env.OV_TEST_STORE || 'pglite', service = 'test', max = 4, log = quiet } = {}) {
@@ -32,11 +56,12 @@ async function createTestDb({ migrations, store = process.env.OV_TEST_STORE || '
     }
     if (!pgAvailable()) throw new Error('store pg needs OV_TEST_PG_URL and OV_TEST_PG_DIRECT_URL (openvibe-sdk scripts/test-services.sh up)');
     const safe = String(service).replace(/[^a-z0-9]/g, '').slice(0, 12) || 'svc';
-    const name = `${safe}_t${process.pid}_${crypto.randomBytes(4).toString('hex')}`;
+    const name = runName(safe);
     const owner = `${name}_owner`;
     const pw = crypto.randomBytes(16).toString('hex');
     const su = createDb({ url: process.env.OV_TEST_PG_DIRECT_URL, service: `${service}-test-admin`, max: 1, log });
     const database = await su.value('SELECT current_database()');
+    await sweepOrphans(su).catch(() => {});   // what killed runs left behind; never in the way of this run
     await su.tx(async (t) => {
         await t.query('SELECT pg_advisory_xact_lock($1)', [SETUP_LOCK]);
         for (const stmt of [
@@ -88,4 +113,4 @@ function createTestValkey({ prefix = 'test' } = {}) {
     return createValkey({ url: process.env.OV_TEST_VALKEY_URL, prefix: `ov:${prefix}-test:${crypto.randomBytes(4).toString('hex')}:`, log: quiet });
 }
 
-module.exports = { createTestDb, createTestValkey, pgAvailable, valkeyAvailable };
+module.exports = { createTestDb, createTestValkey, pgAvailable, valkeyAvailable, runName, runTime, sweepOrphans };
