@@ -12,7 +12,7 @@
 npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.12.0
 ```
 
-It has no runtime dependencies. It needs Node ≥ 20, or any browser with `fetch`, Web Crypto and `TextDecoder`. There is no build step. The package is CommonJS with ESM entry points (`import` works). Each subpath has its own `.d.ts`. For a page with no bundler, `browser/openvibe-sdk.mjs` is one self-contained ES module of the browser-safe subpaths (see [Browser without a bundler](#browser-without-a-bundler)). It does not depend on `openvibe-contracts` at runtime: it copies the contract types it uses (from Contracts v0.49.0, a devDependency the tests check them against).
+It has no runtime dependencies. It needs Node ≥ 20, or any browser with `fetch`, Web Crypto and `TextDecoder`. There is no build step. The package is CommonJS with ESM entry points (`import` works). Each subpath has its own `.d.ts`. For a page with no bundler, `browser/openvibe-sdk.mjs` is one self-contained ES module of the browser-safe subpaths (see [Browser without a bundler](#browser-without-a-bundler)). It does not depend on `openvibe-contracts` at runtime: it copies the contract types it uses (from Contracts v0.86.0, a devDependency the tests check them against).
 
 ## Purpose
 
@@ -418,7 +418,7 @@ Moving an existing service from SQLite: [docs/migrating-to-postgresql.md](docs/m
 ## Versioning
 
 - `openvibe-sdk` follows semver. While it is 0.x, a minor release may break an API, and [CHANGELOG.md](CHANGELOG.md) says so. Pin a tag.
-- Each release states the openvibe-contracts range it was tested against (`CONTRACTS_RANGE`), and `discover()` checks it at runtime. Contract types are copied into `types/contracts.d.ts`. `test/types.test.js` fails if they differ from the pinned Contracts release, the `openvibe-contracts` devDependency (a release tarball pin, v0.49.0), which the tools tests also use to validate requests and answers. It is never a runtime or peer dependency.
+- Each release states the openvibe-contracts range it was tested against (`CONTRACTS_RANGE`), and `discover()` checks it at runtime. Contract types are copied into `types/contracts.d.ts`. `test/types.test.js` fails if they differ from the pinned Contracts release, the `openvibe-contracts` devDependency (a release tarball pin, v0.86.0), which the tools tests also use to validate requests and answers. It is never a runtime or peer dependency.
 - A new public capability ships as a minor release: first the contract, then the wrapper here, then the service's route. Removing a wrapper is a major release, after the capability's deprecation window in Contracts has passed.
 
 ## Not wrapped yet (intentionally)
@@ -485,7 +485,7 @@ Service implementations and their data (each service), the contracts (OpenVibe.C
 
 ## Depends on
 
-Nothing at runtime. `openvibe-contracts` v0.49.0 and `better-sqlite3` are devDependencies (type checks, the outbox and inbox tests). At run time the clients talk to OpenVibe.Network (tokens, registry, discovery) and the service each one wraps.
+Nothing at runtime. `openvibe-contracts` v0.86.0 and `better-sqlite3` are devDependencies (type checks, the outbox and inbox tests). At run time the clients talk to OpenVibe.Network (tokens, registry, discovery) and the service each one wraps.
 
 ---
 
