@@ -1,5 +1,5 @@
 /** platform.* contract shapes are validated by openvibe-contracts; these are the fields the planner reads. */
-export type Offer = { offer_id: string; kind: 'node' | 'provider'; provider?: string; region: string; regions?: string[]; trust: 'first-party' | 'partner' | 'community' | 'external';
+export type Offer = { offer_id: string; kind: 'node' | 'provider'; provider?: string; region: string; regions?: string[]; trust: 'first-party' | 'user-owned' | 'partner' | 'community' | 'external';
     capabilities: string[]; capacity?: Record<string, any>; latency_ms?: Record<string, number>; health: { status: 'up' | 'degraded' | 'down' | 'draining' };
     pricing: { model: string; marginal_usd_per_unit?: number; rate_card?: string } };
 export type Requirements = { kind: string; mobility: 'request' | 'job' | 'session' | 'stateful-partition'; latency_class: 'realtime' | 'interactive' | 'background' | 'bulk' | 'critical';

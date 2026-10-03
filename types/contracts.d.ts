@@ -35,7 +35,7 @@ export type SubjectRef =
 
 /** identity.service-token-claims@1.2.0 (owner: network) */
 /**
- * Claims of a short-lived RS256 client-credentials token issued by OpenVibe.Network to a service or app principal. Replaces X-Internal-Key. App tokens (actor_type app) also carry project_id and env; receivers refuse env=sandbox unless they opted in.
+ * Claims of a short-lived RS256 client-credentials token issued by OpenVibe.Network to a service, app, mod or node principal. Replaces X-Internal-Key. App tokens (actor_type app) also carry project_id and env; receivers refuse env=sandbox unless they opted in.
  */
 export type ServiceTokenClaims = {
   [k: string]: unknown | undefined;
@@ -45,7 +45,7 @@ export type ServiceTokenClaims = {
    */
   iss: string;
   sub: string;
-  actor_type: "service" | "app" | "mod";
+  actor_type: "service" | "app" | "mod" | "node";
   /**
    * @minItems 1
    */
