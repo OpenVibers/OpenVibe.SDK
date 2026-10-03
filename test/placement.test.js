@@ -40,14 +40,6 @@ run([
         assert.equal(plan(req({ objective: 'private' }), [provider('ext', 'rc')], { rateCards: [card('rc', 'ext', 1e9, 0)], now: T }).selected, null, 'private work never leaves first-party capacity');
         assert.match(plan(req(), [node('down', 0.1, { health: { status: 'down' } })], { now: T }).candidates[0].excluded_because, /health down/);
     }],
-    ['a user-owned offer is eligible under trust [user-owned], and by default', async () => {
-        const mine = node('mine', 0.2, { trust: 'user-owned' });
-        assert.equal(plan(req({ trust: ['user-owned'] }), [mine], { now: T }).selected, 'mine', 'asked-for trust: user-owned');
-        assert.equal(plan(req(), [mine], { now: T }).selected, 'mine', 'user-owned is in the default trust order');
-        const r = plan(req({ trust: ['user-owned'] }), [node('first-party-node', 0.2)], { now: T });
-        assert.equal(r.selected, null);
-        assert.match(r.candidates[0].excluded_because, /requires user-owned trust/);
-    }],
     ['an unpriced paid provider is never assumed free', async () => {
         const r = plan(req(), [provider('mystery', 'rc_missing')], { now: T });
         assert.equal(r.selected, null);

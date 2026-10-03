@@ -9,12 +9,9 @@ release may change an API and says so here.
 
 ## Unreleased
 
-- **`openvibe-sdk/placement`: `user-owned` joins the trust classes.** A user's own node
-  (`trust: "user-owned"`) is eligible by default (the order is now first-party, user-owned, partner, community,
-  external) and under `trust: ['user-owned']`. The devDependency `openvibe-contracts` moves to v0.86.0 (the release
-  that adds the class, alongside a `node` principal in `identity.service-token-claims`), and the copied types and the
-  lockfile integrity hash follow.
-- **`openvibe-sdk/govern` emits a full usage record** (plan T5). `createGovernor({ service, provider?, resource?, region? })`; `reserve()` takes optional `operation`, `provider`, `resource`, `region`, `trace_id` and `route_epoch`, which override the defaults. `onUsage` now gets a `platform.usage-sample@1` reading: `id` (the reservation id), `idempotency_key`, `service`, `project`, `subject`, `resource`, `provider`, `region`, `operation` (default `reserve`), `quantity`, `unit`, `at`, `route_epoch`, `trace_id`, `source` (`openvibe-sdk/govern`); absent values are left out. **Changed:** `amount` is now `quantity` and `state` is gone (the schema allows neither; only new reservations are emitted). No money fields: rating is Billing's. A governor created without `service` still works and logs one warning (`log`, default `console`). Tested against openvibe-contracts 0.84.0.
+- The devDependency `openvibe-contracts` moves to v0.86.0 (it adds a `node` principal to
+  `identity.service-token-claims`); the copied types and the lockfile integrity hash follow.
+- **`openvibe-sdk/govern` emits a full usage record** (plan T5). `createGovernor({ service, provider?, resource?, region? })`; `reserve()` takes optional `operation`, `provider`, `resource`, `region`, `trace_id` and `route_epoch`, which override the defaults. `onUsage` now gets a `platform.usage-sample@1` reading: `id` (the reservation id), `idempotency_key`, `service`, `project`, `subject`, `resource`, `provider`, `region`, `operation` (default `reserve`), `quantity`, `unit`, `at`, `route_epoch`, `trace_id`, `source` (`openvibe-sdk/govern`); absent values are left out. **Changed:** `amount` is now `quantity` and `state` is gone (the schema allows neither; only new reservations are emitted). No money fields: rating is Billing's. A governor created without `service` still works and logs one warning (`log`, default `console`). Tested against openvibe-contracts 0.86.0.
 
 ## 0.26.0 (2026-10-01)
 
