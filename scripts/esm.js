@@ -33,6 +33,7 @@ const ENTRIES = {
     'cost.mjs': '../src/cost.js',
     'runtime.mjs': '../src/runtime.js',
     'storage.mjs': '../src/storage.js',
+    'commerce.mjs': '../src/commerce.js',
     'delivery.mjs': '../src/delivery.js',
     'node.mjs': '../src/node.js',
     'db.mjs': '../src/db/index.js',

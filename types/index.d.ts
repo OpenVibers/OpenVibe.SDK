@@ -17,4 +17,5 @@ export * as vip from './vip';
 export * as openre from './openre';
 export * as geo from './geo';
 export * as usage from './usage';
+export * as commerce from './commerce';
 export * as telemetry from './telemetry';

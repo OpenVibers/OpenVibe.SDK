@@ -7,6 +7,18 @@ release may change an API and says so here.
 
 
 
+## 0.28.0 (2026-10-04)
+
+- **`openvibe-sdk/commerce` (new, server; plan T5 step 13):** the Billing client Tips and VIP each carried a copy of.
+  `createCommerceClient(config, { caps, fetchImpl, tokenClients, timeoutMs })` with `createIntent` (purchase or
+  subscription), `createTransfer`, `refundTransfer`, `subscribeWithCredit`, `cancelSubscription`, `getSubscription`,
+  `listSubscriptions`, `entitlement`, `rates` and `baseUrl`. One call shape: an `Idempotency-Key` is sent verbatim, a
+  401 invalidates the token and retries exactly once with the same key, and a problem+json answer becomes a
+  `CommerceError` (`status`, `code`, `body`; `retryable` for no status, 5xx, 429, 401 and `billing.frozen`).
+  `intentKey(prefix, parts)` derives a key and `receipt(kind, fields)` builds an outbox record (never posted).
+  `openvibe-contracts` is required lazily, only when a token client is created, so the tarball still loads with no
+  dependencies. No change to the other modules.
+
 ## 0.27.0 (2026-10-04)
 
 - **`openvibe-sdk/cost` (new, server; plan T1):** `rateCard()` / `validateRateCard()` for `platform.rate-card@1`,
