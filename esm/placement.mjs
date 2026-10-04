@@ -4,5 +4,6 @@ import cjs from '../src/placement.js';
 export const {
     plan, excluded, marginalCost, priceOf, forecast, ownedLoadCost,
     rendezvous, pickTwo, signPlan, verifyPlan, createPlanHolder, canonical,
+    TRUST_CLASSES,
 } = cjs;
 export default cjs;
