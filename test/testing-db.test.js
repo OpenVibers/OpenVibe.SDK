@@ -6,7 +6,7 @@ const os = require('os');
 const path = require('path');
 const { run } = require('./helpers');
 const { createTestDb, pgAvailable } = require('../src/testing');
-const { runName, runTime, leaseKey, sweepOrphans } = require('../src/testing/db');
+const { runName, runTime, isRunSchema, leaseKey, sweepOrphans } = require('../src/testing/db');
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sdk-testdb-'));
 fs.writeFileSync(path.join(dir, '0001_initial.sql'), '-- phase: expand\nCREATE TABLE notes (id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, body text NOT NULL);\n');
@@ -25,6 +25,11 @@ const tests = [
         assert.match(n, /^sdk_t[0-9a-z]{8,9}_[0-9a-f]{8}_l$/); assert.ok(n.length < 50);
         assert.equal(runTime(n), t0); assert.equal(runTime('sdk_t12345_abcdef01'), null);
         assert.equal(runTime(n.slice(0, -2)), null, 'unleased names must never be swept');
+    }],
+    ['the sweep takes only the exact generated shape (a catalog name reaches SQL quoted, and only if it matches whole)', async () => {
+        assert.equal(isRunSchema(runName('sdk')), true); assert.equal(isRunSchema(runName('abcdefghijkl')), true);
+        const tail = runName('sdk').slice(3);
+        for (const bad of [`x"; DROP ROLE ov; --${tail}`, `SDK${tail}`, `a-b${tail}`, `abcdefghijklm${tail}`, tail.slice(1), `sdk${tail}\n`]) assert.equal(isRunSchema(bad), false, bad);
     }],
 ];
 if (pgAvailable()) {

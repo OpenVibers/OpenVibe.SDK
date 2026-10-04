@@ -28,9 +28,14 @@ const runName = (safe, now = Date.now()) => `${safe}_t${now.toString(36)}_${cryp
 /** The time a run's name was made, or null (an older name without one). */
 function runTime(name) { const m = /_t([0-9a-z]{8,9})_[0-9a-f]{8}_l$/.exec(String(name)); if (!m) return null; const t = parseInt(m[1], 36); return t > 1.6e12 && t < 4e12 ? t : null; }
 const leaseKey = (name) => crypto.createHash('sha256').update(`openvibe-test-db:${name}`).digest().readBigInt64BE(0).toString();
-/** Sweep only leased runs: older naming formats have no reliable end-of-run signal. */
+/** Exactly what runName() makes (the service name sanitized to [a-z0-9]{1,12}): only this run shape is ever dropped. */
+const RUN_SCHEMA = /^[a-z0-9]{1,12}_t[0-9a-z]{8,9}_[0-9a-f]{8}_l$/;
+const isRunSchema = (name) => RUN_SCHEMA.test(String(name));
+const quoteIdent = (id) => `"${String(id).replace(/"/g, '""')}"`;
+/** Sweep only leased runs: older naming formats have no reliable end-of-run signal. A catalog name reaches SQL only
+ *  after matching the whole generated shape, and quoted. */
 async function sweepOrphans(su, { now = Date.now(), maxAge = ORPHAN_MS } = {}) {
-    const schemas = (await su.query("SELECT nspname FROM pg_namespace WHERE nspname ~ '_t[0-9a-z]{8,9}_[0-9a-f]{8}_l$'")).rows.map((r) => r.nspname);
+    const schemas = (await su.query("SELECT nspname FROM pg_namespace WHERE nspname ~ '^[a-z0-9]{1,12}_t[0-9a-z]{8,9}_[0-9a-f]{8}_l$'")).rows.map((r) => r.nspname).filter(isRunSchema);
     const old = schemas.filter((n) => { const t = runTime(n); return t && now - t > maxAge; });
     let dropped = 0;
     for (const name of old.slice(0, 200)) {
@@ -39,8 +44,8 @@ async function sweepOrphans(su, { now = Date.now(), maxAge = ORPHAN_MS } = {}) {
             if (!await t.value('SELECT pg_try_advisory_xact_lock($1::bigint)', [leaseKey(name)])) return false;
             const busy = await t.value('SELECT count(*) FROM pg_stat_activity WHERE usename = ANY($1)', [[name, `${name}_owner`]]);
             if (+busy) return false;
-            await t.query(`DROP SCHEMA IF EXISTS ${name} CASCADE`);
-            for (const r of [name, `${name}_owner`]) { if (await t.value('SELECT count(*) FROM pg_roles WHERE rolname = $1', [r]) > 0) { await t.query(`DROP OWNED BY ${r}`); await t.query(`DROP ROLE ${r}`); } }
+            await t.query(`DROP SCHEMA IF EXISTS ${quoteIdent(name)} CASCADE`);
+            for (const r of [name, `${name}_owner`]) { if (await t.value('SELECT count(*) FROM pg_roles WHERE rolname = $1', [r]) > 0) { await t.query(`DROP OWNED BY ${quoteIdent(r)}`); await t.query(`DROP ROLE ${quoteIdent(r)}`); } }
             return true;
         });
         if (removed) dropped++;
@@ -123,4 +128,4 @@ function createTestValkey({ prefix = 'test' } = {}) {
     return createValkey({ url: process.env.OV_TEST_VALKEY_URL, prefix: `ov:${prefix}-test:${crypto.randomBytes(4).toString('hex')}:`, log: quiet });
 }
 
-module.exports = { createTestDb, createTestValkey, pgAvailable, valkeyAvailable, runName, runTime, leaseKey, sweepOrphans };
+module.exports = { createTestDb, createTestValkey, pgAvailable, valkeyAvailable, runName, runTime, isRunSchema, leaseKey, sweepOrphans };
