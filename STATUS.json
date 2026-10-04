@@ -3,7 +3,7 @@
   "stage": "alpha",
   "code": true,
   "wave": "W2",
-  "version": "0.23.1",
+  "version": "0.28.0",
   "plan": "OpenVibe End-to-End Realignment & Implementation Plan, revision 3 (20 Sep 2026), §3.2; roadmap §30",
   "deployed": false,
   "deployment": "none: a package released as git tags; services and apps pin a tag",
@@ -22,7 +22,8 @@
     "ESM entries, TypeScript types and a browser bundle",
     "db (ADR-035): the async PostgreSQL data layer (node-postgres through PgBouncer; PGlite in tests) with safe sql fragments, retrying transactions and savepoints, versioned expand/migrate/contract migrations, and importSqlite for the one-time SQLite move with verification",
     "valkey, cache, queue, pubsub and a shared limits store on Valkey 9, each with an in-process twin for tests",
+    "commerce (openvibe-sdk/commerce): the shared Billing client for Tips and VIP, with intentKey and receipt",
     "events: the PostgreSQL outbox (lease-claimed, several relays per table) and inbox (handler in its transaction)"
   ],
-  "updated": "2026-09-28"
+  "updated": "2026-10-04"
 }

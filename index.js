@@ -26,5 +26,6 @@ module.exports = {
     openre: require('./src/openre'),
     geo: require('./src/geo'),
     usage: require('./src/usage'),
+    commerce: require('./src/commerce'),
     telemetry: require('./src/telemetry'),
 };
