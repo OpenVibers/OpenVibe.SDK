@@ -257,4 +257,4 @@ function createPlanHolder(publicKeys, { now = () => Date.now(), onReject = null 
 /** The five trust classes (T1 ADR-046): the order is the planner's preference when no list is named. */
 const TRUST_CLASSES = ['first-party', 'user-owned', 'partner', 'community', 'external'];
 
-module.exports = { plan, excluded, marginalCost, priceOf, forecast, ownedLoadCost, rendezvous, pickTwo, signPlan, verifyPlan, createPlanHolder, canonical, TRUST_CLASSES };
+module.exports = { plan, excluded, marginalCost, priceOf, forecast, ownedLoadCost, rendezvous, pickTwo, signPlan, verifyPlan, createPlanHolder, canonical, TRUST_CLASSES, TRUST_ORDER };
