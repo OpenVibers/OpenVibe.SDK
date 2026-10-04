@@ -9,10 +9,11 @@ const { nodeCapabilities, nodeOffers, validateNodeCapabilities } = require('../s
 const FIXTURES = path.join(__dirname, '..', 'node_modules', 'openvibe-contracts', 'fixtures', 'platform.node-capabilities');
 let contracts = null;
 try { contracts = require('openvibe-contracts'); } catch { /* the fixture cases skip */ }
+if (contracts && (!fs.existsSync(path.join(FIXTURES, 'valid')) || !fs.existsSync(path.join(FIXTURES, 'invalid')))) contracts = null;
 
 run([
     ['nodeCapabilities passes every valid fixture through unchanged, and they validate', async () => {
-        if (!contracts) { console.log('node-capabilities fixtures: skipped (openvibe-contracts not installed: npm install)'); return; }
+        if (!contracts) { console.log('node-capabilities fixtures: skipped (matching openvibe-contracts fixtures unavailable)'); return; }
         for (const f of fs.readdirSync(path.join(FIXTURES, 'valid'))) {
             const fixture = JSON.parse(fs.readFileSync(path.join(FIXTURES, 'valid', f), 'utf8'));
             assert.deepEqual(nodeCapabilities({ ...fixture }), fixture, f);
@@ -29,7 +30,7 @@ run([
         assert.ok(!('agent_version' in c), 'null agent_version stripped');
     }],
     ['validateNodeCapabilities refuses every invalid fixture with its errors', async () => {
-        if (!contracts) { console.log('node-capabilities invalid fixtures: skipped (openvibe-contracts not installed: npm install)'); return; }
+        if (!contracts) { console.log('node-capabilities invalid fixtures: skipped (matching openvibe-contracts fixtures unavailable)'); return; }
         for (const f of fs.readdirSync(path.join(FIXTURES, 'invalid'))) {
             const fixture = JSON.parse(fs.readFileSync(path.join(FIXTURES, 'invalid', f), 'utf8'));
             const r = validateNodeCapabilities(fixture);
@@ -75,6 +76,6 @@ run([
             regions: ['us-east'], tags: [], costs: { per_hour_usd: 0.36 } });
         const { resource } = nodeOffers(caps);
         assert.equal(resource.pricing.model, 'per-second');
-        assert.equal(resource.pricing.marginal_usd_per_unit, 0.0001);   // 0.36 / 3600
+        assert.ok(Math.abs(resource.pricing.marginal_usd_per_unit - 0.0001) < 1e-12);   // 0.36 / 3600
     }],
 ]);

@@ -10,10 +10,12 @@ const FIXTURES_RC = path.join(__dirname, '..', 'node_modules', 'openvibe-contrac
 const FIXTURES_CS = path.join(__dirname, '..', 'node_modules', 'openvibe-contracts', 'fixtures', 'platform.cost-snapshot');
 let contracts = null;
 try { contracts = require('openvibe-contracts'); } catch { /* the fixture cases skip */ }
+if (contracts && ![FIXTURES_RC, FIXTURES_CS].every((dir) =>
+    fs.existsSync(path.join(dir, 'valid')) && fs.existsSync(path.join(dir, 'invalid')))) contracts = null;
 
 run([
     ['rateCard passes every valid fixture through unchanged, and they validate', async () => {
-        if (!contracts) { console.log('rate-card fixtures: skipped (openvibe-contracts not installed: npm install)'); return; }
+        if (!contracts) { console.log('rate-card fixtures: skipped (matching openvibe-contracts fixtures unavailable)'); return; }
         for (const f of fs.readdirSync(path.join(FIXTURES_RC, 'valid'))) {
             const fixture = JSON.parse(fs.readFileSync(path.join(FIXTURES_RC, 'valid', f), 'utf8'));
             assert.deepEqual(rateCard({ ...fixture }), fixture, f);
@@ -29,7 +31,7 @@ run([
         assert.equal(r.unit_price_usd, 0, 'a 0 is kept, not stripped');
     }],
     ['validateRateCard refuses every invalid fixture with its errors', async () => {
-        if (!contracts) { console.log('rate-card invalid fixtures: skipped (openvibe-contracts not installed: npm install)'); return; }
+        if (!contracts) { console.log('rate-card invalid fixtures: skipped (matching openvibe-contracts fixtures unavailable)'); return; }
         for (const f of fs.readdirSync(path.join(FIXTURES_RC, 'invalid'))) {
             const fixture = JSON.parse(fs.readFileSync(path.join(FIXTURES_RC, 'invalid', f), 'utf8'));
             const r = validateRateCard(fixture);
@@ -38,7 +40,7 @@ run([
         }
     }],
     ['costSnapshot passes every valid fixture through unchanged, and they validate', async () => {
-        if (!contracts) { console.log('cost-snapshot fixtures: skipped (openvibe-contracts not installed: npm install)'); return; }
+        if (!contracts) { console.log('cost-snapshot fixtures: skipped (matching openvibe-contracts fixtures unavailable)'); return; }
         for (const f of fs.readdirSync(path.join(FIXTURES_CS, 'valid'))) {
             const fixture = JSON.parse(fs.readFileSync(path.join(FIXTURES_CS, 'valid', f), 'utf8'));
             assert.deepEqual(costSnapshot({ ...fixture }), fixture, f);
@@ -52,7 +54,7 @@ run([
         assert.ok(!('counterfactual_usd' in s));
     }],
     ['validateCostSnapshot refuses every invalid fixture with its errors', async () => {
-        if (!contracts) { console.log('cost-snapshot invalid fixtures: skipped (openvibe-contracts not installed: npm install)'); return; }
+        if (!contracts) { console.log('cost-snapshot invalid fixtures: skipped (matching openvibe-contracts fixtures unavailable)'); return; }
         for (const f of fs.readdirSync(path.join(FIXTURES_CS, 'invalid'))) {
             const fixture = JSON.parse(fs.readFileSync(path.join(FIXTURES_CS, 'invalid', f), 'utf8'));
             const r = validateCostSnapshot(fixture);

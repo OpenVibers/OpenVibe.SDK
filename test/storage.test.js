@@ -9,10 +9,11 @@ const { storageOffer, validateStorageOffer } = require('../src/storage');
 const FIXTURES = path.join(__dirname, '..', 'node_modules', 'openvibe-contracts', 'fixtures', 'platform.storage-offer');
 let contracts = null;
 try { contracts = require('openvibe-contracts'); } catch { /* the fixture cases skip */ }
+if (contracts && (!fs.existsSync(path.join(FIXTURES, 'valid')) || !fs.existsSync(path.join(FIXTURES, 'invalid')))) contracts = null;
 
 run([
     ['storageOffer passes every valid fixture through unchanged, and they validate', async () => {
-        if (!contracts) { console.log('storage-offer fixtures: skipped (openvibe-contracts not installed: npm install)'); return; }
+        if (!contracts) { console.log('storage-offer fixtures: skipped (matching openvibe-contracts fixtures unavailable)'); return; }
         for (const f of fs.readdirSync(path.join(FIXTURES, 'valid'))) {
             const fixture = JSON.parse(fs.readFileSync(path.join(FIXTURES, 'valid', f), 'utf8'));
             assert.deepEqual(storageOffer({ ...fixture }), fixture, f);
@@ -26,7 +27,7 @@ run([
         assert.ok(!('lifecycle_rules' in o), 'null lifecycle_rules stripped');
     }],
     ['validateStorageOffer refuses every invalid fixture with its errors', async () => {
-        if (!contracts) { console.log('storage-offer invalid fixtures: skipped (openvibe-contracts not installed: npm install)'); return; }
+        if (!contracts) { console.log('storage-offer invalid fixtures: skipped (matching openvibe-contracts fixtures unavailable)'); return; }
         for (const f of fs.readdirSync(path.join(FIXTURES, 'invalid'))) {
             const fixture = JSON.parse(fs.readFileSync(path.join(FIXTURES, 'invalid', f), 'utf8'));
             const r = validateStorageOffer(fixture);

@@ -10,10 +10,12 @@ const FIXTURES_RO = path.join(__dirname, '..', 'node_modules', 'openvibe-contrac
 const FIXTURES_RC = path.join(__dirname, '..', 'node_modules', 'openvibe-contracts', 'fixtures', 'platform.runtime-class');
 let contracts = null;
 try { contracts = require('openvibe-contracts'); } catch { /* the fixture cases skip */ }
+if (contracts && ![FIXTURES_RO, FIXTURES_RC].every((dir) =>
+    fs.existsSync(path.join(dir, 'valid')) && fs.existsSync(path.join(dir, 'invalid')))) contracts = null;
 
 run([
     ['runtimeOffer passes every valid fixture through unchanged, and they validate', async () => {
-        if (!contracts) { console.log('runtime-offer fixtures: skipped (openvibe-contracts not installed: npm install)'); return; }
+        if (!contracts) { console.log('runtime-offer fixtures: skipped (matching openvibe-contracts fixtures unavailable)'); return; }
         for (const f of fs.readdirSync(path.join(FIXTURES_RO, 'valid'))) {
             const fixture = JSON.parse(fs.readFileSync(path.join(FIXTURES_RO, 'valid', f), 'utf8'));
             assert.deepEqual(runtimeOffer({ ...fixture }), fixture, f);
@@ -28,7 +30,7 @@ run([
         assert.ok(!('constraints' in o), 'undefined constraints stripped');
     }],
     ['validateRuntimeOffer refuses every invalid fixture with its errors', async () => {
-        if (!contracts) { console.log('runtime-offer invalid fixtures: skipped (openvibe-contracts not installed: npm install)'); return; }
+        if (!contracts) { console.log('runtime-offer invalid fixtures: skipped (matching openvibe-contracts fixtures unavailable)'); return; }
         for (const f of fs.readdirSync(path.join(FIXTURES_RO, 'invalid'))) {
             const fixture = JSON.parse(fs.readFileSync(path.join(FIXTURES_RO, 'invalid', f), 'utf8'));
             const r = validateRuntimeOffer(fixture);
@@ -37,7 +39,7 @@ run([
         }
     }],
     ['runtimeClass accepts every valid fixture and rejects every invalid one', async () => {
-        if (!contracts) { console.log('runtime-class fixtures: skipped (openvibe-contracts not installed: npm install)'); return; }
+        if (!contracts) { console.log('runtime-class fixtures: skipped (matching openvibe-contracts fixtures unavailable)'); return; }
         for (const f of fs.readdirSync(path.join(FIXTURES_RC, 'valid'))) {
             const value = JSON.parse(fs.readFileSync(path.join(FIXTURES_RC, 'valid', f), 'utf8'));
             assert.equal(runtimeClass(value), value, f);

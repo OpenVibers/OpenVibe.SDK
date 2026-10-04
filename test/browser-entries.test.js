@@ -76,7 +76,7 @@ run([
             for (const [re, why] of FORBIDDEN) if (re.test(src)) problems.push(`${path.relative(ROOT, file)}: ${why}`);
         }
         assert.deepEqual(problems, []);
-        assert.deepEqual(blocked.sort(), ['./cache', './db', './events', './govern', './identity', './limits', './openre', './placement', './pubsub', './queue', './service', './sso', './telemetry', './testing', './usage', './valkey', './vip']);
+        assert.deepEqual(blocked.sort(), ['./cache', './cost', './db', './delivery', './events', './govern', './identity', './limits', './node', './openre', './placement', './pubsub', './queue', './runtime', './service', './sso', './storage', './telemetry', './testing', './usage', './valkey', './vip']);
         const rel = [...scanned].map((f) => path.relative(ROOT, f));
         for (const must of ['browser.js', 'src/core/client.js', 'src/auth/browser.js', 'src/realtime.js', 'src/media.js', 'src/community.js', 'src/modules.js', 'src/registry.js', 'src/jobs.js', 'src/tools.js', 'src/core/form.js', 'src/projects.js', 'browser/openvibe-sdk.mjs']) {
             assert.ok(rel.includes(must), `${must} is scanned`);
