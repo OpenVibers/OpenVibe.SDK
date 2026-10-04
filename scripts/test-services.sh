@@ -21,7 +21,7 @@ up)
   docker network inspect $NET >/dev/null 2>&1 || docker network create $NET >/dev/null
   if docker inspect ovsdk-pg >/dev/null 2>&1 && [ "$(docker inspect -f '{{.HostConfig.ShmSize}}' ovsdk-pg)" -lt 1073741824 ]; then
     # A reused ovsdk-pg from before --shm-size has the 64 MB default; remove it and PgBouncer (which points at it) so both start again.
-    docker rm -f ovsdk-pg ovsdk-pgbouncer >/dev/null 2>&1 || true
+    docker rm -f -v ovsdk-pg ovsdk-pgbouncer >/dev/null 2>&1 || true
   fi
   if ! docker ps --format '{{.Names}}' | grep -qx ovsdk-pg; then
     docker rm -f -v ovsdk-pg >/dev/null 2>&1 || true
@@ -42,10 +42,12 @@ up)
     docker run -d --name ovsdk-valkey --network $NET -p 127.0.0.1:56379:6379 valkey/valkey:9-alpine >/dev/null
   fi
   for i in $(seq 1 60); do docker exec ovsdk-pg pg_isready -U ov -d ovtest >/dev/null 2>&1 && break; sleep 0.5; done
-  # Too big and idle: a fresh empty database (only with no backend on it, so no running suite loses its schema).
+  # Too big and idle: a fresh empty database (only with no backend on it at all, so no running suite loses its schema).
+  # Count every ovtest backend, `ov` included: a live run's admin connection and its per-run roles all count, and
+  # DROP DATABASE ... WITH (FORCE) would terminate them.
   size=$(docker exec ovsdk-pg psql -U ov -d postgres -Atc "SELECT pg_database_size('ovtest')" 2>/dev/null || echo 0)
   if [ "${size:-0}" -gt $(( ${OV_TEST_PG_MAX_GB:-5} * 1024 * 1024 * 1024 )) ]; then
-    busy=$(docker exec ovsdk-pg psql -U ov -d postgres -Atc "SELECT count(*) FROM pg_stat_activity WHERE datname = 'ovtest' AND usename <> 'ov'" 2>/dev/null || echo 1)
+    busy=$(docker exec ovsdk-pg psql -U ov -d postgres -Atc "SELECT count(*) FROM pg_stat_activity WHERE datname = 'ovtest'" 2>/dev/null || echo 1)
     if [ "${busy:-1}" = 0 ] && docker exec ovsdk-pg psql -U ov -d postgres -qc "DROP DATABASE ovtest WITH (FORCE)" >/dev/null 2>&1; then
       docker exec ovsdk-pg psql -U ov -d postgres -qc "CREATE DATABASE ovtest OWNER ov" >/dev/null && echo "test-services: ovtest was $(( size / 1024 / 1024 / 1024 )) GB: rebuilt empty" >&2
     fi

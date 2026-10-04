@@ -28,9 +28,14 @@ const ORPHAN_MS = 6 * 3600e3;
 const runName = (safe, now = Date.now()) => `${safe}_t${now.toString(36)}_${crypto.randomBytes(4).toString('hex')}`;
 /** The time a run's name was made, or null (an older name without one). */
 function runTime(name) { const m = /_t([0-9a-z]{8,9})_[0-9a-f]{8}$/.exec(String(name)); if (!m) return null; const t = parseInt(m[1], 36); return t > 1.6e12 && t < 4e12 ? t : null; }
+/** Exactly what runName() makes (a service name sanitized to [a-z0-9]{1,12}), so only our own leftovers are ever dropped. */
+const RUN_SCHEMA = /^[a-z0-9]{1,12}_t[0-9a-z]{8,9}_[0-9a-f]{8}$/;
+const quoteIdent = (id) => `"${String(id).replace(/"/g, '""')}"`;
 /** Schemas of runs older than ORPHAN_MS whose roles have no backend: dropped with their roles (under the setup lock). */
 async function sweepOrphans(su, { now = Date.now(), maxAge = ORPHAN_MS } = {}) {
-    const schemas = (await su.query("SELECT nspname FROM pg_namespace WHERE nspname ~ '_t[0-9a-z]{8,9}_[0-9a-f]{8}$'")).rows.map((r) => r.nspname);
+    // A name reaches SQL only after matching the full generated shape here (the catalog regex is the same, so a row
+    // cannot smuggle one past), and every identifier is quoted.
+    const schemas = (await su.query("SELECT nspname FROM pg_namespace WHERE nspname ~ '^[a-z0-9]{1,12}_t[0-9a-z]{8,9}_[0-9a-f]{8}$'")).rows.map((r) => r.nspname).filter((n) => RUN_SCHEMA.test(n));
     const old = schemas.filter((n) => { const t = runTime(n); return t && now - t > maxAge; });
     let dropped = 0;
     for (const name of old.slice(0, 200)) {
@@ -38,8 +43,8 @@ async function sweepOrphans(su, { now = Date.now(), maxAge = ORPHAN_MS } = {}) {
         if (+busy) continue;
         await su.tx(async (t) => {
             await t.query('SELECT pg_advisory_xact_lock($1)', [SETUP_LOCK]);
-            await t.query(`DROP SCHEMA IF EXISTS ${name} CASCADE`);
-            for (const r of [name, `${name}_owner`]) { if (await t.value('SELECT count(*) FROM pg_roles WHERE rolname = $1', [r]) > 0) { await t.query(`DROP OWNED BY ${r}`); await t.query(`DROP ROLE ${r}`); } }
+            await t.query(`DROP SCHEMA IF EXISTS ${quoteIdent(name)} CASCADE`);
+            for (const r of [name, `${name}_owner`]) { if (await t.value('SELECT count(*) FROM pg_roles WHERE rolname = $1', [r]) > 0) { await t.query(`DROP OWNED BY ${quoteIdent(r)}`); await t.query(`DROP ROLE ${quoteIdent(r)}`); } }
         });
         dropped++;
     }
