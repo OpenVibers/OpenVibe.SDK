@@ -21,27 +21,29 @@ const crypto = require('crypto');
 const quiet = { log() {}, warn() {}, error: (...a) => console.error(...a) };
 const SETUP_LOCK = 735_1_2026;
 const pgAvailable = () => !!(process.env.OV_TEST_PG_URL && process.env.OV_TEST_PG_DIRECT_URL);
-// A run's schema and roles carry the time they were made (base 36 ms) so a later run can drop what a killed one left: a
-// test process ended by a time budget never reaches close(), and 4,382 schemas (364,277 tables, 19 GB) had piled up in
-// the containers' database by 2026-10-03.
+// A leased run's schema and roles carry the time they were made (base 36 ms). The lease connection stays open even
+// when the query pool goes idle; a killed process releases it so a later run can safely remove what it left behind.
 const ORPHAN_MS = 6 * 3600e3;
-const runName = (safe, now = Date.now()) => `${safe}_t${now.toString(36)}_${crypto.randomBytes(4).toString('hex')}`;
+const runName = (safe, now = Date.now()) => `${safe}_t${now.toString(36)}_${crypto.randomBytes(4).toString('hex')}_l`;
 /** The time a run's name was made, or null (an older name without one). */
-function runTime(name) { const m = /_t([0-9a-z]{8,9})_[0-9a-f]{8}$/.exec(String(name)); if (!m) return null; const t = parseInt(m[1], 36); return t > 1.6e12 && t < 4e12 ? t : null; }
-/** Schemas of runs older than ORPHAN_MS whose roles have no backend: dropped with their roles (under the setup lock). */
+function runTime(name) { const m = /_t([0-9a-z]{8,9})_[0-9a-f]{8}_l$/.exec(String(name)); if (!m) return null; const t = parseInt(m[1], 36); return t > 1.6e12 && t < 4e12 ? t : null; }
+const leaseKey = (name) => crypto.createHash('sha256').update(`openvibe-test-db:${name}`).digest().readBigInt64BE(0).toString();
+/** Sweep only leased runs: older naming formats have no reliable end-of-run signal. */
 async function sweepOrphans(su, { now = Date.now(), maxAge = ORPHAN_MS } = {}) {
-    const schemas = (await su.query("SELECT nspname FROM pg_namespace WHERE nspname ~ '_t[0-9a-z]{8,9}_[0-9a-f]{8}$'")).rows.map((r) => r.nspname);
+    const schemas = (await su.query("SELECT nspname FROM pg_namespace WHERE nspname ~ '_t[0-9a-z]{8,9}_[0-9a-f]{8}_l$'")).rows.map((r) => r.nspname);
     const old = schemas.filter((n) => { const t = runTime(n); return t && now - t > maxAge; });
     let dropped = 0;
     for (const name of old.slice(0, 200)) {
-        const busy = await su.value('SELECT count(*) FROM pg_stat_activity WHERE usename = ANY($1)', [[name, `${name}_owner`]]);
-        if (+busy) continue;
-        await su.tx(async (t) => {
+        const removed = await su.tx(async (t) => {
             await t.query('SELECT pg_advisory_xact_lock($1)', [SETUP_LOCK]);
+            if (!await t.value('SELECT pg_try_advisory_xact_lock($1::bigint)', [leaseKey(name)])) return false;
+            const busy = await t.value('SELECT count(*) FROM pg_stat_activity WHERE usename = ANY($1)', [[name, `${name}_owner`]]);
+            if (+busy) return false;
             await t.query(`DROP SCHEMA IF EXISTS ${name} CASCADE`);
             for (const r of [name, `${name}_owner`]) { if (await t.value('SELECT count(*) FROM pg_roles WHERE rolname = $1', [r]) > 0) { await t.query(`DROP OWNED BY ${r}`); await t.query(`DROP ROLE ${r}`); } }
+            return true;
         });
-        dropped++;
+        if (removed) dropped++;
     }
     return dropped;
 }
@@ -60,25 +62,34 @@ async function createTestDb({ migrations, store = process.env.OV_TEST_STORE || '
     const owner = `${name}_owner`;
     const pw = crypto.randomBytes(16).toString('hex');
     const su = createDb({ url: process.env.OV_TEST_PG_DIRECT_URL, service: `${service}-test-admin`, max: 1, log });
-    const database = await su.value('SELECT current_database()');
-    await sweepOrphans(su).catch(() => {});   // what killed runs left behind; never in the way of this run
-    await su.tx(async (t) => {
-        await t.query('SELECT pg_advisory_xact_lock($1)', [SETUP_LOCK]);
-        for (const stmt of [
-            `CREATE ROLE ${owner} LOGIN PASSWORD '${pw}'`,
-            `CREATE ROLE ${name} LOGIN PASSWORD '${pw}'`,
-            `GRANT CONNECT ON DATABASE ${database} TO ${owner}, ${name}`,
-            `CREATE SCHEMA ${name} AUTHORIZATION ${owner}`,
-            `ALTER ROLE ${owner} SET search_path = ${name}`,
-            `ALTER ROLE ${name} SET search_path = ${name}`,
-            `ALTER ROLE ${name} SET statement_timeout = '15s'`,
-            `ALTER ROLE ${name} SET lock_timeout = '5s'`,
-            `GRANT USAGE ON SCHEMA ${name} TO ${name}`,
-            `ALTER DEFAULT PRIVILEGES FOR ROLE ${owner} IN SCHEMA ${name} GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO ${name}`,
-            `ALTER DEFAULT PRIVILEGES FOR ROLE ${owner} IN SCHEMA ${name} GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO ${name}`,
-        ]) await t.query(stmt);
-    });
+    const { Client } = require('pg');
+    const lease = new Client({ connectionString: process.env.OV_TEST_PG_DIRECT_URL, application_name: `${service}-test-lease`, keepAlive: true });
+    let releasingLease = false;
+    try {
+        await lease.connect();
+        await lease.query('SELECT pg_advisory_lock($1::bigint)', [leaseKey(name)]);
+        lease.on('end', () => { if (!releasingLease) throw new Error(`test database lease lost for ${name}`); });
+        const database = await su.value('SELECT current_database()');
+        await sweepOrphans(su).catch(() => {});   // what killed runs left behind; never in the way of this run
+        await su.tx(async (t) => {
+            await t.query('SELECT pg_advisory_xact_lock($1)', [SETUP_LOCK]);
+            for (const stmt of [
+                `CREATE ROLE ${owner} LOGIN PASSWORD '${pw}'`,
+                `CREATE ROLE ${name} LOGIN PASSWORD '${pw}'`,
+                `GRANT CONNECT ON DATABASE ${database} TO ${owner}, ${name}`,
+                `CREATE SCHEMA ${name} AUTHORIZATION ${owner}`,
+                `ALTER ROLE ${owner} SET search_path = ${name}`,
+                `ALTER ROLE ${name} SET search_path = ${name}`,
+                `ALTER ROLE ${name} SET statement_timeout = '15s'`,
+                `ALTER ROLE ${name} SET lock_timeout = '5s'`,
+                `GRANT USAGE ON SCHEMA ${name} TO ${name}`,
+                `ALTER DEFAULT PRIVILEGES FOR ROLE ${owner} IN SCHEMA ${name} GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO ${name}`,
+                `ALTER DEFAULT PRIVILEGES FOR ROLE ${owner} IN SCHEMA ${name} GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO ${name}`,
+            ]) await t.query(stmt);
+        });
+    } catch (e) { releasingLease = true; await lease.end().catch(() => {}); await su.close().catch(() => {}); throw e; }
     const as = (url, user) => { const u = new URL(url); u.username = user; u.password = pw; return u.toString(); };
+    let db;
     async function drop() {
         try {
             await su.query('SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE usename = ANY($1)', [[name, owner]]);
@@ -87,9 +98,8 @@ async function createTestDb({ migrations, store = process.env.OV_TEST_STORE || '
                 await t.query(`DROP SCHEMA IF EXISTS ${name} CASCADE`);
                 for (const r of [name, owner]) { await t.query(`DROP OWNED BY ${r}`); await t.query(`DROP ROLE ${r}`); }
             });
-        } finally { await su.close(); }
+        } finally { releasingLease = true; await lease.end().catch(() => {}); await su.close(); }
     }
-    let db;
     try {
         if (migrations) {
             const ownerDb = createDb({ url: as(process.env.OV_TEST_PG_DIRECT_URL, owner), service: `${service}-test-migrate`, max: 1, log });
@@ -113,4 +123,4 @@ function createTestValkey({ prefix = 'test' } = {}) {
     return createValkey({ url: process.env.OV_TEST_VALKEY_URL, prefix: `ov:${prefix}-test:${crypto.randomBytes(4).toString('hex')}:`, log: quiet });
 }
 
-module.exports = { createTestDb, createTestValkey, pgAvailable, valkeyAvailable, runName, runTime, sweepOrphans };
+module.exports = { createTestDb, createTestValkey, pgAvailable, valkeyAvailable, runName, runTime, leaseKey, sweepOrphans };

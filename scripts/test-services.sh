@@ -5,9 +5,8 @@
 #   scripts/test-services.sh up      start (or reuse) and print the env to export
 #   scripts/test-services.sh down    remove the containers (and their data volumes)
 #
-# The data is throwaway: `up` rebuilds the test database when it has grown past OV_TEST_PG_MAX_GB (5) and nothing is
-# connected to it (2026-10-03: runs killed before close() had left 4,382 schemas, 19 GB; createTestDb now sweeps those
-# too), and every container is removed with its anonymous volume, which a plain `rm -f` used to orphan (133 of them).
+# The data is throwaway: createTestDb sweeps abandoned schemas, and `down` removes the containers with their anonymous
+# volumes. `up` must not rebuild a reused database: a live test may have no connection after its pool becomes idle.
 #
 # Tests read OV_TEST_PG_URL (through PgBouncer), OV_TEST_PG_DIRECT_URL and OV_TEST_VALKEY_URL; without them the
 # integration cases print "<label>: skipped (…)" and the suite still runs on PGlite and the memory stores.
@@ -42,14 +41,6 @@ up)
     docker run -d --name ovsdk-valkey --network $NET -p 127.0.0.1:56379:6379 valkey/valkey:9-alpine >/dev/null
   fi
   for i in $(seq 1 60); do docker exec ovsdk-pg pg_isready -U ov -d ovtest >/dev/null 2>&1 && break; sleep 0.5; done
-  # Too big and idle: a fresh empty database (only with no backend on it, so no running suite loses its schema).
-  size=$(docker exec ovsdk-pg psql -U ov -d postgres -Atc "SELECT pg_database_size('ovtest')" 2>/dev/null || echo 0)
-  if [ "${size:-0}" -gt $(( ${OV_TEST_PG_MAX_GB:-5} * 1024 * 1024 * 1024 )) ]; then
-    busy=$(docker exec ovsdk-pg psql -U ov -d postgres -Atc "SELECT count(*) FROM pg_stat_activity WHERE datname = 'ovtest'" 2>/dev/null || echo 1)
-    if [ "${busy:-1}" = 0 ] && docker exec ovsdk-pg psql -U ov -d postgres -qc "DROP DATABASE ovtest" >/dev/null 2>&1; then
-      docker exec ovsdk-pg psql -U ov -d postgres -qc "CREATE DATABASE ovtest OWNER ov" >/dev/null && echo "test-services: ovtest was $(( size / 1024 / 1024 / 1024 )) GB: rebuilt empty" >&2
-    fi
-  fi
   echo "export OV_TEST_PG_URL=postgres://ov:$PW@127.0.0.1:56432/ovtest"
   echo "export OV_TEST_PG_DIRECT_URL=postgres://ov:$PW@127.0.0.1:55432/ovtest"
   echo "export OV_TEST_VALKEY_URL=redis://127.0.0.1:56379/0"
