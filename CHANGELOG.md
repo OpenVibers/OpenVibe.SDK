@@ -7,8 +7,10 @@ release may change an API and says so here.
 
 
 
-## Unreleased
+## 0.27.0 (2026-10-03)
 
+- Add server subpaths `openvibe-sdk/cost`, `openvibe-sdk/runtime`, `openvibe-sdk/storage`,
+  `openvibe-sdk/delivery`, and `openvibe-sdk/node` for Fabric contract records and offer builders.
 - **`openvibe-sdk/usage` (new, server; plan T1):** `platform.usage-sample@1` readings in one place.
   `usageSample(fields)` builds the record — `id`, `idempotency_key`, `service`, `operation`, `quantity`, `unit` and
   every optional dimension pass through, `at` defaults to now (ISO) and `source` to `openvibe-sdk/usage`, null fields
