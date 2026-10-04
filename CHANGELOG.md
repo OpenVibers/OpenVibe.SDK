@@ -7,10 +7,22 @@ release may change an API and says so here.
 
 
 
-## 0.27.0 (2026-10-03)
+## 0.27.0 (2026-10-04)
 
-- Add server subpaths `openvibe-sdk/cost`, `openvibe-sdk/runtime`, `openvibe-sdk/storage`,
-  `openvibe-sdk/delivery`, and `openvibe-sdk/node` for Fabric contract records and offer builders.
+- **`openvibe-sdk/cost` (new, server; plan T1):** `rateCard()` / `validateRateCard()` for `platform.rate-card@1`,
+  `costSnapshot()` / `validateCostSnapshot()` for `platform.cost-snapshot@1`, and `estimate(card, quantity, unit)`
+  for the charge a rate card gives a quantity.
+- **`openvibe-sdk/runtime` (new, server; plan T1):** `runtimeOffer()` / `validateRuntimeOffer()` for
+  `platform.runtime-offer@1`, and `runtimeClass()` / `validateRuntimeClass()` / `RUNTIME_CLASSES` for
+  `platform.runtime-class@1`.
+- **`openvibe-sdk/storage` (new, server; plan T1):** `storageOffer()` / `validateStorageOffer()` for
+  `platform.storage-offer@1`.
+- **`openvibe-sdk/delivery` (new, server; plan T1):** `deliveryOffer()` / `validateDeliveryOffer()` for
+  `platform.delivery-offer@1`.
+- **`openvibe-sdk/node` (new, server; plan T1):** `nodeCapabilities()` / `validateNodeCapabilities()` for
+  `platform.node-capabilities@1`, and `nodeOffers(descriptor)`, which derives a node's resource and runtime offers.
+- **`openvibe-sdk/placement` exports `TRUST_CLASSES`** (the five T1 trust classes) and `TRUST_ORDER` (the planner's
+  default preference, unchanged), with their type declarations.
 - **`openvibe-sdk/usage` (new, server; plan T1):** `platform.usage-sample@1` readings in one place.
   `usageSample(fields)` builds the record — `id`, `idempotency_key`, `service`, `operation`, `quantity`, `unit` and
   every optional dimension pass through, `at` defaults to now (ISO) and `source` to `openvibe-sdk/usage`, null fields

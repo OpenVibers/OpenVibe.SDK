@@ -26,3 +26,4 @@ export declare function createPlanHolder(publicKeys: Record<string, any>, opts?:
 export declare function canonical(v: unknown): string;
 /** The five trust classes (T1 ADR-046): first-party, user-owned, partner, community, external. */
 export declare const TRUST_CLASSES: readonly ['first-party', 'user-owned', 'partner', 'community', 'external'];
+export declare const TRUST_ORDER: readonly ['first-party', 'user-owned', 'partner', 'community', 'external'];
