@@ -11,3 +11,62 @@ export declare function usageSample(fields: Partial<UsageSample>): UsageSample;
 export declare function usageKey(service: string, ...parts: (string | number)[]): string;
 /** { ok, errors } against platform.usage-sample@1; a missing openvibe-contracts never claims validity (ok: false, errors: []). */
 export declare function validateUsageSample(record: unknown): { ok: boolean; errors: ValidationError[] };
+
+/** Anything with getToken({ audience }) — openvibe-sdk/auth's createServiceTokenClient. */
+export type UsageTokenClient = { getToken(ctx?: { audience?: string; scope?: string | string[] }): Promise<string> };
+
+export type UsageReporterOptions = {
+    /** An openvibe-sdk/db handle (server); the outbox table lives in the same database. */
+    db: unknown;
+    /** The Contracts service id (services/<id>.json), e.g. 'run', 'tools', 'ai'. */
+    service: string;
+    /** The sample's `source`, e.g. 'openvibe-node.worker', 'ai.runs'. */
+    source: string;
+    /** The outbox table (default 'usage_outbox'); services create it in a migration. */
+    table?: string;
+    /** OpenVibe.Billing's base URL; without it (or a tokenClient) only queueing happens. */
+    billingUrl?: string;
+    tokenClient?: UsageTokenClient | null;
+    /** The token audience (default 'openvibe.billing'). */
+    audience?: string;
+    fetchImpl?: import('./core').FetchLike;
+    /** The Billing POST timeout (default 5000). */
+    timeoutMs?: number;
+    /** The relay tick (default 2000). */
+    intervalMs?: number;
+    /** Readings per publish (default 1: one reading per request). */
+    batchSize?: number;
+    now?: () => number;
+    log?: { warn?(...args: unknown[]): void };
+};
+
+/** One service's usage reporter: build/validate readings, queue them idempotency-keyed, relay to Billing. */
+export interface UsageReporter {
+    readonly enabled: boolean;
+    readonly service: string;
+    readonly source: string;
+    readonly table: string;
+    /** The service's stable key, e.g. key('job', id, n) -> 'run:job:<id>:<n>'. */
+    key(...parts: (string | number)[]): string;
+    /** A reading for this service and source; `id` defaults to `idempotency_key`. */
+    sample(fields: Partial<UsageSample>): UsageSample;
+    /** INSIDE the caller's transaction (db.tx's handle): queue the reading under its idempotency_key. */
+    record(t: unknown, reading: UsageSample | Record<string, unknown>): Promise<boolean>;
+    /** Create the outbox table where the handle may (tests, PGlite); services put it in a migration instead. */
+    ensureSchema(): Promise<unknown>;
+    start(): void;
+    stop(): Promise<unknown>;
+    kick(): void;
+    flush(): Promise<{ sent: number; failed: number; rejected: number }>;
+    prune(olderThanMs?: number): Promise<unknown>;
+    pending(): Promise<number>;
+    rejected(): Promise<number>;
+}
+
+/**
+ * The shared step-7 reporter: readings queue idempotency-keyed in `table` inside the caller's transaction and
+ * relay to Billing's billing.usage.record with createPgOutbox. Never dropped (transient failures retry with
+ * backoff across restarts); only Billing refusing the reading itself (400, 409, 413, 422) marks a row rejected,
+ * kept with its error and never sent again.
+ */
+export declare function createUsageReporter(options: UsageReporterOptions): UsageReporter;
