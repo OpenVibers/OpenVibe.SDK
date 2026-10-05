@@ -26,6 +26,14 @@ release may change an API and says so here.
   subpath already existed); `outboxSchema(table)` stays the migration DDL. New unit test for key derivation,
   replay refusal and the retry/reject relay.
 
+## 0.31.1 (2026-10-05)
+
+- **`createTestDb` in pg mode no longer keeps a test process alive (`openvibe-sdk/testing`, patch):** the lease
+  `pg.Client` it opens to hold the run's advisory lock (since 0.26) kept a ref'd socket, so a test file that finished
+  without `process.exit()` never exited and a per-file runner timed it out (Media's test:pg hung at 300 s per file).
+  The lease socket is now unref'd right after it connects; the lock still holds for as long as the process lives, and
+  `close()` still releases it.
+
 ## 0.31.0 (2026-10-05)
 
 - **`openvibe-sdk/service` carries the HTTP telemetry middleware and autoscaling signals (plan T1):** lifted from
