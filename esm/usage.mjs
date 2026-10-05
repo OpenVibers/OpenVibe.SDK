@@ -2,6 +2,6 @@
 import cjs from '../src/usage.js';
 
 export const {
-    usageSample, usageKey, validateUsageSample,
+    usageSample, usageKey, validateUsageSample, createUsageReporter,
 } = cjs;
 export default cjs;

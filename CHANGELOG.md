@@ -7,6 +7,28 @@ release may change an API and says so here.
 
 
 
+## 0.32.0 (2026-10-05)
+
+- **`openvibe-sdk/usage` gains `createUsageReporter` (plan T1 step 7):** the shared reporter Tools, AI, Events and
+  Bot each rewrote. `createUsageReporter({ db, service, source, table = 'usage_outbox', billingUrl, tokenClient,
+  audience, fetchImpl, timeoutMs, intervalMs, batchSize, now, log })` owns one service's readings: `key(...parts)`
+  is `usageKey(service, …)`, `sample(fields)` fills in the reporter's `service` and `source` and defaults `id` to
+  the idempotency key, and `record(t, reading)` validates the reading against `platform.usage-sample@1`
+  (via `validateUsageSample`, so a missing openvibe-contracts never blocks the queue) and inserts it
+  idempotency-keyed in the outbox table inside the caller's transaction (`db.tx`'s handle; a replayed key changes
+  nothing). The relay is `createPgOutbox` pointed at Billing's `billing.usage.record` (`POST /api/v1/usage`, one
+  reading per request): `start`/`stop`/`kick`/`flush`/`prune` plus `pending`/`rejected`, and it uses the given
+  token client (`createServiceTokenClient`, audience `openvibe.billing`). A reading is never dropped — a relay
+  that cannot reach Billing (down, no grant yet, a missing route, a timeout or a 401/403/404/408/425/429/5xx)
+  retries with backoff across restarts — and only Billing refusing the reading itself (any other 4xx: 400, 402,
+  409, 410, 413, 415, 422) marks a row rejected: kept with its error and never sent again, so nothing is billed
+  twice; a 401 drops the cached token first. The reporter bills whatever reading it is given, so callers must not
+  record first-party or sandbox traffic: `requireProject: true` makes `record()` refuse a reading without a
+  `prj_…` project. Without `billingUrl` or `tokenClient` readings still queue and
+  only the relay is off. Re-exported from the top-level entry and declared in `types/usage.d.ts` (the `./usage`
+  subpath already existed); `outboxSchema(table)` stays the migration DDL. New unit test for key derivation,
+  replay refusal and the retry/reject relay (the full status matrix, 401 invalidation and the timer stop).
+
 ## 0.31.1 (2026-10-05)
 
 - **`createTestDb` in pg mode no longer keeps a test process alive (`openvibe-sdk/testing`, patch):** the lease
