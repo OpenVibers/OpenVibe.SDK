@@ -2,14 +2,14 @@
 
 > Supported browser and server clients for the OpenVibe platform.
 
-**Status:** alpha, v0.32.0 (roadmap Wave 2; developer apps from Wave 20; Media objects v2 from Wave 4; the Tools platform API; Search, Chat and AI clients from WS-F task 4; per-actor limits from WS-R task 4). Every release is tagged (see [CHANGELOG.md](CHANGELOG.md)). Tested against local stub servers and the built-in mock platform only, never against the live platform. Services pin release tags; each repository's `STATUS.json` names the one it uses.  
+**Status:** alpha, v0.33.0 (roadmap Wave 2; developer apps from Wave 20; Media objects v2 from Wave 4; the Tools platform API; Search, Chat and AI clients from WS-F task 4; per-actor limits from WS-R task 4). Every release is tagged (see [CHANGELOG.md](CHANGELOG.md)). Tested against local stub servers and the built-in mock platform only, never against the live platform. Services pin release tags; each repository's `STATUS.json` names the one it uses.  
 **Plan:** OpenVibe End-to-End Realignment & Implementation Plan, revision 3 (20 Sep 2026), §3.2; roadmap §30.  
 **License:** MIT ([LICENSE](LICENSE)). This package is a library that apps outside the network embed, so it uses MIT. The OpenVibe services themselves stay AGPL-3.0.
 
 **If a capability is not in the SDK, it is not public.** Apps call services through `openvibe-sdk` and never build internal routes themselves. A route with no SDK wrapper is internal, even when you can reach it, and it can change without notice. To make a capability public, first define it in OpenVibe.Contracts, then wrap it here.
 
 ```bash
-npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.32.0
+npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.33.0
 ```
 
 It has no runtime dependencies. It needs Node ≥ 20, or any browser with `fetch`, Web Crypto and `TextDecoder`. There is no build step. The package is CommonJS with ESM entry points (`import` works). Each subpath has its own `.d.ts`. For a page with no bundler, `browser/openvibe-sdk.mjs` is one self-contained ES module of the browser-safe subpaths (see [Browser without a bundler](#browser-without-a-bundler)). It does not depend on `openvibe-contracts` at runtime: it copies the contract types it uses (from Contracts v0.86.0, a devDependency the tests check them against).
@@ -214,7 +214,7 @@ Server-only subpaths are declared `"browser": null` in the exports map, so a bun
   - Legacy `{ error: 'text' }` bodies become `http.<status>`.
   - Failures with no HTTP response use `sdk.timeout`, `sdk.deadline_exceeded`, `sdk.aborted`, `sdk.network_error` or `sdk.unknown_service`.
 - **Tracing.** Every call sends `traceparent` and `X-OpenVibe-Request-Id`. The request id stays the same across retries. `client.withContext({ traceparent, requestId })` or `client.fromRequest(req)` continues the caller's trace with a new span. The `traceparent` option also accepts a getter, for example one backed by AsyncLocalStorage.
-- **Pagination.** `paginate(fetchPage, { cursor })` is an async iterator over `{ items, next }` pages. Media and Community use offsets. Events `iterate()` walks `after_seq` and calls `onPage(page)` only after every item of that page was handled, so saving `page.next_after_seq` there is crash-safe.
+- **Pagination.** `paginate(fetchPage, { cursor })` is an async iterator over `{ items, next }` pages. Media and Community use offsets. Events `pull()` takes an opaque `after` cursor (a page's `next_cursor`; `afterSeq`, the numeric position, remains for one release) and `iterate()` walks it, calling `onPage(page)` only after every item of that page was handled, so saving `page.next_cursor` there — it advances even when a page matched nothing — is crash-safe.
 - **Streams and downloads.** `responseType: 'response'` resolves with the raw fetch `Response` (`data` and `response`, body unread). Error statuses are still read and thrown. The timeout covers the headers only, and `signal` still cancels the body. `parseSSE(res.body)` (from `openvibe-sdk/realtime`) iterates a `text/event-stream`.
 
 ### Auth details

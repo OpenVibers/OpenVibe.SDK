@@ -7,6 +7,18 @@ release may change an API and says so here.
 
 
 
+## 0.33.0 (2026-10-05)
+
+- **`openvibe-sdk/events` surfaces the opaque `after`/`next_cursor` pull cursors (ADR-042 decision 7):** `pull()`
+  now takes `after` — a page's opaque `next_cursor` — and sends it as the `after` query parameter; `afterSeq` (the
+  numeric `after_seq`) stays for one release and is sent when no cursor is given. `StoredEvent` carries `cursor`
+  and `EventsPage` carries `next_cursor`. `iterate()` starts from `after` or `afterSeq` and advances on
+  `page.next_cursor` (falling back to `next_after_seq` while the compatibility field remains) after `onPage`, so a
+  page that matched no events still advances the saved cursor; resuming from a saved `next_cursor` replays
+  nothing. The mock platform (`openvibe-sdk/testing`) models the same page shape and accepts `after`, and
+  `README.md`'s pagination note names the cursor. New assertions in `test/events.test.js` and
+  `test/app-events.test.js` cover the round-trip, the empty page, and the `after_seq` fallback.
+
 ## 0.32.0 (2026-10-05)
 
 - **`openvibe-sdk/usage` gains `createUsageReporter` (plan T1 step 7):** the shared reporter Tools, AI, Events and

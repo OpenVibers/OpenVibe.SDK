@@ -71,18 +71,47 @@ run([
         assert.deepEqual(page.events.map((e) => e.seq), [1, 3]);
         assert.equal(page.next_after_seq, 3);
         assert.equal(page.latest_seq, 5);
+        assert.match(page.next_cursor, /^c1\./, 'the page carries an opaque next_cursor');
+        assert.match(page.events[0].cursor, /^c1\./, 'each event carries its cursor');
+        // The opaque cursor round-trips: `after` resumes exactly where the page ended.
+        const rest = await events.pull({ topic: 'media.vod.*', after: page.next_cursor, limit: 2 });
+        assert.deepEqual(rest.events.map((e) => e.seq), [5]);
+        assert.equal((await events.get(platform.state.events[0].event.event_id)).cursor, page.events[0].cursor);
+        // afterSeq, the numeric position, still works for one release.
+        assert.deepEqual((await events.pull({ topic: 'media.vod.*', afterSeq: page.next_after_seq, limit: 2 })).events.map((e) => e.seq), [5]);
         const seen = [];
         const cursors = [];
-        for await (const { seq, event } of events.iterate({ topic: ['media.vod.*'], afterSeq: 0, limit: 2, onPage: (p) => cursors.push(p.next_after_seq) })) {
+        for await (const { seq, event } of events.iterate({ topic: ['media.vod.*'], afterSeq: 0, limit: 2, onPage: (p) => cursors.push(p.next_cursor) })) {
             seen.push(seq);
             assert.equal(event.event_type, 'media.vod.ready');
         }
         assert.deepEqual(seen, [1, 3, 5]);
-        assert.equal(cursors.at(-1), 5);
+        assert.match(cursors.at(-1), /^c1\./);
+        assert.equal(cursors.at(-1), (await events.pull({ topic: 'media.vod.*', afterSeq: 5 })).next_cursor, 'iterate ends on the page cursor');
+        const resumed = [];
+        for await (const { seq } of events.iterate({ topic: 'media.vod.*', after: page.next_cursor, limit: 2 })) resumed.push(seq);
+        assert.deepEqual(resumed, [5], 'iterate resumes from an opaque cursor');
         assert.equal((await events.get(platform.state.events[0].event.event_id)).seq, 1);
         assert.equal(await events.get('evt_01J00000000000000000000000'), null);
         await events.setCheckpoint('media.vod.*', 5);
         assert.equal((await events.getCheckpoint('media.vod.*')).cursor, 5);
+    }],
+
+    ['iterate: onPage advances the cursor even on a page that matches no events', async () => {
+        const { platform, events } = setup();
+        platform.publishEvent({ event_type: 'live.other.thing', source: 'media', actor, subject: { type: 'vod', id: '1' } });
+        const pages = [];
+        for await (const e of events.iterate({ topic: 'media.vod.*', onPage: (p) => pages.push(p) })) void e;
+        assert.equal(pages.length, 1, 'the empty page still called onPage');
+        assert.deepEqual(pages[0].events, []);
+        assert.equal(pages[0].next_after_seq, 1);
+        assert.match(pages[0].next_cursor, /^c1\./, 'the cursor advanced past the scanned, non-matching event');
+        // Resuming from that cursor does not replay the scanned event: the new match is seen once.
+        const saved = pages[0].next_cursor;
+        platform.publishEvent({ event_type: 'media.vod.ready', source: 'media', actor, subject: { type: 'vod', id: '2' } });
+        const seen = [];
+        for await (const e of events.iterate({ topic: 'media.vod.*', after: saved })) seen.push(e.seq);
+        assert.deepEqual(seen, [2]);
     }],
 
     ['iterate reports a retention gap through onGap', async () => {
