@@ -14,6 +14,7 @@ export * as ai from './ai';
 export * as jobs from './jobs';
 export * as tools from './tools';
 export * as projects from './projects';
+export * as resources from './resources';
 export * as vip from './vip';
 export * as openre from './openre';
 export * as geo from './geo';

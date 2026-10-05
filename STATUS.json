@@ -3,7 +3,7 @@
   "stage": "alpha",
   "code": true,
   "wave": "W2",
-  "version": "0.33.0",
+  "version": "0.34.0",
   "plan": "OpenVibe End-to-End Realignment & Implementation Plan, revision 3 (20 Sep 2026), §3.2; roadmap §30",
   "deployed": false,
   "deployment": "none: a package released as git tags; services and apps pin a tag",
@@ -27,7 +27,8 @@
     "commerce (openvibe-sdk/commerce): the shared Billing client for Tips and VIP, with intentKey and receipt",
     "events: the PostgreSQL outbox (lease-claimed, several relays per table) and inbox (handler in its transaction)",
     "usage: createUsageReporter (openvibe-sdk/usage), the shared platform.usage-sample@1 reporter — validated readings queued idempotency-keyed in an outbox and relayed to Billing with retry, never dropped, refused readings kept",
-    "the HTTP telemetry kit (openvibe-sdk/service): the platform.telemetry-sample@1 middleware aggregated per route|method|status_class per flush, with active-requests, p95 and event-loop-lag gauges, lifted from Network's server/telemetry.js and server/observability.js"
+    "the HTTP telemetry kit (openvibe-sdk/service): the platform.telemetry-sample@1 middleware aggregated per route|method|status_class per flush, with active-requests, p95 and event-loop-lag gauges, lifted from Network's server/telemetry.js and server/observability.js",
+    "resources (openvibe-sdk/resources): the ADR-048 resource index fan-out and the idempotent control client"
   ],
   "updated": "2026-10-05"
 }

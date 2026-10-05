@@ -7,6 +7,32 @@ release may change an API and says so here.
 
 
 
+## 0.34.0 (2026-10-05)
+
+- **`openvibe-sdk/resources` (new): the resource index and the control plane (ADR-048, plan T13 step 2).**
+  `parseResourceName`/`resourceName`/`resourceNameOf` reuse the pinned openvibe-contracts helpers
+  (`contracts.resources`, required lazily) for the one resource name, OVRN
+  `ovrn:<service>:<project_id>:<type>/<id>`. `createResourceIndex({ authorities, token, fetch, pageLimit,
+  concurrency, timeoutMs, maxPages, maxMs })` fans out `GET
+  {authority}/api/v1/resources?project=&kind=&cursor=&limit=`, follows each authority opaque
+  `next_cursor` and merges the `common.resource-list-result@1` pages in authority order; an authority
+  that fails (network, timeout, non-2xx, malformed page) never fails the call — its pages read so far are
+  kept and it is reported in `stale`, so a read model can be rebuilt. A cursor chain that would not end
+  is bounded — a repeated cursor (a cycle or an echoed cursor) or an empty `next_cursor` ends the walk,
+  `maxPages` caps the pages read and an optional `maxMs` deadline caps the time — and the authority is
+  reported `stale` (`sdk.bad_response`/`sdk.timeout`) rather than hanging `list()`.
+  `createResourceClient({ origin, token })` POSTs a `common.resource-control-request@1` to
+  `/api/v1/resources/control` and returns the authority `common.resource-control-result@1`
+  (`done`/`pending`/`refused`/`failed`, a refused one carrying its problem or `confirmation_required`);
+  a refused/failed result is returned even when it arrives with a non-retryable non-2xx (403/409/422), so
+  a confirmation gate is not thrown away. An idempotency key is generated when the caller omits it and a
+  transient failure (network, timeout, 408/425/429/5xx) is retried with the same key and body, so an
+  action is never applied twice; an error thrown after the retries carries that `idempotencyKey`, so the
+  caller's own retry reuses it instead of duplicating a sensitive action.
+  `RESOURCE_KINDS` lists the kinds whose three-letter id prefix ADR-048 has chosen
+  (`media.object`/`med`, `watch.watch`/`wch`); the proposed (`act`, `run`, `zon`) and unchosen
+  (`codes.repo`, `events.queue`, `events.subscription`) kinds are deliberately absent until step 8.
+
 ## 0.33.0 (2026-10-05)
 
 - **`openvibe-sdk/events` surfaces the opaque `after`/`next_cursor` pull cursors (ADR-042 decision 7):** `pull()`
