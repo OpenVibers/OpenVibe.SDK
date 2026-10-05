@@ -154,4 +154,155 @@ run([
             assert.equal(srv.requests[0].headers.authorization, undefined, 'no token: no header');
         } finally { await srv.close(); }
     }],
+
+    ['the index stops and reports stale when an authority repeats a cursor (a cycle)', async () => {
+        const srv = await stubServer((req, res) => {
+            const cursor = new URL(req.url, 'http://x').searchParams.get('cursor');
+            const next = cursor === 'A' ? 'B' : 'A';   // A -> B -> A never ends
+            return send(res, 200, page([summary(MED)], next));
+        });
+        try {
+            const index = createResourceIndex({ authorities: [srv.url] });
+            const { resources, stale } = await index.list({ project: PRJ });
+            assert.equal(stale.length, 1);
+            assert.equal(stale[0].authority, srv.url);
+            assert.equal(stale[0].code, 'sdk.bad_response');
+            assert.match(stale[0].error, /cursor repeated/);
+            assert.deepEqual(resources.map((r) => r.id), [MED, MED, MED], 'the pages read are kept');
+            assert.equal(srv.requests.length, 3, 'page 1 (no cursor), A, then B repeats A');
+        } finally { await srv.close(); }
+    }],
+
+    ['the index stops an endless cursor stream at maxPages and reports stale', async () => {
+        let n = 0;
+        const srv = await stubServer((req, res) => send(res, 200, page([summary(MED)], `cursor-${++n}`)));
+        try {
+            const index = createResourceIndex({ authorities: [srv.url], maxPages: 3 });
+            const { resources, stale } = await index.list({ project: PRJ });
+            assert.equal(srv.requests.length, 3, 'maxPages bounds the walk');
+            assert.equal(resources.length, 3, 'the pages read are kept');
+            assert.equal(stale.length, 1);
+            assert.equal(stale[0].code, 'sdk.bad_response');
+            assert.match(stale[0].error, /did not end after 3 pages/);
+        } finally { await srv.close(); }
+    }],
+
+    ['the index reports a walk past its maxMs deadline as stale', async () => {
+        const srv = await stubServer((req, res) => setTimeout(() => send(res, 200, page([summary(MED)], 'more')), 30));
+        try {
+            const index = createResourceIndex({ authorities: [srv.url], maxMs: 15 });
+            const { resources, stale } = await index.list({ project: PRJ });
+            assert.equal(resources.length, 1, 'the first page is kept');
+            assert.equal(stale.length, 1);
+            assert.equal(stale[0].code, 'sdk.timeout');
+            assert.match(stale[0].error, /maxMs/);
+        } finally { await srv.close(); }
+    }],
+
+    ['an empty next_cursor ends the walk (no cursor= request)', async () => {
+        const srv = await stubServer((req, res) => send(res, 200, page([summary(MED)], '')));
+        try {
+            const index = createResourceIndex({ authorities: [srv.url] });
+            const { resources, stale } = await index.list({ project: PRJ });
+            assert.deepEqual(resources.map((r) => r.id), [MED]);
+            assert.deepEqual(stale, []);
+            assert.equal(srv.requests.length, 1, 'an empty cursor is the end, not a cursor to follow');
+        } finally { await srv.close(); }
+    }],
+
+    ['control returns a refused result sent with a non-retryable non-2xx status', async () => {
+        const srv = await stubServer((req, res) => problem(res, 409, 'resource.confirmation_required', 'needs approval', {
+            action: 'delete', state: 'refused', at: '2026-10-05T00:00:00Z',
+            confirmation_required: { confirmation_id: 'cnf_01K0000000000000000000000A', reason: 'the owner must approve a delete' },
+        }));
+        try {
+            const client = createResourceClient({ origin: srv.url, retryDelayMs: 1 });
+            const result = await client.control({ action: 'delete', project_id: PRJ, resource: `ovrn:media:${PRJ}:object/${MED}`, idempotency_key: 'conflict-refused-key' });
+            assert.equal(result.state, 'refused');
+            assert.equal(result.confirmation_required.confirmation_id, 'cnf_01K0000000000000000000000A');
+            assert.equal(srv.requests.length, 1, 'a non-retryable status is not retried');
+        } finally { await srv.close(); }
+    }],
+
+    ['a 5xx refused body still retries first, then throws with the idempotency key', async () => {
+        const srv = await stubServer((req, res) => problem(res, 503, 'service.unavailable', 'try again', {
+            action: 'delete', state: 'refused', at: '2026-10-05T00:00:00Z', problem: { detail: 'busy' },
+        }));
+        try {
+            const client = createResourceClient({ origin: srv.url, retries: 1, retryDelayMs: 1 });
+            const err = await client.control({ action: 'delete', project_id: PRJ, resource: `ovrn:media:${PRJ}:object/${MED}`, idempotency_key: 'busy-refused-key' })
+                .then(() => null, (e) => e);
+            assert.ok(err, 'a retryable status still throws after the retries');
+            assert.equal(srv.requests.length, 2);
+            assert.equal(err.idempotencyKey, 'busy-refused-key');
+            assert.equal(JSON.parse(srv.requests[1].body.toString()).idempotency_key, 'busy-refused-key');
+        } finally { await srv.close(); }
+    }],
+
+    ['a non-retryable non-2xx without a refused/failed body is still thrown', async () => {
+        const srv = await stubServer((req, res) => problem(res, 403, 'authorization.denied', 'no capability'));
+        try {
+            const client = createResourceClient({ origin: srv.url });
+            await assert.rejects(
+                client.control({ action: 'delete', project_id: PRJ, resource: `ovrn:media:${PRJ}:object/${MED}`, idempotency_key: 'forbidden-test-key' }),
+                (err) => err.code === 'authorization.denied' && err.status === 403,
+            );
+            assert.equal(srv.requests.length, 1);
+        } finally { await srv.close(); }
+    }],
+
+    ['a thrown control error carries the generated idempotency key', async () => {
+        let sawKey;
+        const srv = await stubServer((req, res, body) => {
+            sawKey = JSON.parse(body.toString()).idempotency_key;
+            return problem(res, 500, 'internal.error', 'boom');
+        });
+        try {
+            const client = createResourceClient({ origin: srv.url, retries: 0 });
+            const err = await client.control({ action: 'delete', project_id: PRJ, resource: `ovrn:media:${PRJ}:object/${MED}` })
+                .then(() => null, (e) => e);
+            assert.ok(err);
+            assert.match(err.idempotencyKey, /^idem_[0-9A-HJKMNP-TV-Z]{26}$/);
+            assert.equal(err.idempotencyKey, sawKey, 'the key the authority saw is returned to the caller');
+        } finally { await srv.close(); }
+    }],
+
+    ['a real error from the contracts validator propagates instead of the weak shape check', async () => {
+        const contracts = require(require.resolve('openvibe-contracts'));
+        const original = contracts.resources.checkControlRequest;
+        const srv = await stubServer((req, res) => send(res, 200, { action: 'delete', state: 'done', at: '2026-10-05T00:00:00Z' }));
+        try {
+            contracts.resources.checkControlRequest = () => { throw new Error('contracts validator exploded'); };
+            const client = createResourceClient({ origin: srv.url });
+            await assert.rejects(
+                client.control({ action: 'delete', project_id: PRJ, resource: `ovrn:media:${PRJ}:object/${MED}`, idempotency_key: 'validator-test-key' }),
+                /contracts validator exploded/,
+            );
+            assert.equal(srv.requests.length, 0, 'a validator error never degrades into sending the request');
+        } finally {
+            contracts.resources.checkControlRequest = original;
+            await srv.close();
+        }
+    }],
+
+    ['control enforces the project-tenancy rule through the contracts validator', async () => {
+        const srv = await stubServer((req, res) => send(res, 200, { action: 'delete', state: 'done', at: '2026-10-05T00:00:00Z' }));
+        try {
+            const client = createResourceClient({ origin: srv.url });
+            await assert.rejects(
+                client.control({ action: 'delete', project_id: PRJ, resource: `ovrn:media:${PRJ2}:object/${MED}`, idempotency_key: 'tenancy-test-key' }),
+                /not a valid common.resource-control-request@1/,
+            );
+            assert.equal(srv.requests.length, 0, 'a cross-project resource is never sent');
+        } finally { await srv.close(); }
+    }],
+
+    ['STATUS.json lists the resources module among the capabilities', async () => {
+        const status = require('../STATUS.json');
+        assert.ok(
+            status.features.some((f) => /openvibe-sdk\/resources/.test(f)),
+            'the capability list names openvibe-sdk/resources',
+        );
+        assert.equal(status.version, require('../package.json').version);
+    }],
 ]);

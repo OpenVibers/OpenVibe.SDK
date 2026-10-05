@@ -28,7 +28,8 @@ export type ResourceControlAction = 'create' | 'update' | 'delete' | 'start' | '
 export interface ResourceControlRequest {
     action: ResourceControlAction;
     project_id: string;
-    idempotency_key: string;
+    /** Generated when omitted; a thrown OpenVibeError carries it back as `idempotencyKey`, so a retry reuses it. */
+    idempotency_key?: string;
     resource?: string;
     resource_kind?: string;
     params?: Record<string, unknown>;
@@ -62,6 +63,10 @@ export type ResourceIndexOptions = {
     concurrency?: number;
     /** The per-request timeout (default 10000). */
     timeoutMs?: number;
+    /** The most pages per authority before it is reported stale (default 1000). */
+    maxPages?: number;
+    /** An optional per-authority deadline in milliseconds; a walk past it is reported stale. */
+    maxMs?: number;
 };
 export type ResourceListOptions = { project?: string; kind?: string; limit?: number };
 export interface ResourceIndex {
@@ -84,6 +89,7 @@ export type ResourceClientOptions = {
 };
 export interface ResourceClient {
     readonly path: string;
+    /** A thrown OpenVibeError carries `idempotencyKey` (the request's key) so a retry reuses it. */
     control(request: ResourceControlRequest, opts?: { retries?: number }): Promise<ResourceControlResult>;
 }
 /** The chosen resource kinds and their three-letter id prefixes (ADR-048); proposed/unchosen kinds are absent. */

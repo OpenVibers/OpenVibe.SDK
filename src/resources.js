@@ -101,6 +101,8 @@ const INDEX_PATH = '/api/v1/resources';
 const DEFAULT_PAGE_LIMIT = 100;
 const DEFAULT_CONCURRENCY = 4;
 const DEFAULT_TIMEOUT_MS = 10000;
+/** The most pages one authority's cursor chain is followed for before it is reported stale. */
+const DEFAULT_MAX_PAGES = 1000;
 
 /** An authority's failure, reported instead of thrown so one authority cannot fail the whole index. */
 function staleOf(authority, err) {
@@ -145,6 +147,12 @@ async function mapPool(items, limit, fn) {
  * pages read so far are kept and it is reported in `stale` (`{ authority, status, code, error }`), so a
  * caller can rebuild its read model and try that authority again.
  *
+ * A cursor chain that never ends is bounded three ways, so one bad authority cannot hang `list()`:
+ * a repeated cursor (a cycle, or the same cursor echoed back) and an empty-string `next_cursor` end the
+ * walk, `maxPages` caps the pages read (`sdk.bad_response`), and an optional `maxMs` per-authority
+ * deadline reports a walk that outran its budget (`sdk.timeout`). Each bound keeps the pages read so
+ * far and reports the authority stale rather than failing the whole index.
+ *
  * @param {object} o
  * @param {string[]} o.authorities  base URLs of the services whose index to read
  * @param {string|Function|{getToken(): Promise<string>}} [o.token]  a bearer token, a getter, or a token client
@@ -152,16 +160,21 @@ async function mapPool(items, limit, fn) {
  * @param {number} [o.pageLimit]    the per-request `limit` (default 100)
  * @param {number} [o.concurrency]  the most requests in flight at once (default 4)
  * @param {number} [o.timeoutMs]    the per-request timeout (default 10000)
+ * @param {number} [o.maxPages]     the most pages per authority before it is reported stale (default 1000)
+ * @param {number} [o.maxMs]        an optional per-authority deadline; a walk past it is reported stale
  * @returns {{ authorities: string[], list(opts?): Promise<{resources, stale}>, iterate(opts?): AsyncGenerator }}
  */
 function createResourceIndex({
     authorities, token, fetch: fetchImpl = globalThis.fetch,
     pageLimit = DEFAULT_PAGE_LIMIT, concurrency = DEFAULT_CONCURRENCY, timeoutMs = DEFAULT_TIMEOUT_MS,
+    maxPages = DEFAULT_MAX_PAGES, maxMs = null,
 } = {}) {
     if (!Array.isArray(authorities) || authorities.length === 0) throw new TypeError('createResourceIndex: authorities must be a non-empty array of base URLs');
     if (typeof fetchImpl !== 'function') throw new TypeError('createResourceIndex: a fetch implementation is required');
     if (!Number.isInteger(concurrency) || concurrency < 1) throw new TypeError('createResourceIndex: concurrency must be a positive integer');
     if (pageLimit != null && (!Number.isInteger(pageLimit) || pageLimit < 1)) throw new TypeError('createResourceIndex: pageLimit must be a positive integer');
+    if (!Number.isInteger(maxPages) || maxPages < 1) throw new TypeError('createResourceIndex: maxPages must be a positive integer');
+    if (maxMs != null && (!Number.isFinite(maxMs) || maxMs <= 0)) throw new TypeError('createResourceIndex: maxMs must be a positive number of milliseconds');
     const bases = authorities.map((a) => trimSlash(a));
 
     /** One page of an authority's index; a non-2xx or a non-page body throws an OpenVibeError. */
@@ -169,7 +182,7 @@ function createResourceIndex({
         const query = new URLSearchParams();
         if (project != null) query.set('project', project);
         if (kind != null) query.set('kind', kind);
-        if (cursor != null) query.set('cursor', cursor);
+        if (cursor != null && cursor !== '') query.set('cursor', cursor);
         if (limit != null) query.set('limit', String(limit));
         const url = `${authority}${INDEX_PATH}${query.toString() ? `?${query}` : ''}`;
         let res;
@@ -187,13 +200,26 @@ function createResourceIndex({
     /** Walk one authority's cursor chain, keeping its pages and reporting a failure as stale. */
     async function walk(authority, filter) {
         const resources = [];
+        const seen = new Set();
+        const startedAt = Date.now();
+        const where = `${authority}${INDEX_PATH}`;
         let cursor;
         try {
-            for (;;) {
+            for (let pages = 0; ; pages++) {
+                if (pages >= maxPages) {
+                    throw new OpenVibeError({ code: 'sdk.bad_response', message: `GET ${where} did not end after ${maxPages} pages`, method: 'GET', url: where });
+                }
+                if (maxMs != null && Date.now() - startedAt > maxMs) {
+                    throw new OpenVibeError({ code: 'sdk.timeout', message: `GET ${where} exceeded maxMs (${maxMs} ms)`, method: 'GET', url: where });
+                }
                 const body = await page(authority, { ...filter, cursor });
                 resources.push(...body.resources);
                 const next = body.next_cursor;
-                if (next == null || next === cursor) break;
+                if (next == null || next === '') break;                     // null or empty: the end
+                if (next === cursor || seen.has(next)) {
+                    throw new OpenVibeError({ code: 'sdk.bad_response', message: `GET ${where} cursor repeated (${next})`, method: 'GET', url: where });
+                }
+                seen.add(next);
                 cursor = next;
             }
             return { resources, stale: null };
@@ -233,16 +259,15 @@ const CONTROL_PATH = '/api/v1/resources/control';
 const DEFAULT_RETRIES = 2;
 const DEFAULT_RETRY_DELAY_MS = 250;
 
-/**
- * A common.resource-control-request@1, checked with contracts.resources.checkControlRequest when
- * openvibe-contracts is installed; a missing optional dependency never blocks the call, so a minimal
- * shape check stands in for it (create names resource_kind; every other action names resource).
- */
-function checkControlRequest(request) {
-    try {
-        const contracts = require('openvibe-contracts');
-        if (contracts.resources && typeof contracts.resources.checkControlRequest === 'function') return contracts.resources.checkControlRequest(request);
-    } catch { /* not installed: fall through to the shape check */ }
+/** A refused/failed common.resource-control-result@1: a body the authority answered with, not an error. */
+function isRefusedOrFailedResult(body) {
+    return Boolean(body) && typeof body === 'object'
+        && (body.state === 'refused' || body.state === 'failed')
+        && (body.problem != null || body.confirmation_required != null);
+}
+
+/** The minimal request shape check, used only when openvibe-contracts is not installed. */
+function shapeCheckControlRequest(request) {
     const errors = [];
     if (typeof request.action !== 'string' || !request.action) errors.push({ path: '/action', message: 'required' });
     if (typeof request.project_id !== 'string' || !request.project_id) errors.push({ path: '/project_id', message: 'required' });
@@ -253,6 +278,23 @@ function checkControlRequest(request) {
 }
 
 /**
+ * A common.resource-control-request@1, checked with contracts.resources.checkControlRequest when
+ * openvibe-contracts is installed. Only a missing module falls back to the local shape check (create
+ * names resource_kind; every other action names resource): any real error the contracts helper throws
+ * propagates, so the OVRN parse and the project-tenancy rule are never silently skipped.
+ */
+function checkControlRequest(request) {
+    let contracts;
+    try {
+        contracts = require('openvibe-contracts');
+    } catch (err) {
+        if (!err || err.code !== 'MODULE_NOT_FOUND') throw err;
+        return shapeCheckControlRequest(request);
+    }
+    return contracts.resources.checkControlRequest(request);
+}
+
+/**
  * The write side of the control plane: POST a common.resource-control-request@1 to
  * {origin}/api/v1/resources/control and return the authority's common.resource-control-result@1.
  *
@@ -260,9 +302,13 @@ function checkControlRequest(request) {
  * authority stores the first answer per (caller, project, key), so a transient failure (network,
  * timeout, 408/425/429/5xx) is retried with the SAME key and the same body, up to `retries` times, and
  * an action is never applied twice. `state` is the outcome, not the resource's state: `done`, `pending`,
- * `refused` (carrying a `problem` or `confirmation_required`) or `failed` — all four are returned, not
- * thrown, so the caller reads `confirmation_required.confirmation_id` and repeats the request with it
- * once the owner approves. Any other non-2xx answer is an OpenVibeError (problem+json -> code/status).
+ * `refused` (carrying a `problem` or `confirmation_required`) or `failed` — all four are returned when
+ * the authority sends them with a 2xx, and a refused/failed result with a non-retryable non-2xx (403,
+ * 409, 422 …) is returned too, so the caller reads `confirmation_required.confirmation_id` and repeats
+ * the request with it once the owner approves. Any other non-2xx answer is an OpenVibeError
+ * (problem+json -> code/status); a thrown error carries the request's `idempotencyKey`, so a caller that
+ * retries a sensitive action after a timeout or a 5xx reuses the key the authority already saw instead
+ * of generating a fresh one that could duplicate the action.
  *
  * @param {object} o
  * @param {string} o.origin          the authority's base URL
@@ -300,17 +346,25 @@ function createResourceClient({
                 });
             } catch (err) {
                 const netErr = networkError(err, 'POST', url);
+                netErr.idempotencyKey = body.idempotency_key;
                 if (attempt < attempts) { await sleep(retryDelayMs * (attempt + 1)); continue; }
                 throw netErr;
             }
             const data = await res.json().catch(() => null);
             if (!res.ok) {
-                const err = OpenVibeError.fromResponse({ status: res.status, body: data, method: 'POST', url, retryable: isRetryableStatus(res.status) });
-                if (attempt < attempts && isRetryableStatus(res.status)) { await sleep(retryDelayMs * (attempt + 1)); continue; }
+                const retryable = isRetryableStatus(res.status);
+                // ADR-048 does not fix the status for refused/failed: a non-retryable non-2xx may carry
+                // the answer, so return it instead of throwing it away. A retryable status retries first.
+                if (!retryable && isRefusedOrFailedResult(data)) return data;
+                const err = OpenVibeError.fromResponse({ status: res.status, body: data, method: 'POST', url, retryable });
+                err.idempotencyKey = body.idempotency_key;
+                if (attempt < attempts && retryable) { await sleep(retryDelayMs * (attempt + 1)); continue; }
                 throw err;
             }
             if (!data || typeof data !== 'object' || typeof data.state !== 'string') {
-                throw new OpenVibeError({ code: 'sdk.bad_response', message: `POST ${url} is not a common.resource-control-result@1`, method: 'POST', url });
+                const err = new OpenVibeError({ code: 'sdk.bad_response', message: `POST ${url} is not a common.resource-control-result@1`, method: 'POST', url });
+                err.idempotencyKey = body.idempotency_key;
+                throw err;
             }
             return data;
         }
