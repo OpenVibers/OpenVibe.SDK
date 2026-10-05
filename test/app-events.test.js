@@ -130,6 +130,11 @@ run([
 
         assert.deepEqual(ids(await r.pull()), [sbx.event_id], 'another app of the project, same env');
         assert.deepEqual(ids(await a.pull({ topic: 'order.*' })), [sbx.event_id], 'a sandbox app never sees production events');
+        const orderPage = await a.pull({ topic: 'order.*' });
+        assert.match(orderPage.events[0].cursor, /^c1\./, 'a page item carries its cursor');
+        assert.match(orderPage.next_cursor, /^c1\./, 'a page carries its opaque next_cursor');
+        assert.deepEqual(ids(await a.pull({ topic: 'order.*', after: orderPage.next_cursor })), [], 'after resumes from the cursor');
+        assert.deepEqual(ids(await a.pull({ topic: 'order.*', afterSeq: orderPage.next_after_seq })), [], 'afterSeq still works for one release');
         assert.deepEqual(ids(await a2.pull()), [prod.event_id], 'a production app never sees sandbox events');
         assert.deepEqual(ids(await b.pull()), [other.event_id]);
         assert.deepEqual(ids(await a.pull({ platformTopics: ['live.*'] })), [sbx.event_id, pub.event_id], 'public first-party only, never internal');
@@ -141,8 +146,10 @@ run([
         assert.equal(await b.get(sbx.event_id), null, 'another project\'s event does not exist for this app');
         assert.equal(await a2.get(sbx.event_id), null);
         const seen = [];
-        for await (const item of a.iterate({ topic: '*', platformTopics: ['live.stream.*'] })) seen.push(item.event.event_id);
+        const cursors = [];
+        for await (const item of a.iterate({ topic: '*', platformTopics: ['live.stream.*'], onPage: (p) => cursors.push(p.next_cursor) })) seen.push(item.event.event_id);
         assert.deepEqual(seen, [sbx.event_id, pub.event_id]);
+        assert.match(cursors.at(-1), /^c1\./);
 
         // First-party readers: never sandbox; app events only through an app.* pattern.
         assert.ok(!(await live.pull({ topic: '*' })).events.some((e) => e.event.event_type.startsWith('app.')));

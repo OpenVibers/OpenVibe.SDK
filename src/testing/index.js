@@ -357,6 +357,15 @@ function createMockPlatform(opts = {}) {
     }
 
     // ── Events ──────────────────────────────────────────────
+    // Opaque cursors (ADR-042 decision 7): `c1.<epoch>.<base64url(seq)>`. The mock keeps one epoch.
+    const eventCursor = (seq) => `c1.0.${Buffer.from(String(seq), 'utf8').toString('base64url')}`;
+    const eventSeqFromCursor = (input) => {
+        if (typeof input !== 'string') return null;
+        const m = /^c1\.0\.([A-Za-z0-9_-]+)$/.exec(input);
+        if (!m) return null;
+        const seq = Number(Buffer.from(m[1], 'base64url').toString('utf8'));
+        return Number.isSafeInteger(seq) && seq >= 0 && eventCursor(seq) === input ? seq : null;
+    };
     function visible(viewer, e) {
         if (e.project_id || (e.env || 'production') !== 'production') return false;     // never streamed
         if (e.event.visibility === 'public') return true;
@@ -448,9 +457,12 @@ function createMockPlatform(opts = {}) {
             if (!patterns.length || patterns.length > 20 || !patterns.every(appRules.isValidPattern)) return problem(400, 'events.bad_topic', 'topic must be 1..20 comma-separated patterns');
             const scopeErr = scopeError(who.principal, patterns);
             if (scopeErr) return problem(403, 'events.topic_not_allowed', scopeErr);
-            const after = Number(url.searchParams.get('after_seq') || 0);
+            const afterCursor = url.searchParams.get('after');
+            const after = afterCursor ? eventSeqFromCursor(afterCursor) : Number(url.searchParams.get('after_seq') || 0);
             const limit = Number(url.searchParams.get('limit') || 100);
-            if (!Number.isInteger(after) || after < 0 || !Number.isInteger(limit) || limit < 1 || limit > 1000) return problem(400, 'events.bad_request', 'after_seq must be >= 0 and limit 1..1000');
+            if (after === null || !Number.isInteger(after) || after < 0 || !Number.isInteger(limit) || limit < 1 || limit > 1000) {
+                return problem(400, 'events.bad_request', afterCursor ? 'after must be an opaque cursor' : 'after_seq must be >= 0 and limit 1..1000');
+            }
             const pats = patterns.map((x) => [x, topicRegex(x)]);
             const out = [];
             const page = {};
@@ -464,17 +476,17 @@ function createMockPlatform(opts = {}) {
                 if (e.seq <= from) continue;
                 if (out.length >= limit) break;
                 cursor = e.seq;
-                if (pats.some(([x, re]) => re.test(e.event.event_type) && readable(who.principal, e, x))) out.push({ seq: e.seq, event: e.event });
+                if (pats.some(([x, re]) => re.test(e.event.event_type) && readable(who.principal, e, x))) out.push({ seq: e.seq, cursor: eventCursor(e.seq), event: e.event });
             }
             if (out.length < limit) cursor = Math.max(cursor, lastSeq);
-            return json(200, { ...page, events: out, next_after_seq: cursor, latest_seq: lastSeq });
+            return json(200, { ...page, events: out, next_after_seq: cursor, next_cursor: eventCursor(cursor), latest_seq: lastSeq });
         }
         if ((r = path.match(/^\/api\/v1\/events\/([^/]+)$/)) && req.method === 'GET') {
             const who = eventsPrincipal(req, 'events.event.read', 'events.app.read');
             if (who.res) return who.res;
             const e = events.find((x) => x.event.event_id === decodeURIComponent(r[1]));
             const ok = e && (who.principal.kind === 'app' ? appRules.visibleToApp(e, who.principal) : (e.env || 'production') === 'production');
-            return ok ? json(200, { seq: e.seq, event: e.event }) : problem(404, 'events.not_found', 'no such event (or pruned by retention)');
+            return ok ? json(200, { seq: e.seq, cursor: eventCursor(e.seq), event: e.event }) : problem(404, 'events.not_found', 'no such event (or pruned by retention)');
         }
         if (path === '/api/v1/checkpoints') {
             const who = eventsPrincipal(req, 'events.event.read', 'events.app.read');

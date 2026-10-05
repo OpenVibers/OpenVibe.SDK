@@ -181,32 +181,49 @@ function createEventsClient(client, { source, baseUrl } = {}) {
         });
     }
 
-    /** One page: { events: [{ seq, event }], next_after_seq, latest_seq, gap? } */
-    function pull({ topic = '*', afterSeq = 0, limit } = {}) {
-        return call({ path: '/api/v1/events', query: { topic: Array.isArray(topic) ? topic.join(',') : topic, after_seq: afterSeq, limit } });
+    /**
+     * One page: { events: [{ seq, cursor, event }], next_cursor, next_after_seq, latest_seq, gap? }.
+     * Pass `after` — a page's opaque `next_cursor` — to resume exactly where the previous page ended;
+     * `afterSeq`, the numeric position, remains for one release.
+     */
+    function pull({ topic = '*', after, afterSeq = 0, limit } = {}) {
+        return call({ path: '/api/v1/events', query: {
+            topic: Array.isArray(topic) ? topic.join(',') : topic, limit,
+            ...(after == null ? { after_seq: afterSeq } : { after }),
+        } });
     }
 
     /**
-     * Async iterator over { seq, event } from afterSeq up to the current head.
+     * Async iterator over { seq, cursor, event } from `after` (an opaque cursor) or `afterSeq` up to
+     * the current head.
      *
      *   onGap(gap)   called before a page's items when retention already pruned part of the range
      *                ({ from_seq, to_seq }): nothing can replay it, so resync derived state.
      *   onPage(page) called AFTER every item of that page was yielded and handled (your loop body
      *                ran for the page's last item and asked for the next one). Save
-     *                page.next_after_seq there as your durable cursor: it also moves past events
-     *                that did not match your topics, and a crash (or a break/throw in your loop)
-     *                before onPage leaves the cursor on the last page you finished, so nothing is
-     *                skipped. Pages with no matching events still call onPage.
+     *                page.next_cursor there as your durable cursor (page.next_after_seq while the
+     *                compatibility field remains): it also moves past events that did not match your
+     *                topics — a page with no matching events still calls onPage and advances it — and
+     *                a crash (or a break/throw in your loop) before onPage leaves the cursor on the
+     *                last page you finished, so nothing is skipped.
      */
-    async function* iterate({ topic, afterSeq = 0, limit, onGap, onPage, maxPages = Infinity } = {}) {
-        let cursor = afterSeq;
+    async function* iterate({ topic, after, afterSeq = 0, limit, onGap, onPage, maxPages = Infinity } = {}) {
+        // The caller picks the mode (an opaque `after`, or the numeric `afterSeq`, which may arrive as a string), and
+        // the iterator moves to cursors as soon as the server hands one back.
+        let useCursor = after != null;
+        let cursor = useCursor ? after : afterSeq;
         for (let pages = 0; pages < maxPages; pages++) {
-            const page = await pull({ topic, afterSeq: cursor, limit });
+            const page = await pull({ topic, ...(useCursor ? { after: cursor } : { afterSeq: cursor }), limit });
             if (page.gap && onGap) await onGap(page.gap);
             for (const item of page.events || []) yield item;
             if (onPage) await onPage(page);
-            const next = page.next_after_seq;
-            if (next == null || next === cursor || !(next < page.latest_seq)) return;
+            const hasCursor = page.next_cursor != null;
+            const next = hasCursor ? page.next_cursor : page.next_after_seq;
+            // The head: a page that does not move the position, or (while the server still sends the numeric
+            // compatibility fields) one that reached latest_seq. Without those fields the unchanged cursor ends it.
+            if (next == null || next === cursor) return;
+            if (page.next_after_seq != null && page.latest_seq != null && !(page.next_after_seq < page.latest_seq)) return;
+            useCursor = hasCursor;
             cursor = next;
         }
     }

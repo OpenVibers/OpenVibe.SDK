@@ -71,18 +71,47 @@ run([
         assert.deepEqual(page.events.map((e) => e.seq), [1, 3]);
         assert.equal(page.next_after_seq, 3);
         assert.equal(page.latest_seq, 5);
+        assert.match(page.next_cursor, /^c1\./, 'the page carries an opaque next_cursor');
+        assert.match(page.events[0].cursor, /^c1\./, 'each event carries its cursor');
+        // The opaque cursor round-trips: `after` resumes exactly where the page ended.
+        const rest = await events.pull({ topic: 'media.vod.*', after: page.next_cursor, limit: 2 });
+        assert.deepEqual(rest.events.map((e) => e.seq), [5]);
+        assert.equal((await events.get(platform.state.events[0].event.event_id)).cursor, page.events[0].cursor);
+        // afterSeq, the numeric position, still works for one release.
+        assert.deepEqual((await events.pull({ topic: 'media.vod.*', afterSeq: page.next_after_seq, limit: 2 })).events.map((e) => e.seq), [5]);
         const seen = [];
         const cursors = [];
-        for await (const { seq, event } of events.iterate({ topic: ['media.vod.*'], afterSeq: 0, limit: 2, onPage: (p) => cursors.push(p.next_after_seq) })) {
+        for await (const { seq, event } of events.iterate({ topic: ['media.vod.*'], afterSeq: 0, limit: 2, onPage: (p) => cursors.push(p.next_cursor) })) {
             seen.push(seq);
             assert.equal(event.event_type, 'media.vod.ready');
         }
         assert.deepEqual(seen, [1, 3, 5]);
-        assert.equal(cursors.at(-1), 5);
+        assert.match(cursors.at(-1), /^c1\./);
+        assert.equal(cursors.at(-1), (await events.pull({ topic: 'media.vod.*', afterSeq: 5 })).next_cursor, 'iterate ends on the page cursor');
+        const resumed = [];
+        for await (const { seq } of events.iterate({ topic: 'media.vod.*', after: page.next_cursor, limit: 2 })) resumed.push(seq);
+        assert.deepEqual(resumed, [5], 'iterate resumes from an opaque cursor');
         assert.equal((await events.get(platform.state.events[0].event.event_id)).seq, 1);
         assert.equal(await events.get('evt_01J00000000000000000000000'), null);
         await events.setCheckpoint('media.vod.*', 5);
         assert.equal((await events.getCheckpoint('media.vod.*')).cursor, 5);
+    }],
+
+    ['iterate: onPage advances the cursor even on a page that matches no events', async () => {
+        const { platform, events } = setup();
+        platform.publishEvent({ event_type: 'live.other.thing', source: 'media', actor, subject: { type: 'vod', id: '1' } });
+        const pages = [];
+        for await (const e of events.iterate({ topic: 'media.vod.*', onPage: (p) => pages.push(p) })) void e;
+        assert.equal(pages.length, 1, 'the empty page still called onPage');
+        assert.deepEqual(pages[0].events, []);
+        assert.equal(pages[0].next_after_seq, 1);
+        assert.match(pages[0].next_cursor, /^c1\./, 'the cursor advanced past the scanned, non-matching event');
+        // Resuming from that cursor does not replay the scanned event: the new match is seen once.
+        const saved = pages[0].next_cursor;
+        platform.publishEvent({ event_type: 'media.vod.ready', source: 'media', actor, subject: { type: 'vod', id: '2' } });
+        const seen = [];
+        for await (const e of events.iterate({ topic: 'media.vod.*', after: saved })) seen.push(e.seq);
+        assert.deepEqual(seen, [2]);
     }],
 
     ['iterate reports a retention gap through onGap', async () => {
@@ -287,5 +316,26 @@ run([
         await waitFor(() => handled.length === 3);
         await worker.stop();
         await srv.close();
+    }],
+    ['iterate keeps paging when the server sends only cursors, and a string afterSeq stays numeric', async () => {
+        const asked = [];
+        // A server past the compatibility release: no next_after_seq / latest_seq, the same cursor at the head.
+        const pages = { '': { events: [{ seq: 1, cursor: 'c1', event: { id: 'a' } }], next_cursor: 'c1' },
+            c1: { events: [{ seq: 2, cursor: 'c2', event: { id: 'b' } }], next_cursor: 'c2' },
+            c2: { events: [], next_cursor: 'c2' } };
+        const fetch = async (url) => {
+            const u = new URL(url);
+            asked.push(u.search);
+            const body = u.searchParams.has('after') ? pages[u.searchParams.get('after')] : { ...pages[''], next_after_seq: 1, latest_seq: 2 };
+            return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+        };
+        const events = createEventsClient(createClient({ fetch }), { source: 'live', baseUrl: 'http://events.test' });
+        const seen = [];
+        for await (const item of events.iterate({ afterSeq: '0' })) seen.push(item.event.id);
+        assert.deepEqual(seen, ['a', 'b'], 'every page up to the head');
+        assert.match(asked[0], /after_seq=0/, 'a string afterSeq is still the numeric position');
+        assert.match(asked[1], /after=c1/);
+        assert.match(asked[2], /after=c2/);
+        assert.equal(asked.length, 3, 'the unchanged cursor at the head ends it');
     }],
 ]);

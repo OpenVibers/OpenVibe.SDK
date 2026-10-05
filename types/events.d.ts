@@ -3,9 +3,9 @@ import type { OpenVibeClient, EventEnvelope } from './core';
 /** What a producer passes: event_id, timestamp, source, version, payload and trace_id are filled in. */
 export type EventInput = Omit<EventEnvelope, 'event_id' | 'timestamp' | 'source' | 'version' | 'payload'> & Partial<Pick<EventEnvelope, 'event_id' | 'timestamp' | 'source' | 'version' | 'payload'>>;
 export interface PublishResult { event_id: string; seq: number; duplicate: boolean; }
-export interface StoredEvent { seq: number; event: EventEnvelope; }
+export interface StoredEvent { seq: number; cursor: string; event: EventEnvelope; }
 export interface Gap { from_seq: number; to_seq: number; reason?: string; latest_seq?: number; }
-export interface EventsPage { events: StoredEvent[]; next_after_seq: number; latest_seq: number; gap?: Gap; }
+export interface EventsPage { events: StoredEvent[]; next_cursor: string; next_after_seq: number; latest_seq: number; gap?: Gap; }
 export interface Subscription {
     id: string;
     consumer: string;
@@ -23,9 +23,9 @@ export interface EventsClient {
     prepare(envelope: EventInput, opts?: { traceId?: string; now?: number }): EventEnvelope;
     publish(envelope: EventInput, opts?: { traceparent?: string }): Promise<PublishResult>;
     publish(envelopes: EventInput[], opts?: { traceparent?: string }): Promise<{ results: PublishResult[] }>;
-    pull(opts?: { topic?: string | string[]; afterSeq?: number; limit?: number }): Promise<EventsPage>;
-    /** onPage runs after every item of that page was yielded and handled: save page.next_after_seq there. */
-    iterate(opts?: { topic?: string | string[]; afterSeq?: number; limit?: number; maxPages?: number; onGap?: (gap: Gap) => void | Promise<void>; onPage?: (page: EventsPage) => void | Promise<void> }): AsyncGenerator<StoredEvent, void, unknown>;
+    pull(opts?: { topic?: string | string[]; after?: string; afterSeq?: number; limit?: number }): Promise<EventsPage>;
+    /** onPage runs after every item of that page was yielded and handled: save page.next_cursor there. */
+    iterate(opts?: { topic?: string | string[]; after?: string; afterSeq?: number; limit?: number; maxPages?: number; onGap?: (gap: Gap) => void | Promise<void>; onPage?: (page: EventsPage) => void | Promise<void> }): AsyncGenerator<StoredEvent, void, unknown>;
     get(eventId: string): Promise<StoredEvent | null>;
     getCheckpoint(topic: string): Promise<{ consumer: string; topic: string; cursor: number; updated_at: string | null }>;
     setCheckpoint(topic: string, cursor: number): Promise<{ consumer: string; topic: string; cursor: number }>;
@@ -65,8 +65,8 @@ export interface AppEventsClient {
     publish(envelope: AppEventInput, opts?: { traceparent?: string }): Promise<PublishResult>;
     publish(envelopes: AppEventInput[], opts?: { traceparent?: string }): Promise<{ results: PublishResult[] }>;
     /** topic is project-relative (default '*'); platformTopics are first-party patterns (public events only). */
-    pull(opts?: { topic?: string | string[]; platformTopics?: string[]; afterSeq?: number; limit?: number }): Promise<EventsPage>;
-    iterate(opts?: { topic?: string | string[]; platformTopics?: string[]; afterSeq?: number; limit?: number; maxPages?: number; onGap?: (gap: Gap) => void | Promise<void>; onPage?: (page: EventsPage) => void | Promise<void> }): AsyncGenerator<StoredEvent, void, unknown>;
+    pull(opts?: { topic?: string | string[]; platformTopics?: string[]; after?: string; afterSeq?: number; limit?: number }): Promise<EventsPage>;
+    iterate(opts?: { topic?: string | string[]; platformTopics?: string[]; after?: string; afterSeq?: number; limit?: number; maxPages?: number; onGap?: (gap: Gap) => void | Promise<void>; onPage?: (page: EventsPage) => void | Promise<void> }): AsyncGenerator<StoredEvent, void, unknown>;
     get(eventId: string): Promise<StoredEvent | null>;
     getCheckpoint(topic: string): Promise<{ consumer: string; topic: string; cursor: number; updated_at: string | null }>;
     setCheckpoint(topic: string, cursor: number): Promise<{ consumer: string; topic: string; cursor: number }>;
