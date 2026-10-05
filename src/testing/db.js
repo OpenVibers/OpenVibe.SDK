@@ -209,6 +209,9 @@ async function createTestDb({ migrations, seed, seedKey, store = process.env.OV_
     let releasingLease = false;
     try {
         await lease.connect();
+        // The lease socket must not keep the process alive: a test file that ends without process.exit() would otherwise
+        // never exit (0.26-0.31.0). It still holds the advisory lock for as long as the process lives.
+        if (lease.connection && lease.connection.stream && typeof lease.connection.stream.unref === 'function') lease.connection.stream.unref();
         await lease.query('SELECT pg_advisory_lock($1::bigint)', [leaseKey(name)]);
         lease.on('end', () => { if (!releasingLease) throw new Error(`test database lease lost for ${name}`); });
         const database = await su.value('SELECT current_database()');
