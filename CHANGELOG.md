@@ -7,6 +7,25 @@ release may change an API and says so here.
 
 
 
+## 0.34.0 (2026-10-05)
+
+- **`openvibe-sdk/resources` (new): the resource index and the control plane (ADR-048, plan T13 step 2).**
+  `parseResourceName`/`resourceName`/`resourceNameOf` reuse the pinned openvibe-contracts helpers
+  (`contracts.resources`, required lazily) for the one resource name, OVRN
+  `ovrn:<service>:<project_id>:<type>/<id>`. `createResourceIndex({ authorities, token, fetch, pageLimit,
+  concurrency, timeoutMs })` fans out `GET {authority}/api/v1/resources?project=&kind=&cursor=&limit=`,
+  follows each authority opaque `next_cursor` and merges the `common.resource-list-result@1` pages in
+  authority order; an authority that fails (network, timeout, non-2xx, malformed page) never fails the
+  call — its pages read so far are kept and it is reported in `stale`, so a read model can be rebuilt.
+  `createResourceClient({ origin, token })` POSTs a `common.resource-control-request@1` to
+  `/api/v1/resources/control` and returns the authority `common.resource-control-result@1`
+  (`done`/`pending`/`refused`/`failed`, a refused one carrying its problem or `confirmation_required`);
+  an idempotency key is generated when the caller omits it and a transient failure (network, timeout,
+  408/425/429/5xx) is retried with the same key and body, so an action is never applied twice.
+  `RESOURCE_KINDS` lists the kinds whose three-letter id prefix ADR-048 has chosen
+  (`media.object`/`med`, `watch.watch`/`wch`); the proposed (`act`, `run`, `zon`) and unchosen
+  (`codes.repo`, `events.queue`, `events.subscription`) kinds are deliberately absent until step 8.
+
 ## 0.33.0 (2026-10-05)
 
 - **`openvibe-sdk/events` surfaces the opaque `after`/`next_cursor` pull cursors (ADR-042 decision 7):** `pull()`

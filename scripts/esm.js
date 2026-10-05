@@ -30,6 +30,7 @@ const ENTRIES = {
     'govern.mjs': '../src/govern.js',
     'placement.mjs': '../src/placement.js',
     'usage.mjs': '../src/usage.js',
+    'resources.mjs': '../src/resources.js',
     'telemetry.mjs': '../src/telemetry.js',
     'cost.mjs': '../src/cost.js',
     'runtime.mjs': '../src/runtime.js',

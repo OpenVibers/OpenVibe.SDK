@@ -23,6 +23,7 @@ module.exports = {
     jobs: require('./src/jobs'),
     tools: require('./src/tools'),
     projects: require('./src/projects'),
+    resources: require('./src/resources'),
     vip: require('./src/vip'),
     openre: require('./src/openre'),
     geo: require('./src/geo'),

@@ -241,3 +241,34 @@ alone. `parser: express.json({ limit })` keeps Express's parser and maps its err
 
 `jsonErrors()` is opt-in: adopting it decides which paths answer JSON and which text, so mount it only where that is
 already the behaviour.
+
+## The resource index and the control plane
+
+ADR-048 makes every service that owns resources answer `GET /api/v1/resources` with a
+`common.resource-list-result@1` page of `common.resource-summary@1`, and every change a call to
+`POST /api/v1/resources/control` with a `common.resource-control-request@1` that it answers with a
+`common.resource-control-result@1`. `openvibe-sdk/resources` carries both sides; it is server-only (a
+control plane carries a user or service token and is never shipped to a page).
+
+```js
+const { createResourceIndex, createResourceClient, resourceName } = require('openvibe-sdk/resources');
+
+// A console reads several authorities and merges their index pages; a failing authority is reported, not fatal.
+const index = createResourceIndex({ authorities: ['https://media.openvibe.network', 'https://events.openvibe.network'], token: userAccessToken });
+const { resources, stale } = await index.list({ project: prj.id, kind: 'media.object' });   // follows each next_cursor
+
+// A change is a control call to the authority that owns the resource; it decides, we only show the answer.
+const media = createResourceClient({ origin: 'https://media.openvibe.network', token: userAccessToken });
+const result = await media.control({ action: 'delete', project_id: prj.id,
+    resource: resourceName({ service: 'media', project_id: prj.id, type: 'object', id: objectId }),
+    idempotency_key: 'idem_…' });                        // done | pending | refused | failed
+if (result.state === 'refused' && result.confirmation_required) retryWith(result.confirmation_required.confirmation_id);
+```
+
+`parseResourceName`, `resourceName` and `resourceNameOf` reuse the pinned openvibe-contracts
+`contracts.resources` helpers (required lazily, only by these three), so no service splits an OVRN on
+`:`. `RESOURCE_KINDS` names only the kinds whose three-letter id prefix ADR-048 has chosen
+(`media.object`/`med`, `watch.watch`/`wch`); `codes.repo`, `events.queue` and `events.subscription` are
+unchosen and `act`, `run` and `zon` are only proposed. The control client generates an idempotency key
+when the caller omits one and retries a transient failure (network, timeout, 408/425/429/5xx) with the
+same key and body, so an authority applies an action at most once.
