@@ -7,6 +7,17 @@ release may change an API and says so here.
 
 
 
+## 0.30.0 (2026-10-04)
+
+- **`openvibe-sdk/bot` (new, both; plan B8):** the OpenVibe.Bot client. `createBotClient(client, {actingSubject?})`
+  wraps `robots` — `list`/`get`/`create`/`update`/`delete`/`pairingCode`, `operators.list`/`add`/`remove`,
+  `devices` (listing), `streaming.get`/`set`, `audit`/`iterateAudit`, `estop`/`clearEstop` and `command`
+  (`bot.command@1`, answered by Bot's own idempotency cache) — plus `devices.rotate`/`revoke`, the public
+  `profiles`/`kits` reads, and `pair` (the agent redeems a one-time code; never retried). A service acts for a
+  person with `X-OV-Subject` (`bot.robot.read`/`manage`/`control`, `bot.device.connect`); a browser calls as the
+  signed-in person. Browser-safe, with its ESM entry, types and the browser bundle, and a test over the
+  Contracts bot fixtures. The operator WebSocket and the internal Run→Bot job dispatch are not wrapped.
+
 ## 0.29.0 (2026-10-04)
 
 - **`createTestDb` reuses a migrated snapshot (`openvibe-sdk/testing`, minor):** on PGlite, the first test process
