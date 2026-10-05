@@ -1,7 +1,7 @@
 {
   "name": "openvibe-sdk",
-  "version": "0.29.0",
-  "description": "Supported browser and server clients for the OpenVibe platform: auth (incl. developer apps), registry discovery, identity, user modules, events, realtime, media, community, search, chat, AI runs, Tools (registry, run API and jobs), VIP memberships and developer projects, the async PostgreSQL data layer (db) and the Valkey cache, limits store, queue and pub/sub, with deadlines, safe retries, problem errors and trace propagation.",
+  "version": "0.30.0",
+  "description": "Supported browser and server clients for the OpenVibe platform: auth (incl. developer apps), registry discovery, identity, user modules, events, realtime, media, community, Bot robots, search, chat, AI runs, Tools (registry, run API and jobs), VIP memberships and developer projects, the async PostgreSQL data layer (db) and the Valkey cache, limits store, queue and pub/sub, with deadlines, safe retries, problem errors and trace propagation.",
   "main": "index.js",
   "types": "types/index.d.ts",
   "browser": "browser.js",
@@ -70,6 +70,11 @@
       "types": "./types/community.d.ts",
       "import": "./esm/community.mjs",
       "default": "./src/community.js"
+    },
+    "./bot": {
+      "types": "./types/bot.d.ts",
+      "import": "./esm/bot.mjs",
+      "default": "./src/bot.js"
     },
     "./search": {
       "types": "./types/search.d.ts",
