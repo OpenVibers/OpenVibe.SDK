@@ -166,7 +166,9 @@ service emits `platform.telemetry-sample@1` the same way. A request is not a row
 `route|method|status_class` per flush interval into `count`, `sum`, `max` and `p95`, and **one** `http.request`
 sample per key is emitted per flush — plus the HTTP autoscaling gauges (active requests, rolling p95, event-loop
 lag) once per flush from a timer, never per request. The SDK buffer (maxBuffered 1000) therefore cannot overflow.
-A sample carries the route template, method and status class — never a raw URL, client id or token.
+A sample carries the route template, method and status class — never a raw URL, client id or token (a request
+that matched no route is `unmatched`, and the per-flush key map and latency samples are capped, so a scanner or a
+404 flood stays bounded).
 
 ```js
 const svc = require('openvibe-sdk/service');
@@ -174,7 +176,7 @@ const collector = svc.createHttpTelemetry({
     service: 'blog',                                     // the schema's service; there is no `instance` field
     sink: (samples) => post('/internal/telemetry', samples),   // one batch per flush
     intervalMs: 15000,                                   // also the p95 window
-    skipPrefixes: ['/shared'],                           // health/ready/metrics/static are always skipped
+    skipPrefixes: ['/shared'],                           // default ['/shared']; Network passes '/shared', '/api/chrome'
     routeLabel: (req) => metrics.routeLabel(req),        // optional; default reads req.route.path under req.baseUrl
 });
 app.use(collector.middleware());                         // per request, before the routes

@@ -178,7 +178,99 @@ run([
         assert.equal(batches.length, 2);
     }],
 
+    ['defaultRouteLabel is the matched template or unmatched, never a raw path', async () => {
+        assert.equal(svc.defaultRouteLabel({ route: { path: '/api/posts/:id' }, baseUrl: '/v1', path: '/v1/api/posts/7' }), '/v1/api/posts/:id');
+        assert.equal(svc.defaultRouteLabel({ route: { path: '/' }, baseUrl: '' }), '/');
+        assert.equal(svc.defaultRouteLabel({ path: '/etc/passwd', url: '/etc/passwd' }), 'unmatched', 'a request with no matched route is never labelled by its path');
+        assert.equal(svc.defaultRouteLabel({ url: '/wp-login.php?x=1' }), 'unmatched', 'a scanner path is not a label');
+        assert.equal(svc.defaultRouteLabel(null), 'unmatched');
+    }],
+
+    ['1000 distinct 404 paths produce one unmatched key', async () => {
+        const { c, samples } = collector();
+        for (let i = 0; i < 1000; i += 1) {
+            const route = svc.defaultRouteLabel({ path: `/missing/${i}`, url: `/missing/${i}?q=${i}` });
+            c.requestFinished({ route, method: 'GET', httpStatus: 404, latencyMs: 1 });
+        }
+        await c.flush();
+        const requests = samples().filter((s) => s.operation === 'http.request');
+        assert.equal(requests.length, 1, 'all unmatched paths share one key');
+        assert.equal(requests[0].resource, 'unmatched');
+        assert.equal(requests[0].extra.status_class, '4xx');
+        assert.equal(requests[0].extra.count, 1000, 'the count stays exact across the shared key');
+    }],
+
+    ['distinct matched templates past the per-flush cap fold into the other key', async () => {
+        const { c, samples } = collector({ maxRouteKeys: 3 });
+        for (let i = 0; i < 6; i += 1) c.requestFinished({ route: `/api/r${i}/:id`, method: 'GET', httpStatus: 200, latencyMs: 1 });
+        await c.flush();
+        const requests = samples().filter((s) => s.operation === 'http.request');
+        assert.equal(requests.length, 4, 'the cap of distinct templates plus the one overflow bucket');
+        assert.equal(requests.filter((s) => s.resource !== 'other').length, 3, 'the first maxRouteKeys templates keep their labels');
+        const other = requests.find((s) => s.resource === 'other');
+        assert.equal(other.extra.count, 3, 'every later template folds into other');
+    }],
+
+    ['skipPrefixes defaults to /shared and is overridable', async () => {
+        assert.equal(svc.telemetrySkipped({ path: '/shared/data', url: '/shared/data' }), true, 'the default prefix');
+        assert.equal(svc.telemetrySkipped({ path: '/shared', url: '/shared' }), true, 'the prefix itself');
+        assert.equal(svc.telemetrySkipped({ path: '/sharedness', url: '/sharedness' }), false, 'not a path segment');
+        assert.equal(svc.telemetrySkipped({ path: '/shared/data', url: '/shared/data' }, { prefixes: [] }), false, 'overridable with []');
+        assert.equal(svc.telemetrySkipped({ path: '/api/chrome/x', url: '/api/chrome/x' }, { prefixes: ['/shared', '/api/chrome'] }), true, "Network's two prefixes");
+        assert.equal(svc.telemetrySkipped({ path: '/api/chrome/x', url: '/api/chrome/x' }), false, 'only /shared is the SDK default');
+
+        const { c, samples } = collector();
+        const mw = c.middleware();
+        const { server, url } = await listen((req, res) => { mw(req, res, () => res.end('ok')); });
+        try {
+            assert.equal(await get(`${url}/shared/data`), 200);
+            assert.equal(await get(`${url}/api/posts`), 200);
+            await c.flush();
+            assert.ok(!samples().some((s) => typeof s.resource === 'string' && s.resource.startsWith('/shared')), 'a default collector skips /shared before counting');
+            assert.ok(samples().some((s) => s.resource === 'unmatched'), 'a non-skipped unmatched request is still counted');
+        } finally {
+            server.close();
+        }
+    }],
+
+    ['50k requests keep the latency buffers at the cap with the count exact', async () => {
+        const { c, samples } = collector();
+        for (let i = 0; i < 50000; i += 1) c.requestFinished({ route: '/api/x', method: 'GET', httpStatus: 200, latencyMs: (i % 100) + 1 });
+        const stats = c.bufferStats();
+        assert.deepEqual(stats, { keys: 1, latencies: svc.LATENCY_SAMPLE_CAP, maxKeyLatencies: svc.LATENCY_SAMPLE_CAP }, 'arrays capped at 10k');
+        await c.flush();
+        const s = samples().find((x) => x.operation === 'http.request');
+        assert.equal(s.extra.count, 50000, 'the count is exact');
+        assert.equal(s.extra.max_ms, 100, 'the max is exact');
+        assert.equal(s.extra.sum_ms, 2525000, 'the sum is exact (1..100, 500 times each)');
+        assert.equal(s.latency_ms, 50.5, 'the mean is exact');
+        assert.ok(s.extra.p95_ms >= 1 && s.extra.p95_ms <= 100, 'the p95 comes from the bounded sample');
+        assert.deepEqual(c.bufferStats(), { keys: 0, latencies: 0, maxKeyLatencies: 0 }, 'a flush resets the buffers');
+    }],
+
+    ['init stops the previous collector: its interval is flushed and its timer replaced', async () => {
+        const first = [];
+        const second = [];
+        const sinkOf = (batches) => async (s) => { batches.push(s); };
+        const c1 = svc.telemetry.init({ service: 'demo', sink: sinkOf(first), intervalMs: 3600e3, log: quiet, signals: noSignals });
+        svc.telemetry.requestFinished({ route: '/old', method: 'GET', httpStatus: 200, latencyMs: 4 });
+        const c2 = svc.telemetry.init({ service: 'demo', sink: sinkOf(second), intervalMs: 3600e3, log: quiet, signals: noSignals });
+        assert.notEqual(c2, c1);
+        await new Promise((r) => setTimeout(r, 20));      // previous.stop() flushes asynchronously
+        assert.ok(first.flat().some((s) => s.operation === 'http.request' && s.resource === '/old'), 'the replaced interval was flushed to the old sink');
+        assert.equal(second.flat().length, 0, 'the new sink saw nothing yet');
+
+        svc.telemetry.requestFinished({ route: '/new', method: 'GET', httpStatus: 200, latencyMs: 2 });
+        await svc.telemetry.flush();
+        assert.ok(second.flat().some((s) => s.operation === 'http.request' && s.resource === '/new'), 'the singleton routes into the new collector');
+        assert.ok(!second.flat().some((s) => s.resource === '/old'), 'the old interval did not leak into the new collector');
+        await svc.telemetry.stop();
+    }],
+
     ['DEFAULT_INTERVAL_MS is the 15 s flush interval', async () => {
         assert.equal(svc.DEFAULT_INTERVAL_MS, 15000);
+        assert.equal(svc.DEFAULT_MAX_ROUTE_KEYS, 500);
+        assert.equal(svc.LATENCY_SAMPLE_CAP, 10000);
+        assert.deepEqual(svc.DEFAULT_SKIP_PREFIXES, ['/shared']);
     }],
 ]);

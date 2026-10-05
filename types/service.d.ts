@@ -167,16 +167,21 @@ export interface HttpTelemetryOptions {
     now?: () => number;
     log?: Logger;
     maxBuffered?: number;
-    /** The route template for a request. Default: Express's `req.route.path` under `req.baseUrl`, else the path. */
+    /** The route template for a request. Default: Express's `req.route.path` under `req.baseUrl`, else `'unmatched'`
+     *  (a raw path is never used as a label). */
     routeLabel?: (req: Req) => string;
     /** Replaces telemetrySkipped entirely. */
     skipped?: (req: Req) => boolean;
     /** Paths never observed. Default: /api/health, /ready, /api/ready, /metrics. */
     skipExact?: Set<string> | string[];
-    /** Prefixes never observed (a path segment, e.g. Network's /shared, /api/chrome). Default []. */
+    /** Prefixes never observed (a path segment). Default `['/shared']`; OpenVibe.Network passes
+     *  `['/shared', '/api/chrome']`. Pass `[]` to disable. */
     skipPrefixes?: string[];
     /** An extra always-skip predicate. */
     skip?: (req: Req) => boolean;
+    /** Distinct route|method|status_class keys kept per flush; further keys fold into the `'other'` route label.
+     *  Default 500. */
+    maxRouteKeys?: number;
     /** Override the module's signals for this collector (tests; a service with its own monitor). */
     signals?: Partial<TelemetrySignals>;
 }
@@ -202,6 +207,8 @@ export interface HttpTelemetry {
     /** A request ended: free the in-flight slot and fold it by route|method|status_class. */
     requestFinished(info: RequestObservation): void;
     observeRequest(info?: RequestObservation): void;
+    /** The live buffer sizes (diagnostics/tests): aggregation keys and sampled latencies held per flush. */
+    bufferStats(): { keys: number; latencies: number; maxKeyLatencies: number };
     routeLabel(req: Req): string;
     skipped(req: Req): boolean;
     /** The per-request middleware for this collector. */
@@ -213,7 +220,7 @@ export declare function createHttpTelemetry(options: HttpTelemetryOptions): Http
 export declare function createTelemetryMiddleware(collector: HttpTelemetry, options?: { routeLabel?: (req: Req) => string; skipped?: (req: Req) => boolean }): (req: Req, res: Res, next: Next) => void;
 /** Whether a request carries no product signal (probe paths, configured prefixes, static assets). */
 export declare function telemetrySkipped(req: Req, options?: { exact?: Set<string> | string[]; prefixes?: string[]; skip?: (req: Req) => boolean }): boolean;
-/** The route label without openvibe-shared/metrics. */
+/** The route label without openvibe-shared/metrics: the matched route template, else `'unmatched'`. */
 export declare function defaultRouteLabel(req: Req): string;
 /** Merge signals over the current defaults (a service or test injecting start/stop/lag). */
 export declare function registerSignals(injected?: Partial<TelemetrySignals>): void;
@@ -238,6 +245,9 @@ export declare const telemetry: {
     middleware: (req: Req, res: Res, next: Next) => void;
 };
 export declare const DEFAULT_INTERVAL_MS: 15000;
+export declare const DEFAULT_MAX_ROUTE_KEYS: 500;
+export declare const LATENCY_SAMPLE_CAP: 10000;
+export declare const DEFAULT_SKIP_PREFIXES: string[];
 export declare const HTTP_METHODS: Set<string>;
 
 // ── re-exported from openvibe-shared and openvibe-contracts (loaded on first use) ──

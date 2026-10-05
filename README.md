@@ -2,14 +2,14 @@
 
 > Supported browser and server clients for the OpenVibe platform.
 
-**Status:** alpha, v0.12.0 (roadmap Wave 2; developer apps from Wave 20; Media objects v2 from Wave 4; the Tools platform API; Search, Chat and AI clients from WS-F task 4; per-actor limits from WS-R task 4). Every release is tagged (see [CHANGELOG.md](CHANGELOG.md)). Tested against local stub servers and the built-in mock platform only, never against the live platform. Services pin release tags; each repository's `STATUS.json` names the one it uses.  
+**Status:** alpha, v0.31.0 (roadmap Wave 2; developer apps from Wave 20; Media objects v2 from Wave 4; the Tools platform API; Search, Chat and AI clients from WS-F task 4; per-actor limits from WS-R task 4). Every release is tagged (see [CHANGELOG.md](CHANGELOG.md)). Tested against local stub servers and the built-in mock platform only, never against the live platform. Services pin release tags; each repository's `STATUS.json` names the one it uses.  
 **Plan:** OpenVibe End-to-End Realignment & Implementation Plan, revision 3 (20 Sep 2026), §3.2; roadmap §30.  
 **License:** MIT ([LICENSE](LICENSE)). This package is a library that apps outside the network embed, so it uses MIT. The OpenVibe services themselves stay AGPL-3.0.
 
 **If a capability is not in the SDK, it is not public.** Apps call services through `openvibe-sdk` and never build internal routes themselves. A route with no SDK wrapper is internal, even when you can reach it, and it can change without notice. To make a capability public, first define it in OpenVibe.Contracts, then wrap it here.
 
 ```bash
-npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.12.0
+npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.31.0
 ```
 
 It has no runtime dependencies. It needs Node ≥ 20, or any browser with `fetch`, Web Crypto and `TextDecoder`. There is no build step. The package is CommonJS with ESM entry points (`import` works). Each subpath has its own `.d.ts`. For a page with no bundler, `browser/openvibe-sdk.mjs` is one self-contained ES module of the browser-safe subpaths (see [Browser without a bundler](#browser-without-a-bundler)). It does not depend on `openvibe-contracts` at runtime: it copies the contract types it uses (from Contracts v0.86.0, a devDependency the tests check them against).
@@ -392,11 +392,14 @@ it exits `deadlineExitCode`. `stopping()` turns true at once, for a readiness ch
 The kit also carries the HTTP telemetry Network wrote in `server/telemetry.js` and `server/observability.js`. A
 request is not a row: `createHttpTelemetry({ service, sink, skipPrefixes? })` aggregates per
 `route|method|status_class` per flush interval into `count`/`sum`/`max`/`p95` and emits one `http.request`
-`platform.telemetry-sample@1` per key, plus active-requests, p95 and event-loop-lag gauges once per flush. Mount
+`platform.telemetry-sample@1` per key, plus active-requests, p95 and event-loop-lag gauges once per flush. A request
+that matched no route is labelled `unmatched` (never its raw path), and the per-flush key map and latency samples
+are capped, so a scanner or a 404 flood cannot grow them without bound. Mount
 `collector.middleware()` before the routes and add `() => collector.stop()` to `gracefulStop`'s stop steps (one
 flush). The `telemetry.init({service, sink})` / `telemetryMiddleware` / `telemetry.stop()` singleton is the same
-design wired process-wide: health, readiness, metrics and static assets are skipped, the event-loop monitor starts
-in `init` and stops in `stop`, and requiring the kit starts nothing.
+design wired process-wide: health, readiness, metrics and static assets are skipped, `skipPrefixes` defaults to
+`['/shared']` (OpenVibe.Network passes `['/shared', '/api/chrome']`), the event-loop monitor starts in `init` and
+stops in `stop`, and requiring the kit starts nothing.
 
 ### Data: PostgreSQL and Valkey (server)
 

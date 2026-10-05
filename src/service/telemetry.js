@@ -8,7 +8,7 @@
  *   const collector = svc.createHttpTelemetry({
  *       service: 'blog',
  *       sink: (samples) => post('/internal/telemetry', samples),   // one batch per flush
- *       skipPrefixes: ['/shared'],                                 // plus health/ready/metrics/static, always
+ *       skipPrefixes: ['/shared'],                                 // default ['/shared'] (Network adds '/api/chrome')
  *       routeLabel: (req) => metrics.routeLabel(req),              // optional; the default reads req.route.path
  *   });
  *   app.use(collector.middleware());
@@ -30,14 +30,23 @@
  * event-loop-lag gauges carry theirs in `extra` — never in `latency_ms`, which a consumer maps to a
  * response time and would make indistinguishable from a latency.
  *
- * A sample carries the route template, method and status class — never a raw URL, client id or token.
- * Health, readiness, metrics and static/shared assets carry no product signal and are skipped before
- * anything is counted (telemetrySkipped).
+ * A sample carries the route template, method and status class — never a raw URL, client id or token; a
+ * request that matched no route is labelled 'unmatched', never by its path. Per flush, the distinct aggregation
+ * keys are capped (DEFAULT_MAX_ROUTE_KEYS; overflow folds into the 'other' route label) and each latency array is
+ * capped (LATENCY_SAMPLE_CAP, reservoir-sampled for the p95 while count/sum/max stay exact), so a flush's memory
+ * is bounded no matter the traffic. Health, readiness, metrics and static/shared assets carry no product signal
+ * and are skipped before anything is counted (telemetrySkipped).
  */
 const path = require('node:path');
 const { createTelemetry, telemetrySample, validateTelemetrySample } = require('../telemetry');
 
 const DEFAULT_INTERVAL_MS = 15000;
+/** Distinct route|method|status_class keys kept per flush; further keys fold into the 'other' route label. */
+const DEFAULT_MAX_ROUTE_KEYS = 500;
+/** Latency samples kept per key (and for the flush p95) by reservoir sampling; count/sum/max stay exact. */
+const LATENCY_SAMPLE_CAP = 10000;
+/** Path prefixes skipped by default (no product signal); a service overrides them, Network passes more. */
+const DEFAULT_SKIP_PREFIXES = ['/shared'];
 const HTTP_METHODS = new Set(['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']);
 const statusClass = (code) => (code ? `${Math.floor(code / 100)}xx` : 'aborted');
 const round = (n, digits = 3) => { const f = 10 ** digits; return Math.round(n * f) / f; };
@@ -47,6 +56,25 @@ function percentile95(values) {
     if (!values.length) return null;
     const sorted = [...values].sort((a, b) => a - b);
     return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))];
+}
+
+/**
+ * A fixed-capacity uniform sample of an unbounded stream (reservoir sampling): memory is O(cap). The p95 is
+ * read from the sample; a bucket's count/sum/max stay exact on the bucket itself.
+ */
+function createReservoir(cap) {
+    const values = [];
+    let count = 0;
+    return {
+        values,
+        push(value) {
+            count += 1;
+            if (values.length < cap) { values.push(value); return; }
+            const j = Math.floor(Math.random() * count);
+            if (j < cap) values[j] = value;
+        },
+        get size() { return values.length; },
+    };
 }
 
 // ── the event-loop monitor (a signal init starts and stop stops; requiring this module starts nothing) ──
@@ -95,11 +123,11 @@ const STATIC_EXTENSIONS = new Set([
 
 /**
  * Whether a request carries no product signal: the probe paths (/api/health, /ready, /api/ready, /metrics),
- * a configured prefix (skipPrefixes, e.g. Network's /shared and /api/chrome), a static asset by extension,
- * or whatever a `skip(req)` function also refuses. `req.path` (Express) or the URL without its query is
- * matched, never the raw URL.
+ * a configured prefix (skipPrefixes), a static asset by extension, or whatever a `skip(req)` function also
+ * refuses. `req.path` (Express) or the URL without its query is matched, never the raw URL. skipPrefixes
+ * defaults to ['/shared']; OpenVibe.Network passes ['/shared', '/api/chrome']. Pass `prefixes: []` to disable.
  */
-function telemetrySkipped(req, { exact = SKIP_EXACT, prefixes = [], skip } = {}) {
+function telemetrySkipped(req, { exact = SKIP_EXACT, prefixes = DEFAULT_SKIP_PREFIXES, skip } = {}) {
     if (typeof skip === 'function' && skip(req)) return true;
     const raw = req == null ? '' : req.path || String(req.url || '').split('?')[0];
     const p = raw || '';
@@ -109,16 +137,17 @@ function telemetrySkipped(req, { exact = SKIP_EXACT, prefixes = [], skip } = {})
 }
 
 /** The route label without openvibe-shared/metrics: Express's route template (req.route.path under
- *  req.baseUrl), else the path without its query. A service with metrics passes `routeLabel: metrics.routeLabel`. */
+ *  req.baseUrl), else 'unmatched'. A request with no matched route is never labelled by its raw path, so a
+ *  404 or a scanner stays one bounded 'unmatched' key (as OpenVibe.Network's metrics.routeLabel does). */
 function defaultRouteLabel(req) {
     if (req && req.route && typeof req.route.path === 'string') return `${req.baseUrl || ''}${req.route.path}`;
-    return (req && (req.path || String(req.url || '').split('?')[0])) || 'unmatched';
+    return 'unmatched';
 }
 
 /**
  * createHttpTelemetry({ service, sink, intervalMs = 15000, now, log, maxBuffered, routeLabel,
- *                       skipped, skipExact, skipPrefixes, skip, signals }) -> a collector:
- *   record/gauge/count, flush, stop, requestStarted, requestFinished, observeRequest,
+ *                       skipped, skipExact, skipPrefixes = ['/shared'], skip, maxRouteKeys = 500, signals }) -> a collector:
+ *   record/gauge/count, flush, stop, requestStarted, requestFinished, observeRequest, bufferStats,
  *   routeLabel(req), skipped(req), middleware(opts) -> (req, res, next)
  * A request began/ended is folded into the interval's aggregation; flush() emits the interval's samples and
  * hands the SDK everything buffered; stop() emits once and lets the SDK clear its timer and flush (idempotent).
@@ -127,7 +156,8 @@ function defaultRouteLabel(req) {
 function createHttpTelemetry(options = {}) {
     const {
         service = null, sink, intervalMs = DEFAULT_INTERVAL_MS, now, log, maxBuffered,
-        routeLabel = defaultRouteLabel, skipped = null, skipExact, skipPrefixes, skip, signals: injected,
+        routeLabel = defaultRouteLabel, skipped = null, skipExact, skipPrefixes = DEFAULT_SKIP_PREFIXES,
+        skip, maxRouteKeys = DEFAULT_MAX_ROUTE_KEYS, signals: injected,
     } = options;
     const sdk = createTelemetry({ service, sink, intervalMs, now, log, maxBuffered });
     const sig = injected ? { ...signals, ...injected } : signals;
@@ -136,7 +166,7 @@ function createHttpTelemetry(options = {}) {
         : (req) => telemetrySkipped(req, { exact: skipExact, prefixes: skipPrefixes, skip });
 
     let routes = new Map();      // key -> { route, method, status, count, sumMs, maxMs, latencies, codes }
-    let allLatencies = [];       // the flush interval's latencies, for the single p95 gauge
+    let allLatencies = createReservoir(LATENCY_SAMPLE_CAP);   // the flush's latencies, for the single p95 gauge
     let active = 0;              // requests in flight right now
     let activeMax = 0;           // the interval's peak, sampled at request start
     let stopped = false;
@@ -148,14 +178,18 @@ function createHttpTelemetry(options = {}) {
     }
 
     function observeRequest(info = {}) {
-        const r = String(info.route == null ? 'unmatched' : info.route).slice(0, 200);
+        let r = String(info.route == null ? 'unmatched' : info.route).slice(0, 200);
         const m = HTTP_METHODS.has(info.method) ? info.method : 'OTHER';
         const s = statusClass(info.httpStatus);
         const latency = Number.isFinite(info.latencyMs) && info.latencyMs >= 0 ? info.latencyMs : 0;
-        const key = `${r}|${m}|${s}`;
+        let key = `${r}|${m}|${s}`;
+        if (!routes.has(key) && routes.size >= maxRouteKeys) {
+            r = 'other';                    // the interval's key map is full: fold the new route label, bounded
+            key = `other|${m}|${s}`;
+        }
         let bucket = routes.get(key);
         if (!bucket) {
-            bucket = { route: r, method: m, status: s, count: 0, sumMs: 0, maxMs: 0, latencies: [], codes: new Set() };
+            bucket = { route: r, method: m, status: s, count: 0, sumMs: 0, maxMs: 0, latencies: createReservoir(LATENCY_SAMPLE_CAP), codes: new Set() };
             routes.set(key, bucket);
         }
         bucket.count += 1;
@@ -164,6 +198,13 @@ function createHttpTelemetry(options = {}) {
         bucket.latencies.push(latency);
         if (Number.isInteger(info.httpStatus) && info.httpStatus > 0) bucket.codes.add(info.httpStatus);
         allLatencies.push(latency);
+    }
+
+    /** The live buffer sizes (diagnostics/tests): the aggregation keys and the sampled latencies held per flush. */
+    function bufferStats() {
+        let maxKeyLatencies = 0;
+        for (const b of routes.values()) if (b.latencies.size > maxKeyLatencies) maxKeyLatencies = b.latencies.size;
+        return { keys: routes.size, latencies: allLatencies.size, maxKeyLatencies };
     }
 
     /** A request ended: free the in-flight slot, then fold it into its aggregation key. */
@@ -183,12 +224,12 @@ function createHttpTelemetry(options = {}) {
     /** Drain this interval: one http.request sample per route|method|status_class, then the three gauges. */
     function emitSamples() {
         const buckets = [...routes.values()];
-        const latencies = allLatencies;
+        const latencies = allLatencies.values;
         routes = new Map();
-        allLatencies = [];
+        allLatencies = createReservoir(LATENCY_SAMPLE_CAP);
         for (const b of buckets) {
             const mean = b.count ? b.sumMs / b.count : 0;
-            const p95 = percentile95(b.latencies);
+            const p95 = percentile95(b.latencies.values);
             const extra = {
                 method: b.method,
                 status_class: b.status,
@@ -226,7 +267,7 @@ function createHttpTelemetry(options = {}) {
 
     const collector = {
         record: sdk.record, gauge: sdk.gauge, count: sdk.count,
-        flush, stop, requestStarted, requestFinished, observeRequest,
+        flush, stop, requestStarted, requestFinished, observeRequest, bufferStats,
         routeLabel, skipped: skipFn,
         middleware: (o = {}) => createTelemetryMiddleware(collector, { routeLabel, skipped: skipFn, ...o }),
     };
@@ -268,16 +309,21 @@ let timer = null;
 let activeSignals = signals;
 
 /**
- * init({ service, sink, intervalMs?, routeLabel?, skipPrefixes?, signals?, …
- *        createHttpTelemetry options }) -> the collector. Starts the event-loop monitor (the injected
- * signals, else the module's) and the flush timer (unref'd). Call once at boot; a second call replaces it.
+ * init({ service, sink, intervalMs?, routeLabel?, skipPrefixes?, signals?, … createHttpTelemetry options })
+ * -> the collector. Starts the event-loop monitor (the injected signals, else the module's) and the flush timer
+ * (unref'd). Call once at boot; a second call stops the previous collector first (its interval is emitted and
+ * flushed, its timer cleared) and replaces it.
  */
 function init(opts = {}) {
+    if (timer) { clearInterval(timer); timer = null; }
+    const previous = current;
+    current = null;
+    currentMiddleware = null;
+    if (previous) previous.stop();       // flush the replaced collector's interval; its timer is stopped too
     current = createHttpTelemetry(opts);
     currentMiddleware = createTelemetryMiddleware(current, opts);
     activeSignals = opts.signals ? { ...signals, ...opts.signals } : signals;
     activeSignals.start();
-    if (timer) clearInterval(timer);
     const interval = Number.isFinite(opts.intervalMs) ? opts.intervalMs : DEFAULT_INTERVAL_MS;
     timer = setInterval(() => { current.flush(); }, interval);
     if (timer.unref) timer.unref();
@@ -313,6 +359,9 @@ const telemetry = { init, record, gauge, count, requestStarted, requestFinished,
 
 module.exports = {
     DEFAULT_INTERVAL_MS,
+    DEFAULT_MAX_ROUTE_KEYS,
+    LATENCY_SAMPLE_CAP,
+    DEFAULT_SKIP_PREFIXES,
     HTTP_METHODS,
     telemetrySample,
     validateTelemetrySample,

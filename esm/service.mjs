@@ -4,9 +4,10 @@ import cjs from '../src/service/index.js';
 export const {
     gracefulStop, within, DRAIN_MS, DEADLINE_MS, ServiceError, createServiceError,
     asServiceError, sendError, run, wrap, jsonBody, privateNoStore,
-    jsonErrors, DEFAULT_INTERVAL_MS, HTTP_METHODS, telemetrySample, validateTelemetrySample, telemetrySkipped,
-    defaultRouteLabel, createHttpTelemetry, createTelemetryMiddleware, registerSignals, startEventLoopMonitor, stopEventLoopMonitor,
-    eventLoopMonitorEnabled, eventLoopLagMs, telemetry, telemetryMiddleware,
+    jsonErrors, DEFAULT_INTERVAL_MS, DEFAULT_MAX_ROUTE_KEYS, LATENCY_SAMPLE_CAP, DEFAULT_SKIP_PREFIXES, HTTP_METHODS,
+    telemetrySample, validateTelemetrySample, telemetrySkipped, defaultRouteLabel, createHttpTelemetry, createTelemetryMiddleware,
+    registerSignals, startEventLoopMonitor, stopEventLoopMonitor, eventLoopMonitorEnabled, eventLoopLagMs, telemetry,
+    telemetryMiddleware,
 } = cjs;
 export function createReadiness(...args) { return cjs.createReadiness(...args); }
 export function skip(...args) { return cjs.skip(...args); }
