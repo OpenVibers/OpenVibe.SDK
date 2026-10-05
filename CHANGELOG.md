@@ -7,6 +7,22 @@ release may change an API and says so here.
 
 
 
+## 0.29.0 (2026-10-04)
+
+- **`createTestDb` reuses a migrated snapshot (`openvibe-sdk/testing`, minor):** on PGlite, the first test process
+  boots, migrates, runs the new `seed: async (db) => {}` hook and saves the data directory (`dumpDataDir`) under
+  `os.tmpdir()/openvibe-test-snapshots` (`OV_TEST_SNAPSHOT_DIR`); later processes load it (`loadDataDir`) instead of
+  migrating, refresh `ov_migrations.applied_at` (so an ADR-028 contract migration stays held as on a fresh migrate) and
+  run `migrate` only if the snapshot is behind. The key is the migrations' file names and contents, the
+  SDK and `@electric-sql/pglite` versions and `seedKey` (default: the seed function's source; a `seedKey` without a
+  `seed` is not the same snapshot as one with both). Parallel processes build
+  it once under a lock file; the others wait up to 60 s, then migrate on their own. A file that does not load is
+  deleted and rebuilt. The result adds `snapshot` (`'hit'`, `'built'` or `'off'`) and `setupMs`. Each database is
+  still the process's own: rows a test writes are never in the snapshot. **Opt out** with `OV_TEST_SNAPSHOT=0`.
+  On `store: 'pg'`, `seed` runs on the run's schema after the migrations with the schema owner's rights (as on PGlite)
+  and `setupMs` is reported; roles, privileges
+  and the lease are unchanged.
+
 ## 0.28.0 (2026-10-04)
 
 - **`openvibe-sdk/commerce` (new, server; plan T5 step 13):** the Billing client Tips and VIP each carried a copy of.

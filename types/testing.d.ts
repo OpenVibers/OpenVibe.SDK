@@ -160,10 +160,21 @@ export interface TestDb {
     url: string | null;
     /** DATABASE_DIRECT_URL for a spawned process (the owner, direct: its boot's migrate); null on PGlite. */
     directUrl: string | null;
+    /** PGlite: loaded from the migrated snapshot ('hit'), made it ('built'), or migrated without one ('off'); always 'off' on store pg. */
+    snapshot: 'hit' | 'built' | 'off';
+    /** How long the setup took, in ms. */
+    setupMs: number;
     close(): Promise<void>;
 }
 /** A migrated database for one test run: PGlite, or (store 'pg') roles and a schema of its own on the containers. */
-export declare function createTestDb(opts?: { migrations?: string; store?: 'pglite' | 'pg' | string; service?: string; max?: number; log?: object }): Promise<TestDb>;
+export declare function createTestDb(opts?: {
+    migrations?: string;
+    /** Runs once after the migrations with the schema owner's rights on both stores; on PGlite its rows are part of the snapshot. */
+    seed?: (db: Db) => Promise<void> | void;
+    /** Part of the snapshot key: change it when the seed changes (default: the seed function's source). */
+    seedKey?: string;
+    store?: 'pglite' | 'pg' | string; service?: string; max?: number; log?: object;
+}): Promise<TestDb>;
 export declare function createTestValkey(opts?: { prefix?: string }): Valkey | null;
 export declare function pgAvailable(): boolean;
 export declare function valkeyAvailable(): boolean;

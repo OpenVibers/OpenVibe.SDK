@@ -14,9 +14,21 @@
  *     concurrently updated"). close() ends the roles' backends (PgBouncer keeps idle server connections) and drops them.
  *   open(): another pooled handle on the same database (a second process).
  *
+ *   Snapshot (PGlite): a fresh PGlite plus the whole migration run costs seconds in every test process. The first
+ *   process to need a database builds it (boot, migrate, the optional `seed(db)` hook), dumps its data directory to
+ *   os.tmpdir()/openvibe-test-snapshots (OV_TEST_SNAPSHOT_DIR), and every later one loads that file instead. The key
+ *   is the migrations' file names and contents, the SDK and @electric-sql/pglite versions and `seedKey` (else the
+ *   seed function's source). Parallel processes build it once under a lock file (the others wait up to 60 s, then
+ *   migrate on their own); a file that does not load is deleted and rebuilt. A hit refreshes `ov_migrations.applied_at`
+ *   so an ADR-028 contract migration stays held exactly as it would on a fresh migrate. OV_TEST_SNAPSHOT=0 turns it off.
+ *   The result says which happened (`snapshot`: 'hit' | 'built' | 'off') and how long setup took (`setupMs`).
+ *
  *   createTestValkey({ prefix }): the containers' Valkey (OV_TEST_VALKEY_URL) under a prefix no other run uses, or null.
  */
 const crypto = require('crypto');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 
 const quiet = { log() {}, warn() {}, error: (...a) => console.error(...a) };
 const SETUP_LOCK = 735_1_2026;
@@ -54,13 +66,138 @@ async function sweepOrphans(su, { now = Date.now(), maxAge = ORPHAN_MS } = {}) {
 }
 const valkeyAvailable = () => !!process.env.OV_TEST_VALKEY_URL;
 
-async function createTestDb({ migrations, store = process.env.OV_TEST_STORE || 'pglite', service = 'test', max = 4, log = quiet } = {}) {
-    const { createDb } = require('../db');
-    if (store !== 'pg') {
-        const db = createDb({ pglite: true, service: `${service}-test`, log });
-        if (migrations) await db.migrate({ dir: migrations, log });
-        return { db, store: 'pglite', url: null, directUrl: null, open: null, close: () => db.close().catch(() => {}) };
+// ── PGlite snapshot ────────────────────────────────────────────────────────────────────────
+const SNAPSHOT_WAIT_MS = 60_000;          // a waiter migrates on its own after this
+const SNAPSHOT_LOCK_STALE_MS = 10 * 60e3; // a lock this old is a dead builder's
+const SNAPSHOT_KEEP_MS = 7 * 86400e3;     // snapshots unused this long are removed when another is built
+const snapshotsOn = () => !/^(0|false|off|no)$/i.test(String(process.env.OV_TEST_SNAPSHOT || '').trim());
+const snapshotDir = () => process.env.OV_TEST_SNAPSHOT_DIR || path.join(os.tmpdir(), 'openvibe-test-snapshots');
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function pgliteVersion() {
+    try {
+        let d = path.dirname(require.resolve('@electric-sql/pglite'));
+        for (let i = 0; i < 5; i++, d = path.dirname(d)) {
+            const f = path.join(d, 'package.json');
+            if (fs.existsSync(f)) { const j = JSON.parse(fs.readFileSync(f, 'utf8')); if (j.name === '@electric-sql/pglite') return j.version; }
+        }
+    } catch { /* not installed: createDb says so */ }
+    return 'unknown';
+}
+
+/** The snapshot's name: what a migrated (and seeded) database depends on. */
+function snapshotKey({ migrations, seed, seedKey } = {}) {
+    const h = crypto.createHash('sha256');
+    h.update(`openvibe-test-snapshot:1\0sdk ${require('../../package.json').version}\0pglite ${pgliteVersion()}\0`);
+    if (migrations && fs.existsSync(migrations)) {
+        for (const f of fs.readdirSync(migrations).filter((n) => n.endsWith('.sql')).sort()) h.update(`${f}\0`).update(fs.readFileSync(path.join(migrations, f))).update('\0');
     }
+    h.update(`seed\0${seed ? (seedKey != null ? `key:${seedKey}` : `fn:${seed.toString()}`) : 'none'}`);
+    return h.digest('hex').slice(0, 32);
+}
+
+const statOf = (f) => { try { return fs.statSync(f); } catch { return null; } };
+const sameFile = (a, b) => !!(a && b && a.ino === b.ino && a.size === b.size && a.mtimeMs === b.mtimeMs);
+
+/** Take the build lock (a file made exclusively), or break it when its builder is gone. */
+function takeLock(lock) {
+    try { fs.writeFileSync(lock, `${process.pid} ${Date.now()}`, { flag: 'wx' }); return true; } catch (e) { if (e.code !== 'EEXIST') throw e; }
+    const st = statOf(lock);
+    let pid = 0;
+    try { pid = parseInt(fs.readFileSync(lock, 'utf8'), 10) || 0; } catch { /* gone already */ }
+    let alive = true;
+    if (pid && pid !== process.pid) { try { process.kill(pid, 0); } catch (e) { alive = e.code === 'EPERM'; } }
+    if (!alive || (st && Date.now() - st.mtimeMs > SNAPSHOT_LOCK_STALE_MS)) fs.rmSync(lock, { force: true });
+    return false;
+}
+
+function pruneSnapshots(dir, keep) {
+    const now = Date.now();
+    for (const f of fs.readdirSync(dir)) {
+        const p = path.join(dir, f);
+        if (p === keep) continue;
+        const st = statOf(p);
+        if (!st) continue;
+        if ((f.endsWith('.pgdata') && now - st.mtimeMs > SNAPSHOT_KEEP_MS) || (f.endsWith('.tmp') && now - st.mtimeMs > 3600e3)) fs.rmSync(p, { force: true });
+    }
+}
+
+async function pgliteTestDb({ migrations, seed, seedKey, service, log }) {
+    const { createDb } = require('../db');
+    const t0 = Date.now();
+    const handle = (db, snapshot) => ({
+        db, store: 'pglite', snapshot, setupMs: Date.now() - t0, url: null, directUrl: null, open: null, close: () => db.close().catch(() => {}),
+    });
+    const build = async () => {
+        const db = createDb({ pglite: true, service: `${service}-test`, log });
+        try {
+            if (migrations) await db.migrate({ dir: migrations, log });
+            if (seed) await seed(db);
+        } catch (e) { await db.close().catch(() => {}); throw e; }
+        return db;
+    };
+    if (!snapshotsOn()) return handle(await build(), 'off');
+    const dir = snapshotDir();
+    try { fs.mkdirSync(dir, { recursive: true }); } catch (e) { log.warn(`[test-db] snapshot directory ${dir}: ${e.message}; migrating instead`); return handle(await build(), 'off'); }
+    const file = path.join(dir, `${snapshotKey({ migrations, seed, seedKey })}.pgdata`);
+    const lock = `${file}.lock`;
+    const deadline = Date.now() + SNAPSHOT_WAIT_MS;
+    let bad = null;   // the snapshot file that failed to load: rebuilt, never loaded again
+    for (;;) {
+        const st = statOf(file);
+        if (st && !sameFile(st, bad)) {
+            let inst = null;
+            try {
+                const { PGlite } = require('@electric-sql/pglite');
+                inst = new PGlite({ loadDataDir: new Blob([fs.readFileSync(file)]) });
+                await inst.waitReady;
+                const db = createDb({ pglite: inst, service: `${service}-test`, log });
+                if (migrations) {
+                    // The snapshot froze ov_migrations.applied_at at build time. An ADR-028 contract migration is
+                    // held until its expand has been applied for windowDays, so a reused snapshot would let it run
+                    // ~7 days after it was built, while a fresh migrate holds it. Refresh the ages so the loaded
+                    // database looks freshly migrated, as it did before snapshots.
+                    await db.query('UPDATE ov_migrations SET applied_at = now()').catch(() => {});
+                    // The key covers the migrations, so this is a check: migrate only if the snapshot is behind.
+                    const applied = new Set((await db.many('SELECT id FROM ov_migrations').catch(() => [])).map((r) => r.id));
+                    if (require('../db/migrate').parse(migrations).some((m) => !applied.has(m.id))) await db.migrate({ dir: migrations, log });
+                }
+                try { const now = new Date(); fs.utimesSync(file, now, now); } catch { /* kept a little less long */ }
+                return handle(db, 'hit');
+            } catch (e) {
+                if (inst) await inst.close().catch(() => {});
+                log.warn(`[test-db] snapshot ${path.basename(file)} did not load (${e.message}); rebuilding it`);
+                bad = st;
+                continue;
+            }
+        }
+        if (takeLock(lock)) {
+            let db;
+            try {
+                const now = statOf(file);
+                if (now && !sameFile(now, bad)) continue;   // another process finished it meanwhile
+                if (now) fs.rmSync(file, { force: true });
+                db = await build();
+                const tmp = `${file}.${process.pid}.${crypto.randomBytes(4).toString('hex')}.tmp`;
+                try {
+                    const blob = await db._adapter.instance.dumpDataDir('none');
+                    fs.writeFileSync(tmp, Buffer.from(await blob.arrayBuffer()));
+                    fs.renameSync(tmp, file);
+                    pruneSnapshots(dir, file);
+                } catch (e) { fs.rmSync(tmp, { force: true }); log.warn(`[test-db] snapshot not saved: ${e.message}`); }
+            } finally { fs.rmSync(lock, { force: true }); }
+            return handle(db, 'built');
+        }
+        if (Date.now() > deadline) { log.warn(`[test-db] snapshot still being built after ${SNAPSHOT_WAIT_MS / 1000} s; migrating instead`); return handle(await build(), 'off'); }
+        await sleep(100);
+    }
+}
+
+async function createTestDb({ migrations, seed, seedKey, store = process.env.OV_TEST_STORE || 'pglite', service = 'test', max = 4, log = quiet } = {}) {
+    const { createDb } = require('../db');
+    if (seed != null && typeof seed !== 'function') throw new TypeError('createTestDb: seed must be an async function (db) => {}');
+    if (store !== 'pg') return pgliteTestDb({ migrations, seed, seedKey, service, log });
+    const t0 = Date.now();
     if (!pgAvailable()) throw new Error('store pg needs OV_TEST_PG_URL and OV_TEST_PG_DIRECT_URL (openvibe-sdk scripts/test-services.sh up)');
     const safe = String(service).replace(/[^a-z0-9]/g, '').slice(0, 12) || 'svc';
     const name = runName(safe);
@@ -111,9 +248,15 @@ async function createTestDb({ migrations, store = process.env.OV_TEST_STORE || '
             try { await ownerDb.migrate({ dir: migrations, log }); } finally { await ownerDb.close(); }
         }
         db = createDb({ url: as(process.env.OV_TEST_PG_URL, name), service: `${service}-test`, max, log });
-    } catch (e) { await drop().catch(() => {}); throw e; }   // a failed setup leaves nothing behind
+        if (seed) {
+            // On PGlite the seed runs on the migrated handle (the owner). The runtime role here is DML-only
+            // (no TRUNCATE, ALTER SEQUENCE or DDL), so run the pg seed as the owner too: both stores behave alike.
+            const seedDb = createDb({ url: as(process.env.OV_TEST_PG_DIRECT_URL, owner), service: `${service}-test-seed`, max: 1, log });
+            try { await seed(seedDb); } finally { await seedDb.close(); }
+        }
+    } catch (e) { if (db) await db.close().catch(() => {}); await drop().catch(() => {}); throw e; }   // a failed setup leaves nothing behind
     return {
-        db, store: 'postgresql', schema: name,
+        db, store: 'postgresql', schema: name, snapshot: 'off', setupMs: Date.now() - t0,
         // For a process of its own (a worker the test spawns): DATABASE_URL (through PgBouncer, the service role) and
         // DATABASE_DIRECT_URL (the owner, for its boot's migrate, which finds everything applied).
         url: as(process.env.OV_TEST_PG_URL, name), directUrl: as(process.env.OV_TEST_PG_DIRECT_URL, owner),
@@ -128,4 +271,4 @@ function createTestValkey({ prefix = 'test' } = {}) {
     return createValkey({ url: process.env.OV_TEST_VALKEY_URL, prefix: `ov:${prefix}-test:${crypto.randomBytes(4).toString('hex')}:`, log: quiet });
 }
 
-module.exports = { createTestDb, createTestValkey, pgAvailable, valkeyAvailable, runName, runTime, isRunSchema, leaseKey, sweepOrphans };
+module.exports = { createTestDb, createTestValkey, pgAvailable, valkeyAvailable, runName, runTime, isRunSchema, leaseKey, sweepOrphans, snapshotKey, snapshotDir };

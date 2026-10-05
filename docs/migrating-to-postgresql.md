@@ -100,6 +100,7 @@ Anything held in a process that must be shared once there are two processes:
   - a test that the hot routes run a bounded number of queries;
   - a migration test (the files parse, apply in order, and apply twice without change);
   - an import test that imports a small SQLite fixture with `importSqlite` and checks `report.ok`.
+- **One migrated database per test process, from a snapshot:** `const { db, close } = await createTestDb({ migrations, seed, seedKey })` (`openvibe-sdk/testing`). The first process builds the migrated (and seeded) PGlite and saves it under `os.tmpdir()/openvibe-test-snapshots` (`OV_TEST_SNAPSHOT_DIR`); every later one loads it in well under a second instead of migrating. Put the app's seed in `seed: async (db) => {}`, not after the call, and change `seedKey` when the seed changes (without one the seed function's source is the key). `snapshot` says `'hit'`, `'built'` or `'off'` and `setupMs` how long it took. `OV_TEST_SNAPSHOT=0` turns it off.
 - **CI** starts the containers and runs the suite against them (`test: 'eval "$(node_modules/openvibe-sdk/scripts/test-services.sh up)" && npm test'`, as the SDK does) when the service has pooler-sensitive code.
 - **Skipping:** a test that cannot run something prints `<label>: skipped (<why>)`, and the shared runner reports it.
 
