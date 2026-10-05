@@ -159,6 +159,49 @@ kit.
 It has no hard timer today. `gracefulStop({ name: 'OpenRe', server, close: [...] })` adds one (5 s, exit 1): new
 behaviour, but a safer one.
 
+## The telemetry
+
+The kit carries the HTTP telemetry Network wrote in `server/telemetry.js` and `server/observability.js`, so every
+service emits `platform.telemetry-sample@1` the same way. A request is not a row: requests are aggregated per
+`route|method|status_class` per flush interval into `count`, `sum`, `max` and `p95`, and **one** `http.request`
+sample per key is emitted per flush — plus the HTTP autoscaling gauges (active requests, rolling p95, event-loop
+lag) once per flush from a timer, never per request. The SDK buffer (maxBuffered 1000) therefore cannot overflow.
+A sample carries the route template, method and status class — never a raw URL, client id or token (a request
+that matched no route is `unmatched`, and the per-flush key map and latency samples are capped, so a scanner or a
+404 flood stays bounded).
+
+```js
+const svc = require('openvibe-sdk/service');
+const collector = svc.createHttpTelemetry({
+    service: 'blog',                                     // the schema's service; there is no `instance` field
+    sink: (samples) => post('/internal/telemetry', samples),   // one batch per flush
+    intervalMs: 15000,                                   // also the p95 window
+    skipPrefixes: ['/shared'],                           // default ['/shared']; Network passes '/shared', '/api/chrome'
+    routeLabel: (req) => metrics.routeLabel(req),        // optional; default reads req.route.path under req.baseUrl
+});
+app.use(collector.middleware());                         // per request, before the routes
+svc.gracefulStop({ name: 'Blog', server, stop: [() => collector.stop()] });   // stop() emits once, then flushes once
+```
+
+The process-wide singleton keeps Network's shape, for a service that just wants it wired at boot:
+
+```js
+svc.telemetry.init({ service: 'blog', sink });           // starts the flush timer and the event-loop monitor
+app.use(svc.telemetryMiddleware);                        // a no-op until init, so mount order is not delicate
+svc.gracefulStop({ name: 'Blog', server, stop: [() => svc.telemetry.stop()] });   // stops both, flushes once
+```
+
+`telemetrySkipped(req)` skips `/api/health`, `/ready`, `/api/ready`, `/metrics` and static assets by extension;
+`skipExact`, `skipPrefixes` and `skip(req)` add a service's own probes, chrome and shared assets. Field mapping
+(`platform.telemetry-sample@1` has no generic gauge field): an aggregated request carries its mean in `latency_ms`
+and the counts in `extra`; the p95 gauge carries its value in `latency_ms` (it is a latency); the active-requests
+and event-loop-lag gauges carry theirs in `extra`, never in `latency_ms` (which a consumer reads as a response
+time). `registerSignals({ start, stop, lag })` injects a service's own monitor in place of the default.
+
+**Network and Community** delete `server/telemetry.js` and the telemetry block of `server/observability.js`
+(`telemetrySkipped`/`telemetryMiddleware`/the loop monitor) and register the kit's middleware with
+`skipPrefixes: ['/shared', '/api/chrome']`; their `analyticsSink` becomes the `sink` passed to `init`.
+
 ## The errors
 
 ```js

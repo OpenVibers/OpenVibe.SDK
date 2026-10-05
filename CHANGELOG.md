@@ -7,6 +7,26 @@ release may change an API and says so here.
 
 
 
+## 0.31.0 (2026-10-05)
+
+- **`openvibe-sdk/service` carries the HTTP telemetry middleware and autoscaling signals (plan T1):** lifted from
+  OpenVibe.Network's `server/telemetry.js` and `server/observability.js`, which were the only implementation.
+  `createHttpTelemetry({ service, sink, intervalMs = 15000, routeLabel?, skipExact?, skipPrefixes?, skip?, signals? })`
+  returns a collector with `middleware()`, `record`/`gauge`/`count`, `requestStarted`, `requestFinished`,
+  `observeRequest`, `flush` and `stop`. A request is not a row: requests aggregate per `route|method|status_class`
+  per flush into `count`/`sum`/`max`/`p95`, and one `http.request` `platform.telemetry-sample@1` sample per key is
+  emitted per flush (its mean in `latency_ms`, the counts in `extra`), plus the active-requests, rolling-p95 and
+  event-loop-lag gauges once per flush — never per request, so the SDK buffer cannot overflow. A sample carries the
+  route template, method and status class, never a raw URL or token; health, readiness, metrics and static assets are
+  skipped (`telemetrySkipped`). The singleton `telemetry.init(...)` / `telemetryMiddleware` / `telemetry.stop()`
+  wires it process-wide: `init` starts the event-loop monitor and the unref'd flush timer, `stop` stops both and
+  flushes once (a `gracefulStop` stop step), and requiring the kit starts nothing. `registerSignals({start, stop,
+  lag})` injects a service's own monitor. No change to the other modules. A request that matched no route is
+  labelled `'unmatched'` (never its raw path), `skipPrefixes` defaults to `['/shared']` (Network passes
+  `['/shared', '/api/chrome']`), the per-flush aggregation keys and latency samples are capped (overflow folds into
+  the `'other'` route label; p95 uses reservoir sampling while count/sum/max stay exact), and a second `init`
+  stops (flushes) the collector it replaces.
+
 ## 0.30.0 (2026-10-04)
 
 - **`openvibe-sdk/bot` (new, both; plan B8):** the OpenVibe.Bot client. `createBotClient(client, {actingSubject?})`
