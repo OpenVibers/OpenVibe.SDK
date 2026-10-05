@@ -33,9 +33,9 @@ export type SubjectRef =
       id: string;
     };
 
-/** identity.service-token-claims@1.2.0 (owner: network) */
+/** identity.service-token-claims@1.3.0 (owner: network) */
 /**
- * Claims of a short-lived RS256 client-credentials token issued by OpenVibe.Network to a service, app, mod or node principal. Replaces X-Internal-Key. App tokens (actor_type app) also carry project_id and env; receivers refuse env=sandbox unless they opted in.
+ * Claims of a short-lived RS256 client-credentials token issued by OpenVibe.Network to a service, app, mod, node or agent principal. Replaces X-Internal-Key. App tokens (actor_type app) also carry project_id and env; receivers refuse env=sandbox unless they opted in. Agent tokens (actor_type agent, sub agent:agt_<ULID>) are minted for the agent's host and also carry project_id, env and on_behalf_of (the owner), and optionally cap_confirm and act.
  */
 export type ServiceTokenClaims = {
   [k: string]: unknown | undefined;
@@ -45,7 +45,7 @@ export type ServiceTokenClaims = {
    */
   iss: string;
   sub: string;
-  actor_type: "service" | "app" | "mod" | "node";
+  actor_type: "service" | "app" | "mod" | "node" | "agent";
   /**
    * @minItems 1
    */
@@ -55,6 +55,10 @@ export type ServiceTokenClaims = {
    */
   cap: string[];
   /**
+   * Agent tokens: capabilities the agent holds in confirm mode. Each use needs an approved network.confirmation-request@1, presented as OpenVibe-Confirmation: cnf_<ULID> and consumed by the owning service. Never also in cap, so a receiver that does not know agents refuses those actions.
+   */
+  cap_confirm?: string[];
+  /**
    * Namespace constraints, e.g. live.* or mod.example.*. A developer app token carries its project_id (the whole project, as issued before namespaces were rows) and app.<project_id>.*: on Media, app.<project_id> and app.<project_id>.sandbox are the project's production and sandbox namespaces, with children below them.
    */
   ns?: string[];
@@ -62,17 +66,23 @@ export type ServiceTokenClaims = {
   exp: number;
   jti: string;
   /**
-   * Developer project of an app principal (ADR-014). Services key tenancy by it. Absent on first-party service tokens.
+   * Developer project of an app or agent principal (ADR-014). Services key tenancy by it. Absent on first-party service tokens.
    */
   project_id?: string;
   /**
-   * Environment of an app principal. A receiver MUST refuse env=sandbox (401 token.sandbox_refused) unless it opted in to sandbox tokens. Absent on first-party service tokens, which are production.
+   * Environment of an app or agent principal. A receiver MUST refuse env=sandbox (401 token.sandbox_refused) unless it opted in to sandbox tokens. Absent on first-party service tokens, which are production.
    */
   env?: "sandbox" | "production";
   /**
-   * The person who authorized an app through the authorization-code flow. Absent on client_credentials tokens.
+   * The person who authorized an app through the authorization-code flow, or the owner an agent acts for (always present on agent tokens). Absent on client_credentials tokens.
    */
   on_behalf_of?: string;
+  /**
+   * Agent tokens: the host that runs the agent and the token was minted for (RFC 8693 actor claim), a service or an app.
+   */
+  act?: {
+    sub: string;
+  };
   [k: string]: unknown | undefined;
 };
 
