@@ -169,7 +169,7 @@ export interface TestDb {
 /** A migrated database for one test run: PGlite, or (store 'pg') roles and a schema of its own on the containers. */
 export declare function createTestDb(opts?: {
     migrations?: string;
-    /** Runs once after the migrations; on PGlite its rows are part of the snapshot. */
+    /** Runs once after the migrations with the schema owner's rights on both stores; on PGlite its rows are part of the snapshot. */
     seed?: (db: Db) => Promise<void> | void;
     /** Part of the snapshot key: change it when the seed changes (default: the seed function's source). */
     seedKey?: string;

@@ -1,10 +1,11 @@
 'use strict';
 /** openvibe-sdk/testing createTestDb: a migrated PGlite database; on the containers, parallel setups do not race. */
 const assert = require('node:assert/strict');
+const { fork } = require('node:child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { run } = require('./helpers');
+const { run, waitFor } = require('./helpers');
 const { createTestDb, pgAvailable } = require('../src/testing');
 const { runName, runTime, isRunSchema, leaseKey, sweepOrphans, snapshotKey } = require('../src/testing/db');
 
@@ -80,6 +81,37 @@ const tests = [
         assert.equal(fs.readdirSync(snaps).filter((f) => f.startsWith(snapshotKey({ migrations: m }))).length, 1);
         assert.deepEqual(leftovers(), []);
     }],
+    ['snapshot: a builder in another process holds the lock; this process waits and loads its file', async () => {
+        const m = migrationsDir('CREATE TABLE crossing (id int);');
+        const seed = async () => {}; const seedKey = 'slow-build';
+        const lock = `${snapshotFile({ migrations: m, seed, seedKey })}.lock`;
+        const script = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'sdk-testdb-child-')), 'build.js');
+        fs.writeFileSync(script, `'use strict';
+const { createTestDb } = require(${JSON.stringify(path.join(__dirname, '..', 'src', 'testing', 'db'))});
+(async () => {
+    const t = await createTestDb({ migrations: process.argv[2], seed: async () => { await new Promise((r) => setTimeout(r, 2500)); }, seedKey: 'slow-build', service: 'sdk' });
+    if (process.send) process.send({ snapshot: t.snapshot });
+    await t.close();
+})().catch((e) => { if (process.send) process.send({ error: e.message }); process.exit(1); });
+`);
+        const child = fork(script, [m], { stdio: ['ignore', 'ignore', 'inherit', 'ipc'] });
+        const built = new Promise((resolve, reject) => {
+            child.on('message', (msg) => { if (msg && msg.error) reject(new Error(msg.error)); else resolve(msg); });
+            child.on('exit', (code, signal) => reject(new Error(`snapshot builder exited (${code == null ? signal : code})`)));
+        });
+        built.catch(() => {});   // the waiter may fail before the child exits; keep that rejection handled
+        try {
+            await waitFor(() => fs.existsSync(lock), { timeoutMs: 30000 });
+            const t0 = Date.now();
+            const t = await createTestDb({ migrations: m, seed, seedKey, service: 'sdk' });
+            try {
+                assert.equal(t.snapshot, 'hit', 'the other process built it; this one loaded it');
+                assert.ok(Date.now() - t0 >= 100, 'this process waited for the live builder instead of breaking its lock');
+            } finally { await t.close(); }
+            assert.deepEqual(await built, { snapshot: 'built' });
+        } finally { child.kill('SIGKILL'); }
+        assert.deepEqual(leftovers(), []);
+    }],
     ['snapshot: a lock left by a builder that died is broken', async () => {
         const m = migrationsDir('CREATE TABLE stale (id int);');
         fs.writeFileSync(`${snapshotFile({ migrations: m })}.lock`, `2147483646 ${Date.now()}`);
@@ -115,6 +147,33 @@ const tests = [
         assert.equal(runs, 2, 'another seedKey is another snapshot');
         const plain = await createTestDb({ migrations: m, service: 'sdk' });
         try { assert.equal(plain.snapshot, 'built'); assert.equal(await plain.db.value('SELECT count(*)::int FROM users'), 0, 'no seed, no rows'); } finally { await plain.close(); }
+    }],
+    ['snapshot: a seedKey without a seed is not the same snapshot as one with both', async () => {
+        const m = migrationsDir('CREATE TABLE keyed (id int PRIMARY KEY, name text);');
+        const seed = async (db) => { await db.query("INSERT INTO keyed VALUES (1, 'admin')"); };
+        assert.notEqual(snapshotKey({ migrations: m, seedKey: 'v1' }), snapshotKey({ migrations: m, seed, seedKey: 'v1' }), 'the keys differ');
+        const bare = await createTestDb({ migrations: m, seedKey: 'v1', service: 'sdk' });
+        try { assert.equal(bare.snapshot, 'built'); assert.equal(await bare.db.value('SELECT count(*)::int FROM keyed'), 0); } finally { await bare.close(); }
+        const seeded = await createTestDb({ migrations: m, seed, seedKey: 'v1', service: 'sdk' });
+        try {
+            assert.equal(seeded.snapshot, 'built', 'the unseeded snapshot is not served to a seeded call');
+            assert.equal(await seeded.db.value('SELECT count(*)::int FROM keyed'), 1, 'the seed ran');
+        } finally { await seeded.close(); }
+    }],
+    ['snapshot: a hit refreshes ov_migrations ages, so an ADR-028 contract stays held as on a fresh migrate', async () => {
+        const m = fs.mkdtempSync(path.join(os.tmpdir(), 'sdk-testdb-'));
+        fs.writeFileSync(path.join(m, '0001_expand.sql'), '-- phase: expand\nCREATE TABLE legacy (id int);\n');
+        fs.writeFileSync(path.join(m, '0002_contract.sql'), '-- phase: contract\n-- after: 0001\nCREATE TABLE contracted (id int);\n');
+        // The seed ages the expand; a snapshot built more than windowDays ago looks exactly like this to a hit.
+        const seed = async (db) => { await db.query("UPDATE ov_migrations SET applied_at = now() - interval '30 days'"); };
+        const a = await createTestDb({ migrations: m, seed, service: 'sdk' });
+        try { assert.equal(a.snapshot, 'built'); } finally { await a.close(); }
+        const b = await createTestDb({ migrations: m, seed, service: 'sdk' });
+        try {
+            assert.equal(b.snapshot, 'hit');
+            assert.equal(await b.db.value("SELECT to_regclass('contracted')"), null, 'the contract is still held');
+            assert.equal(await b.db.value("SELECT count(*)::int FROM ov_migrations WHERE id = '0002'"), 0, 'the contract is not recorded');
+        } finally { await b.close(); }
     }],
     ['a run\'s schema name carries when it was made (so a killed run\'s leftovers can be swept); an older name has none', async () => {
         const t0 = Date.now(), n = runName('sdk', t0);
@@ -161,6 +220,18 @@ if (pgAvailable()) {
             for (const q of [`DROP SCHEMA IF EXISTS ${fresh} CASCADE`, `DROP ROLE IF EXISTS ${fresh}`, `DROP ROLE IF EXISTS ${fresh}_owner`]) await su.query(q).catch(() => {});
             await su.close();
         }
+    }]);
+    tests.push(['postgresql: seed runs with the schema owner\'s rights, as on PGlite', async () => {
+        const m = migrationsDir('CREATE TABLE seeded (id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, label text NOT NULL);');
+        const seed = async (db) => {
+            await db.query("INSERT INTO seeded (label) VALUES ('admin')");
+            await db.query('ALTER SEQUENCE seeded_id_seq RESTART WITH 100');   // owner-only: the runtime role may not
+        };
+        const t = await createTestDb({ migrations: m, store: 'pg', seed, service: 'sdk' });
+        try {
+            assert.equal(await t.db.value("SELECT nextval('seeded_id_seq')"), 100);
+            assert.equal(await t.db.value('SELECT count(*)::int FROM seeded'), 1);
+        } finally { await t.close(); }
     }]);
 } else console.log('createTestDb on the containers: skipped (OV_TEST_PG_URL not set; scripts/test-services.sh up)');
 tests.push(['(the snapshots made here are removed)', async () => { fs.rmSync(snaps, { recursive: true, force: true }); }]);

@@ -19,7 +19,8 @@
  *   os.tmpdir()/openvibe-test-snapshots (OV_TEST_SNAPSHOT_DIR), and every later one loads that file instead. The key
  *   is the migrations' file names and contents, the SDK and @electric-sql/pglite versions and `seedKey` (else the
  *   seed function's source). Parallel processes build it once under a lock file (the others wait up to 60 s, then
- *   migrate on their own); a file that does not load is deleted and rebuilt. OV_TEST_SNAPSHOT=0 turns it off.
+ *   migrate on their own); a file that does not load is deleted and rebuilt. A hit refreshes `ov_migrations.applied_at`
+ *   so an ADR-028 contract migration stays held exactly as it would on a fresh migrate. OV_TEST_SNAPSHOT=0 turns it off.
  *   The result says which happened (`snapshot`: 'hit' | 'built' | 'off') and how long setup took (`setupMs`).
  *
  *   createTestValkey({ prefix }): the containers' Valkey (OV_TEST_VALKEY_URL) under a prefix no other run uses, or null.
@@ -91,7 +92,7 @@ function snapshotKey({ migrations, seed, seedKey } = {}) {
     if (migrations && fs.existsSync(migrations)) {
         for (const f of fs.readdirSync(migrations).filter((n) => n.endsWith('.sql')).sort()) h.update(`${f}\0`).update(fs.readFileSync(path.join(migrations, f))).update('\0');
     }
-    h.update(`seed\0${seedKey != null ? `key:${seedKey}` : seed ? `fn:${seed.toString()}` : ''}`);
+    h.update(`seed\0${seed ? (seedKey != null ? `key:${seedKey}` : `fn:${seed.toString()}`) : 'none'}`);
     return h.digest('hex').slice(0, 32);
 }
 
@@ -152,6 +153,11 @@ async function pgliteTestDb({ migrations, seed, seedKey, service, log }) {
                 await inst.waitReady;
                 const db = createDb({ pglite: inst, service: `${service}-test`, log });
                 if (migrations) {
+                    // The snapshot froze ov_migrations.applied_at at build time. An ADR-028 contract migration is
+                    // held until its expand has been applied for windowDays, so a reused snapshot would let it run
+                    // ~7 days after it was built, while a fresh migrate holds it. Refresh the ages so the loaded
+                    // database looks freshly migrated, as it did before snapshots.
+                    await db.query('UPDATE ov_migrations SET applied_at = now()').catch(() => {});
                     // The key covers the migrations, so this is a check: migrate only if the snapshot is behind.
                     const applied = new Set((await db.many('SELECT id FROM ov_migrations').catch(() => [])).map((r) => r.id));
                     if (require('../db/migrate').parse(migrations).some((m) => !applied.has(m.id))) await db.migrate({ dir: migrations, log });
@@ -242,7 +248,12 @@ async function createTestDb({ migrations, seed, seedKey, store = process.env.OV_
             try { await ownerDb.migrate({ dir: migrations, log }); } finally { await ownerDb.close(); }
         }
         db = createDb({ url: as(process.env.OV_TEST_PG_URL, name), service: `${service}-test`, max, log });
-        if (seed) await seed(db);
+        if (seed) {
+            // On PGlite the seed runs on the migrated handle (the owner). The runtime role here is DML-only
+            // (no TRUNCATE, ALTER SEQUENCE or DDL), so run the pg seed as the owner too: both stores behave alike.
+            const seedDb = createDb({ url: as(process.env.OV_TEST_PG_DIRECT_URL, owner), service: `${service}-test-seed`, max: 1, log });
+            try { await seed(seedDb); } finally { await seedDb.close(); }
+        }
     } catch (e) { if (db) await db.close().catch(() => {}); await drop().catch(() => {}); throw e; }   // a failed setup leaves nothing behind
     return {
         db, store: 'postgresql', schema: name, snapshot: 'off', setupMs: Date.now() - t0,
