@@ -341,6 +341,8 @@ const platform = createMockPlatform({
 const client = createClient({ fetch: platform.fetch, tokenProvider: createServiceTokenClient({ clientId: 'app_01K5WZX7S7Q4D2B8N3M6V1C9TR', clientSecret: 's', fetch: platform.fetch }) });
 ```
 
+For a service's own database, `createTestDb({ migrations, seed, seedKey })` returns a migrated PGlite (or, with `store: 'pg'`, a schema of its own on the test containers). The migrated and seeded PGlite is saved once as a snapshot, keyed by the migrations' contents, and later test processes load it instead of migrating (`snapshot: 'hit' | 'built' | 'off'`, `setupMs`; `OV_TEST_SNAPSHOT=0` turns it off, `OV_TEST_SNAPSHOT_DIR` moves it). See [docs/migrating-to-postgresql.md](docs/migrating-to-postgresql.md#5-tests).
+
 The mock answers at the real public origins with real RS256 tokens and checks audience, capability, namespace and sandbox the way the services do. It covers:
 
 - **Network:** discovery, `/oauth/token` (client credentials, authorization code with PKCE, refresh; developer apps), `GET /oauth/authorize` (consents automatically as `setAuthorization({ subjectId })`, or declines with `{ decision: 'deny' }`), the JWKS, the registry, `/api/v1/projects` (projects, members, apps, credentials, grants, quotas, audit), `/api/modules` and `/internal/modules`, and `/internal/identity`.

@@ -6,19 +6,115 @@ const os = require('os');
 const path = require('path');
 const { run } = require('./helpers');
 const { createTestDb, pgAvailable } = require('../src/testing');
-const { runName, runTime, isRunSchema, leaseKey, sweepOrphans } = require('../src/testing/db');
+const { runName, runTime, isRunSchema, leaseKey, sweepOrphans, snapshotKey } = require('../src/testing/db');
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sdk-testdb-'));
 fs.writeFileSync(path.join(dir, '0001_initial.sql'), '-- phase: expand\nCREATE TABLE notes (id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, body text NOT NULL);\n');
-
+// Snapshots of this file's databases go to a directory of its own, removed at the end.
+const snaps = fs.mkdtempSync(path.join(os.tmpdir(), 'sdk-testdb-snap-'));
+process.env.OV_TEST_SNAPSHOT_DIR = snaps;
+delete process.env.OV_TEST_SNAPSHOT;
+const migrationsDir = (sql) => {
+    const d = fs.mkdtempSync(path.join(os.tmpdir(), 'sdk-testdb-'));
+    fs.writeFileSync(path.join(d, '0001_initial.sql'), `-- phase: expand\n${sql}\n`);
+    return d;
+};
+const snapshotFile = (o) => path.join(snaps, `${snapshotKey(o)}.pgdata`);
+const leftovers = () => fs.readdirSync(snaps).filter((f) => !f.endsWith('.pgdata'));
 const tests = [
     ['pglite: migrated and usable', async () => {
         const t = await createTestDb({ migrations: dir, service: 'sdk' });
         try {
             assert.equal(t.store, 'pglite');
+            assert.ok(['built', 'hit'].includes(t.snapshot), t.snapshot); assert.equal(typeof t.setupMs, 'number');
             await t.db.prepare('INSERT INTO notes (body) VALUES (?)').run('hi');
             assert.equal(await t.db.value('SELECT count(*)::int FROM notes'), 1);
         } finally { await t.close(); }
+    }],
+    ['snapshot: the second database with the same migrations loads it; tables there, the first one\'s rows not', async () => {
+        const m = migrationsDir('CREATE TABLE items (id int PRIMARY KEY, label text NOT NULL);');
+        const a = await createTestDb({ migrations: m, service: 'sdk' });
+        try {
+            assert.equal(a.snapshot, 'built');
+            assert.ok(fs.existsSync(snapshotFile({ migrations: m })));
+            await a.db.query('INSERT INTO items VALUES (1, $1)', ['first']);
+        } finally { await a.close(); }
+        const b = await createTestDb({ migrations: m, service: 'sdk' });
+        try {
+            assert.equal(b.snapshot, 'hit');
+            assert.equal(await b.db.value('SELECT count(*)::int FROM items'), 0, 'data written by the first is not in the snapshot');
+            assert.equal(await b.db.value('SELECT count(*)::int FROM ov_migrations'), 1, 'migrations recorded');
+            await b.db.query('INSERT INTO items VALUES (2, $1)', ['second']);
+            assert.deepEqual(await b.db.many('SELECT id, label FROM items'), [{ id: 2, label: 'second' }]);
+        } finally { await b.close(); }
+        // Changed migration content is another key: built afresh, with the new schema.
+        fs.writeFileSync(path.join(m, '0001_initial.sql'), '-- phase: expand\nCREATE TABLE items (id int PRIMARY KEY, label text NOT NULL, extra text);\n');
+        const c = await createTestDb({ migrations: m, service: 'sdk' });
+        try {
+            assert.equal(c.snapshot, 'built');
+            await c.db.query("INSERT INTO items VALUES (3, 'c', 'x')");
+        } finally { await c.close(); }
+        // A new migration file misses too.
+        fs.writeFileSync(path.join(m, '0002_more.sql'), '-- phase: expand\nCREATE TABLE more (id int);\n');
+        const d = await createTestDb({ migrations: m, service: 'sdk' });
+        try { assert.equal(d.snapshot, 'built'); assert.equal(await d.db.value('SELECT count(*)::int FROM more'), 0); } finally { await d.close(); }
+        assert.deepEqual(leftovers(), [], 'no lock or temporary file left');
+    }],
+    ['snapshot: a corrupt file is deleted and rebuilt, never failing the test', async () => {
+        const m = migrationsDir('CREATE TABLE c (id int);');
+        fs.writeFileSync(snapshotFile({ migrations: m }), 'not a data directory');
+        const a = await createTestDb({ migrations: m, service: 'sdk' });
+        try { assert.equal(a.snapshot, 'built'); assert.equal(await a.db.value('SELECT count(*)::int FROM c'), 0); } finally { await a.close(); }
+        assert.ok(fs.statSync(snapshotFile({ migrations: m })).size > 1000, 'rebuilt');
+        const b = await createTestDb({ migrations: m, service: 'sdk' });
+        try { assert.equal(b.snapshot, 'hit'); } finally { await b.close(); }
+    }],
+    ['snapshot: concurrent builders make one file; the others wait and load it', async () => {
+        const m = migrationsDir('CREATE TABLE par (id int);');
+        const all = await Promise.all([1, 2, 3].map(() => createTestDb({ migrations: m, service: 'sdk' })));
+        try {
+            assert.deepEqual(all.map((t) => t.snapshot).sort(), ['built', 'hit', 'hit']);
+            await all[0].db.query('INSERT INTO par VALUES (1)');
+            for (const t of all.slice(1)) assert.equal(await t.db.value('SELECT count(*)::int FROM par'), 0, 'each its own database');
+        } finally { await Promise.all(all.map((t) => t.close())); }
+        assert.equal(fs.readdirSync(snaps).filter((f) => f.startsWith(snapshotKey({ migrations: m }))).length, 1);
+        assert.deepEqual(leftovers(), []);
+    }],
+    ['snapshot: a lock left by a builder that died is broken', async () => {
+        const m = migrationsDir('CREATE TABLE stale (id int);');
+        fs.writeFileSync(`${snapshotFile({ migrations: m })}.lock`, `2147483646 ${Date.now()}`);
+        const t = await createTestDb({ migrations: m, service: 'sdk' });
+        try { assert.equal(t.snapshot, 'built'); } finally { await t.close(); }
+        assert.deepEqual(leftovers(), []);
+    }],
+    ['snapshot: OV_TEST_SNAPSHOT=0 migrates every time and writes nothing', async () => {
+        const m = migrationsDir('CREATE TABLE off (id int);');
+        process.env.OV_TEST_SNAPSHOT = '0';
+        try {
+            for (let i = 0; i < 2; i++) {
+                const t = await createTestDb({ migrations: m, service: 'sdk' });
+                try { assert.equal(t.snapshot, 'off'); assert.equal(await t.db.value('SELECT count(*)::int FROM off'), 0); } finally { await t.close(); }
+            }
+            assert.equal(fs.existsSync(snapshotFile({ migrations: m })), false);
+        } finally { delete process.env.OV_TEST_SNAPSHOT; }
+    }],
+    ['snapshot: the seed runs once per key and its rows are there after a hit', async () => {
+        const m = migrationsDir('CREATE TABLE users (id int PRIMARY KEY, name text NOT NULL);');
+        let runs = 0;
+        const seed = async (db) => { runs++; await db.query("INSERT INTO users VALUES (1, 'admin')"); };
+        for (const want of ['built', 'hit', 'hit']) {
+            const t = await createTestDb({ migrations: m, seed, seedKey: 'v1', service: 'sdk' });
+            try {
+                assert.equal(t.snapshot, want);
+                assert.deepEqual(await t.db.many('SELECT id, name FROM users'), [{ id: 1, name: 'admin' }]);
+            } finally { await t.close(); }
+        }
+        assert.equal(runs, 1);
+        const other = await createTestDb({ migrations: m, seed, seedKey: 'v2', service: 'sdk' });
+        try { assert.equal(other.snapshot, 'built'); } finally { await other.close(); }
+        assert.equal(runs, 2, 'another seedKey is another snapshot');
+        const plain = await createTestDb({ migrations: m, service: 'sdk' });
+        try { assert.equal(plain.snapshot, 'built'); assert.equal(await plain.db.value('SELECT count(*)::int FROM users'), 0, 'no seed, no rows'); } finally { await plain.close(); }
     }],
     ['a run\'s schema name carries when it was made (so a killed run\'s leftovers can be swept); an older name has none', async () => {
         const t0 = Date.now(), n = runName('sdk', t0);
@@ -67,5 +163,6 @@ if (pgAvailable()) {
         }
     }]);
 } else console.log('createTestDb on the containers: skipped (OV_TEST_PG_URL not set; scripts/test-services.sh up)');
+tests.push(['(the snapshots made here are removed)', async () => { fs.rmSync(snaps, { recursive: true, force: true }); }]);
 
 run(tests);
