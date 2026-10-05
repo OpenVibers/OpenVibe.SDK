@@ -189,7 +189,7 @@ Until OpenVibe.Tools serves the gateway facade (Tools S6), point the jobs client
 | `openvibe-sdk/storage` | server | `storageOffer()` and `validateStorageOffer()` for `platform.storage-offer@1` |
 | `openvibe-sdk/delivery` | server | `deliveryOffer()` and `validateDeliveryOffer()` for `platform.delivery-offer@1` |
 | `openvibe-sdk/node` | server | `nodeCapabilities()` and `validateNodeCapabilities()` for `platform.node-capabilities@1`; `nodeOffers()` derives resource and runtime offers from a node descriptor |
-| `openvibe-sdk/service` | server | the service kit: `gracefulStop({name, server, stop, close, drainMs, deadlineMs, deadlineExitCode, beforeDrain, handles})` → `{stop, stopping}`, `within(ms, p)`; `createServiceError(name)`, `ServiceError`, `asServiceError`, `run`, `wrap`, `sendError`, `jsonBody({limit})`, `privateNoStore`, `jsonErrors()`; re-exports (loaded on first use) of openvibe-shared `createReadiness`, `skip`, `safeReason`, `createRegistry`, `instrument`, `metricsHandler`, `isLoopbackDirect`, `releaseInfo`, `createRelease` and openvibe-contracts `problem`, `sendProblem` |
+| `openvibe-sdk/service` | server | the service kit: `gracefulStop({name, server, stop, close, drainMs, deadlineMs, deadlineExitCode, beforeDrain, handles})` → `{stop, stopping}`, `within(ms, p)`; `createServiceError(name)`, `ServiceError`, `asServiceError`, `run`, `wrap`, `sendError`, `jsonBody({limit})`, `privateNoStore`, `jsonErrors()`; the HTTP telemetry kit: `createHttpTelemetry({service, sink, intervalMs?, routeLabel?, skipPrefixes?, …})` → `{middleware(), record, gauge, count, requestStarted, requestFinished, flush, stop}`, `createTelemetryMiddleware`, `telemetrySkipped`, `defaultRouteLabel`, `registerSignals`, `telemetrySample`, `validateTelemetrySample`, and the singleton `telemetry.{init, record, gauge, count, requestStarted, requestFinished, flush, stop}` + `telemetryMiddleware` (a request is aggregated per `route\|method\|status_class` per flush into one `platform.telemetry-sample@1` `http.request` sample, plus active-requests/p95/event-loop-lag gauges once per flush); re-exports (loaded on first use) of openvibe-shared `createReadiness`, `skip`, `safeReason`, `createRegistry`, `instrument`, `metricsHandler`, `isLoopbackDirect`, `releaseInfo`, `createRelease` and openvibe-contracts `problem`, `sendProblem` |
 | `openvibe-sdk/testing` | Node | `createMockPlatform()`: fake Network (incl. developer apps and projects), Events, Media, Tools jobs and the Tools platform API on an in-process `fetch` |
 | `openvibe-sdk/browser/openvibe-sdk.mjs` | browser | one self-contained ES module: core + auth (browser), registry, modules, realtime, media, community, jobs, tools, projects |
 
@@ -387,6 +387,15 @@ the stop steps, `beforeDrain`, then closes the server (`Connection: close` on re
 connections closed every 50 ms, event streams destroyed), the close steps and `handles`, and exits 0; past `deadlineMs`
 it exits `deadlineExitCode`. `stopping()` turns true at once, for a readiness check. The recipe per service family is
 [docs/service.md](docs/service.md).
+
+The kit also carries the HTTP telemetry Network wrote in `server/telemetry.js` and `server/observability.js`. A
+request is not a row: `createHttpTelemetry({ service, sink, skipPrefixes? })` aggregates per
+`route|method|status_class` per flush interval into `count`/`sum`/`max`/`p95` and emits one `http.request`
+`platform.telemetry-sample@1` per key, plus active-requests, p95 and event-loop-lag gauges once per flush. Mount
+`collector.middleware()` before the routes and add `() => collector.stop()` to `gracefulStop`'s stop steps (one
+flush). The `telemetry.init({service, sink})` / `telemetryMiddleware` / `telemetry.stop()` singleton is the same
+design wired process-wide: health, readiness, metrics and static assets are skipped, the event-loop monitor starts
+in `init` and stops in `stop`, and requiring the kit starts nothing.
 
 ### Data: PostgreSQL and Valkey (server)
 

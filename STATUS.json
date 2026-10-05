@@ -24,7 +24,8 @@
     "db (ADR-035): the async PostgreSQL data layer (node-postgres through PgBouncer; PGlite in tests) with safe sql fragments, retrying transactions and savepoints, versioned expand/migrate/contract migrations, and importSqlite for the one-time SQLite move with verification",
     "valkey, cache, queue, pubsub and a shared limits store on Valkey 9, each with an in-process twin for tests",
     "commerce (openvibe-sdk/commerce): the shared Billing client for Tips and VIP, with intentKey and receipt",
-    "events: the PostgreSQL outbox (lease-claimed, several relays per table) and inbox (handler in its transaction)"
+    "events: the PostgreSQL outbox (lease-claimed, several relays per table) and inbox (handler in its transaction)",
+    "the HTTP telemetry kit (openvibe-sdk/service): the platform.telemetry-sample@1 middleware aggregated per route|method|status_class per flush, with active-requests, p95 and event-loop-lag gauges, lifted from Network's server/telemetry.js and server/observability.js"
   ],
   "updated": "2026-10-04"
 }
