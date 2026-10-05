@@ -317,4 +317,25 @@ run([
         await worker.stop();
         await srv.close();
     }],
+    ['iterate keeps paging when the server sends only cursors, and a string afterSeq stays numeric', async () => {
+        const asked = [];
+        // A server past the compatibility release: no next_after_seq / latest_seq, the same cursor at the head.
+        const pages = { '': { events: [{ seq: 1, cursor: 'c1', event: { id: 'a' } }], next_cursor: 'c1' },
+            c1: { events: [{ seq: 2, cursor: 'c2', event: { id: 'b' } }], next_cursor: 'c2' },
+            c2: { events: [], next_cursor: 'c2' } };
+        const fetch = async (url) => {
+            const u = new URL(url);
+            asked.push(u.search);
+            const body = u.searchParams.has('after') ? pages[u.searchParams.get('after')] : { ...pages[''], next_after_seq: 1, latest_seq: 2 };
+            return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+        };
+        const events = createEventsClient(createClient({ fetch }), { source: 'live', baseUrl: 'http://events.test' });
+        const seen = [];
+        for await (const item of events.iterate({ afterSeq: '0' })) seen.push(item.event.id);
+        assert.deepEqual(seen, ['a', 'b'], 'every page up to the head');
+        assert.match(asked[0], /after_seq=0/, 'a string afterSeq is still the numeric position');
+        assert.match(asked[1], /after=c1/);
+        assert.match(asked[2], /after=c2/);
+        assert.equal(asked.length, 3, 'the unchanged cursor at the head ends it');
+    }],
 ]);

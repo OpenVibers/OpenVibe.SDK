@@ -18,6 +18,9 @@ release may change an API and says so here.
   nothing. The mock platform (`openvibe-sdk/testing`) models the same page shape and accepts `after`, and
   `README.md`'s pagination note names the cursor. New assertions in `test/events.test.js` and
   `test/app-events.test.js` cover the round-trip, the empty page, and the `after_seq` fallback.
+- `iterate()` keeps the mode the caller asked for (a string `afterSeq` such as `'5'` is still the numeric
+  position) and finds the head without the numeric compatibility fields: once a server sends only cursors,
+  the page whose `next_cursor` does not move ends the walk.
 
 ## 0.32.0 (2026-10-05)
 
