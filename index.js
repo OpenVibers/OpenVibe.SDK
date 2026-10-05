@@ -16,6 +16,7 @@ module.exports = {
     realtime: require('./src/realtime'),
     media: require('./src/media'),
     community: require('./src/community'),
+    bot: require('./src/bot'),
     search: require('./src/search'),
     chat: require('./src/chat'),
     ai: require('./src/ai'),

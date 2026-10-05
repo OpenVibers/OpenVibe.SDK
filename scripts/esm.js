@@ -24,6 +24,7 @@ const ENTRIES = {
     'realtime.mjs': '../src/realtime.js',
     'media.mjs': '../src/media.js',
     'community.mjs': '../src/community.js',
+    'bot.mjs': '../src/bot.js',
     'search.mjs': '../src/search.js',
     'limits.mjs': '../src/limits.js',
     'govern.mjs': '../src/govern.js',
