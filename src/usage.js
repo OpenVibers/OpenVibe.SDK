@@ -14,11 +14,15 @@
  * createUsageReporter() is the shared step-7 recipe Tools, AI, Events and Bot each rewrote: one service's
  * readings, built and validated, queued idempotency-keyed in an outbox table inside the caller's
  * transaction, and relayed to Billing's billing.usage.record (POST /api/v1/usage, one reading per
- * request) with createPgOutbox, so a reading is never dropped: a relay that cannot reach Billing (down,
- * no grant yet, 401/403/404/429/5xx) retries with backoff across restarts, and only Billing refusing
- * the reading itself (400, 409, 413, 422) marks a row rejected — kept with its error and never sent
- * again, so nothing is billed twice. With no billingUrl or tokenClient the reporter still queues
- * readings; only the relay is off (they wait for a process that has both).
+ * request) with createPgOutbox, so a reading is never dropped: a relay that cannot reach Billing — no
+ * grant yet, a missing route, a timeout, backpressure or a 401/403/404/408/425/429 — retries with
+ * backoff across restarts, and only Billing refusing the reading itself (any other 4xx: 400, 402, 409,
+ * 410, 413, 415, 422 …) marks a row rejected — kept with its error and never sent again, so nothing is
+ * billed twice. A 401 drops the cached service token so the retry mints a new one. With no billingUrl or
+ * tokenClient the reporter still queues readings; only the relay is off (they wait for a process with both).
+ * The reporter bills whatever reading it is given: it cannot tell production traffic from first-party or
+ * sandbox traffic, so callers must only record billable production readings; `requireProject: true` makes
+ * record() refuse a reading whose `project` is not a `prj_…` id.
  *
  *   const reporter = createUsageReporter({ db, service: 'run', source: 'openvibe-node.worker',
  *       billingUrl, tokenClient: createServiceTokenClient({ clientId: 'run', clientSecret }) });
@@ -84,9 +88,13 @@ const { createPgOutbox, outboxSchema } = require('./outbox');
 
 const TABLE_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const STATUSES = 'sent_at IS NULL AND rejected_at IS NULL';
-// Billing refusing the reading itself (a malformed sample, or a key it already holds with a different
-// body) is permanent; a token it has not granted, a missing route, a timeout or a 5xx is not.
-const REFUSED = new Set([400, 409, 413, 422]);
+// Billing's 4xx answers about the credentials, the grant, the address or pressure — not the reading: those
+// (with 5xx and network errors) stay pending with backoff; any other 4xx is Billing refusing the reading.
+// OpenVibe.Events' server/billing.js uses this same set. The events outbox's own RETRYABLE_4XX differs (409
+// is a duplicate to retry there, and 403/404 are permanent): it is for envelopes, not for a billed reading.
+const RETRYABLE_4XX = new Set([401, 403, 404, 408, 425, 429]);
+// A production project id, the way openvibe-contracts/Events spell it (ULID alphabet, no I/L/O/U).
+const PROJECT_RE = /^prj_[0-9A-HJKMNP-TV-Z]{26}$/;
 
 /**
  * The reporter for one service's readings. It never invents a reading: `sample()` fills in the
@@ -103,6 +111,8 @@ const REFUSED = new Set([400, 409, 413, 422]);
  * @param {{ getToken(ctx?: { audience?: string }): Promise<string> }} [o.tokenClient] openvibe-sdk/auth's
  *                                createServiceTokenClient (or anything with getToken)
  * @param {string} [o.audience]   the token audience (default 'openvibe.billing')
+ * @param {boolean} [o.requireProject] when true, record() refuses a reading whose `project` is not a
+ *                                `prj_…` id (default false: the reporter bills whatever reading it is given)
  * @param {Function} [o.fetchImpl] fetch for the Billing POST (default globalThis.fetch)
  * @param {number} [o.timeoutMs]  the Billing POST timeout (default 5000)
  * @param {number} [o.intervalMs] the relay tick (default 2000)
@@ -113,7 +123,8 @@ const REFUSED = new Set([400, 409, 413, 422]);
  */
 function createUsageReporter({
     db, service, source, table = 'usage_outbox', billingUrl, tokenClient, audience = 'openvibe.billing',
-    fetchImpl = globalThis.fetch, timeoutMs = 5000, intervalMs = 2000, batchSize = 1, now = () => Date.now(), log = console,
+    requireProject = false, fetchImpl = globalThis.fetch, timeoutMs = 5000, intervalMs = 2000, batchSize = 1,
+    now = () => Date.now(), log = console,
 } = {}) {
     if (!db || typeof db.query !== 'function' || typeof db.tx !== 'function') throw new TypeError('createUsageReporter: an openvibe-sdk/db handle is required');
     if (typeof service !== 'string' || !service) throw new TypeError('createUsageReporter: service must be a non-empty string');
@@ -135,6 +146,10 @@ function createUsageReporter({
      * INSIDE the caller's transaction: validate and queue the reading under its idempotency_key.
      * -> true when this call inserted it, false when the key was already queued. An invalid reading
      * throws (when openvibe-contracts is installed); a missing contracts never blocks the queue.
+     *
+     * The reporter bills whatever reading it is given: it cannot tell production from first-party or
+     * sandbox traffic, so never record those. With `requireProject: true`, a reading whose `project` is
+     * not a production project id (`prj_…`) is refused here instead of being queued.
      */
     async function record(t, reading) {
         if (!t || typeof t.query !== 'function' || typeof t.tx !== 'function') throw new TypeError('usageReporter.record(t, reading): pass the transaction handle db.tx gives you');
@@ -142,6 +157,9 @@ function createUsageReporter({
         const v = validateUsageSample(reading);
         if (!v.ok && v.errors.length) throw new Error(`usage reading ${reading.idempotency_key || reading.id || '(no key)'} is not a valid platform.usage-sample@1: ${JSON.stringify(v.errors)}`);
         if (typeof reading.idempotency_key !== 'string' || !reading.idempotency_key) throw new TypeError('usageReporter.record: reading.idempotency_key is required (it is the outbox key)');
+        if (requireProject && !PROJECT_RE.test(String(reading.project || ''))) {
+            throw new Error(`usage reading ${reading.idempotency_key} has no production project (requireProject): first-party and sandbox traffic must not be billed`);
+        }
         const n = await t.exec(`INSERT INTO ${table} (event_id, envelope, created_at) VALUES ($1, $2, $3) ON CONFLICT (event_id) DO NOTHING`,
             [reading.idempotency_key, JSON.stringify(reading), now()]);
         return n > 0;
@@ -162,8 +180,13 @@ function createUsageReporter({
             });
             // 201 written, 200 an identical reading replayed: either way Billing holds it.
             if (!res.ok) {
+                // 401 means the cached token was refused: drop it so the retry mints a fresh one (as Events does).
+                if (res.status === 401) tokenClient.invalidate?.({ audience });
                 const err = new Error(`billing.usage.record answered ${res.status}`);
-                err.status = REFUSED.has(res.status) ? 422 : 503;   // 401/403 before the grant, 404 before Billing ships the route, 429, 5xx: retried
+                // createPgOutbox's isPermanent() reads err.status: 422 is permanent, 503 is retried. Only
+                // Billing refusing the reading itself (a 4xx that is not RETRYABLE_4XX) is permanent; a
+                // missing grant/route, a timeout, backpressure or a 5xx stays pending with backoff.
+                err.status = res.status >= 400 && res.status < 500 && !RETRYABLE_4XX.has(res.status) ? 422 : 503;
                 throw err;
             }
             return { event_id: reading.idempotency_key || reading.id, seq: null };

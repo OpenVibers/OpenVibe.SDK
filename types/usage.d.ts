@@ -12,8 +12,10 @@ export declare function usageKey(service: string, ...parts: (string | number)[])
 /** { ok, errors } against platform.usage-sample@1; a missing openvibe-contracts never claims validity (ok: false, errors: []). */
 export declare function validateUsageSample(record: unknown): { ok: boolean; errors: ValidationError[] };
 
-/** Anything with getToken({ audience }) — openvibe-sdk/auth's createServiceTokenClient. */
-export type UsageTokenClient = { getToken(ctx?: { audience?: string; scope?: string | string[] }): Promise<string> };
+/** Anything with getToken({ audience }) — openvibe-sdk/auth's createServiceTokenClient. `invalidate` drops the
+ *  cached token (called for a Billing 401 so the retry mints a fresh one). */
+export type UsageTokenClient = { getToken(ctx?: { audience?: string; scope?: string | string[] }): Promise<string>;
+    invalidate?(ctx?: { audience?: string }): void };
 
 export type UsageReporterOptions = {
     /** An openvibe-sdk/db handle (server); the outbox table lives in the same database. */
@@ -29,6 +31,9 @@ export type UsageReporterOptions = {
     tokenClient?: UsageTokenClient | null;
     /** The token audience (default 'openvibe.billing'). */
     audience?: string;
+    /** When true, `record()` refuses a reading whose `project` is not a `prj_…` id (default false: the
+     *  reporter bills whatever reading it is given, so callers must never record first-party or sandbox traffic). */
+    requireProject?: boolean;
     fetchImpl?: import('./core').FetchLike;
     /** The Billing POST timeout (default 5000). */
     timeoutMs?: number;
@@ -50,7 +55,9 @@ export interface UsageReporter {
     key(...parts: (string | number)[]): string;
     /** A reading for this service and source; `id` defaults to `idempotency_key`. */
     sample(fields: Partial<UsageSample>): UsageSample;
-    /** INSIDE the caller's transaction (db.tx's handle): queue the reading under its idempotency_key. */
+    /** INSIDE the caller's transaction (db.tx's handle): queue the reading under its idempotency_key. The
+     *  reporter bills whatever reading it is given — never record first-party or sandbox traffic; with
+     *  `requireProject: true` a reading without a `prj_…` project is refused. */
     record(t: unknown, reading: UsageSample | Record<string, unknown>): Promise<boolean>;
     /** Create the outbox table where the handle may (tests, PGlite); services put it in a migration instead. */
     ensureSchema(): Promise<unknown>;
@@ -65,8 +72,9 @@ export interface UsageReporter {
 
 /**
  * The shared step-7 reporter: readings queue idempotency-keyed in `table` inside the caller's transaction and
- * relay to Billing's billing.usage.record with createPgOutbox. Never dropped (transient failures retry with
- * backoff across restarts); only Billing refusing the reading itself (400, 409, 413, 422) marks a row rejected,
- * kept with its error and never sent again.
+ * relay to Billing's billing.usage.record with createPgOutbox. Never dropped (transient failures — 5xx,
+ * network errors and 4xx about credentials, grant, address or load: 401/403/404/408/425/429 — retry with
+ * backoff across restarts; a 401 also drops the cached token); only Billing refusing the reading itself (any
+ * other 4xx: 400, 402, 409, 410, 413, 415, 422 …) marks a row rejected, kept with its error and never sent again.
  */
 export declare function createUsageReporter(options: UsageReporterOptions): UsageReporter;

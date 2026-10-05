@@ -19,12 +19,15 @@ release may change an API and says so here.
   nothing). The relay is `createPgOutbox` pointed at Billing's `billing.usage.record` (`POST /api/v1/usage`, one
   reading per request): `start`/`stop`/`kick`/`flush`/`prune` plus `pending`/`rejected`, and it uses the given
   token client (`createServiceTokenClient`, audience `openvibe.billing`). A reading is never dropped — a relay
-  that cannot reach Billing (down, no grant yet, 401/403/404/429/5xx) retries with backoff across restarts — and
-  only Billing refusing the reading itself (400, 409, 413, 422) marks a row rejected: kept with its error and
-  never sent again, so nothing is billed twice. Without `billingUrl` or `tokenClient` readings still queue and
+  that cannot reach Billing (down, no grant yet, a missing route, a timeout or a 401/403/404/408/425/429/5xx)
+  retries with backoff across restarts — and only Billing refusing the reading itself (any other 4xx: 400, 402,
+  409, 410, 413, 415, 422) marks a row rejected: kept with its error and never sent again, so nothing is billed
+  twice; a 401 drops the cached token first. The reporter bills whatever reading it is given, so callers must not
+  record first-party or sandbox traffic: `requireProject: true` makes `record()` refuse a reading without a
+  `prj_…` project. Without `billingUrl` or `tokenClient` readings still queue and
   only the relay is off. Re-exported from the top-level entry and declared in `types/usage.d.ts` (the `./usage`
   subpath already existed); `outboxSchema(table)` stays the migration DDL. New unit test for key derivation,
-  replay refusal and the retry/reject relay.
+  replay refusal and the retry/reject relay (the full status matrix, 401 invalidation and the timer stop).
 
 ## 0.31.1 (2026-10-05)
 
