@@ -515,3 +515,7 @@ Nothing at runtime. `openvibe-contracts` v0.86.0 and `better-sqlite3` are devDep
 ---
 
 Part of the [OpenVibe network](https://openvibe.network). Built in the open by [OpenVibers](https://github.com/OpenVibers).
+
+<!-- versions:start -->
+- openvibe-contracts: v0.112.0
+<!-- versions:end -->
