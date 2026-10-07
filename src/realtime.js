@@ -3,7 +3,7 @@
  * openvibe-sdk/realtime: the browser realtime plane inside OpenVibe.Events (ADR-005), over SSE.
  *
  *   const sub = subscribe(['live.stream.*'], (event, { seq }) => { … }, {
- *       client,                      // or url: 'https://events.openvibe.network'
+ *       client,                      // or url: 'https://openvibe.events'
  *       lastEventId: savedSeq,       // resume after a reload
  *       onGap: (gap) => refetchState(),
  *   });
@@ -17,7 +17,7 @@
  */
 const { OpenVibeError } = require('./core/errors');
 
-const DEFAULT_ORIGIN = 'https://events.openvibe.network';
+const DEFAULT_ORIGIN = 'https://openvibe.events';
 const FATAL = new Set([400, 401, 403, 404]);
 const sleep = (ms, signal) => new Promise((resolve) => {
     const t = setTimeout(resolve, ms);

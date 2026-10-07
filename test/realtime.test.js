@@ -2,13 +2,29 @@
 /** Realtime SSE: resume from Last-Event-ID after a drop, dedupe, gap callback, transports. */
 const assert = require('node:assert/strict');
 const { stubServer, run, waitFor } = require('./helpers');
-const { subscribe, createRealtimeClient, parseSSE } = require('../src/realtime');
+const { subscribe, createRealtimeClient, parseSSE, DEFAULT_ORIGIN } = require('../src/realtime');
 const { createClient } = require('../src/core');
 const { createMockPlatform } = require('../src/testing');
 
 const frame = (seq, type = 'live.stream.started') => `id: ${seq}\ndata: ${JSON.stringify({ seq, event: { event_type: type, event_id: `e${seq}` } })}\n\n`;
 
 run([
+    ['uses the new Events public origin when no URL or client is supplied', async () => {
+        const made = [];
+        class FakeES {
+            constructor(url) { this.url = url; this.readyState = 0; made.push(this); }
+            addEventListener() {}
+            close() { this.readyState = 2; }
+        }
+        const sub = subscribe('live.*', () => {}, { EventSource: FakeES });
+        await waitFor(() => made.length === 1);
+        assert.equal(DEFAULT_ORIGIN, 'https://openvibe.events');
+        assert.equal(new URL(made[0].url).origin, DEFAULT_ORIGIN);
+        assert.equal(new URL(made[0].url).pathname, '/realtime/stream');
+        sub.close();
+        await sub.done;
+    }],
+
     ['resumes with Last-Event-ID after a drop, skips repeats, reports the gap', async () => {
         const connections = [];
         const srv = await stubServer((req, res) => {

@@ -254,7 +254,7 @@ control plane carries a user or service token and is never shipped to a page).
 const { createResourceIndex, createResourceClient, resourceName } = require('openvibe-sdk/resources');
 
 // A console reads several authorities and merges their index pages; a failing authority is reported, not fatal.
-const index = createResourceIndex({ authorities: ['https://media.openvibe.network', 'https://events.openvibe.network'], token: userAccessToken });
+const index = createResourceIndex({ authorities: ['https://media.openvibe.network', 'https://openvibe.events'], token: userAccessToken });
 const { resources, stale } = await index.list({ project: prj.id, kind: 'media.object' });   // follows each next_cursor
 
 // A change is a control call to the authority that owns the resource; it decides, we only show the answer.
