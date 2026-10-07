@@ -3,6 +3,13 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.35.0 (2026-10-07)
+
+- **Events public origin moves to `https://openvibe.events` (plan T7):** realtime clients and the mock
+  platform now use the new origin by default; SDK examples and types name it as well. Browser pages using
+  the SDK's realtime client must allow `connect-src https://openvibe.events` in their Content Security Policy.
+  Events serves both origins during migration; the old origin will answer 308 after clients have moved.
+
 
 
 

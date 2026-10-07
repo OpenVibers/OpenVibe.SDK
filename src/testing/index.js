@@ -43,11 +43,12 @@ const { signDeliveryHeaders } = require('../events');
 
 const DEFAULT_ORIGINS = {
     network: 'https://openvibe.network',
-    events: 'https://events.openvibe.network',
+    events: 'https://openvibe.events',
     media: 'https://openvibe.media',
     community: 'https://openvibe.community',
     tools: 'https://openvibe.tools',
 };
+const LEGACY_EVENTS_ORIGIN = 'https://events.openvibe.network';
 
 /** The Tools satellites that run jobs (/api/v1/jobs); the mock answers them too. */
 const DEFAULT_TOOLS_SATELLITES = ['https://img.openvibe.tools', 'https://audio.openvibe.tools', 'https://docs.openvibe.tools'];
@@ -815,7 +816,8 @@ function createMockPlatform(opts = {}) {
     async function route(req, url) {
         const origin = url.origin;
         if (origin === new URL(origins.network).origin) return network(req, url);
-        if (origin === new URL(origins.events).origin) return eventsService(req, url);
+        // During the public-origin migration, Events answers both names. Keep explicit old-URL fixtures working.
+        if (origin === new URL(origins.events).origin || (origins.events === DEFAULT_ORIGINS.events && origin === LEGACY_EVENTS_ORIGIN)) return eventsService(req, url);
         if (origin === new URL(origins.media).origin) return media(req, url);
         if (toolsOrigins.includes(origin)) return /^\/api\/v1\/tools(\/|$)/.test(url.pathname) ? toolsService.handle(req, url) : jobsService.handle(req, url);
         throw new TypeError(`mock platform: no service at ${origin} (fetch failed)`);
