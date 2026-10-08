@@ -122,8 +122,35 @@ function pruneSnapshots(dir, keep) {
     }
 }
 
+/**
+ * PGlite emulates PostgreSQL's SIGALRM timers (startup progress, statement and lock timeouts) with setTimeout from
+ * its wasm runtime's __setitimer_js. A PGlite loaded from a data directory (a snapshot hit) keeps rescheduling a
+ * 10 s startup-progress alarm, so a test that ends without closing its database never exits and a per-file runner
+ * times it out. Queries run synchronously in the wasm and never wait on an alarm, so those timers are unref'd: the
+ * first PGlite test database of a process wraps setTimeout once, and every other timer (a test's own) stays ref'd.
+ */
+let alarmsUnrefd = false;
+function unrefPgliteAlarms() {
+    if (alarmsUnrefd) return;
+    alarmsUnrefd = true;
+    const real = globalThis.setTimeout;
+    const fromAlarm = () => {
+        const limit = Error.stackTraceLimit;
+        Error.stackTraceLimit = 3;   // the wrapper, then its caller: enough to see __setitimer_js, and cheap
+        try { return String(new Error().stack || '').includes('__setitimer_js'); } finally { Error.stackTraceLimit = limit; }
+    };
+    const wrapped = function setTimeout(...args) {
+        const h = real.apply(this, args);
+        if (h && typeof h.unref === 'function' && fromAlarm()) h.unref();
+        return h;
+    };
+    Object.defineProperties(wrapped, Object.getOwnPropertyDescriptors(real));   // util.promisify.custom and the rest
+    globalThis.setTimeout = wrapped;
+}
+
 async function pgliteTestDb({ migrations, seed, seedKey, service, log }) {
     const { createDb } = require('../db');
+    unrefPgliteAlarms();
     const t0 = Date.now();
     const handle = (db, snapshot) => ({
         db, store: 'pglite', snapshot, setupMs: Date.now() - t0, url: null, directUrl: null, open: null, close: () => db.close().catch(() => {}),
@@ -209,10 +236,12 @@ async function createTestDb({ migrations, seed, seedKey, store = process.env.OV_
     let releasingLease = false;
     try {
         await lease.connect();
-        // The lease socket must not keep the process alive: a test file that ends without process.exit() would otherwise
-        // never exit (0.26-0.31.0). It still holds the advisory lock for as long as the process lives.
-        if (lease.connection && lease.connection.stream && typeof lease.connection.stream.unref === 'function') lease.connection.stream.unref();
         await lease.query('SELECT pg_advisory_lock($1::bigint)', [leaseKey(name)]);
+        // The lease socket must not keep the process alive: a test file that ends without process.exit() would otherwise
+        // never exit (0.26-0.31.0). It still holds the advisory lock for as long as the process lives. Unref'd only once
+        // the lock is held: a query pending on an unref'd socket lets a process with nothing else open exit mid-setup
+        // (0.31.1-0.35.0, hidden while a PGlite alarm kept test processes open).
+        if (lease.connection && lease.connection.stream && typeof lease.connection.stream.unref === 'function') lease.connection.stream.unref();
         lease.on('end', () => { if (!releasingLease) throw new Error(`test database lease lost for ${name}`); });
         const database = await su.value('SELECT current_database()');
         await sweepOrphans(su).catch(() => {});   // what killed runs left behind; never in the way of this run
