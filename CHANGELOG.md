@@ -3,6 +3,19 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.35.1 (2026-10-08)
+
+- **A PGlite test database no longer keeps its process alive (`openvibe-sdk/testing`, patch):** PGlite emulates
+  PostgreSQL's SIGALRM timers with `setTimeout` (its wasm runtime's `__setitimer_js`), and one loaded from a snapshot
+  (0.29.0) keeps rescheduling a 10 s startup-progress alarm, so a test file that ended without closing its database
+  never exited and a per-file runner timed it out (OpenVibe.Network's whole suite, OpenVibe.Community's unclosed
+  tests). `createTestDb` on PGlite now unrefs the timers `__setitimer_js` sets (told apart by the caller's frame, once
+  per process); queries run synchronously in the wasm and never wait on one. Every other timer, a test's own
+  included, stays ref'd. A service-side workaround that unrefs every PGlite timer (OpenVibe.Media's preload) can go.
+- **`createTestDb` on the containers unrefs its lease connection only once the lease is held (patch):** 0.31.1
+  unref'd the socket before `pg_advisory_lock` answered, so a process with nothing else open (no PGlite alarm since
+  the fix above) exited mid-setup with code 0, its remaining tests never run.
+
 ## 0.35.0 (2026-10-07)
 
 - **Events public origin moves to `https://openvibe.events` (plan T7):** realtime clients and the mock

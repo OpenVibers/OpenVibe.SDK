@@ -119,6 +119,32 @@ const { createTestDb } = require(${JSON.stringify(path.join(__dirname, '..', 'sr
         try { assert.equal(t.snapshot, 'built'); } finally { await t.close(); }
         assert.deepEqual(leftovers(), []);
     }],
+    ['snapshot: a test that never closes its database still exits (PGlite\'s alarm timers are unref\'d)', async () => {
+        const m = migrationsDir('CREATE TABLE left_open (id int);');
+        const first = await createTestDb({ migrations: m, service: 'sdk' }); await first.close();   // the snapshot exists now
+        const script = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'sdk-testdb-child-')), 'open.js');
+        fs.writeFileSync(script, `'use strict';
+const { createTestDb } = require(${JSON.stringify(path.join(__dirname, '..', 'src', 'testing', 'db'))});
+(async () => {
+    const t = await createTestDb({ migrations: process.argv[2], service: 'sdk' });
+    await t.db.query('INSERT INTO left_open VALUES (1)');
+    const n = await t.db.value('SELECT count(*)::int FROM left_open');
+    await new Promise((r) => setTimeout(r, 300));   // a test's own timer still runs: ref'd as ever
+    process.send({ snapshot: t.snapshot, n });
+})().catch((e) => { process.send({ error: e.message }); process.exit(1); });
+`);
+        const child = fork(script, [m], { stdio: ['ignore', 'ignore', 'inherit', 'ipc'] });
+        const t0 = Date.now();
+        let msg = null;
+        child.on('message', (x) => { msg = x; });
+        const code = await new Promise((resolve) => {
+            const kill = setTimeout(() => { child.kill('SIGKILL'); resolve('still running after 30 s'); }, 30000);
+            child.on('exit', (c) => { clearTimeout(kill); resolve(c); });
+        });
+        assert.deepEqual(msg, { snapshot: 'hit', n: 1 });
+        assert.equal(code, 0, 'the child exited by itself');
+        assert.ok(Date.now() - t0 < 9000, `without waiting out the 10 s alarm (${Date.now() - t0} ms)`);
+    }],
     ['snapshot: OV_TEST_SNAPSHOT=0 migrates every time and writes nothing', async () => {
         const m = migrationsDir('CREATE TABLE off (id int);');
         process.env.OV_TEST_SNAPSHOT = '0';
