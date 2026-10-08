@@ -24,14 +24,16 @@ const RANK = { viewer: 1, developer: 2, admin: 3, owner: 4 };
 const ENV_POLICIES = { sandbox: ['sandbox'], 'sandbox+production': ['sandbox', 'production'] };
 
 /**
- * Capabilities that are public + active in openvibe-contracts v0.28.0, the ones Network grants to
- * apps (network.project.manage is public but planned, so not grantable).
+ * Capabilities that are public + active, the ones Network grants to apps (network.project.manage is public but
+ * planned, so not grantable). openvibe-contracts 0.113.0 renamed codes.release.* to services.release.* (the developer
+ * console moved to OpenVibe.Services).
  */
 const DEFAULT_APP_CATALOG = [
-    'codes.release.manage', 'codes.release.read', 'community.paste.create', 'community.post.create',
+    'community.paste.create', 'community.post.create',
     'events.app.publish', 'events.app.read', 'events.app.subscribe',
     'games.mod.read', 'games.prop.place', 'games.world.announce',
     'media.object.read', 'media.object.upload',
+    'services.release.manage', 'services.release.read',
     'tools.job.cancel', 'tools.job.create', 'tools.job.read',
     'vip.perk.list', 'vip.plan.list',
 ];
