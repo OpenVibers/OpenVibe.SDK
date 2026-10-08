@@ -3,6 +3,18 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.36.0 (2026-10-08)
+
+- **`openvibe-sdk/account-data` (new, node): a service's share of account export and deletion (ADR-033).** Six services
+  implemented it by hand; every newer one (Actor, Food, Help, Work, Quest, Rent, Watch…) had none. A service now
+  declares the tables that hold a person's rows (`{ table, subject, value?, file?, columns?, erase? }`, with `erase`
+  `'delete'`, `{ anonymize: {…} }` or `{ keep: '<why>' }`) and gets `apply(event, { send })` for
+  network.account.export_requested / network.account.deleted, a signed `consumer()` handler for POST /internal/events,
+  `exportPart()`, `erase()` (one transaction, merged-account aliases included), `ensureSchema()` /
+  `ACCOUNT_DATA_SCHEMA` (account_data_events: idempotent per export/deletion id, so a redelivery never erases twice and a
+  failed confirmation is sent again) and `createNetworkSender()` (the service's own client-credentials token for
+  Network's internal routes). Identifiers in the table map are checked when it is made; values are always parameters.
+
 ## 0.35.2 (2026-10-08)
 
 - **The mock developer platform grants `services.release.manage|read` (`openvibe-sdk/testing`, patch):** openvibe-contracts
