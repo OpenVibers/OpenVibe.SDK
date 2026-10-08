@@ -3,6 +3,13 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.35.2 (2026-10-08)
+
+- **The mock developer platform grants `services.release.manage|read` (`openvibe-sdk/testing`, patch):** openvibe-contracts
+  0.113.0 moved the developer console from OpenVibe.Codes to OpenVibe.Services and retired `codes.release.*`; the mock's
+  app catalog follows, so a developer-path run against it requests the names Network grants. Pins openvibe-contracts
+  v0.113.0.
+
 ## 0.35.1 (2026-10-08)
 
 - **A PGlite test database no longer keeps its process alive (`openvibe-sdk/testing`, patch):** PGlite emulates
