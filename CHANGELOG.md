@@ -3,6 +3,14 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.37.0 (2026-10-08)
+
+- **`openvibe-sdk/account-data`: `startSubscriptions()`**, the boot-time half every adopter had copied. It creates any
+  missing OpenVibe.Events subscription for the two account topics (or `topics`) to the service's loopback endpoint with
+  its own token (audience openvibe.events, scope events.subscription.manage), retried with backoff in the background,
+  and leaves an existing one alone, so a restart creates nothing. It returns null when the Events URL, the delivery
+  secret or the client secret is unset; `stop()` ends the retries and `done` says whether every topic was subscribed.
+
 ## 0.36.0 (2026-10-08)
 
 - **`openvibe-sdk/account-data` (new, node): a service's share of account export and deletion (ADR-033).** Six services

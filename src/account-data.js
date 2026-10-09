@@ -17,6 +17,8 @@
  *   await accountData.ensureSchema();                    // or ACCOUNT_DATA_SCHEMA in a migration
  *   const send = createNetworkSender({ networkInternalUrl, clientId, clientSecret });
  *   app.use('/internal/events', accountData.consumer({ secrets: [process.env.FOOD_EVENTS_SECRET], send }));
+ *   startSubscriptions({ eventsUrl, endpoint: 'http://127.0.0.1:4970/internal/events', secret, networkInternalUrl,
+ *       clientId, clientSecret });                      // the two subscriptions, created at boot when missing
  *   // or, inside a consumer the service already has:  const outcome = await accountData.apply(event, { send });
  *
  * A table entry:
@@ -275,4 +277,64 @@ function createNetworkSender({ networkInternalUrl, clientId, clientSecret, fetch
     };
 }
 
-module.exports = { createAccountData, createNetworkSender, ACCOUNT_DATA_SCHEMA, TOPICS };
+/**
+ * The boot-time half: create any missing Events subscription for `topics` (default the two account topics) to this
+ * service's loopback `endpoint`, idempotently, retried with backoff in the background. Off (null) when the Events URL,
+ * the delivery secret or the client secret is unset. The token is this service's own, audience openvibe.events, scope
+ * events.subscription.manage. A subscription already there for the same topic and endpoint is left alone, so a
+ * restart creates nothing; Events answers 409 for a racing duplicate, which counts as done.
+ *
+ *   const subs = startSubscriptions({ eventsUrl, endpoint: `http://127.0.0.1:${port}/internal/events`, secret,
+ *       networkInternalUrl, clientId, clientSecret });
+ *   // graceful stop: subs && subs.stop()
+ *
+ * `done` resolves true once every topic is subscribed, false when the retries ran out or stop() came first.
+ */
+function startSubscriptions({
+    eventsUrl, endpoint, secret, topics = TOPICS, networkInternalUrl, clientId, clientSecret,
+    fetch: fetchImpl = globalThis.fetch, log = console, delays = [0, 10_000, 60_000, 5 * 60_000, 15 * 60_000],
+} = {}) {
+    if (!eventsUrl || !endpoint || !secret || !clientId || !clientSecret || !networkInternalUrl) return null;
+    const base = String(eventsUrl).replace(/\/+$/, '');
+    const tokens = createServiceTokenClient({ tokenUrl: `${String(networkInternalUrl).replace(/\/+$/, '')}/oauth/token`, clientId, clientSecret, audience: 'openvibe.events', scope: 'events.subscription.manage', fetch: fetchImpl });
+    const call = async (method, path, body) => {
+        const res = await fetchImpl(`${base}${path}`, {
+            method,
+            headers: { Accept: 'application/json', ...(body ? { 'Content-Type': 'application/json' } : {}), ...(await tokens.authHeaders()) },
+            body: body ? JSON.stringify(body) : undefined,
+            signal: AbortSignal.timeout(15000),
+        });
+        if (res.status === 401) tokens.invalidate();
+        return { status: res.status, ok: res.ok, body: await res.json().catch(() => ({})) };
+    };
+    const attempt = async () => {
+        const listed = await call('GET', '/api/v1/subscriptions');
+        if (!listed.ok) throw new Error(`listing subscriptions: ${listed.status}`);
+        const mine = (listed.body.subscriptions || []).filter((s) => s.endpoint === endpoint);
+        for (const topic of topics) {
+            if (mine.some((s) => s.topic_pattern === topic)) continue;
+            const r = await call('POST', '/api/v1/subscriptions', { topic_pattern: topic, endpoint, secret });
+            if (!r.ok && r.status !== 409) throw new Error(`subscribing to ${topic}: ${r.status} ${r.body.code || ''}`.trim());
+            if (r.ok) log.log(`[Events] subscription created: ${r.body.id} (${topic} → ${endpoint})`);
+        }
+    };
+    let i = 0;
+    let timer = null;
+    let stopped = false;
+    let settle;
+    const done = new Promise((resolve) => { settle = resolve; });
+    const schedule = (ms) => { timer = setTimeout(run, ms); if (timer.unref) timer.unref(); };
+    function run() {
+        timer = null;
+        if (stopped) return;
+        attempt().then(() => settle(true), (err) => {
+            if (stopped) return;
+            if (++i < delays.length) schedule(delays[i]);
+            else { log.warn(`[Events] subscriptions not created: ${err.message}`); settle(false); }
+        });
+    }
+    schedule(delays[0] || 0);
+    return { topics: [...topics], endpoint, done, stop() { stopped = true; if (timer) clearTimeout(timer); timer = null; settle(false); } };
+}
+
+module.exports = { createAccountData, createNetworkSender, startSubscriptions, ACCOUNT_DATA_SCHEMA, TOPICS };
