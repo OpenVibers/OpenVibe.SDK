@@ -1,6 +1,6 @@
 'use strict';
 /**
- * openvibe-sdk/openre — OpenRe.Stream, the platform's streaming engine (ingest, sessions, restream outputs), for
+ * openvibe-sdk/openre — OpenRestream, the platform's streaming engine (ingest, sessions, restream outputs), for
  * every product that puts a stream on air (OpenVibe.Live first). One client instead of a copy in each product.
  * Server-side: it sends a Network service token for audience openvibe.openre.
  *
@@ -13,7 +13,7 @@
  *
  * Grants (on the caller's principal, audience openvibe.openre): openre.stream.read / .write, openre.key.rotate,
  * openre.output.read / .write, openre.session.read / .end. `subject` names the person a call acts for
- * (X-OV-Subject; a usr_ id); OpenRe checks that they own the stream. Errors are OpenVibeError (status, code);
+ * (X-OV-Subject; a usr_ id); OpenRestream checks that they own the stream. Errors are OpenVibeError (status, code);
  * a missing stream, destination or session is null from get(), not an error.
  * Shapes: Contracts openre.stream@1, openre.destination@1, openre.output@1, openre.session-read-result@1.
  */
@@ -82,7 +82,7 @@ function createOpenReClient(client, { baseUrl, publicUrl = 'https://openre.strea
         sessions,
         outputLogs: (id, { subject, limit } = {}) => call({ path: `/api/v1/outputs/${enc(id)}/logs`, query: { limit }, subject }),
         workers: () => call({ path: '/api/v1/workers' }),
-        /** The standalone UI's page for a stream (for "manage on OpenRe.Stream" links). */
+        /** The standalone UI's page for a stream (for "manage on OpenRestream" links). */
         manageUrl: (streamId) => `${String(publicUrl).replace(/\/+$/, '')}/streams/${enc(streamId || '')}`,
         clearCache: () => playbackCache.clear(),
     };

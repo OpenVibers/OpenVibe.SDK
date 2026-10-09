@@ -1,5 +1,5 @@
 'use strict';
-/** OpenRe: service-token calls with the acting subject, external_ref lookup, key rotation, null for a missing
+/** OpenRestream: service-token calls with the acting subject, external_ref lookup, key rotation, null for a missing
  *  stream or session, playback cached 10 s, destinations and sessions paths, and errors kept as OpenVibeError. */
 const assert = require('node:assert/strict');
 const { stubServer, send, run } = require('./helpers');

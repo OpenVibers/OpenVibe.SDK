@@ -13,7 +13,7 @@ dependency, and a service that lacks the package gets an error naming it (`code:
 
 Convert one service at a time, smallest first (the audit's order): Blog, Codes, News, Deals, Coupons, VIP, Tips, Trade
 (errors only), Wiki, Reviews, Network, Community, Billing, Bot, Chat, Host, AI, Events, Search, Sources, Media,
-OpenRe.Stream, Live.
+OpenRestream, Live.
 
 ## The stop
 
@@ -154,9 +154,9 @@ lifecycle = gracefulStop({
 with the `accepting` readiness check above replacing `_bootComplete = false`. The drill branch (3 s) stays outside the
 kit.
 
-### OpenRe.Stream
+### OpenRestream
 
-It has no hard timer today. `gracefulStop({ name: 'OpenRe', server, close: [...] })` adds one (5 s, exit 1): new
+It has no hard timer today. `gracefulStop({ name: 'OpenRestream', server, close: [...] })` adds one (5 s, exit 1): new
 behaviour, but a safer one.
 
 ## The telemetry

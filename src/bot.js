@@ -96,7 +96,7 @@ function createBotClient(client, defaults = {}) {
          */
         command: (id, input, o = {}) => call({ method: 'POST', path: `/api/v1/robots/${enc(id)}/commands`, json: input }, o),
         streaming: {
-            /** The owner's OpenRe toggles (Bot stores no copy). A member read. */
+            /** The owner's OpenRestream toggles (Bot stores no copy). A member read. */
             get: (id, o = {}) => call({ path: `/api/v1/robots/${enc(id)}/streaming` }, o),
             /** { to?, on? } (a service must also act for the owner) -> the new streaming state. */
             set: (id, input = {}, o = {}) => call({ method: 'POST', path: `/api/v1/robots/${enc(id)}/streaming`, json: input }, o),
