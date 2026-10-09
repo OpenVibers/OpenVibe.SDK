@@ -44,5 +44,12 @@ export function createAccountData(opts: {
     log?: { log(msg: string): void; warn(msg: string): void };
 }): AccountData;
 export function createNetworkSender(opts: { networkInternalUrl: string; clientId: string; clientSecret: string; fetch?: typeof fetch; timeoutMs?: number }): NetworkSend;
+export interface Subscriptions { topics: string[]; endpoint: string; done: Promise<boolean>; stop(): void }
+/** Create any missing Events subscription for `topics` (default TOPICS) at boot; null when a setting is missing. */
+export function startSubscriptions(opts: {
+    eventsUrl: string; endpoint: string; secret: string; topics?: readonly string[];
+    networkInternalUrl: string; clientId: string; clientSecret: string;
+    fetch?: typeof fetch; log?: { log(msg: string): void; warn(msg: string): void }; delays?: number[];
+}): Subscriptions | null;
 export const ACCOUNT_DATA_SCHEMA: string;
 export const TOPICS: readonly string[];

@@ -8,7 +8,7 @@ const http = require('node:http');
 const { run, stubServer } = require('./helpers');
 const { createDb } = require('../src/db');
 const { signDeliveryHeaders } = require('../src/events');
-const { createAccountData, createNetworkSender, ACCOUNT_DATA_SCHEMA, TOPICS } = require('../src/account-data');
+const { createAccountData, createNetworkSender, startSubscriptions, ACCOUNT_DATA_SCHEMA, TOPICS } = require('../src/account-data');
 
 const A = 'usr_01JZ0000000000000000000AAA';
 const B = 'usr_01JZ0000000000000000000BBB';
@@ -171,6 +171,42 @@ run([
         } finally {
             await new Promise((r) => server.close(r));
             await db.close();
+        }
+    }],
+    ['startSubscriptions: the missing topics are created once with the events token, a failure is retried, a restart creates nothing', async () => {
+        const subs = [];
+        let failListing = 1;
+        const tokenAsks = [];
+        const stub = await stubServer(async (req, res, body) => {
+            res.setHeader('Content-Type', 'application/json');
+            if (req.url === '/oauth/token') { tokenAsks.push(Object.fromEntries(new URLSearchParams(body.toString()))); return res.end(JSON.stringify({ access_token: 'evtok', expires_in: 300 })); }
+            assert.equal(req.headers.authorization, 'Bearer evtok');
+            if (req.method === 'GET') {
+                if (failListing-- > 0) { res.statusCode = 502; return res.end('{}'); }
+                return res.end(JSON.stringify({ subscriptions: subs }));
+            }
+            const b = JSON.parse(body.toString());
+            const sub = { id: `sub_${subs.length + 1}`, topic_pattern: b.topic_pattern, endpoint: b.endpoint };
+            subs.push(sub);
+            res.statusCode = 201;
+            return res.end(JSON.stringify(sub));
+        });
+        const opts = { eventsUrl: `${stub.url}/`, networkInternalUrl: stub.url, endpoint: 'http://127.0.0.1:4970/internal/events', secret: SECRET, clientId: 'food', clientSecret: 'secret', log: quiet, delays: [0, 5] };
+        try {
+            assert.equal(startSubscriptions({ ...opts, secret: '' }), null, 'off without the delivery secret');
+            assert.equal(startSubscriptions({ ...opts, eventsUrl: '' }), null, 'off without the Events URL');
+            const first = startSubscriptions(opts);
+            assert.equal(await first.done, true);
+            assert.deepEqual(subs.map((x) => [x.topic_pattern, x.endpoint]), TOPICS.map((t) => [t, opts.endpoint]));
+            assert.deepEqual([tokenAsks[0].audience, tokenAsks[0].scope, tokenAsks[0].client_id], ['openvibe.events', 'events.subscription.manage', 'food']);
+            const again = startSubscriptions(opts);
+            assert.equal(await again.done, true);
+            assert.equal(subs.length, 2, 'a restart creates nothing');
+            const stopped = startSubscriptions({ ...opts, delays: [60_000] });
+            stopped.stop();
+            assert.equal(await stopped.done, false, 'stop() before the first attempt');
+        } finally {
+            await stub.close();
         }
     }],
 ]);
