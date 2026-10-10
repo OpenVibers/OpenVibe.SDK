@@ -46,8 +46,8 @@ const community = createCommunityClient(client);
 const { pastes } = await community.pastes.list({ limit: 20 });
 
 // Live updates, resumable across reloads.
-const sub = subscribe(['live.stream.*'], (event, { seq }) => render(event), {
-    client, lastEventId: localStorage.getItem('seq'), onGap: () => refetchEverything(),
+const sub = subscribe(['live.stream.*'], (event, { cursor }) => { render(event); localStorage.setItem('cursor', cursor); }, {
+    client, lastEventId: localStorage.getItem('cursor'), onGap: () => refetchEverything(),
 });
 ```
 
@@ -108,7 +108,7 @@ const { createAppEvents } = require('openvibe-sdk/events');
 const events = createAppEvents(client, { projectId: unverifiedClaims.project_id, appId: process.env.OV_CLIENT_ID });
 await events.publish({ event_type: 'order.shipped', subject: { type: 'order', id: 'o1' }, payload: { n: 1 } });
 //   -> app.p01k5….order.shipped, source app-01k5…, actor { type: 'app', id: 'app_…' } (onBehalfOf: the person instead)
-const page = await events.pull({ topic: 'order.*', platformTopics: ['live.stream.*'], afterSeq });   // + public first-party events
+const page = await events.pull({ topic: 'order.*', platformTopics: ['live.stream.*'], after: saved });   // + public first-party events; save page.next_cursor
 await events.subscribe({ topicPattern: '*', endpoint: 'https://hooks.example.com/openvibe' });        // public https only
 ```
 
@@ -217,7 +217,7 @@ Server-only subpaths are declared `"browser": null` in the exports map, so a bun
   - Legacy `{ error: 'text' }` bodies become `http.<status>`.
   - Failures with no HTTP response use `sdk.timeout`, `sdk.deadline_exceeded`, `sdk.aborted`, `sdk.network_error` or `sdk.unknown_service`.
 - **Tracing.** Every call sends `traceparent` and `X-OpenVibe-Request-Id`. The request id stays the same across retries. `client.withContext({ traceparent, requestId })` or `client.fromRequest(req)` continues the caller's trace with a new span. The `traceparent` option also accepts a getter, for example one backed by AsyncLocalStorage.
-- **Pagination.** `paginate(fetchPage, { cursor })` is an async iterator over `{ items, next }` pages. Media and Community use offsets. Events `pull()` takes an opaque `after` cursor (a page's `next_cursor`; `afterSeq`, the numeric position, remains for one release) and `iterate()` walks it, calling `onPage(page)` only after every item of that page was handled, so saving `page.next_cursor` there — it advances even when a page matched nothing — is crash-safe.
+- **Pagination.** `paginate(fetchPage, { cursor })` is an async iterator over `{ items, next }` pages. Media and Community use offsets. Events `pull()` takes an opaque `after` cursor (a page's `next_cursor`, or `latest_cursor` to start at the head; a position is never a number, and `afterSeq` throws) and `iterate()` walks it, calling `onPage(page)` only after every item of that page was handled, so saving `page.next_cursor` there — it advances even when a page matched nothing — is crash-safe.
 - **Streams and downloads.** `responseType: 'response'` resolves with the raw fetch `Response` (`data` and `response`, body unread). Error statuses are still read and thrown. The timeout covers the headers only, and `signal` still cancels the body. `parseSSE(res.body)` (from `openvibe-sdk/realtime`) iterates a `text/event-stream`.
 
 ### Auth details

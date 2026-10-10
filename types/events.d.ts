@@ -2,10 +2,14 @@ import type { OpenVibeClient, EventEnvelope } from './core';
 
 /** What a producer passes: event_id, timestamp, source, version, payload and trace_id are filled in. */
 export type EventInput = Omit<EventEnvelope, 'event_id' | 'timestamp' | 'source' | 'version' | 'payload'> & Partial<Pick<EventEnvelope, 'event_id' | 'timestamp' | 'source' | 'version' | 'payload'>>;
-export interface PublishResult { event_id: string; seq: number; duplicate: boolean; }
+/** `seq` is informational; the position is `cursor`. */
+export interface PublishResult { event_id: string; seq: number; cursor: string; duplicate: boolean; }
 export interface StoredEvent { seq: number; cursor: string; event: EventEnvelope; }
 export interface Gap { from_seq: number; to_seq: number; reason?: string; latest_seq?: number; }
-export interface EventsPage { events: StoredEvent[]; next_cursor: string; next_after_seq: number; latest_seq: number; gap?: Gap; }
+/** A position is only ever an opaque cursor: `next_cursor` to read on, `latest_cursor` for the head. */
+export interface EventsPage { events: StoredEvent[]; next_cursor: string; latest_cursor: string; gap?: Gap; }
+/** A stored checkpoint: `cursor` is the opaque cursor as it was stored, null when none is. */
+export interface Checkpoint { consumer: string; topic: string; cursor: string | null; carrier: string | null; updated_at: string | null; }
 export interface Subscription {
     id: string;
     consumer: string;
@@ -23,12 +27,14 @@ export interface EventsClient {
     prepare(envelope: EventInput, opts?: { traceId?: string; now?: number }): EventEnvelope;
     publish(envelope: EventInput, opts?: { traceparent?: string }): Promise<PublishResult>;
     publish(envelopes: EventInput[], opts?: { traceparent?: string }): Promise<{ results: PublishResult[] }>;
-    pull(opts?: { topic?: string | string[]; after?: string; afterSeq?: number; limit?: number }): Promise<EventsPage>;
+    /** Without `after`, from the oldest retained event. */
+    pull(opts?: { topic?: string | string[]; after?: string; limit?: number }): Promise<EventsPage>;
     /** onPage runs after every item of that page was yielded and handled: save page.next_cursor there. */
-    iterate(opts?: { topic?: string | string[]; after?: string; afterSeq?: number; limit?: number; maxPages?: number; onGap?: (gap: Gap) => void | Promise<void>; onPage?: (page: EventsPage) => void | Promise<void> }): AsyncGenerator<StoredEvent, void, unknown>;
+    iterate(opts?: { topic?: string | string[]; after?: string; limit?: number; maxPages?: number; onGap?: (gap: Gap) => void | Promise<void>; onPage?: (page: EventsPage) => void | Promise<void> }): AsyncGenerator<StoredEvent, void, unknown>;
     get(eventId: string): Promise<StoredEvent | null>;
-    getCheckpoint(topic: string): Promise<{ consumer: string; topic: string; cursor: number; updated_at: string | null }>;
-    setCheckpoint(topic: string, cursor: number): Promise<{ consumer: string; topic: string; cursor: number }>;
+    getCheckpoint(topic: string): Promise<Checkpoint>;
+    /** `cursor` is an opaque cursor string (a page's next_cursor); anything else rejects. */
+    setCheckpoint(topic: string, cursor: string, opts?: { carrier?: string }): Promise<Checkpoint>;
     subscriptions: {
         create(input: CreateSubscription): Promise<Subscription>;
         list(): Promise<Subscription[]>;
@@ -65,11 +71,12 @@ export interface AppEventsClient {
     publish(envelope: AppEventInput, opts?: { traceparent?: string }): Promise<PublishResult>;
     publish(envelopes: AppEventInput[], opts?: { traceparent?: string }): Promise<{ results: PublishResult[] }>;
     /** topic is project-relative (default '*'); platformTopics are first-party patterns (public events only). */
-    pull(opts?: { topic?: string | string[]; platformTopics?: string[]; after?: string; afterSeq?: number; limit?: number }): Promise<EventsPage>;
-    iterate(opts?: { topic?: string | string[]; platformTopics?: string[]; after?: string; afterSeq?: number; limit?: number; maxPages?: number; onGap?: (gap: Gap) => void | Promise<void>; onPage?: (page: EventsPage) => void | Promise<void> }): AsyncGenerator<StoredEvent, void, unknown>;
+    pull(opts?: { topic?: string | string[]; platformTopics?: string[]; after?: string; limit?: number }): Promise<EventsPage>;
+    iterate(opts?: { topic?: string | string[]; platformTopics?: string[]; after?: string; limit?: number; maxPages?: number; onGap?: (gap: Gap) => void | Promise<void>; onPage?: (page: EventsPage) => void | Promise<void> }): AsyncGenerator<StoredEvent, void, unknown>;
     get(eventId: string): Promise<StoredEvent | null>;
-    getCheckpoint(topic: string): Promise<{ consumer: string; topic: string; cursor: number; updated_at: string | null }>;
-    setCheckpoint(topic: string, cursor: number): Promise<{ consumer: string; topic: string; cursor: number }>;
+    getCheckpoint(topic: string): Promise<Checkpoint>;
+    /** `cursor` is an opaque cursor string (a page's next_cursor); anything else rejects. */
+    setCheckpoint(topic: string, cursor: string, opts?: { carrier?: string }): Promise<Checkpoint>;
     subscriptions: {
         /** topicPattern is project-relative (default '*'); the endpoint must be public https. */
         create(input: Partial<CreateSubscription> & { endpoint: string }): Promise<Subscription>;
@@ -111,7 +118,7 @@ export interface ParseDeliveryOptions extends DeliveryV2Options {
     /** Refuse deliveries without X-OpenVibe-Signature-V2 (v1-only). Default false. A present v2 header must always verify. */
     requireV2?: boolean;
 }
-export declare function parseDelivery(rawBody: RawBody, headers: Record<string, any> | Headers, secret: string, opts?: ParseDeliveryOptions): { event: EventEnvelope; seq: number; subscriptionId: string | null; attempt: number } | null;
+export declare function parseDelivery(rawBody: RawBody, headers: Record<string, any> | Headers, secret: string, opts?: ParseDeliveryOptions): { event: EventEnvelope; seq: number | null; subscriptionId: string | null; attempt: number } | null;
 
 /** The subset of a better-sqlite3 Database the outbox and inbox use. */
 export interface SqliteDatabase {

@@ -1,13 +1,15 @@
 import type { OpenVibeClient, EventEnvelope, FetchLike, TokenContext } from './core';
 
 export interface RealtimeGap { reason: 'retention' | 'replay_limit' | 'cursor_ahead' | string; from_seq: number; to_seq: number; latest_seq?: number; }
+/** `cursor` is the position to save; `seq` is informational. */
+export interface RealtimeMeta { seq: number | null; cursor: string | null; }
 export interface SubscribeOptions {
     client?: OpenVibeClient;
     /** Events origin or the full …/realtime/stream URL; default from the client's registry, else https://openvibe.events */
     url?: string;
     baseUrl?: string;
-    /** Resume after this seq (e.g. saved before a reload). */
-    lastEventId?: number | string | null;
+    /** Resume after this opaque cursor (the `cursor` a callback was given, saved before a reload). */
+    lastEventId?: string | null;
     onGap?: (gap: RealtimeGap) => void;
     onOpen?: () => void;
     onError?: (err: Error) => void;
@@ -30,8 +32,8 @@ export interface RealtimeSubscription {
     readonly closed: boolean;
     readonly done: Promise<void>;
 }
-export declare function subscribe(topics: string | string[], onEvent: (event: EventEnvelope, meta: { seq: number }) => void, opts?: SubscribeOptions): RealtimeSubscription;
-export declare function createRealtimeClient(client: OpenVibeClient, defaults?: Omit<SubscribeOptions, 'client'>): { subscribe(topics: string | string[], onEvent: (event: EventEnvelope, meta: { seq: number }) => void, opts?: SubscribeOptions): RealtimeSubscription };
+export declare function subscribe(topics: string | string[], onEvent: (event: EventEnvelope, meta: RealtimeMeta) => void, opts?: SubscribeOptions): RealtimeSubscription;
+export declare function createRealtimeClient(client: OpenVibeClient, defaults?: Omit<SubscribeOptions, 'client'>): { subscribe(topics: string | string[], onEvent: (event: EventEnvelope, meta: RealtimeMeta) => void, opts?: SubscribeOptions): RealtimeSubscription };
 export interface SSEMessage { event: string; data: string; id: string | undefined; }
 /** WHATWG event-stream parser over a fetch body (or any async iterable of chunks). */
 export declare function parseSSE(body: ReadableStream<Uint8Array> | AsyncIterable<Uint8Array | string>, opts?: { onRetry?: (ms: number) => void }): AsyncGenerator<SSEMessage, void, unknown>;

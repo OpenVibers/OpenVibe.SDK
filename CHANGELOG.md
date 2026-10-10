@@ -3,6 +3,28 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.42.0 (2026-10-10)
+
+An Events position is an opaque cursor and nothing else (ADR-042 decision 7, plan T7). **Breaking** for a caller that
+still passes a number:
+
+- **`pull()` / `iterate()`** take `after` (a page's `next_cursor`, or `latest_cursor` for the head) and nothing
+  numeric. `afterSeq` throws a `TypeError` instead of silently reading from the start. Without `after`, a page starts
+  at the oldest retained event, and no `after_seq` is ever sent. `iterate()` ends on the page whose `next_cursor` is
+  `latest_cursor`, or on one that does not move the position. Pages carry `next_cursor` and `latest_cursor` only
+  (types: `next_after_seq` and `latest_seq` are gone).
+- **Checkpoints** store the opaque cursor. `setCheckpoint(topic, cursor, { carrier })` rejects anything but a cursor
+  string, and `getCheckpoint()` answers `{ consumer, topic, cursor, carrier, updated_at }` with `cursor` as stored,
+  or null when none is.
+- **Realtime** resumes from the cursor exactly as Events sent it (`lastEventId` is a string; a bare number is no
+  longer read as a position), and it dedupes by `event_id` (the last 512), never by position. The callback's
+  `{ cursor }` is what to save; `seq` is informational and null when absent.
+- **`parseDelivery()`** answers `seq: null` when a delivery carries none (it was `NaN`). Dedupe deliveries by
+  `event.event_id`.
+- **Mock Events** (`openvibe-sdk/testing`) behaves like Events after the change: `after_seq` is a 400, pages have no
+  numeric fields, checkpoints hold cursors, the realtime `id:` is the cursor and a bare-number `Last-Event-ID` is
+  ignored.
+
 ## 0.41.0 (2026-10-10)
 
 - **`createResourceIndex().list({ owner })`.** The index passes `owner` (a `usr_…`/`agt_…` subject id) to every

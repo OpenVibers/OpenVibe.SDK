@@ -2,7 +2,7 @@
 /**
  * openvibe-sdk/realtime: the browser realtime plane inside OpenVibe.Events (ADR-005), over SSE.
  *
- *   const sub = subscribe(['live.stream.*'], (event, { seq, cursor }) => { … save cursor … }, {
+ *   const sub = subscribe(['live.stream.*'], (event, { cursor }) => { … save cursor … }, {
  *       client,                      // or url: 'https://openvibe.events'
  *       lastEventId: savedCursor,    // resume after a reload (the `cursor` the callback was given)
  *       onGap: (gap) => refetchState(),
@@ -12,13 +12,14 @@
  * Transport: EventSource when the environment has one and no Bearer token is needed (cookies ride
  * along with withCredentials); otherwise fetch with a streamed body (Node, or a token). Either
  * way it resumes from the last position it saw (Last-Event-ID: Events' opaque cursor, the `cursor` each
- * callback gets; an older Events sends a bare seq), skips anything it already delivered,
+ * callback gets, never parsed), skips an event it already delivered (by event_id),
  * and reports an `event: gap` (events missed beyond retention or replay limits) through onGap.
  * Browser-safe.
  */
 const { OpenVibeError } = require('./core/errors');
 
 const DEFAULT_ORIGIN = 'https://openvibe.events';
+const SEEN_MAX = 512;   // event ids remembered for dedupe
 const FATAL = new Set([400, 401, 403, 404]);
 const sleep = (ms, signal) => new Promise((resolve) => {
     const t = setTimeout(resolve, ms);
@@ -36,10 +37,11 @@ function subscribe(topics, onEvent, opts = {}) {
     const fetchImpl = opts.fetch || (typeof globalThis.fetch === 'function' ? globalThis.fetch.bind(globalThis) : null);
     const ES = opts.EventSource !== undefined ? opts.EventSource : globalThis.EventSource;
 
-    // The position to resume from is the last SSE id as Events sent it: an opaque cursor (ADR-042) or, from an older
-    // Events, a bare seq. Dedupe compares the numeric seq the message data carries.
+    // The position to resume from is the last SSE id Events sent: an opaque cursor (ADR-042), handed back as it came.
+    // A reconnect replays strictly after it; the ids of the last events delivered catch anything a transport hands
+    // over twice (dedupe by event_id, never by position).
     const initial = lastEventId != null && lastEventId !== '' ? String(lastEventId) : null;
-    const state = { lastId: initial, lastSeq: initial != null && /^\d+$/.test(initial) ? Number(initial) : null, closed: false, transport: null, connected: false };
+    const state = { lastId: initial, seen: new Set(), closed: false, transport: null, connected: false };
     const stop = new AbortController();
     let es = null;
     let retryMs = reconnectDelayMs;
@@ -57,12 +59,14 @@ function subscribe(topics, onEvent, opts = {}) {
         if (type !== 'message' || !data) return;
         let msg;
         try { msg = JSON.parse(data); } catch { report(new OpenVibeError({ code: 'sdk.bad_response', message: 'realtime: undecodable message' })); return; }
-        const seq = Number(msg && msg.seq != null ? msg.seq : id);
-        if (Number.isFinite(seq)) {
-            if (state.lastSeq != null && seq <= state.lastSeq) return;      // already delivered
-            state.lastSeq = seq;
+        const eventId = msg && msg.event && typeof msg.event.event_id === 'string' ? msg.event.event_id : null;
+        if (eventId) {
+            if (state.seen.has(eventId)) return;                              // already delivered
+            state.seen.add(eventId);
+            if (state.seen.size > SEEN_MAX) state.seen.delete(state.seen.values().next().value);
         }
         if (id !== undefined && id !== '') state.lastId = String(id);
+        const seq = msg && msg.seq != null && Number.isFinite(Number(msg.seq)) ? Number(msg.seq) : null;   // informational
         try { onEvent(msg && msg.event, { seq, cursor: id !== undefined && id !== '' ? String(id) : null }); } catch (err) { report(err); }
     }
 
@@ -143,7 +147,7 @@ function subscribe(topics, onEvent, opts = {}) {
             es.onerror = () => {
                 state.connected = false;
                 // CONNECTING (0): the browser reconnects by itself and sends Last-Event-ID.
-                // CLOSED (2): it gave up (HTTP error); reconnect ourselves from the last seq.
+                // CLOSED (2): it gave up (HTTP error); reconnect ourselves from the last cursor.
                 if (es.readyState === 2 && !state.closed) {
                     report(new OpenVibeError({ code: 'sdk.network_error', retryable: true, message: 'realtime: stream closed' }));
                     failures++;
