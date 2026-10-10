@@ -239,7 +239,7 @@ Server-only subpaths are declared `"browser": null` in the exports map, so a bun
   - It accepts RS256 only. `alg: none`, HS256 and anything else fail as `token.malformed` before any key is used.
   - It checks the signature against the JWKS document, URL or client (`createNetworkKeys().verifyOptions`). A URL is cached for 6 h and fetched again when a token carries an unknown `kid`. It also accepts the Network's legacy `public_key` field or a PEM string.
   - It checks `exp`, `nbf` and `iat` (30 s clock skew), then `iss` and `aud`.
-  - It rejects service-principal tokens and typed tokens (a realtime ticket, a FedCM assertion: `typ` or `purpose` set) as `token.not_user`.
+  - It rejects principal tokens (a service, a developer app, a module or a node: a machine paired for a service) and typed tokens (a realtime ticket, a FedCM assertion: `typ` or `purpose` set) as `token.not_user`.
 
   It returns the claims, including `subject_id`.
 - `verifyServiceToken(token, { jwks, issuer, audience, contracts })` checks a service or app token for a service that receives them: the SDK chooses the key (the `kid`'s, else each; the shared JWKS client or a pinned PEM), and every rule is your own pinned openvibe-contracts `serviceAuth.verifyServiceToken` (pass the module as `contracts`). No key answers `{ ok: false, code: 'token.unavailable' }` with a fixed reason, never the internal JWKS URL.
