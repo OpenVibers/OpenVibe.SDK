@@ -186,7 +186,7 @@ const { createTestDb } = require(${JSON.stringify(path.join(__dirname, '..', 'sr
             assert.equal(await seeded.db.value('SELECT count(*)::int FROM keyed'), 1, 'the seed ran');
         } finally { await seeded.close(); }
     }],
-    ['snapshot: a hit refreshes ov_migrations ages, so an ADR-028 contract stays held as on a fresh migrate', async () => {
+    ['snapshot: a fresh build applies its ADR-028 contract (no previous release exists), and a hit is that same schema', async () => {
         const m = fs.mkdtempSync(path.join(os.tmpdir(), 'sdk-testdb-'));
         fs.writeFileSync(path.join(m, '0001_expand.sql'), '-- phase: expand\nCREATE TABLE legacy (id int);\n');
         fs.writeFileSync(path.join(m, '0002_contract.sql'), '-- phase: contract\n-- after: 0001\nCREATE TABLE contracted (id int);\n');
@@ -197,8 +197,8 @@ const { createTestDb } = require(${JSON.stringify(path.join(__dirname, '..', 'sr
         const b = await createTestDb({ migrations: m, seed, service: 'sdk' });
         try {
             assert.equal(b.snapshot, 'hit');
-            assert.equal(await b.db.value("SELECT to_regclass('contracted')"), null, 'the contract is still held');
-            assert.equal(await b.db.value("SELECT count(*)::int FROM ov_migrations WHERE id = '0002'"), 0, 'the contract is not recorded');
+            assert.equal(await b.db.value("SELECT to_regclass('contracted')::text"), 'contracted', 'the contract ran when the snapshot was built');
+            assert.equal(await b.db.value("SELECT count(*)::int FROM ov_migrations WHERE id = '0002'"), 1, 'the contract is recorded');
         } finally { await b.close(); }
     }],
     ['a run\'s schema name carries when it was made (so a killed run\'s leftovers can be swept); an older name has none', async () => {

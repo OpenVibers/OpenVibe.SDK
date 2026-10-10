@@ -13,7 +13,11 @@
  * with its checksum; editing an applied file is refused. Runs are serialised by an advisory lock, so several
  * processes starting together apply each migration once. A contract migration is refused until the expand it
  * names has been applied for `windowDays` (default 7, the N-1 window of ADR-016), so a rollback to the previous
- * release still finds what it expects. Run it with the owner role (DATABASE_DIRECT_URL): the runtime role
+ * release still finds what it expects; a held contract holds every later migration too (order is kept). A fresh
+ * database (no row in ov_migrations when the run starts: a new install, a test database, a restore drill into an
+ * empty schema) applies its contracts at once: no previous release can be running against it, and holding them
+ * would stop every fresh database at its first contract for the length of the window, with everything after it
+ * untested. Run it with the owner role (DATABASE_DIRECT_URL): the runtime role
  * behind PgBouncer may not change the schema, and advisory locks need a session.
  */
 const crypto = require('crypto');
@@ -63,6 +67,8 @@ async function migrate({ db, dir, windowDays = 7, dryRun = false, now = () => Da
             id text PRIMARY KEY, name text NOT NULL, phase text NOT NULL CHECK (phase IN ('expand','migrate','contract')),
             checksum text NOT NULL, applied_at timestamptz NOT NULL DEFAULT now(), duration_ms integer NOT NULL DEFAULT 0)`);
         const done = new Map((await t.many('SELECT id, checksum, applied_at FROM ov_migrations')).map((r) => [r.id, r]));
+        // A database with no applied migration has no previous release to protect: its contracts apply at once.
+        const fresh = done.size === 0;
         for (const m of all) {
             const prev = done.get(m.id);
             if (prev) {
@@ -71,7 +77,7 @@ async function migrate({ db, dir, windowDays = 7, dryRun = false, now = () => Da
             }
             const later = [...done.keys()].find((id) => id > m.id);
             if (later) throw new Error(`migrate: ${m.file} is older than applied migration ${later}; number new migrations after the last one`);
-            if (m.phase === 'contract') {
+            if (m.phase === 'contract' && !fresh) {
                 const exp = done.get(m.after);
                 const ageDays = exp ? (now() - Date.parse(exp.applied_at)) / 86400000 : -1;
                 if (!exp || ageDays < windowDays) {

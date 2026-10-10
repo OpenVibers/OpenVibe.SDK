@@ -3,6 +3,16 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.38.1 (2026-10-10)
+
+- **`migrate`: a fresh database applies its contract migrations at once.** When a run starts with no row in
+  `ov_migrations` (a new install, a test database, a restore drill into an empty schema), no previous release can be
+  running against it, so the N-1 window has nothing to protect. Before, a fresh database stopped at its first contract
+  for `windowDays`, and because a held contract holds everything after it, every migration past that point went
+  untested: OpenVibe.Chat's test databases had stopped at 0004 since its 0005 contract. An existing database is
+  unchanged: a contract waits for its expand's window, also when both arrive in the same deploy, and holds what follows.
+- `createTestDb` snapshots are built on a fresh database, so they carry the contracts too.
+
 ## 0.38.0 (2026-10-10)
 
 - **Removed: the one-time SQLite → PostgreSQL migration tooling** (plan T1, "Delete the migration era"). Every

@@ -180,10 +180,10 @@ async function pgliteTestDb({ migrations, seed, seedKey, service, log }) {
                 await inst.waitReady;
                 const db = createDb({ pglite: inst, service: `${service}-test`, log });
                 if (migrations) {
-                    // The snapshot froze ov_migrations.applied_at at build time. An ADR-028 contract migration is
-                    // held until its expand has been applied for windowDays, so a reused snapshot would let it run
-                    // ~7 days after it was built, while a fresh migrate holds it. Refresh the ages so the loaded
-                    // database looks freshly migrated, as it did before snapshots.
+                    // The snapshot froze ov_migrations.applied_at at build time. It was built on a fresh database,
+                    // so its contracts already ran (sdk/db applies them on a fresh database); refreshing the ages keeps
+                    // a contract added after the build (the key covers the migrations, so that is a stale snapshot)
+                    // held for the window, as on any existing database.
                     await db.query('UPDATE ov_migrations SET applied_at = now()').catch(() => {});
                     // The key covers the migrations, so this is a check: migrate only if the snapshot is behind.
                     const applied = new Set((await db.many('SELECT id FROM ov_migrations').catch(() => [])).map((r) => r.id));
