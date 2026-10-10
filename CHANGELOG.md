@@ -3,6 +3,13 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.37.2 (2026-10-10)
+
+- `openvibe-sdk/realtime`: each event's callback gets its opaque `cursor` (the SSE id Events sent) beside `seq`:
+  `subscribe(topics, (event, { seq, cursor }) => …)`. Save the cursor after handling the event and pass it back as
+  `lastEventId` to resume, so a subscriber never needs the numeric seq (plan T7). `cursor` is null when Events sent no
+  id. Additive.
+
 ## 0.37.1 (2026-10-10)
 
 - `openvibe-sdk/testing`'s mock Events answers a pull with `latest_cursor` (the head as an opaque cursor), as
