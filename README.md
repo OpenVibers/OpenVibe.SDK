@@ -162,7 +162,7 @@ Until OpenVibe.Tools serves the gateway facade (Tools S6), point the jobs client
 | Subpath | Where | What |
 |---|---|---|
 | `openvibe-sdk/core` | both | `createClient()`, `OpenVibeError`, `paginate()`, `offsetPager()`, trace and id helpers, `CONTRACTS_RANGE` |
-| `openvibe-sdk/auth` | server (browser build: PKCE only) | `createServiceTokenClient()` (+ `getTokenInfo()`), `verifyUserToken()`, `verifyAppToken()`, `verifyServiceToken()`, `exchangeCode()`, `refreshUserToken()`; `startAuthorization()`, `buildAuthorizeUrl()`, `createPkcePair()`, `pkceChallenge()`, `readCallback()`, `decodeUnverified()`, `unverifiedClaims()` |
+| `openvibe-sdk/auth` | server (browser build: PKCE only) | `createServiceTokenClient()` (+ `getTokenInfo()`), `createNetworkKeys()`, `verifyUserToken()`, `verifyAppToken()`, `verifyServiceToken()`, `exchangeCode()`, `refreshUserToken()`; `startAuthorization()`, `buildAuthorizeUrl()`, `createPkcePair()`, `pkceChallenge()`, `readCallback()`, `decodeUnverified()`, `unverifiedClaims()` |
 | `openvibe-sdk/registry` | both | `createRegistryClient(client)`: `services({status})`, `service(id)`, `capabilities({owner})`, `capability(id)`, `namespaces()`, `contracts()`, `topics()`, `domain(host)`, `descriptor()` |
 | `openvibe-sdk/identity` | server | `createIdentityClient(client)`: `resolve({subjectId} \| {system,type,id})`, `resolveBatch({subjectIds} \| {system,type,ids})` |
 | `openvibe-sdk/notifications` | server | `createNotificationsClient(client)`: `push({subjectId \| userId, type, title, message, url, category, priority, …})` through Network (`network.notifications.push`); `{ sent, skipped }` or `{ sent: false, reason: 'unknown_subject' }`; attempted once, the caller retries |
@@ -223,11 +223,23 @@ Server-only subpaths are declared `"browser": null` in the exports map, so a bun
 ### Auth details
 
 - `createServiceTokenClient()` follows the rules of openvibe-contracts `serviceAuth.createTokenClient()` but needs no dependencies. It sends `POST /oauth/token` with `grant_type=client_credentials`, `audience` and an optional `scope`, which can be a string, an array, or a map from audience to scope. It keeps one cached token per audience until 60 s before expiry and shares one in-flight request. As a `tokenProvider`, each call gets a token for the audience of the service it calls: `openvibe.<service>` by default, or the value in `audiences` if you set one.
+- `createNetworkKeys({ network, publicKey?, log? })` holds the keys a service verifies Network tokens with: a pinned PEM
+  (`publicKey`) as is, or `<network>/api/.well-known/jwks` through the shared JWKS client (a rotation is honoured on an
+  unknown `kid`, the last good keys are kept through an outage). Call `start()` at boot (it retries every 30 s until the
+  first load, then refreshes every 15 minutes) and `stop()` at shutdown; spread `keys.verifyOptions` into the verifiers
+  below; `keys.loaded()` is your readiness check.
+
+  ```js
+  const keys = createNetworkKeys({ network: config.networkInternalUrl, publicKey: config.networkPublicKey, log });
+  keys.start();
+  const claims = await verifyUserToken(token, { ...keys.verifyOptions, issuer, audience: 'openvibe.myservice' });
+  const svc = await verifyServiceToken(token, { ...keys.verifyOptions, issuer, audience: 'openvibe.myservice', contracts });
+  ```
 - `verifyUserToken(token, { jwks, issuer, audience })` checks a token offline:
   - It accepts RS256 only. `alg: none`, HS256 and anything else fail as `token.malformed` before any key is used.
-  - It checks the signature against the JWKS document or URL. A URL is cached for 6 h and fetched again when a token carries an unknown `kid`. It also accepts the Network's legacy `public_key` field or a PEM string.
+  - It checks the signature against the JWKS document, URL or client (`createNetworkKeys().verifyOptions`). A URL is cached for 6 h and fetched again when a token carries an unknown `kid`. It also accepts the Network's legacy `public_key` field or a PEM string.
   - It checks `exp`, `nbf` and `iat` (30 s clock skew), then `iss` and `aud`.
-  - It rejects service-principal tokens (`token.not_user`).
+  - It rejects service-principal tokens and typed tokens (a realtime ticket, a FedCM assertion: `typ` or `purpose` set) as `token.not_user`.
 
   It returns the claims, including `subject_id`.
 - `verifyServiceToken(token, { jwks, issuer, audience, contracts })` checks a service or app token for a service that receives them: the SDK chooses the key (the `kid`'s, else each; the shared JWKS client or a pinned PEM), and every rule is your own pinned openvibe-contracts `serviceAuth.verifyServiceToken` (pass the module as `contracts`). No key answers `{ ok: false, code: 'token.unavailable' }` with a fixed reason, never the internal JWKS URL.

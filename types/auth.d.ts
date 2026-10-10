@@ -52,8 +52,8 @@ export interface UserTokenClaims {
 export interface VerifyUserTokenOptions {
     /** Receives the JWKS client's state changes (the first failure, the recovery). */
     log?: JwksClientOptions['log'];
-    /** JWKS document, or its URL (fetched and cached 6 h, refetched on an unknown kid). */
-    jwks?: { keys?: object[]; public_key?: string } | string;
+    /** JWKS document, its URL (fetched and cached 6 h, refetched on an unknown kid), or a JWKS client you hold. */
+    jwks?: { keys?: object[]; public_key?: string } | string | JwksClient;
     /** PEM string or a crypto KeyObject instead of a JWKS. */
     publicKey?: string | object;
     issuer?: string;
@@ -110,6 +110,41 @@ export declare function jwksClient(url: string, opts?: JwksClientOptions): JwksC
 /** Every JWKS client this process uses, for /api/ready. */
 export declare function jwksStatus(): JwksStatus[];
 
+export interface NetworkKeysOptions {
+    /** Network's base URL (its JWKS is <network>/api/.well-known/jwks). */
+    network?: string | null;
+    /** The JWKS URL itself, instead of `network`. */
+    jwksUrl?: string | null;
+    /** A pinned key (PEM or KeyObject, e.g. OV_NETWORK_PUBLIC_KEY): used as is, never fetched. */
+    publicKey?: string | import('node:crypto').KeyObject | null;
+    fetch?: typeof fetch;
+    log?: JwksClientOptions['log'];
+    /** Until the first load, retry this often (default 30 s). */
+    retryMs?: number;
+    /** After it, refresh this often (default 15 min). */
+    refreshMs?: number;
+}
+export type NetworkKeysStatus = { source: 'pinned'; url: null; ready: true; keys: 1 } | ({ source: 'jwks' } & JwksStatus);
+export interface NetworkKeys {
+    /** The JWKS URL, or null for a pinned key. */
+    url: string | null;
+    pinned: boolean;
+    /** Spread into verifyUserToken / verifyAppToken / verifyServiceToken. */
+    verifyOptions: { publicKey: import('node:crypto').KeyObject } | { jwks: JwksClient };
+    /** A token can be verified (the readiness check). */
+    loaded(): boolean;
+    status(): NetworkKeysStatus;
+    /** Fetch now and retry until the first load, then refresh (idempotent; resolves after the first attempt with loaded()). */
+    start(): Promise<boolean>;
+    stop(): void;
+    /** One fetch now: the keys, or null when it failed. */
+    refresh(): Promise<JwksKey[] | null>;
+    /** The keys to check a token of your own with: the kid's after a rotation refetch, else every loaded key; [] when none. */
+    keysFor(kid: string | null | undefined): Promise<JwksKey[]>;
+}
+/** The keys a service verifies Network tokens with: a pinned PEM, or Network's JWKS (rotation, last good keys, retry until loaded). */
+export declare function createNetworkKeys(opts: NetworkKeysOptions): NetworkKeys;
+
 /** A developer app's token (identity.service-token-claims@1 with actor_type app). */
 export type AppTokenClaims = ServiceTokenClaims & {
     sub: `app:app_${string}`;
@@ -124,7 +159,7 @@ export type AppTokenClaims = ServiceTokenClaims & {
 export interface VerifyAppTokenOptions {
     /** Receives the JWKS client's state changes (the first failure, the recovery). */
     log?: JwksClientOptions['log'];
-    jwks?: { keys?: object[]; public_key?: string } | string;
+    jwks?: { keys?: object[]; public_key?: string } | string | JwksClient;
     publicKey?: string | object;
     issuer?: string;
     /** Required: the audience your service answers for (openvibe.<service>). */

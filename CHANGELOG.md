@@ -3,6 +3,19 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.40.0 (2026-10-10)
+
+- **New: `createNetworkKeys()`** (`openvibe-sdk/auth`, server). The keys a service verifies Network tokens with, as one
+  object: a pinned key (`publicKey`, e.g. `OV_NETWORK_PUBLIC_KEY`) used as is, or Network's JWKS (`network` or
+  `jwksUrl`) through the process-wide JWKS client, so a token naming an unknown kid is verified after one refetch
+  (a rotation) and the last good keys are served through a Network outage. `start()` fetches at once and retries every
+  30 s until the first load (Network may still be booting), then refreshes every 15 minutes; `stop()` clears both.
+  `keys.verifyOptions` spreads into `verifyUserToken`, `verifyAppToken` and `verifyServiceToken`; `keys.loaded()` is the
+  readiness check; `keys.keysFor(kid)` answers the keys for a token type a service checks itself. Services each had
+  their own key store (one PEM, no kid, a 6 h refresh); this replaces them.
+- `verifyUserToken` and `verifyAppToken` accept a JWKS client as `jwks` (a URL, a document or a PEM as before), as
+  `verifyServiceToken` already did.
+
 ## 0.39.0 (2026-10-10)
 
 - **New: `openvibe-sdk/notifications`** (server). `createNotificationsClient(client).push({ subjectId | userId, type, title,
@@ -13,6 +26,7 @@ release may change an API and says so here.
   The push is attempted once, because Network keeps no idempotency record for it: callers retry from their own queue.
   Search and Watch each had (or were about to write) their own copy.
 
+## 0.38.1 (2026-10-10)
 
 - **`migrate`: a fresh database applies its contract migrations at once.** When a run starts with no row in
   `ov_migrations` (a new install, a test database, a restore drill into an empty schema), no previous release can be
