@@ -3,6 +3,12 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.37.1 (2026-10-10)
+
+- `openvibe-sdk/testing`'s mock Events answers a pull with `latest_cursor` (the head as an opaque cursor), as
+  OpenVibe.Events does since Events#45. A consumer that starts at "now" stores it and reads on with `after=`,
+  never needing the numeric `latest_seq`. `events.pull()` documents it. Additive.
+
 ## 0.37.0 (2026-10-08)
 
 - **`openvibe-sdk/account-data`: `startSubscriptions()`**, the boot-time half every adopter had copied. It creates any
