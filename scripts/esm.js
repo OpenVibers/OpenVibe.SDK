@@ -18,6 +18,7 @@ const ENTRIES = {
     'auth-browser.mjs': '../src/auth/browser.js',
     'registry.mjs': '../src/registry.js',
     'identity.mjs': '../src/identity.js',
+    'notifications.mjs': '../src/notifications.js',
     'modules.mjs': '../src/modules.js',
     'events.mjs': '../src/events.js',
     'sso.mjs': '../src/sso/index.js',

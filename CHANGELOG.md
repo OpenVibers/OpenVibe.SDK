@@ -3,7 +3,16 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
-## 0.38.1 (2026-10-10)
+## 0.39.0 (2026-10-10)
+
+- **New: `openvibe-sdk/notifications`** (server). `createNotificationsClient(client).push({ subjectId | userId, type, title,
+  message, url, category, priority, icon, rich_content })` sends a person one notification through OpenVibe.Network
+  (`POST /internal/notifications/push`, network.notification-push-request@1; capabilities `network.notifications.push`
+  and, for a subject, `identity.subject.resolve`). It answers `{ sent: true, skipped }` (skipped: the person switched the
+  category off) or `{ sent: false, reason: 'unknown_subject' }` for a subject Network does not know or a deleted account.
+  The push is attempted once, because Network keeps no idempotency record for it: callers retry from their own queue.
+  Search and Watch each had (or were about to write) their own copy.
+
 
 - **`migrate`: a fresh database applies its contract migrations at once.** When a run starts with no row in
   `ov_migrations` (a new install, a test database, a restore drill into an empty schema), no previous release can be
