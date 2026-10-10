@@ -8,7 +8,7 @@ const { paginate, offsetPager } = require('./paginate');
 const semver = require('./semver');
 
 /** The package version (test/version.test.js keeps it equal to package.json). */
-const SDK_VERSION = '0.37.2';
+const SDK_VERSION = '0.38.0';
 
 module.exports = {
     createClient,

@@ -3,7 +3,7 @@
  * db (ADR-035): the sql builder binds every value; both adapters return the same row shapes (int8 → Number,
  * timestamps → ISO, dates → 'YYYY-MM-DD', numeric → exact text, json parsed); transactions commit, roll back
  * and nest as savepoints; serializable conflicts retry; migrations run once, in order, refuse edits, and hold a
- * contract migration inside the N-1 window; importSqlite copies a SQLite file into the schema parents first,
+ * contract migration inside the N-1 window;
  * converts by target type, keeps identity values, and verifies counts and checksums. The suite runs on PGlite
  * always, and again through PgBouncer against PostgreSQL 18 when OV_TEST_PG_URL is set
  * (scripts/test-services.sh up).
@@ -13,7 +13,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { run } = require('./helpers');
-const { createDb, sql, importSqlite } = require('../src/db');
+const { createDb, sql } = require('../src/db');
 const { parse } = require('../src/db/migrate');
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ovsdk-db-'));
@@ -131,61 +131,6 @@ const tests = [
             fs.writeFileSync(path.join(d2, '0003_late.sql'), '-- phase: expand\nSELECT 1;');
             await assert.rejects(db2.migrate({ dir: d2, log: quiet }), /older than applied migration 0005/);
         } finally { await db2.close(); }
-    }],
-    ['importSqlite: parents first, conversions by target type, identities kept, verified', async () => {
-        const Database = require('better-sqlite3');
-        const file = path.join(tmp, 'legacy.db');
-        const s = new Database(file);
-        s.exec(`CREATE TABLE people (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL, is_admin INTEGER DEFAULT 0, settings TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, legacy_note TEXT);
-                CREATE TABLE notes (id INTEGER PRIMARY KEY, person_id INTEGER REFERENCES people(id), body TEXT, pinned INTEGER, posted INTEGER, tags TEXT);
-                CREATE TABLE loose (k TEXT, v TEXT);
-                CREATE TABLE forgotten (id INTEGER PRIMARY KEY, secret TEXT);
-                CREATE VIRTUAL TABLE docs_fts USING fts5(title);`);
-        const ins = s.prepare('INSERT INTO people (id, username, is_admin, settings, created_at, legacy_note) VALUES (?, ?, ?, ?, ?, ?)');
-        ins.run(3, 'ann', 1, '{"theme":"blue","n":[1,2]}', '2026-09-01 10:00:00', 'drop me');
-        ins.run(7, 'bob', 0, null, '2026-09-02T11:30:00.000Z', null);
-        ins.run(12, 'zoë', 0, '{}', '2026-09-03 09:15:00', null);
-        s.prepare('INSERT INTO notes VALUES (?, ?, ?, ?, ?, ?)').run(1, 3, 'hello', 1, 1790000000, '["a","b"]');
-        s.prepare('INSERT INTO notes VALUES (?, ?, ?, ?, ?, ?)').run(2, 7, 'ms time', 0, 1790000000123, '[]');
-        s.prepare('INSERT INTO loose VALUES (?, ?)').run('b', '2');
-        s.prepare('INSERT INTO loose VALUES (?, ?)').run('a', '1');
-        s.close();
-
-        const db = createDb({ pglite: true });
-        try {
-            await db.migrate({ dir: mdir('imp', { '0001_s.sql': `-- phase: expand
-CREATE TABLE people (id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, username text NOT NULL, is_admin boolean NOT NULL DEFAULT false, settings jsonb, created_at timestamptz NOT NULL DEFAULT now());
-CREATE TABLE notes (id bigint PRIMARY KEY, person_id bigint REFERENCES people(id), body text, pinned boolean, posted timestamptz, tags text[] NOT NULL DEFAULT '{}');
-CREATE TABLE loose (k text, v text);` }), log: { log() {} } });
-            const quiet = { log() {} };
-            // A source column with no target column is a problem until it is dropped on purpose.
-            let r = await importSqlite({ sqlite: file, db, log: quiet });
-            assert.equal(r.ok, false);
-            assert.ok(r.problems.some((p) => /legacy_note/.test(p.problem)), JSON.stringify(r.problems));
-            r = await importSqlite({ sqlite: file, db, log: quiet, tables: { people: { dropColumns: ['legacy_note'] } } });
-            // A source table the target lacks would be dropped without a word: refused until skipped on purpose
-            // (an FTS5 index and its shadow tables are skipped: an index is rebuilt, not copied).
-            assert.equal(r.ok, false);
-            assert.deepEqual(r.problems.map((p) => p.table), ['forgotten']);
-            r = await importSqlite({ sqlite: file, db, log: quiet, truncate: true, skipSource: ['forgotten'], tables: { people: { dropColumns: ['legacy_note'] } } });
-            assert.equal(r.ok, true, JSON.stringify(r.problems));
-            assert.deepEqual(r.tables.map((t) => [t.table, t.rows]), [['loose', 2], ['people', 3], ['notes', 2]], 'parents before children');
-            const ann = await db.one(sql`SELECT * FROM people WHERE id = 3`);
-            assert.deepEqual([ann.username, ann.is_admin, ann.settings, ann.created_at], ['ann', true, { theme: 'blue', n: [1, 2] }, '2026-09-01T10:00:00.000Z']);
-            const n2 = await db.one(sql`SELECT * FROM notes WHERE id = 2`);
-            assert.deepEqual([n2.pinned, n2.posted, n2.tags], [false, new Date(1790000000123).toISOString(), []]);
-            assert.equal((await db.one(sql`SELECT * FROM notes WHERE id = 1`)).posted, new Date(1790000000 * 1000).toISOString(), 'epoch seconds');
-            const next = await db.one(sql`INSERT INTO people (username) VALUES ('new') RETURNING id`);
-            assert.equal(next.id, 13, 'the identity continues after the imported maximum');
-            // A second import onto the same rows fails loudly; truncate makes a rehearsal repeatable.
-            r = await importSqlite({ sqlite: file, db, log: quiet, truncate: true, skipSource: ['forgotten'], tables: { people: { dropColumns: ['legacy_note'] } } });
-            assert.equal(r.ok, true);
-            // A transformation that differs between copy and check shows up as a failed verification.
-            let flip = 0;
-            r = await importSqlite({ sqlite: file, db, log: quiet, truncate: true, only: ['loose'], tables: { loose: { map: (row) => ({ ...row, v: String(flip++) }) } } });
-            assert.equal(r.ok, false);
-            assert.match(r.problems[0].problem, /verification failed/);
-        } finally { await db.close(); }
     }],
 ];
 

@@ -3,6 +3,15 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.38.0 (2026-10-10)
+
+- **Removed: the one-time SQLite → PostgreSQL migration tooling** (plan T1, "Delete the migration era"). Every
+  OpenVibe service runs on PostgreSQL and none calls them: `importSqlite` and `runSqliteMigration` (`openvibe-sdk/db`),
+  `src/db/sqlite-import.js`, `src/db/sqlite-cli.js`, the `tools/asyncify/` conversion scripts and
+  `docs/migrating-to-postgresql.md`. A consumer that still imported either function must drop it; nothing else changes.
+- Kept: the better-sqlite3-shaped statements on PostgreSQL (`db.prepare`), and the SQLite outbox and inbox
+  (`createOutbox`/`createInbox`) for a small app that keeps them in SQLite (OpenVibe.Examples' webhook consumer does).
+
 ## 0.37.2 (2026-10-10)
 
 - `openvibe-sdk/realtime`: each event's callback gets its opaque `cursor` (the SSE id Events sent) beside `seq`:

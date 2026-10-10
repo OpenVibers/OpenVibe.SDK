@@ -2,7 +2,6 @@
 import cjs from '../src/db/index.js';
 
 export const {
-    createDb, sql, DbError, importSqlite, runSqliteMigration, PARSERS,
-    ISOLATION,
+    createDb, sql, DbError, PARSERS, ISOLATION,
 } = cjs;
 export default cjs;
