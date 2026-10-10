@@ -103,7 +103,7 @@ async function pgOpen() {
 
 const tests = [
     ...suite('pglite', async () => { const db = createDb({ pglite: true, service: 'sdk-test' }); return { db, migrate: (dir) => db.migrate({ dir, log: { log() {} } }) }; }),
-    ['migration rules: phases, edits refused, order kept, contract held in the N-1 window, no-transaction', async () => {
+    ['migration rules: phases, edits refused, order kept, contract held in the N-1 window (not on a fresh database), no-transaction', async () => {
         assert.throws(() => parse(mdir('bad1', { 'x.sql': '-- phase: expand\nSELECT 1;' })), /NNNN_description/);
         assert.throws(() => parse(mdir('bad2', { '0001_a.sql': 'SELECT 1;' })), /phase/);
         assert.throws(() => parse(mdir('bad3', { '0001_a.sql': '-- phase: contract\nSELECT 1;' })), /must name its expand/);
@@ -116,14 +116,42 @@ const tests = [
                 '0003_drop.sql': '-- phase: contract\n-- after: 0001\nALTER TABLE t DROP COLUMN old;',
                 '0004_idx.sql': '-- phase: expand\n-- no-transaction\nCREATE INDEX t_new ON t (new);',
             });
-            let r = await db.migrate({ dir: d, log: quiet });
-            assert.deepEqual(r.applied.map((a) => a.id), ['0001', '0002']);
-            assert.match(r.held[0].reason, /N-1 window is 7/);
-            r = await db.migrate({ dir: d, log: quiet, now: () => Date.now() + 8 * 86400000 });
-            assert.deepEqual(r.applied.map((a) => a.id), ['0003', '0004'], 'after the window the contract runs, then the rest');
+            // A fresh database: no previous release can exist, so the contract applies with the rest.
+            const r0 = await db.migrate({ dir: d, log: quiet });
+            assert.deepEqual(r0.applied.map((a) => a.id), ['0001', '0002', '0003', '0004'], 'a fresh database applies its contracts at once');
+            assert.deepEqual(r0.held, []);
             fs.writeFileSync(path.join(d, '0002_fill.sql'), '-- phase: migrate\nUPDATE t SET new = upper(old);');
             await assert.rejects(db.migrate({ dir: d, log: quiet }), /changed after it was applied/);
         } finally { await db.close(); }
+        // An existing database (the expand ran in an earlier deploy): the contract waits out the N-1 window, and
+        // what comes after it waits too.
+        const dbw = createDb({ pglite: true });
+        try {
+            const dw = mdir('window', {
+                '0001_add.sql': '-- phase: expand\nCREATE TABLE t (id int PRIMARY KEY, old text, new text);',
+                '0002_fill.sql': '-- phase: migrate\nUPDATE t SET new = old;',
+            });
+            await dbw.migrate({ dir: dw, log: quiet });
+            fs.writeFileSync(path.join(dw, '0003_drop.sql'), '-- phase: contract\n-- after: 0001\nALTER TABLE t DROP COLUMN old;');
+            fs.writeFileSync(path.join(dw, '0004_idx.sql'), '-- phase: expand\n-- no-transaction\nCREATE INDEX t_new ON t (new);');
+            let r = await dbw.migrate({ dir: dw, log: quiet });
+            assert.deepEqual(r.applied.map((a) => a.id), [], 'held, and the expand after it waits');
+            assert.match(r.held[0].reason, /N-1 window is 7/);
+            r = await dbw.migrate({ dir: dw, log: quiet, now: () => Date.now() + 8 * 86400000 });
+            assert.deepEqual(r.applied.map((a) => a.id), ['0003', '0004'], 'after the window the contract runs, then the rest');
+        } finally { await dbw.close(); }
+        // An existing database that gets an expand and its contract in the same deploy still holds the contract:
+        // the previous release may be running against the expanded schema.
+        const dbs = createDb({ pglite: true });
+        try {
+            const ds = mdir('same-deploy', { '0001_base.sql': '-- phase: expand\nCREATE TABLE base (id int);' });
+            await dbs.migrate({ dir: ds, log: quiet });
+            fs.writeFileSync(path.join(ds, '0002_add.sql'), '-- phase: expand\nCREATE TABLE v (id int, old text);');
+            fs.writeFileSync(path.join(ds, '0003_drop.sql'), '-- phase: contract\n-- after: 0002\nALTER TABLE v DROP COLUMN old;');
+            const r = await dbs.migrate({ dir: ds, log: quiet });
+            assert.deepEqual(r.applied.map((a) => a.id), ['0002']);
+            assert.strictEqual(r.held[0].id, '0003');
+        } finally { await dbs.close(); }
         const db2 = createDb({ pglite: true });
         try {
             const d2 = mdir('order', { '0001_add.sql': '-- phase: expand\nCREATE TABLE u (id int);', '0005_b.sql': '-- phase: expand\nSELECT 1;' });
