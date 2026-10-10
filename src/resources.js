@@ -141,8 +141,9 @@ async function mapPool(items, limit, fn) {
 
 /**
  * The read side of the control plane: one index for several authorities. `list()` fans out
- * GET {authority}/api/v1/resources?project=&kind=&cursor=&limit= with at most `concurrency` requests in
- * flight, follows each authority's opaque next_cursor to the end, and merges the pages in authority
+ * GET {authority}/api/v1/resources?project=&kind=&owner=&cursor=&limit= with at most `concurrency` requests in
+ * flight (`owner` is a subject id, usr_… or agt_…: an authority answers only the resources that subject owns, so a
+ * person's own resources, which belong to no project, can be listed without reading everyone's), follows each authority's opaque next_cursor to the end, and merges the pages in authority
  * order. An authority that fails (network, timeout, non-2xx, malformed page) never fails the call: its
  * pages read so far are kept and it is reported in `stale` (`{ authority, status, code, error }`), so a
  * caller can rebuild its read model and try that authority again.
@@ -178,10 +179,11 @@ function createResourceIndex({
     const bases = authorities.map((a) => trimSlash(a));
 
     /** One page of an authority's index; a non-2xx or a non-page body throws an OpenVibeError. */
-    async function page(authority, { project, kind, cursor, limit }) {
+    async function page(authority, { project, kind, owner, cursor, limit }) {
         const query = new URLSearchParams();
         if (project != null) query.set('project', project);
         if (kind != null) query.set('kind', kind);
+        if (owner != null) query.set('owner', owner);
         if (cursor != null && cursor !== '') query.set('cursor', cursor);
         if (limit != null) query.set('limit', String(limit));
         const url = `${authority}${INDEX_PATH}${query.toString() ? `?${query}` : ''}`;
@@ -232,8 +234,8 @@ function createResourceIndex({
      * Every resource of every authority, merged in authority order. `{ resources, stale }`; `stale`
      * lists the authorities this call could not read to the end.
      */
-    async function list({ project, kind, limit = pageLimit } = {}) {
-        const filter = { project, kind, limit };
+    async function list({ project, kind, owner, limit = pageLimit } = {}) {
+        const filter = { project, kind, owner, limit };
         const perAuthority = await mapPool(bases, concurrency, (authority) => walk(authority, filter));
         const resources = [];
         const stale = [];

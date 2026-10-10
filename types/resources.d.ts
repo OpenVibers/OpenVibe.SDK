@@ -68,7 +68,13 @@ export type ResourceIndexOptions = {
     /** An optional per-authority deadline in milliseconds; a walk past it is reported stale. */
     maxMs?: number;
 };
-export type ResourceListOptions = { project?: string; kind?: string; limit?: number };
+export type ResourceListOptions = {
+    project?: string;
+    kind?: string;
+    /** A subject id (usr_…/agt_…): only what that subject owns. An authority filters on its own owner column. */
+    owner?: string;
+    limit?: number;
+};
 export interface ResourceIndex {
     readonly authorities: string[];
     /** Every resource of every authority, merged in authority order; `stale` lists those not fully read. */

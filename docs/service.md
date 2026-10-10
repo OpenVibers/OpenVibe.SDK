@@ -256,6 +256,7 @@ const { createResourceIndex, createResourceClient, resourceName } = require('ope
 // A console reads several authorities and merges their index pages; a failing authority is reported, not fatal.
 const index = createResourceIndex({ authorities: ['https://media.openvibe.network', 'https://openvibe.events'], token: userAccessToken });
 const { resources, stale } = await index.list({ project: prj.id, kind: 'media.object' });   // follows each next_cursor
+const mine = await index.list({ owner: 'usr_…' });   // a person's own resources (no project), filtered by each authority
 
 // A change is a control call to the authority that owns the resource; it decides, we only show the answer.
 const media = createResourceClient({ origin: 'https://media.openvibe.network', token: userAccessToken });
@@ -264,6 +265,11 @@ const result = await media.control({ action: 'delete', project_id: prj.id,
     idempotency_key: 'idem_…' });                        // done | pending | refused | failed
 if (result.state === 'refused' && result.confirmation_required) retryWith(result.confirmation_required.confirmation_id);
 ```
+
+An authority answers `?project=`, `?kind=` and `?owner=` (a `usr_…` or `agt_…` subject: only what that subject owns,
+by the column its summaries take `owner` from) together, and refuses a malformed value with 400 rather than ignoring
+it. A console still filters the merged page itself, so an authority that has not added a filter yet never leaks a
+row; it only costs a longer walk.
 
 `parseResourceName`, `resourceName` and `resourceNameOf` reuse the pinned openvibe-contracts
 `contracts.resources` helpers (required lazily, only by these three), so no service splits an OVRN on

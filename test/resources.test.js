@@ -60,8 +60,23 @@ run([
                 assert.equal(url.searchParams.get('kind'), 'media.object');
                 assert.equal(url.searchParams.get('limit'), '25');
                 assert.equal(url.searchParams.has('cursor'), false, 'the first page names no cursor');
+                assert.equal(url.searchParams.has('owner'), false, 'no owner named, none sent');
             }
         } finally { await a.close(); await b.close(); }
+    }],
+
+    ['owner is passed to every authority on every page, so a person\'s own resources need no full walk', async () => {
+        const OWNER = 'usr_01JAB2C3D4E5F6G7H8J9K0MNPR';
+        let n = 0;
+        const a = await stubServer((req, res) => send(res, 200, ++n === 1 ? { ...page([summary(MED)]), next_cursor: 'c2' } : page([summary(MED2)])));
+        try {
+            const index = createResourceIndex({ authorities: [a.url], token: 'svc-token' });
+            const { resources } = await index.list({ owner: OWNER });
+            assert.deepEqual(resources.map((r) => r.id), [MED, MED2]);
+            assert.equal(a.requests.length, 2);
+            for (const r of a.requests) assert.equal(new URL(r.url, a.url).searchParams.get('owner'), OWNER);
+            assert.equal(new URL(a.requests[1].url, a.url).searchParams.get('cursor'), 'c2');
+        } finally { await a.close(); }
     }],
 
     ['the index follows each authority next_cursor to the end', async () => {
