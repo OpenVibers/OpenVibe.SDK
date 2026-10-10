@@ -344,7 +344,7 @@ const platform = createMockPlatform({
 const client = createClient({ fetch: platform.fetch, tokenProvider: createServiceTokenClient({ clientId: 'app_01K5WZX7S7Q4D2B8N3M6V1C9TR', clientSecret: 's', fetch: platform.fetch }) });
 ```
 
-For a service's own database, `createTestDb({ migrations, seed, seedKey })` returns a migrated PGlite (or, with `store: 'pg'`, a schema of its own on the test containers). The migrated and seeded PGlite is saved once as a snapshot, keyed by the migrations' contents, and later test processes load it instead of migrating (`snapshot: 'hit' | 'built' | 'off'`, `setupMs`; `OV_TEST_SNAPSHOT=0` turns it off, `OV_TEST_SNAPSHOT_DIR` moves it). See [docs/migrating-to-postgresql.md](docs/migrating-to-postgresql.md#5-tests).
+For a service's own database, `createTestDb({ migrations, seed, seedKey })` returns a migrated PGlite (or, with `store: 'pg'`, a schema of its own on the test containers). The migrated and seeded PGlite is saved once as a snapshot, keyed by the migrations' contents, and later test processes load it instead of migrating (`snapshot: 'hit' | 'built' | 'off'`, `setupMs`; `OV_TEST_SNAPSHOT=0` turns it off, `OV_TEST_SNAPSHOT_DIR` moves it).
 
 The mock answers at the real public origins with real RS256 tokens and checks audience, capability, namespace and sandbox the way the services do. It covers:
 
@@ -425,9 +425,8 @@ const thumbs = createQueue({ valkey, name: 'thumbs' });
 thumbs.process(async (job) => { … }, { concurrency: 4 });
 ```
 
-Install the drivers the service uses: `pg` and `iovalkey` (production), `@electric-sql/pglite` (tests), `better-sqlite3` (only for the one-time `importSqlite`).
+Install the drivers the service uses: `pg` and `iovalkey` (production), `@electric-sql/pglite` (tests). `better-sqlite3` is only for a small app that keeps its outbox or inbox in SQLite (`createOutbox`/`createInbox`).
 
-Moving an existing service from SQLite: [docs/migrating-to-postgresql.md](docs/migrating-to-postgresql.md) (the schema mapping, the code idioms, per-process state to Valkey, tests, the rehearsed import and the production switch).
 
 ### Browser without a bundler
 

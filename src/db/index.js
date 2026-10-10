@@ -331,9 +331,4 @@ function pgliteAdapter(opt) {
     };
 }
 
-/** The one-time SQLite → PostgreSQL move (loaded on use: it needs better-sqlite3). */
-function importSqlite(opts) { return require('./sqlite-import').importSqlite(opts); }
-/** A service's scripts/migrate-to-postgres.js in one call (./sqlite-cli.js). */
-function runSqliteMigration(opts) { return require('./sqlite-cli').runSqliteMigration(opts); }
-
-module.exports = { createDb, sql, DbError, importSqlite, runSqliteMigration, PARSERS, ISOLATION };
+module.exports = { createDb, sql, DbError, PARSERS, ISOLATION };
