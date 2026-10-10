@@ -13,7 +13,8 @@
  *
  * `jwks` is the JWKS document ({ keys: [...] }, Network's shape also carries public_key PEM), a URL
  * to fetch it from (one client per URL: ./jwks.js keeps the keys fresh, serves the last good ones through a JWKS
- * outage and backs off), or pass `publicKey` (PEM or KeyObject). `log` receives the client's state changes. Throws OpenVibeError (401)
+ * outage and backs off), a JWKS client the service already holds (createNetworkKeys().verifyOptions passes its own),
+ * or pass `publicKey` (PEM or KeyObject). `log` receives the client's state changes. Throws OpenVibeError (401)
  * with a stable code: token.malformed | token.bad_signature | token.expired | token.not_yet_valid |
  * token.wrong_issuer | token.wrong_audience | token.not_user | token.not_app | token.invalid_claims |
  * token.sandbox_refused | token.no_key.
@@ -50,6 +51,7 @@ async function verifyJwt(token, { jwks, publicKey, issuer, audience, clockSkewSe
     // A JWKS URL: the process-wide client (./jwks.js) serves the last good keys through outages, backs off, and
     // refetches for an unknown kid (a rotation) at most every 30 s.
     else if (typeof jwks === 'string') keys = await jwksClient(jwks, { fetch: fetchImpl, log }).keysForKid(header.kid);
+    else if (jwks && typeof jwks.keysForKid === 'function') keys = await jwks.keysForKid(header.kid);
     else keys = keysFromJwks(jwks);
     if (!keys.length) throw fail('token.no_key', 'no RS256 verification key', kind);
 
