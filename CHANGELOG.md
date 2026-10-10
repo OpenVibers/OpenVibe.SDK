@@ -3,6 +3,15 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.41.0 (2026-10-10)
+
+- **`createResourceIndex().list({ owner })`.** The index passes `owner` (a `usr_…`/`agt_…` subject id) to every
+  authority on every page, beside `project` and `kind`. An authority answers only what that subject owns. A person's
+  own resources (robots, rooms, streams, watches, Actor tasks: none of them in a project) can then be listed without
+  reading every authority's whole index. A console keeps its own filter on the merged page, so an authority that has
+  not added `owner` yet costs a longer walk but never shows another person's row. `docs/service.md` says what an
+  authority answers.
+
 ## 0.40.1 (2026-10-10)
 
 - **`verifyUserToken` refuses node principals.** A node token (`actor_type: node`, `sub node:nod_…`: a machine paired
