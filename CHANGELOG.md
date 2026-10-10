@@ -3,6 +3,14 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.40.1 (2026-10-10)
+
+- **`verifyUserToken` refuses node principals.** A node token (`actor_type: node`, `sub node:nod_…`: a machine paired
+  for a service, such as a robot's computer for OpenVibe.Bot) is signed with Network's key like every principal token.
+  It was refused for service, app and module principals only, so a service that checks user tokens without an
+  audience would have taken a node token for a session. It is `token.not_user` now, by its `actor_type` or its `sub`
+  alone, unless the caller passes `allowServiceTokens`.
+
 ## 0.40.0 (2026-10-10)
 
 - **New: `createNetworkKeys()`** (`openvibe-sdk/auth`, server). The keys a service verifies Network tokens with, as one
