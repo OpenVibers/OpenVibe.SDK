@@ -2,16 +2,17 @@
 /**
  * openvibe-sdk/realtime: the browser realtime plane inside OpenVibe.Events (ADR-005), over SSE.
  *
- *   const sub = subscribe(['live.stream.*'], (event, { seq }) => { … }, {
+ *   const sub = subscribe(['live.stream.*'], (event, { seq, cursor }) => { … save cursor … }, {
  *       client,                      // or url: 'https://openvibe.events'
- *       lastEventId: savedSeq,       // resume after a reload
+ *       lastEventId: savedCursor,    // resume after a reload (the `cursor` the callback was given)
  *       onGap: (gap) => refetchState(),
  *   });
  *   sub.close();
  *
  * Transport: EventSource when the environment has one and no Bearer token is needed (cookies ride
  * along with withCredentials); otherwise fetch with a streamed body (Node, or a token). Either
- * way it resumes from the last seq it saw (Last-Event-ID), skips anything it already delivered,
+ * way it resumes from the last position it saw (Last-Event-ID: Events' opaque cursor, the `cursor` each
+ * callback gets; an older Events sends a bare seq), skips anything it already delivered,
  * and reports an `event: gap` (events missed beyond retention or replay limits) through onGap.
  * Browser-safe.
  */
@@ -62,7 +63,7 @@ function subscribe(topics, onEvent, opts = {}) {
             state.lastSeq = seq;
         }
         if (id !== undefined && id !== '') state.lastId = String(id);
-        try { onEvent(msg && msg.event, { seq }); } catch (err) { report(err); }
+        try { onEvent(msg && msg.event, { seq, cursor: id !== undefined && id !== '' ? String(id) : null }); } catch (err) { report(err); }
     }
 
     async function streamUrl() {

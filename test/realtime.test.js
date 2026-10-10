@@ -75,9 +75,11 @@ run([
             else { res.write(cframe(2)); res.write(cframe(3)); }
         });
         const got = [];
-        const sub = subscribe('live.*', (event, { seq }) => got.push([seq, event.event_id]), { url: srv.url, token: 't', reconnectDelayMs: 10 });
+        const cursors = [];
+        const sub = subscribe('live.*', (event, { seq, cursor }) => { got.push([seq, event.event_id]); cursors.push(cursor); }, { url: srv.url, token: 't', reconnectDelayMs: 10 });
         await waitFor(() => got.length === 3);
         assert.deepEqual(got, [[1, 'e1'], [2, 'e2'], [3, 'e3']], 'the replayed event is not delivered twice');
+        assert.deepEqual(cursors, [cur(1), cur(2), cur(3)], 'each callback gets its event\'s opaque cursor, to save and resume from');
         assert.equal(seen[1], cur(2), 'the reconnect resumes from the cursor');
         assert.equal(sub.lastEventId, cur(3));
         sub.close();
