@@ -93,9 +93,9 @@ run([
             res.end(JSON.stringify({ status: 401, code: 'token.bad_signature', detail: 'bad', type: 't', title: 'x' }));
         });
         const errors = [];
-        const sub = subscribe('live.*', () => {}, { url: `${srv.url}/realtime/stream`, lastEventId: 41, onError: (e) => errors.push(e), reconnectDelayMs: 10 });
+        const sub = subscribe('live.*', () => {}, { url: `${srv.url}/realtime/stream`, lastEventId: 'c1.0.NDE', onError: (e) => errors.push(e), reconnectDelayMs: 10 });
         await sub.done;
-        assert.equal(srv.requests[0].headers['last-event-id'], '41');
+        assert.equal(srv.requests[0].headers['last-event-id'], 'c1.0.NDE', 'the saved cursor is handed back as it is');
         assert.ok(srv.requests[0].url.startsWith('/realtime/stream?topics=live.*'));
         assert.equal(errors[0].code, 'token.bad_signature');
         assert.equal(sub.closed, true);
@@ -112,22 +112,22 @@ run([
         }
         const got = [];
         const gaps = [];
-        const sub = subscribe(['live.stream.*'], (event, { seq }) => got.push(seq), { url: 'https://events.example', EventSource: FakeES, onGap: (g) => gaps.push(g), reconnectDelayMs: 5 });
+        const sub = subscribe(['live.stream.*'], (event, { seq, cursor }) => got.push([seq, cursor]), { url: 'https://events.example', EventSource: FakeES, onGap: (g) => gaps.push(g), reconnectDelayMs: 5 });
         await waitFor(() => made.length === 1);
         assert.equal(sub.transport, 'eventsource');
         const es = made[0];
         assert.deepEqual(es.init, { withCredentials: true });
         assert.equal(new URL(es.url).searchParams.get('last_event_id'), null);
         es.onopen();
-        es.onmessage({ data: JSON.stringify({ seq: 7, event: { event_type: 'live.stream.started' } }), lastEventId: '7' });
-        es.onmessage({ data: JSON.stringify({ seq: 7, event: {} }), lastEventId: '7' });
+        es.onmessage({ data: JSON.stringify({ seq: 7, event: { event_id: 'evt_7', event_type: 'live.stream.started' } }), lastEventId: 'c1.0.Nw' });
+        es.onmessage({ data: JSON.stringify({ seq: 7, event: { event_id: 'evt_7', event_type: 'live.stream.started' } }), lastEventId: 'c1.0.Nw' });
         es.listeners.gap({ data: JSON.stringify({ reason: 'replay_limit', from_seq: 8, to_seq: 9 }) });
-        assert.deepEqual(got, [7]);
+        assert.deepEqual(got, [[7, 'c1.0.Nw']], 'a repeated event_id is delivered once');
         assert.equal(gaps[0].reason, 'replay_limit');
         es.readyState = 2;
         es.onerror();
         await waitFor(() => made.length === 2);
-        assert.equal(new URL(made[1].url).searchParams.get('last_event_id'), '7');
+        assert.equal(new URL(made[1].url).searchParams.get('last_event_id'), 'c1.0.Nw', 'it resumes from the opaque cursor');
         sub.close();
         assert.equal(made[1].closedByClient, true);
     }],
@@ -141,7 +141,8 @@ run([
         pub('live.stream.updated');
         const got = [];
         const realtime = createRealtimeClient(client, { fetch: platform.fetch, reconnectDelayMs: 10 });
-        const sub = realtime.subscribe('live.stream.*', (event, { seq }) => got.push([seq, event.event_type]), { lastEventId: 0 });
+        // Resume from the cursor of position 0 (the mock's single epoch): everything retained is replayed.
+        const sub = realtime.subscribe('live.stream.*', (event, { seq }) => got.push([seq, event.event_type]), { lastEventId: 'c1.0.MA' });
         await waitFor(() => got.length === 2);
         assert.deepEqual(got, [[1, 'live.stream.started'], [3, 'live.stream.updated']], 'internal events never reach an anonymous browser');
         pub('live.stream.ended');
@@ -151,7 +152,7 @@ run([
         await waitFor(() => got.length === 4);
         assert.deepEqual(got.map((g) => g[0]), [1, 3, 4, 5]);
         const reconnect = platform.stats.requests.filter((r) => r.url.includes('/realtime/stream')).at(-1);
-        assert.equal(reconnect.headers['last-event-id'], '4');
+        assert.equal(reconnect.headers['last-event-id'], 'c1.0.NA', 'the reconnect hands back the opaque cursor of the last event');
         sub.close();
         await sub.done;
     }],

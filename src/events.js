@@ -112,7 +112,8 @@ function verifyDeliveryV2(rawBody, headers, secret, { toleranceSec = V2_TOLERANC
 
 /**
  * Verify and parse one delivery: { event, seq, subscriptionId, attempt } or null when it does not
- * verify. `headers` is req.headers (or a Fetch Headers).
+ * verify. `headers` is req.headers (or a Fetch Headers). `seq` is informational (null when the delivery
+ * carries none): dedupe by event.event_id, never by seq.
  *
  *   X-OpenVibe-Signature-V2 present  it must verify and be within ±toleranceSec (default 300) of
  *                                    `now`; a bad or stale v2 is null, never a fallback to v1
@@ -130,9 +131,10 @@ function parseDelivery(rawBody, headers, secret, { requireV2 = false, toleranceS
     let body;
     try { body = JSON.parse(toBuffer(rawBody).toString('utf8')); } catch { return null; }
     if (!body || !body.event) return null;
+    const seq = body.seq ?? get('x-openvibe-seq');
     return {
         event: body.event,
-        seq: Number(body.seq ?? get('x-openvibe-seq')),
+        seq: seq == null || seq === '' || !Number.isFinite(Number(seq)) ? null : Number(seq),
         subscriptionId: get('x-openvibe-subscription-id') || null,
         attempt: Number(get('x-openvibe-delivery-attempt')) || 1,
     };
@@ -168,8 +170,8 @@ function createEventsClient(client, { source, baseUrl } = {}) {
     }
 
     /**
-     * publish(envelope | envelope[], { traceparent }) -> { event_id, seq, duplicate } | { results }.
-     * Safe to retry: Events stores an event_id once and answers a repeat with the stored seq.
+     * publish(envelope | envelope[], { traceparent }) -> { event_id, seq, cursor, duplicate } | { results }.
+     * Safe to retry: Events stores an event_id once and answers a repeat with the stored position.
      */
     async function publish(input, { traceparent } = {}) {
         const span = startSpan(traceparent || client.traceparent());
@@ -182,49 +184,45 @@ function createEventsClient(client, { source, baseUrl } = {}) {
     }
 
     /**
-     * One page: { events: [{ seq, cursor, event }], next_cursor, next_after_seq, latest_seq, latest_cursor, gap? }.
+     * One page: { events: [{ seq, cursor, event }], next_cursor, latest_cursor, gap? }.
      * Pass `after` — a page's opaque `next_cursor` — to resume exactly where the previous page ended, or
-     * `latest_cursor` to start at the head without history; `afterSeq`, the numeric position, remains for
-     * one release.
+     * `latest_cursor` to start at the head without history; without it the page starts at the oldest retained
+     * event. A position is only ever an opaque cursor (ADR-042): the numeric `afterSeq` is gone, and passing it
+     * throws rather than silently reading from the start.
      */
-    function pull({ topic = '*', after, afterSeq = 0, limit } = {}) {
+    function pull({ topic = '*', after, limit, afterSeq } = {}) {
+        if (afterSeq !== undefined) throw new TypeError("pull: afterSeq is retired; pass after (a page's next_cursor, or latest_cursor for the head)");
         return call({ path: '/api/v1/events', query: {
             topic: Array.isArray(topic) ? topic.join(',') : topic, limit,
-            ...(after == null ? { after_seq: afterSeq } : { after }),
+            ...(after == null || after === '' ? {} : { after: String(after) }),
         } });
     }
 
     /**
-     * Async iterator over { seq, cursor, event } from `after` (an opaque cursor) or `afterSeq` up to
-     * the current head.
+     * Async iterator over { seq, cursor, event } from `after` (an opaque cursor; the oldest retained event
+     * without one) up to the current head.
      *
      *   onGap(gap)   called before a page's items when retention already pruned part of the range
      *                ({ from_seq, to_seq }): nothing can replay it, so resync derived state.
      *   onPage(page) called AFTER every item of that page was yielded and handled (your loop body
      *                ran for the page's last item and asked for the next one). Save
-     *                page.next_cursor there as your durable cursor (page.next_after_seq while the
-     *                compatibility field remains): it also moves past events that did not match your
+     *                page.next_cursor there as your durable cursor: it also moves past events that did not match your
      *                topics — a page with no matching events still calls onPage and advances it — and
      *                a crash (or a break/throw in your loop) before onPage leaves the cursor on the
      *                last page you finished, so nothing is skipped.
      */
-    async function* iterate({ topic, after, afterSeq = 0, limit, onGap, onPage, maxPages = Infinity } = {}) {
-        // The caller picks the mode (an opaque `after`, or the numeric `afterSeq`, which may arrive as a string), and
-        // the iterator moves to cursors as soon as the server hands one back.
-        let useCursor = after != null;
-        let cursor = useCursor ? after : afterSeq;
+    async function* iterate({ topic, after, limit, onGap, onPage, maxPages = Infinity, afterSeq } = {}) {
+        if (afterSeq !== undefined) throw new TypeError('iterate: afterSeq is retired; pass after (a saved next_cursor)');
+        let cursor = after == null || after === '' ? null : String(after);
         for (let pages = 0; pages < maxPages; pages++) {
-            const page = await pull({ topic, ...(useCursor ? { after: cursor } : { afterSeq: cursor }), limit });
+            const page = await pull({ topic, ...(cursor == null ? {} : { after: cursor }), limit });
             if (page.gap && onGap) await onGap(page.gap);
             for (const item of page.events || []) yield item;
             if (onPage) await onPage(page);
-            const hasCursor = page.next_cursor != null;
-            const next = hasCursor ? page.next_cursor : page.next_after_seq;
-            // The head: a page that does not move the position, or (while the server still sends the numeric
-            // compatibility fields) one that reached latest_seq. Without those fields the unchanged cursor ends it.
-            if (next == null || next === cursor) return;
-            if (page.next_after_seq != null && page.latest_seq != null && !(page.next_after_seq < page.latest_seq)) return;
-            useCursor = hasCursor;
+            const next = page.next_cursor;
+            // The head: the page reached latest_cursor (both name a position in the same epoch, so equal strings are
+            // the same position; nothing is parsed), or it did not move the position at all.
+            if (next == null || next === cursor || next === page.latest_cursor) return;
             cursor = next;
         }
     }
@@ -246,10 +244,15 @@ function createEventsClient(client, { source, baseUrl } = {}) {
         publish,
         pull,
         iterate,
-        /** { seq, event } or null. */
+        /** { seq, cursor, event } or null. */
         get: (eventId) => orNull(call({ path: `/api/v1/events/${encodeURIComponent(eventId)}` })),
+        /** { consumer, topic, cursor, carrier, updated_at }: the stored opaque cursor, or cursor null when none is stored. */
         getCheckpoint: (topic) => call({ path: '/api/v1/checkpoints', query: { topic } }),
-        setCheckpoint: (topic, cursor) => call({ method: 'PUT', path: '/api/v1/checkpoints', json: { topic, cursor } }),
+        /** Store an opaque cursor (a page's next_cursor) for a topic pattern; `carrier` records the carrier it is on. */
+        setCheckpoint: (topic, cursor, { carrier } = {}) => {
+            if (typeof cursor !== 'string' || !cursor) return Promise.reject(new TypeError("setCheckpoint: cursor is an opaque cursor string (a page's next_cursor)"));
+            return call({ method: 'PUT', path: '/api/v1/checkpoints', json: { topic, cursor, ...(carrier ? { carrier } : {}) } });
+        },
         subscriptions,
         subscribe: subscriptions.create,
         /** Operators (events.delivery.admin): { deliveries, counts }. */
@@ -359,7 +362,7 @@ function createAppEvents(client, { projectId, appId, onBehalfOf, baseUrl } = {})
         iterate: ({ topic: t = '*', platformTopics, ...rest } = {}) => events.iterate({ ...rest, topic: readTopics(t, platformTopics) }),
         get: (eventId) => events.get(eventId),
         getCheckpoint: (t) => events.getCheckpoint(topic(t)),
-        setCheckpoint: (t, cursor) => events.setCheckpoint(topic(t), cursor),
+        setCheckpoint: (t, cursor, opts) => events.setCheckpoint(topic(t), cursor, opts),
         subscriptions: {
             create: ({ topicPattern = '*', ...rest } = {}) => events.subscriptions.create({ ...rest, topicPattern: topic(topicPattern) }),
             list: () => events.subscriptions.list(),

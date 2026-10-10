@@ -134,7 +134,6 @@ run([
         assert.match(orderPage.events[0].cursor, /^c1\./, 'a page item carries its cursor');
         assert.match(orderPage.next_cursor, /^c1\./, 'a page carries its opaque next_cursor');
         assert.deepEqual(ids(await a.pull({ topic: 'order.*', after: orderPage.next_cursor })), [], 'after resumes from the cursor');
-        assert.deepEqual(ids(await a.pull({ topic: 'order.*', afterSeq: orderPage.next_after_seq })), [], 'afterSeq still works for one release');
         assert.deepEqual(ids(await a2.pull()), [prod.event_id], 'a production app never sees sandbox events');
         assert.deepEqual(ids(await b.pull()), [other.event_id]);
         assert.deepEqual(ids(await a.pull({ platformTopics: ['live.*'] })), [sbx.event_id, pub.event_id], 'public first-party only, never internal');
@@ -158,11 +157,11 @@ run([
         assert.equal((await live.get(prod.event_id)).event.event_id, prod.event_id);
 
         // Checkpoints are per app and scoped the same way.
-        const cp = await a.setCheckpoint('*', 5);
+        const cp = await a.setCheckpoint('*', orderPage.next_cursor);
         assert.equal(cp.consumer, `app:${A}`);
         assert.equal(cp.topic, `app.${K1}.*`);
-        assert.equal((await a.getCheckpoint('*')).cursor, 5);
-        assert.equal((await r.getCheckpoint('*')).cursor, 0, 'another app has its own');
+        assert.equal((await a.getCheckpoint('*')).cursor, orderPage.next_cursor);
+        assert.equal((await r.getCheckpoint('*')).cursor, null, 'another app has its own');
         await assert.rejects(b.events.getCheckpoint(`app.${K1}.*`), { status: 403, code: 'events.topic_not_allowed' });
     }],
 

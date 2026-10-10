@@ -458,12 +458,13 @@ function createMockPlatform(opts = {}) {
             if (!patterns.length || patterns.length > 20 || !patterns.every(appRules.isValidPattern)) return problem(400, 'events.bad_topic', 'topic must be 1..20 comma-separated patterns');
             const scopeErr = scopeError(who.principal, patterns);
             if (scopeErr) return problem(403, 'events.topic_not_allowed', scopeErr);
+            // Like Events: a position is an opaque cursor; the numeric after_seq is refused, never read as "from the start".
+            if (url.searchParams.has('after_seq')) return problem(400, 'events.bad_request', "after_seq is retired: pass after=<cursor> (a page's next_cursor, or latest_cursor for the head)");
             const afterCursor = url.searchParams.get('after');
-            const after = afterCursor ? eventSeqFromCursor(afterCursor) : Number(url.searchParams.get('after_seq') || 0);
+            const after = afterCursor ? eventSeqFromCursor(afterCursor) : 0;
             const limit = Number(url.searchParams.get('limit') || 100);
-            if (after === null || !Number.isInteger(after) || after < 0 || !Number.isInteger(limit) || limit < 1 || limit > 1000) {
-                return problem(400, 'events.bad_request', afterCursor ? 'after must be an opaque cursor' : 'after_seq must be >= 0 and limit 1..1000');
-            }
+            if (after === null) return problem(400, 'events.bad_request', 'after must be an opaque cursor');
+            if (!Number.isInteger(limit) || limit < 1 || limit > 1000) return problem(400, 'events.bad_request', 'limit must be 1..1000');
             const pats = patterns.map((x) => [x, topicRegex(x)]);
             const out = [];
             const page = {};
@@ -480,7 +481,7 @@ function createMockPlatform(opts = {}) {
                 if (pats.some(([x, re]) => re.test(e.event.event_type) && readable(who.principal, e, x))) out.push({ seq: e.seq, cursor: eventCursor(e.seq), event: e.event });
             }
             if (out.length < limit) cursor = Math.max(cursor, lastSeq);
-            return json(200, { ...page, events: out, next_after_seq: cursor, next_cursor: eventCursor(cursor), latest_seq: lastSeq, latest_cursor: eventCursor(lastSeq) });
+            return json(200, { ...page, events: out, next_cursor: eventCursor(cursor), latest_cursor: eventCursor(lastSeq) });
         }
         if ((r = path.match(/^\/api\/v1\/events\/([^/]+)$/)) && req.method === 'GET') {
             const who = eventsPrincipal(req, 'events.event.read', 'events.app.read');
@@ -495,15 +496,15 @@ function createMockPlatform(opts = {}) {
             const b = req.method === 'GET' ? {} : await req.json().catch(() => ({}));
             const topic = req.method === 'GET' ? url.searchParams.get('topic') || '' : b.topic;
             if (!appRules.isValidPattern(topic)) return problem(400, 'events.bad_request', 'topic (pattern) is required');
-            if (req.method !== 'GET' && (!Number.isInteger(b.cursor) || b.cursor < 0)) return problem(400, 'events.bad_request', 'topic (pattern) and cursor (integer >= 0) are required');
+            if (req.method !== 'GET' && (typeof b.cursor !== 'string' || eventSeqFromCursor(b.cursor) === null)) return problem(400, 'events.bad_request', 'topic (pattern) and cursor (an opaque cursor) are required');
             const scopeErr = scopeError(who.principal, [topic]);
             if (scopeErr) return problem(403, 'events.topic_not_allowed', scopeErr);
             const k = `${who.consumer}|${topic}`;
             if (req.method === 'GET') {
                 const cp = checkpoints.get(k);
-                return json(200, { consumer: who.consumer, topic, cursor: cp ? cp.cursor : 0, updated_at: cp ? cp.updated_at : null });
+                return json(200, { consumer: who.consumer, topic, cursor: cp ? cp.cursor : null, carrier: cp ? cp.carrier : null, updated_at: cp ? cp.updated_at : null });
             }
-            const cp = { cursor: b.cursor, updated_at: new Date().toISOString() };
+            const cp = { cursor: b.cursor, carrier: typeof b.carrier === 'string' && b.carrier ? b.carrier : null, updated_at: new Date().toISOString() };
             checkpoints.set(k, cp);
             return json(200, { consumer: who.consumer, topic, ...cp });
         }
@@ -572,8 +573,9 @@ function createMockPlatform(opts = {}) {
             if (/^app:/.test(String(claims.sub)) && claims.env === 'sandbox') return problem(401, 'token.sandbox_refused', 'sandbox tokens are not accepted here');
             viewer = { kind: 'service' };
         } else if (claims) viewer = { kind: 'user', subject: claims.subject_id };
+        // Like Events: Last-Event-ID is an opaque cursor; anything else (a bare number included) is ignored.
         const raw = req.headers.get('last-event-id') ?? url.searchParams.get('last_event_id');
-        const last = raw != null && /^\d+$/.test(raw) ? Number(raw) : null;
+        const last = raw != null ? eventSeqFromCursor(String(raw).trim()) : null;
         const enc = new TextEncoder();
         let conn;
         const body = new ReadableStream({
@@ -585,7 +587,7 @@ function createMockPlatform(opts = {}) {
                     push(e) {
                         if (e.seq <= conn.lastSeq || !pats.some((re) => re.test(e.event.event_type)) || !visible(viewer, e)) return;
                         conn.lastSeq = e.seq;
-                        send(`id: ${e.seq}\ndata: ${JSON.stringify({ seq: e.seq, event: e.event })}\n\n`);
+                        send(`id: ${eventCursor(e.seq)}\ndata: ${JSON.stringify({ seq: e.seq, event: e.event })}\n\n`);
                     },
                     close() { streams.delete(conn); try { controller.close(); } catch { /* closed */ } },
                 };
