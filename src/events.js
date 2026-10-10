@@ -182,9 +182,10 @@ function createEventsClient(client, { source, baseUrl } = {}) {
     }
 
     /**
-     * One page: { events: [{ seq, cursor, event }], next_cursor, next_after_seq, latest_seq, gap? }.
-     * Pass `after` — a page's opaque `next_cursor` — to resume exactly where the previous page ended;
-     * `afterSeq`, the numeric position, remains for one release.
+     * One page: { events: [{ seq, cursor, event }], next_cursor, next_after_seq, latest_seq, latest_cursor, gap? }.
+     * Pass `after` — a page's opaque `next_cursor` — to resume exactly where the previous page ended, or
+     * `latest_cursor` to start at the head without history; `afterSeq`, the numeric position, remains for
+     * one release.
      */
     function pull({ topic = '*', after, afterSeq = 0, limit } = {}) {
         return call({ path: '/api/v1/events', query: {

@@ -72,6 +72,8 @@ run([
         assert.equal(page.next_after_seq, 3);
         assert.equal(page.latest_seq, 5);
         assert.match(page.next_cursor, /^c1\./, 'the page carries an opaque next_cursor');
+        assert.match(page.latest_cursor, /^c1\./, 'and the head as an opaque latest_cursor');
+        assert.deepStrictEqual((await events.pull({ topic: 'media.vod.*', after: page.latest_cursor })).events, [], 'nothing after the head');
         assert.match(page.events[0].cursor, /^c1\./, 'each event carries its cursor');
         // The opaque cursor round-trips: `after` resumes exactly where the page ended.
         const rest = await events.pull({ topic: 'media.vod.*', after: page.next_cursor, limit: 2 });

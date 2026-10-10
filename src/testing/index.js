@@ -480,7 +480,7 @@ function createMockPlatform(opts = {}) {
                 if (pats.some(([x, re]) => re.test(e.event.event_type) && readable(who.principal, e, x))) out.push({ seq: e.seq, cursor: eventCursor(e.seq), event: e.event });
             }
             if (out.length < limit) cursor = Math.max(cursor, lastSeq);
-            return json(200, { ...page, events: out, next_after_seq: cursor, next_cursor: eventCursor(cursor), latest_seq: lastSeq });
+            return json(200, { ...page, events: out, next_after_seq: cursor, next_cursor: eventCursor(cursor), latest_seq: lastSeq, latest_cursor: eventCursor(lastSeq) });
         }
         if ((r = path.match(/^\/api\/v1\/events\/([^/]+)$/)) && req.method === 'GET') {
             const who = eventsPrincipal(req, 'events.event.read', 'events.app.read');
