@@ -81,6 +81,38 @@ function cases(label, open) {
                 assert.equal(await o2.rejected(), 1);
             } finally { await done(); }
         }],
+        [`${label}: a token-endpoint refusal is retried, never rejected`, async () => {
+            const { db, done } = await open();
+            try {
+                const { events } = eventsClient();
+                const noGrant = { prepare: events.prepare, publish: () => Promise.reject(Object.assign(new Error('unauthorized_client'), { status: 400, url: 'http://127.0.0.1:4000/oauth/token' })) };
+                const outbox = createPgOutbox(db, { events: noGrant });
+                await db.tx(async (t) => { await outbox.enqueue(t, { event_type: 'live.stream.started', actor, subject: { type: 'stream', id: 'tok' } }); });
+                assert.deepEqual(await outbox.flush(), { sent: 0, failed: 1, rejected: 0 }, 'no grant yet says nothing about the event');
+                assert.equal(await outbox.rejected(), 0);
+                assert.equal(await outbox.pending(), 1);
+            } finally { await done(); }
+        }],
+        [`${label}: a flush during a pass also publishes what was committed after that pass claimed`, async () => {
+            const { db, done } = await open();
+            try {
+                const { events } = eventsClient();
+                let release; const gate = new Promise((r) => { release = r; });
+                const sent = [];
+                const slow = { prepare: events.prepare, publish: async (input, o) => { await gate; for (const e of [].concat(input)) sent.push(e.subject.id); return await events.publish(input, o); } };
+                const outbox = createPgOutbox(db, { events: slow });
+                await db.tx(async (t) => { await outbox.enqueue(t, { event_type: 'live.stream.started', actor, subject: { type: 'stream', id: '12' } }); });
+                const first = outbox.flush();
+                await new Promise((r) => setTimeout(r, 20));
+                await db.tx(async (t) => { await outbox.enqueue(t, { event_type: 'live.stream.started', actor, subject: { type: 'stream', id: '13' } }); });
+                const second = outbox.flush();
+                assert.equal(outbox.flush(), second, 'calls during a pass share the next one');
+                release();
+                await first; await second;
+                assert.deepEqual(sent.sort(), ['12', '13']);
+                assert.equal(await outbox.pending(), 0);
+            } finally { await done(); }
+        }],
         [`${label}: the inbox runs a handler once, inside its transaction`, async () => {
             const { db, done } = await open();
             try {

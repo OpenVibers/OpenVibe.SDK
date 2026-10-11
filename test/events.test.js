@@ -5,7 +5,8 @@ const crypto = require('node:crypto');
 const { stubServer, send, run, waitFor } = require('./helpers');
 const { createClient, parseTraceparent } = require('../src/core');
 const { createServiceTokenClient } = require('../src/auth');
-const { createEventsClient, verifyDelivery, signDelivery, parseDelivery, createInbox, verifyDeliveryV2, signDeliveryV2, signDeliveryHeaders } = require('../src/events');
+const { createEventsClient, verifyDelivery, signDelivery, parseDelivery, createPgInbox, inboxSchema, verifyDeliveryV2, signDeliveryV2, signDeliveryHeaders } = require('../src/events');
+const { createDb } = require('../src/db');
 const { subscribe } = require('../src/realtime');
 const { createMockPlatform } = require('../src/testing');
 
@@ -293,18 +294,18 @@ run([
 
     ['deliverEvents: signed deliveries to a local endpoint, retried in order, dead after max attempts', async () => {
         const { platform, events } = setup();
-        const Database = require('better-sqlite3');
-        const inbox = createInbox(new Database(':memory:'));
-        inbox.ensureSchema();
+        const idb = createDb({ pglite: true, service: 'sdk-test' });
+        await idb.query(inboxSchema());
+        const inbox = createPgInbox(idb);
         let failNext = 1;
         let secret;
         const handled = [];
-        const srv = await stubServer((req, res, body) => {
+        const srv = await stubServer(async (req, res, body) => {
             const d = parseDelivery(body, req.headers, secret, { requireV2: true });
             if (!d) return send(res, 401, { error: 'bad signature' });
             if (failNext > 0) { failNext--; return send(res, 503, { error: 'busy' }); }
             assert.ok(!('seq' in d) && !('seq' in JSON.parse(body)) && req.headers['x-openvibe-seq'] === undefined, 'a delivery carries no sequence number');
-            const r = inbox.once('webhook', d.event.event_id, () => handled.push([d.event.subject.id, d.attempt, req.headers['x-openvibe-event-type']]));
+            const r = await inbox.once('webhook', d.event.event_id, async () => { handled.push([d.event.subject.id, d.attempt, req.headers['x-openvibe-event-type']]); });
             return send(res, 200, { duplicate: r.duplicate });
         });
         platform.publishEvent({ event_type: 'media.vod.ready', source: 'media', actor, subject: { type: 'vod', id: '0' } });   // before the subscription: not delivered
@@ -339,6 +340,7 @@ run([
         await waitFor(() => handled.length === 3);
         await worker.stop();
         await srv.close();
+        await idb.close();
     }],
     ['iterate pages by cursor alone: the unchanged cursor or latest_cursor ends it', async () => {
         const asked = [];

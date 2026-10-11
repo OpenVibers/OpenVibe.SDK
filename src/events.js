@@ -374,11 +374,11 @@ function createAppEvents(client, { projectId, appId, onBehalfOf, baseUrl } = {})
     };
 }
 
-const { createOutbox, createInbox, createPgOutbox, createPgInbox, outboxSchema, inboxSchema } = require('./outbox');
+const { createPgOutbox, createPgInbox, outboxSchema, inboxSchema } = require('./outbox');
 const { createServiceOutbox } = require('./service-outbox');
 
 module.exports = {
-    createEventsClient, verifyDelivery, signDelivery, parseDelivery, createOutbox, createInbox,
+    createEventsClient, verifyDelivery, signDelivery, parseDelivery, 
     createPgOutbox, createPgInbox, outboxSchema, inboxSchema,
     projectKey, appSource, createAppEvents, verifyDeliveryV2, signDeliveryV2, signDeliveryHeaders, createServiceOutbox,
 };

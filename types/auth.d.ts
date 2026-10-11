@@ -224,22 +224,7 @@ export interface ExchangeCodeOptions {
 export declare function exchangeCode(opts: ExchangeCodeOptions): Promise<UserTokenResponse>;
 export declare function refreshUserToken(opts: { refreshToken: string; clientId: string; clientSecret: string; network?: string; tokenUrl?: string; fetch?: FetchLike; timeoutMs?: number }): Promise<UserTokenResponse>;
 
-/** Per-person token cutoffs from network.user.token_valid_after (Contracts 0.39.0). */
-export interface RevocationStore {
-    /** Apply an envelope: 'revoked' when the cutoff moved, 'unchanged', or 'ignored:<why>'. */
-    apply(event: unknown): 'revoked' | 'unchanged' | `ignored:${string}`;
-    /** Keep the later cutoff; true when it moved forward. */
-    record(subject: string, validAfterMs: number, reason?: string | null): boolean;
-    /** True when claims.iat (seconds) is before claims.subject_id's cutoff. */
-    isRevoked(claims: { iat?: number; subject_id?: string } | null | undefined): boolean;
-    /** The cutoff in ms, 0 when none. */
-    cutoffFor(subject: string): number;
-    readonly EVENT_TYPE: 'network.user.token_valid_after';
-}
-export interface RevocationStoreOptions { table?: string; now?: () => number; maxCache?: number }
-/** A better-sqlite3 handle keeps cutoffs across restarts; without one they live in memory. */
-export declare function createRevocationStore(db?: unknown, opts?: RevocationStoreOptions): RevocationStore;
-/** The same cutoffs on PostgreSQL: load() reads them into memory; apply()/record() write through (async). */
+/** Per-person token cutoffs from network.user.token_valid_after (Contracts 0.39.0), on PostgreSQL: load() reads them into memory; apply()/record() write through (async). */
 export interface PgRevocationStore {
     /** Read every stored cutoff into memory (at boot); resolves to how many. */
     load(): Promise<number>;
