@@ -6,7 +6,8 @@ const { subscribe, createRealtimeClient, parseSSE, DEFAULT_ORIGIN } = require('.
 const { createClient } = require('../src/core');
 const { createMockPlatform } = require('../src/testing');
 
-const frame = (seq, type = 'live.stream.started') => `id: ${seq}\ndata: ${JSON.stringify({ seq, event: { event_type: type, event_id: `e${seq}` } })}\n\n`;
+// Events' frames: the id is the position as Events sent it (opaque to the client), the data the event alone.
+const frame = (seq, type = 'live.stream.started') => `id: ${seq}\ndata: ${JSON.stringify({ event: { event_type: type, event_id: `e${seq}` } })}\n\n`;
 
 run([
     ['uses the new Events public origin when no URL or client is supplied', async () => {
@@ -45,12 +46,12 @@ run([
         const got = [];
         const gaps = [];
         let opens = 0;
-        const sub = subscribe(['live.stream.*', 'network.notification.*'], (event, { seq }) => got.push([seq, event.event_id]), {
+        const sub = subscribe(['live.stream.*', 'network.notification.*'], (event, { cursor }) => got.push([cursor, event.event_id]), {
             url: srv.url, token: 'user-jwt', onGap: (g) => gaps.push(g), onOpen: () => opens++, reconnectDelayMs: 10,
         });
         assert.equal(sub.transport, 'fetch');
         await waitFor(() => got.length === 3);
-        assert.deepEqual(got, [[1, 'e1'], [2, 'e2'], [5, 'e5']]);
+        assert.deepEqual(got, [['1', 'e1'], ['2', 'e2'], ['5', 'e5']], 'each event once (the replayed e2 deduped by its event_id), with its id as the cursor');
         assert.deepEqual(gaps, [{ reason: 'retention', from_seq: 3, to_seq: 4, latest_seq: 5 }]);
         assert.equal(connections[0].lastEventId, undefined);
         assert.equal(connections[1].lastEventId, '2');
@@ -63,9 +64,9 @@ run([
         await srv.close();
     }],
 
-    ['cursor ids (ADR-042): resumes with the cursor Events sent, dedupes on the seq in the data', async () => {
+    ['cursor ids (ADR-042): resumes with the cursor Events sent, dedupes on the event id', async () => {
         const cur = (seq) => `c1.0.${Buffer.from([seq]).toString('base64url')}`;
-        const cframe = (seq) => `id: ${cur(seq)}\ndata: ${JSON.stringify({ seq, event: { event_type: 'live.stream.started', event_id: `e${seq}` } })}\n\n`;
+        const cframe = (seq) => `id: ${cur(seq)}\ndata: ${JSON.stringify({ event: { event_type: 'live.stream.started', event_id: `e${seq}` } })}\n\n`;
         const seen = [];
         const srv = await stubServer((req, res) => {
             seen.push(req.headers['last-event-id']);
@@ -76,9 +77,9 @@ run([
         });
         const got = [];
         const cursors = [];
-        const sub = subscribe('live.*', (event, { seq, cursor }) => { got.push([seq, event.event_id]); cursors.push(cursor); }, { url: srv.url, token: 't', reconnectDelayMs: 10 });
+        const sub = subscribe('live.*', (event, meta) => { got.push(event.event_id); cursors.push(meta.cursor); assert.ok(!('seq' in meta), 'the callback gets the cursor, no sequence number'); }, { url: srv.url, token: 't', reconnectDelayMs: 10 });
         await waitFor(() => got.length === 3);
-        assert.deepEqual(got, [[1, 'e1'], [2, 'e2'], [3, 'e3']], 'the replayed event is not delivered twice');
+        assert.deepEqual(got, ['e1', 'e2', 'e3'], 'the replayed event is not delivered twice');
         assert.deepEqual(cursors, [cur(1), cur(2), cur(3)], 'each callback gets its event\'s opaque cursor, to save and resume from');
         assert.equal(seen[1], cur(2), 'the reconnect resumes from the cursor');
         assert.equal(sub.lastEventId, cur(3));
@@ -112,17 +113,17 @@ run([
         }
         const got = [];
         const gaps = [];
-        const sub = subscribe(['live.stream.*'], (event, { seq, cursor }) => got.push([seq, cursor]), { url: 'https://events.example', EventSource: FakeES, onGap: (g) => gaps.push(g), reconnectDelayMs: 5 });
+        const sub = subscribe(['live.stream.*'], (event, { cursor }) => got.push([event.event_id, cursor]), { url: 'https://events.example', EventSource: FakeES, onGap: (g) => gaps.push(g), reconnectDelayMs: 5 });
         await waitFor(() => made.length === 1);
         assert.equal(sub.transport, 'eventsource');
         const es = made[0];
         assert.deepEqual(es.init, { withCredentials: true });
         assert.equal(new URL(es.url).searchParams.get('last_event_id'), null);
         es.onopen();
-        es.onmessage({ data: JSON.stringify({ seq: 7, event: { event_id: 'evt_7', event_type: 'live.stream.started' } }), lastEventId: 'c1.0.Nw' });
-        es.onmessage({ data: JSON.stringify({ seq: 7, event: { event_id: 'evt_7', event_type: 'live.stream.started' } }), lastEventId: 'c1.0.Nw' });
+        es.onmessage({ data: JSON.stringify({ event: { event_id: 'evt_7', event_type: 'live.stream.started' } }), lastEventId: 'c1.0.Nw' });
+        es.onmessage({ data: JSON.stringify({ event: { event_id: 'evt_7', event_type: 'live.stream.started' } }), lastEventId: 'c1.0.Nw' });
         es.listeners.gap({ data: JSON.stringify({ reason: 'replay_limit', from_seq: 8, to_seq: 9 }) });
-        assert.deepEqual(got, [[7, 'c1.0.Nw']], 'a repeated event_id is delivered once');
+        assert.deepEqual(got, [['evt_7', 'c1.0.Nw']], 'a repeated event_id is delivered once');
         assert.equal(gaps[0].reason, 'replay_limit');
         es.readyState = 2;
         es.onerror();
@@ -142,7 +143,8 @@ run([
         const got = [];
         const realtime = createRealtimeClient(client, { fetch: platform.fetch, reconnectDelayMs: 10 });
         // Resume from the cursor of position 0 (the mock's single epoch): everything retained is replayed.
-        const sub = realtime.subscribe('live.stream.*', (event, { seq }) => got.push([seq, event.event_type]), { lastEventId: 'c1.0.MA' });
+        const posOf = (c) => Number(Buffer.from(String(c).split('.')[2], 'base64url').toString('utf8'));   // the mock's cursor → its position (test only)
+        const sub = realtime.subscribe('live.stream.*', (event, { cursor }) => got.push([posOf(cursor), event.event_type]), { lastEventId: 'c1.0.MA' });
         await waitFor(() => got.length === 2);
         assert.deepEqual(got, [[1, 'live.stream.started'], [3, 'live.stream.updated']], 'internal events never reach an anonymous browser');
         pub('live.stream.ended');

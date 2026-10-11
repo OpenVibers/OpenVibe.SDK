@@ -2,9 +2,9 @@ import type { OpenVibeClient, EventEnvelope } from './core';
 
 /** What a producer passes: event_id, timestamp, source, version, payload and trace_id are filled in. */
 export type EventInput = Omit<EventEnvelope, 'event_id' | 'timestamp' | 'source' | 'version' | 'payload'> & Partial<Pick<EventEnvelope, 'event_id' | 'timestamp' | 'source' | 'version' | 'payload'>>;
-/** `seq` is informational; the position is `cursor`. */
-export interface PublishResult { event_id: string; seq: number; cursor: string; duplicate: boolean; }
-export interface StoredEvent { seq: number; cursor: string; event: EventEnvelope; }
+/** `cursor` is the event's position; `pruned` (no cursor) answers a repeat whose stored copy retention removed. */
+export interface PublishResult { event_id: string; cursor?: string; duplicate: boolean; pruned?: true; }
+export interface StoredEvent { cursor: string; event: EventEnvelope; }
 export interface Gap { from_seq: number; to_seq: number; reason?: string; latest_seq?: number; }
 /** A position is only ever an opaque cursor: `next_cursor` to read on, `latest_cursor` for the head. */
 export interface EventsPage { events: StoredEvent[]; next_cursor: string; latest_cursor: string; gap?: Gap; }
@@ -118,7 +118,7 @@ export interface ParseDeliveryOptions extends DeliveryV2Options {
     /** Refuse deliveries without X-OpenVibe-Signature-V2 (v1-only). Default false. A present v2 header must always verify. */
     requireV2?: boolean;
 }
-export declare function parseDelivery(rawBody: RawBody, headers: Record<string, any> | Headers, secret: string, opts?: ParseDeliveryOptions): { event: EventEnvelope; seq: number | null; subscriptionId: string | null; attempt: number } | null;
+export declare function parseDelivery(rawBody: RawBody, headers: Record<string, any> | Headers, secret: string, opts?: ParseDeliveryOptions): { event: EventEnvelope; subscriptionId: string | null; attempt: number } | null;
 
 /** The subset of a better-sqlite3 Database the outbox and inbox use. */
 export interface SqliteDatabase {

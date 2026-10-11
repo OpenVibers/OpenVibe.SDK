@@ -49,7 +49,7 @@ function cases(label, open) {
                 assert.equal(platform.state.events[0].event.event_id, env.event_id);
                 await outbox.flush();
                 assert.equal(platform.state.events.length, 1, 'nothing republished');
-                assert.ok((await db.value(sql`SELECT seq FROM event_outbox WHERE event_id = ${env.event_id}`)) >= 1, 'the seq Events assigned is kept');
+                assert.strictEqual(await db.value(sql`SELECT seq FROM event_outbox WHERE event_id = ${env.event_id}`), null, 'Events hands out no sequence number (ADR-042): nothing is recorded');
                 // Published in the order written (UPDATE … RETURNING alone has no order).
                 const written = [];
                 for (let i = 0; i < 12; i++) {

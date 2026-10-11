@@ -86,7 +86,7 @@ function createOutbox(db, {
             stmts = {
                 insert: db.prepare(`INSERT INTO ${table} (event_id, envelope, traceparent, created_at, next_attempt_at) VALUES (?, ?, ?, ?, 0)`),
                 due: db.prepare(`SELECT * FROM ${table} WHERE sent_at IS NULL AND rejected_at IS NULL AND next_attempt_at <= ? ORDER BY id LIMIT ?`),
-                sent: db.prepare(`UPDATE ${table} SET sent_at = ?, seq = ?, attempts = attempts + 1, last_error = NULL WHERE id = ?`),
+                sent: db.prepare(`UPDATE ${table} SET sent_at = ?, attempts = attempts + 1, last_error = NULL WHERE id = ?`),
                 failed: db.prepare(`UPDATE ${table} SET attempts = attempts + 1, next_attempt_at = ?, last_error = ? WHERE id = ?`),
                 rejected: db.prepare(`UPDATE ${table} SET rejected_at = ?, attempts = attempts + 1, last_error = ? WHERE id = ?`),
                 pending: db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE sent_at IS NULL AND rejected_at IS NULL`),
@@ -122,11 +122,8 @@ function createOutbox(db, {
         const envelopes = rows.map((r) => JSON.parse(r.envelope));
         const traceparent = rows[0].traceparent || undefined;
         try {
-            const out = rows.length === 1
-                ? { results: [await events.publish(envelopes[0], { traceparent })] }
-                : await events.publish(envelopes, { traceparent });
-            const byId = new Map(((out && out.results) || []).map((r) => [r.event_id, r]));
-            db.transaction(() => { for (const row of rows) q().sent.run(now(), byId.get(row.event_id)?.seq ?? null, row.id); })();
+            await events.publish(rows.length === 1 ? envelopes[0] : envelopes, { traceparent });
+            db.transaction(() => { for (const row of rows) q().sent.run(now(), row.id); })();
             stats.sent += rows.length;
         } catch (err) {
             if (rows.length > 1 && isPermanent(err)) {
@@ -311,13 +308,10 @@ function createPgOutbox(db, {
         const envelopes = rows.map((r) => (typeof r.envelope === 'string' ? JSON.parse(r.envelope) : r.envelope));
         const traceparent = rows[0].traceparent || undefined;
         try {
-            const out = rows.length === 1
-                ? { results: [await events.publish(envelopes[0], { traceparent })] }
-                : await events.publish(envelopes, { traceparent });
-            const byId = new Map(((out && out.results) || []).map((r) => [r.event_id, r]));
-            await db.query(`UPDATE ${table} AS o SET sent_at = $1, seq = v.seq, attempts = o.attempts + 1, last_error = NULL
-                FROM unnest($2::bigint[], $3::bigint[]) AS v(id, seq) WHERE o.id = v.id`,
-            [now(), rows.map((r) => r.id), rows.map((r) => (byId.get(r.event_id) && byId.get(r.event_id).seq) ?? null)]);
+            await events.publish(rows.length === 1 ? envelopes[0] : envelopes, { traceparent });
+            // Events hands out no sequence number (ADR-042): the `seq` column, where a table still has one, stays empty.
+            await db.query(`UPDATE ${table} SET sent_at = $1, attempts = attempts + 1, last_error = NULL WHERE id = ANY($2::bigint[])`,
+                [now(), rows.map((r) => r.id)]);
             stats.sent += rows.length;
         } catch (err) {
             if (rows.length > 1 && isPermanent(err)) {

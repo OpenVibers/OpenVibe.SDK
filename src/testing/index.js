@@ -448,7 +448,8 @@ function createMockPlatform(opts = {}) {
                 if (items.findIndex((x) => x.event_id === e.event_id) !== i) return problem(422, 'events.invalid_envelope', `events[${i}]: event_id repeated within the batch`);
             }
             const meta = p.kind === 'app' ? { projectId: p.projectId, env: p.env } : {};
-            const results = items.map((e) => publishEvent(e, p.sub, meta));
+            // Like Events: the answer carries the event's cursor, never a sequence number.
+            const results = items.map((e) => publishEvent(e, p.sub, meta)).map((r) => ({ event_id: r.event_id, cursor: eventCursor(r.seq), duplicate: r.duplicate }));
             return json(results.some((x) => !x.duplicate) ? 201 : 200, batch ? { results } : results[0]);
         }
         if (path === '/api/v1/events' && req.method === 'GET') {
@@ -478,7 +479,7 @@ function createMockPlatform(opts = {}) {
                 if (e.seq <= from) continue;
                 if (out.length >= limit) break;
                 cursor = e.seq;
-                if (pats.some(([x, re]) => re.test(e.event.event_type) && readable(who.principal, e, x))) out.push({ seq: e.seq, cursor: eventCursor(e.seq), event: e.event });
+                if (pats.some(([x, re]) => re.test(e.event.event_type) && readable(who.principal, e, x))) out.push({ cursor: eventCursor(e.seq), event: e.event });
             }
             if (out.length < limit) cursor = Math.max(cursor, lastSeq);
             return json(200, { ...page, events: out, next_cursor: eventCursor(cursor), latest_cursor: eventCursor(lastSeq) });
@@ -488,7 +489,7 @@ function createMockPlatform(opts = {}) {
             if (who.res) return who.res;
             const e = events.find((x) => x.event.event_id === decodeURIComponent(r[1]));
             const ok = e && (who.principal.kind === 'app' ? appRules.visibleToApp(e, who.principal) : (e.env || 'production') === 'production');
-            return ok ? json(200, { seq: e.seq, cursor: eventCursor(e.seq), event: e.event }) : problem(404, 'events.not_found', 'no such event (or pruned by retention)');
+            return ok ? json(200, { cursor: eventCursor(e.seq), event: e.event }) : problem(404, 'events.not_found', 'no such event (or pruned by retention)');
         }
         if (path === '/api/v1/checkpoints') {
             const who = eventsPrincipal(req, 'events.event.read', 'events.app.read');
@@ -587,7 +588,7 @@ function createMockPlatform(opts = {}) {
                     push(e) {
                         if (e.seq <= conn.lastSeq || !pats.some((re) => re.test(e.event.event_type)) || !visible(viewer, e)) return;
                         conn.lastSeq = e.seq;
-                        send(`id: ${eventCursor(e.seq)}\ndata: ${JSON.stringify({ seq: e.seq, event: e.event })}\n\n`);
+                        send(`id: ${eventCursor(e.seq)}\ndata: ${JSON.stringify({ event: e.event })}\n\n`);
                     },
                     close() { streams.delete(conn); try { controller.close(); } catch { /* closed */ } },
                 };
@@ -614,7 +615,7 @@ function createMockPlatform(opts = {}) {
     /**
      * deliverEvents({ fetch, subscriptionId, timeoutMs }) plays the Events delivery worker once:
      * for each enabled subscription, POSTs every event published after it was created (in seq
-     * order, one at a time) to its endpoint as { event, seq }, signed like Events signs deliveries
+     * order, one at a time) to its endpoint as { event }, signed like Events signs deliveries
      * (X-OpenVibe-Signature: sha256=<HMAC of the raw body with the subscription secret>;
      * X-OpenVibe-Timestamp and X-OpenVibe-Signature-V2: t=<ts>,v2=<HMAC of "<ts>.<raw body>">,
      * signed afresh on every attempt; plus X-OpenVibe-Event-Id, -Event-Type, -Seq, -Subscription-Id, -Delivery-Attempt, -Hops,
@@ -637,7 +638,7 @@ function createMockPlatform(opts = {}) {
                 if (!wanted) { sub.cursor = e.seq; continue; }
                 const attempt = (sub.attempts.get(e.event.event_id) || 0) + 1;
                 sub.attempts.set(e.event.event_id, attempt);
-                const body = JSON.stringify({ event: e.event, seq: e.seq });
+                const body = JSON.stringify({ event: e.event });
                 const trace = /^[0-9a-f]{32}$/.test(e.event.trace_id || '') ? e.event.trace_id : crypto.randomBytes(16).toString('hex');
                 let status = null;
                 let error;
@@ -646,7 +647,7 @@ function createMockPlatform(opts = {}) {
                         method: 'POST', redirect: 'manual', signal: AbortSignal.timeout(timeoutMs), body,
                         headers: {
                             'Content-Type': 'application/json', 'User-Agent': 'OpenVibe.Events/mock',
-                            'X-OpenVibe-Event-Id': e.event.event_id, 'X-OpenVibe-Event-Type': e.event.event_type, 'X-OpenVibe-Seq': String(e.seq),
+                            'X-OpenVibe-Event-Id': e.event.event_id, 'X-OpenVibe-Event-Type': e.event.event_type,
                             'X-OpenVibe-Subscription-Id': sub.id, 'X-OpenVibe-Delivery-Attempt': String(attempt), 'X-OpenVibe-Hops': '0',
                             ...signDeliveryHeaders(body, sub.secret),
                             traceparent: `00-${trace}-${crypto.randomBytes(8).toString('hex')}-01`,
