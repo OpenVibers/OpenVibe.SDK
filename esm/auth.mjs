@@ -5,6 +5,6 @@ export const {
     createCodeVerifier, pkceChallenge, createPkcePair, createState, buildAuthorizeUrl, startAuthorization,
     readCallback, base64url, decodeUnverified, unverifiedClaims, createServiceTokenClient, verifyUserToken,
     verifyAppToken, verifyServiceToken, createJwksClient, jwksClient, jwksStatus, createNetworkKeys,
-    exchangeCode, refreshUserToken, createRevocationStore, createPgRevocationStore, revocationSchema, TOKEN_VALID_AFTER,
+    exchangeCode, refreshUserToken, createPgRevocationStore, revocationSchema, TOKEN_VALID_AFTER,
 } = cjs;
 export default cjs;

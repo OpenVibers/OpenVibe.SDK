@@ -2,8 +2,8 @@
 import cjs from '../src/events.js';
 
 export const {
-    createEventsClient, verifyDelivery, signDelivery, parseDelivery, createOutbox, createInbox,
-    createPgOutbox, createPgInbox, outboxSchema, inboxSchema, projectKey, appSource,
-    createAppEvents, verifyDeliveryV2, signDeliveryV2, signDeliveryHeaders, createServiceOutbox,
+    createEventsClient, verifyDelivery, signDelivery, parseDelivery, createPgOutbox, createPgInbox,
+    outboxSchema, inboxSchema, projectKey, appSource, createAppEvents, verifyDeliveryV2,
+    signDeliveryV2, signDeliveryHeaders, createServiceOutbox,
 } = cjs;
 export default cjs;

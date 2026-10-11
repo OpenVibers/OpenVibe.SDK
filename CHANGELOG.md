@@ -3,6 +3,22 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.44.0 (2026-10-11)
+
+The SQLite kits are gone (plan T1, the deletion ledger): every OpenVibe service has run on PostgreSQL since
+2026-10-08, and nothing in the estate used them. **Breaking** for a caller of what was removed:
+
+- `createOutbox` / `createInbox` (`openvibe-sdk/events`, better-sqlite3): use `createPgOutbox` / `createPgInbox` on an
+  `openvibe-sdk/db` handle (`createDb({ pglite: true })` for a small embedded app), with `outboxSchema()` /
+  `inboxSchema()` in its migration.
+- `createRevocationStore` (`openvibe-sdk/auth`, better-sqlite3 or memory): use `createPgRevocationStore`.
+- The stale `importSqlite` / `runSqliteMigration` type declarations (their code was already gone).
+- `better-sqlite3` is no longer a devDependency or an optional peer dependency, so it leaves every service's lockfile
+  with this pin.
+- **Tests:** the SQLite outbox suite's two cases the PostgreSQL suite lacked move there (a token-endpoint refusal is
+  retried, never rejected; a flush during a pass also publishes what was committed after it claimed). The delivery
+  worker test's inbox runs on PGlite.
+
 ## 0.43.0 (2026-10-10)
 
 No sequence number from Events (Contracts 0.136.x, ADR-042 decision 7, its last step). **Breaking** only for code that

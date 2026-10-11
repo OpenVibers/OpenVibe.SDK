@@ -248,7 +248,7 @@ Server-only subpaths are declared `"browser": null` in the exports map, so a bun
 - `startAuthorization()` / `buildAuthorizeUrl()` default `scope` to `'profile theme'` only for first-party sign-in (no `audience`). Apps pass `audience` and capability ids. Network refuses `prompt=none` for apps.
 - `createServiceTokenClient().getTokenInfo({ audience })` returns `{ accessToken, scope, expiresAt, unverifiedClaims }`. `decodeUnverified()` / `unverifiedClaims()` decode a JWT without verifying it: for display and diagnostics, never for authorization.
 - PKCE follows RFC 7636 S256. The verifier is 64 characters from the unreserved set, and the challenge is `BASE64URL(SHA-256(verifier))`. Network verifies the verifier whenever the authorization carried a challenge, and requires S256 from every developer app.
-- `createRevocationStore(db?)` keeps each person's token cutoff from Network's `network.user.token_valid_after` event (Contracts 0.39.0: sign out everywhere, a password change or reset, a ban, staff ending someone's sessions). Subscribe to the event, pass each delivery to `store.apply(event)` (`'revoked'` means the cutoff moved: close that person's sockets, drop their cached sessions), and after `verifyUserToken()` refuse the token when `store.isRevoked(claims)`. That is Network's rule, `iat * 1000 < valid_after`. With a better-sqlite3 handle the cutoffs survive restarts; the store only ever moves a cutoff forward and ignores anything not from `network`.
+- `createPgRevocationStore(db)` keeps each person's token cutoff from Network's `network.user.token_valid_after` event (Contracts 0.39.0: sign out everywhere, a password change or reset, a ban, staff ending someone's sessions). Subscribe to the event, pass each delivery to `store.apply(event)` (`'revoked'` means the cutoff moved: close that person's sockets, drop their cached sessions), and after `verifyUserToken()` refuse the token when `store.isRevoked(claims)`. That is Network's rule, `iat * 1000 < valid_after`. The cutoffs live in the service's PostgreSQL (`revocationSchema()` for its migration; `await store.load()` at boot reads them into memory); the store only ever moves a cutoff forward and ignores anything not from `network`.
 
 - `createSsoClient()` (`openvibe-sdk/sso`) is the site side of first-party sign-in, the layer Blog, Coupons, Deals, Host, News and Trade each carried a copy of. `/auth/login` sends the browser to the Network with a random `state` and a PKCE S256 challenge kept in short-lived httpOnly cookies on `/auth`; `/auth/callback` requires the state (constant-time compare) and exchanges the code server-side with the client secret and the verifier. `next` is a same-site path, this site's https origin or the Network's; anything else, including control characters and backslashes, goes home. Sessions are verified offline with `verifyUserToken` through the shared JWKS client (the last good keys survive a Network outage), so a service principal or a typed token (a realtime ticket, a FedCM assertion) is never a session. Cookies are host-only: `ov_token` (the access JWT, readable by the shared navbar), `ov_refresh` (httpOnly, `Path=/auth`) and `ov_sso_hint`.
 
@@ -438,7 +438,7 @@ const thumbs = createQueue({ valkey, name: 'thumbs' });
 thumbs.process(async (job) => { … }, { concurrency: 4 });
 ```
 
-Install the drivers the service uses: `pg` and `iovalkey` (production), `@electric-sql/pglite` (tests). `better-sqlite3` is only for a small app that keeps its outbox or inbox in SQLite (`createOutbox`/`createInbox`).
+Install the drivers the service uses: `pg` and `iovalkey` (production), `@electric-sql/pglite` (tests and small embedded apps). PostgreSQL is the only database: the better-sqlite3 outbox, inbox and revocation store were removed in 0.44.0.
 
 
 ### Browser without a bundler
@@ -523,7 +523,7 @@ Service implementations and their data (each service), the contracts (OpenVibe.C
 
 ## Depends on
 
-Nothing at runtime. `openvibe-contracts` v0.86.0 and `better-sqlite3` are devDependencies (type checks, the outbox and inbox tests). At run time the clients talk to OpenVibe.Network (tokens, registry, discovery) and the service each one wraps.
+Nothing at runtime. `openvibe-contracts` and `@electric-sql/pglite` are devDependencies (type checks, the database, outbox and inbox tests). At run time the clients talk to OpenVibe.Network (tokens, registry, discovery) and the service each one wraps.
 
 ---
 
