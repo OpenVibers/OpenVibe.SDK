@@ -298,7 +298,7 @@
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
     "iovalkey": "^0.4.0",
-    "openvibe-contracts": "https://codeload.github.com/OpenVibers/OpenVibe.Contracts/tar.gz/refs/tags/v0.129.0",
+    "openvibe-contracts": "https://codeload.github.com/OpenVibers/OpenVibe.Contracts/tar.gz/refs/tags/v0.143.0",
     "pg": "^8.23.0"
   },
   "peerDependencies": {
