@@ -3,6 +3,21 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.43.0 (2026-10-10)
+
+No sequence number from Events (Contracts 0.136.x, ADR-042 decision 7, its last step). **Breaking** only for code that
+read `seq`; nothing in the estate does.
+
+- **`publish()`** answers `{ event_id, cursor, duplicate }` (a repeat whose stored copy retention removed:
+  `{ event_id, duplicate: true, pruned: true }`).
+- **Reads:** `pull()`/`iterate()` items and `get()` are `{ cursor, event }`.
+- **Realtime:** callbacks get `{ cursor }`.
+- **`parseDelivery()`:** `{ event, subscriptionId, attempt }`. Dedupe on `event.event_id`.
+- **Outbox kits:** no longer record a sequence number (a table's old `seq` column stays empty).
+- **Mock Events:** publish answers carry the cursor; pages, single reads, SSE data and deliveries carry no `seq`
+  (no `X-OpenVibe-Seq`). The mock's own `platform.publishEvent()` still returns the stored `seq`, for tests that
+  build a cursor.
+
 ## 0.42.0 (2026-10-10)
 
 An Events position is an opaque cursor and nothing else (ADR-042 decision 7, plan T7). **Breaking** for a caller that

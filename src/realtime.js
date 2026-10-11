@@ -66,8 +66,7 @@ function subscribe(topics, onEvent, opts = {}) {
             if (state.seen.size > SEEN_MAX) state.seen.delete(state.seen.values().next().value);
         }
         if (id !== undefined && id !== '') state.lastId = String(id);
-        const seq = msg && msg.seq != null && Number.isFinite(Number(msg.seq)) ? Number(msg.seq) : null;   // informational
-        try { onEvent(msg && msg.event, { seq, cursor: id !== undefined && id !== '' ? String(id) : null }); } catch (err) { report(err); }
+        try { onEvent(msg && msg.event, { cursor: id !== undefined && id !== '' ? String(id) : null }); } catch (err) { report(err); }
     }
 
     async function streamUrl() {

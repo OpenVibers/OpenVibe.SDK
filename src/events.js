@@ -111,9 +111,8 @@ function verifyDeliveryV2(rawBody, headers, secret, { toleranceSec = V2_TOLERANC
 }
 
 /**
- * Verify and parse one delivery: { event, seq, subscriptionId, attempt } or null when it does not
- * verify. `headers` is req.headers (or a Fetch Headers). `seq` is informational (null when the delivery
- * carries none): dedupe by event.event_id, never by seq.
+ * Verify and parse one delivery: { event, subscriptionId, attempt } or null when it does not verify.
+ * `headers` is req.headers (or a Fetch Headers). There is no sequence number: dedupe by event.event_id.
  *
  *   X-OpenVibe-Signature-V2 present  it must verify and be within ±toleranceSec (default 300) of
  *                                    `now`; a bad or stale v2 is null, never a fallback to v1
@@ -131,10 +130,8 @@ function parseDelivery(rawBody, headers, secret, { requireV2 = false, toleranceS
     let body;
     try { body = JSON.parse(toBuffer(rawBody).toString('utf8')); } catch { return null; }
     if (!body || !body.event) return null;
-    const seq = body.seq ?? get('x-openvibe-seq');
     return {
         event: body.event,
-        seq: seq == null || seq === '' || !Number.isFinite(Number(seq)) ? null : Number(seq),
         subscriptionId: get('x-openvibe-subscription-id') || null,
         attempt: Number(get('x-openvibe-delivery-attempt')) || 1,
     };
@@ -170,7 +167,8 @@ function createEventsClient(client, { source, baseUrl } = {}) {
     }
 
     /**
-     * publish(envelope | envelope[], { traceparent }) -> { event_id, seq, cursor, duplicate } | { results }.
+     * publish(envelope | envelope[], { traceparent }) -> { event_id, cursor, duplicate } | { results }; a repeat whose
+     * stored copy retention removed is { event_id, duplicate: true, pruned: true } (no cursor).
      * Safe to retry: Events stores an event_id once and answers a repeat with the stored position.
      */
     async function publish(input, { traceparent } = {}) {
@@ -184,7 +182,7 @@ function createEventsClient(client, { source, baseUrl } = {}) {
     }
 
     /**
-     * One page: { events: [{ seq, cursor, event }], next_cursor, latest_cursor, gap? }.
+     * One page: { events: [{ cursor, event }], next_cursor, latest_cursor, gap? }.
      * Pass `after` — a page's opaque `next_cursor` — to resume exactly where the previous page ended, or
      * `latest_cursor` to start at the head without history; without it the page starts at the oldest retained
      * event. A position is only ever an opaque cursor (ADR-042): the numeric `afterSeq` is gone, and passing it
@@ -199,7 +197,7 @@ function createEventsClient(client, { source, baseUrl } = {}) {
     }
 
     /**
-     * Async iterator over { seq, cursor, event } from `after` (an opaque cursor; the oldest retained event
+     * Async iterator over { cursor, event } from `after` (an opaque cursor; the oldest retained event
      * without one) up to the current head.
      *
      *   onGap(gap)   called before a page's items when retention already pruned part of the range
@@ -244,7 +242,7 @@ function createEventsClient(client, { source, baseUrl } = {}) {
         publish,
         pull,
         iterate,
-        /** { seq, cursor, event } or null. */
+        /** { cursor, event } or null. */
         get: (eventId) => orNull(call({ path: `/api/v1/events/${encodeURIComponent(eventId)}` })),
         /** { consumer, topic, cursor, carrier, updated_at }: the stored opaque cursor, or cursor null when none is stored. */
         getCheckpoint: (topic) => call({ path: '/api/v1/checkpoints', query: { topic } }),

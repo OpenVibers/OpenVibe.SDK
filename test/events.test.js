@@ -10,6 +10,9 @@ const { subscribe } = require('../src/realtime');
 const { createMockPlatform } = require('../src/testing');
 
 const actor = { type: 'service', id: 'live' };
+// The mock's cursor → the position it names. Tests read positions this way only to assert order; a consumer never parses
+// a cursor, and Events hands out no sequence number (ADR-042).
+const posOf = (c) => Number(Buffer.from(String(c).split('.')[2], 'base64url').toString('utf8'));
 
 function setup() {
     const platform = createMockPlatform({
@@ -28,7 +31,8 @@ run([
         const { platform, events } = setup();
         const tp = '00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01';
         const out = await events.publish({ event_type: 'live.stream.started', actor, subject: { type: 'stream', id: '12' } }, { traceparent: tp });
-        assert.equal(out.seq, 1);
+        assert.equal(out.cursor, 'c1.0.MQ', 'the answer carries the event\'s cursor');
+        assert.ok(!('seq' in out), 'and no sequence number');
         assert.equal(out.duplicate, false);
         const stored = platform.state.events[0].event;
         assert.match(stored.event_id, /^evt_[0-9A-HJKMNP-TV-Z]{26}$/);
@@ -68,7 +72,7 @@ run([
         const { platform, client, events } = setup();
         for (let i = 1; i <= 5; i++) platform.publishEvent({ event_type: i % 2 ? 'media.vod.ready' : 'live.stream.started', source: 'media', actor, subject: { type: 'vod', id: String(i) } });
         const page = await events.pull({ topic: 'media.vod.*', limit: 2 });
-        assert.deepEqual(page.events.map((e) => e.seq), [1, 3], 'without after, from the oldest retained event');
+        assert.deepEqual(page.events.map((e) => posOf(e.cursor)), [1, 3], 'without after, from the oldest retained event');
         assert.ok(!('next_after_seq' in page) && !('latest_seq' in page), 'no numeric position on the page');
         assert.match(page.next_cursor, /^c1\./, 'the page carries an opaque next_cursor');
         assert.match(page.latest_cursor, /^c1\./, 'and the head as an opaque latest_cursor');
@@ -76,7 +80,7 @@ run([
         assert.match(page.events[0].cursor, /^c1\./, 'each event carries its cursor');
         // The opaque cursor round-trips: `after` resumes exactly where the page ended.
         const rest = await events.pull({ topic: 'media.vod.*', after: page.next_cursor, limit: 2 });
-        assert.deepEqual(rest.events.map((e) => e.seq), [5]);
+        assert.deepEqual(rest.events.map((e) => posOf(e.cursor)), [5]);
         assert.equal((await events.get(platform.state.events[0].event.event_id)).cursor, page.events[0].cursor);
         // The numeric position is gone: passing it throws instead of reading from the start, and Events refuses it.
         assert.throws(() => events.pull({ topic: 'media.vod.*', afterSeq: 3 }), /afterSeq is retired/);
@@ -85,8 +89,9 @@ run([
             { status: 400, code: 'events.bad_request' }, 'after_seq is refused, never read as "from the start"');
         const seen = [];
         const cursors = [];
-        for await (const { seq, event } of events.iterate({ topic: ['media.vod.*'], limit: 2, onPage: (p) => cursors.push(p.next_cursor) })) {
-            seen.push(seq);
+        for await (const { cursor, event, ...rest } of events.iterate({ topic: ['media.vod.*'], limit: 2, onPage: (p) => cursors.push(p.next_cursor) })) {
+            assert.ok(!('seq' in rest), 'an item is { cursor, event }');
+            seen.push(posOf(cursor));
             assert.equal(event.event_type, 'media.vod.ready');
         }
         assert.deepEqual(seen, [1, 3, 5]);
@@ -94,9 +99,10 @@ run([
         assert.equal(cursors.at(-1), (await events.pull({ topic: 'media.vod.*', limit: 1 })).latest_cursor, 'iterate ends on the head');
         assert.equal(cursors.length, 2, 'and stops there: the last page reached latest_cursor');
         const resumed = [];
-        for await (const { seq } of events.iterate({ topic: 'media.vod.*', after: page.next_cursor, limit: 2 })) resumed.push(seq);
+        for await (const { cursor } of events.iterate({ topic: 'media.vod.*', after: page.next_cursor, limit: 2 })) resumed.push(posOf(cursor));
         assert.deepEqual(resumed, [5], 'iterate resumes from an opaque cursor');
-        assert.equal((await events.get(platform.state.events[0].event.event_id)).seq, 1);
+        const one = await events.get(platform.state.events[0].event.event_id);
+        assert.deepEqual([posOf(one.cursor), 'seq' in one], [1, false], 'a single read is { cursor, event }');
         assert.equal(await events.get('evt_01J00000000000000000000000'), null);
         assert.equal((await events.getCheckpoint('media.vod.*')).cursor, null, 'none stored yet');
         await events.setCheckpoint('media.vod.*', page.next_cursor, { carrier: 'pg' });
@@ -118,7 +124,7 @@ run([
         const saved = pages[0].next_cursor;
         platform.publishEvent({ event_type: 'media.vod.ready', source: 'media', actor, subject: { type: 'vod', id: '2' } });
         const seen = [];
-        for await (const e of events.iterate({ topic: 'media.vod.*', after: saved })) seen.push(e.seq);
+        for await (const e of events.iterate({ topic: 'media.vod.*', after: saved })) seen.push(posOf(e.cursor));
         assert.deepEqual(seen, [2]);
     }],
 
@@ -127,13 +133,13 @@ run([
         const srv = await stubServer((req, res) => {
             const q = new URL(req.url, 'http://x').searchParams;
             asked.push([q.get('after'), q.get('after_seq')]);
-            if (!q.get('after')) return send(res, 200, { gap: { from_seq: 1, to_seq: 9 }, events: [{ seq: 10, cursor: 'c1.0.MTA', event: { event_type: 'a.b.c' } }], next_cursor: 'c1.0.MTA', latest_cursor: 'c1.0.MTE' });
-            return send(res, 200, { events: [{ seq: 11, cursor: 'c1.0.MTE', event: { event_type: 'a.b.c' } }], next_cursor: 'c1.0.MTE', latest_cursor: 'c1.0.MTE' });
+            if (!q.get('after')) return send(res, 200, { gap: { from_seq: 1, to_seq: 9 }, events: [{ cursor: 'c1.0.MTA', event: { event_type: 'a.b.c' } }], next_cursor: 'c1.0.MTA', latest_cursor: 'c1.0.MTE' });
+            return send(res, 200, { events: [{ cursor: 'c1.0.MTE', event: { event_type: 'a.b.c' } }], next_cursor: 'c1.0.MTE', latest_cursor: 'c1.0.MTE' });
         });
         const events = createEventsClient(createClient({ baseUrls: { events: srv.url }, token: 't' }), { source: 'live' });
         const gaps = [];
         const seqs = [];
-        for await (const e of events.iterate({ topic: 'a.*', onGap: (g) => gaps.push(g) })) seqs.push(e.seq);
+        for await (const e of events.iterate({ topic: 'a.*', onGap: (g) => gaps.push(g) })) seqs.push(posOf(e.cursor));
         assert.deepEqual(gaps, [{ from_seq: 1, to_seq: 9 }]);
         assert.deepEqual(seqs, [10, 11]);
         assert.deepEqual(asked, [[null, null], ['c1.0.MTA', null]], 'no after_seq is ever sent; the second page reads on from the cursor and the head ends it');
@@ -156,25 +162,25 @@ run([
 
     ['verifyDelivery / parseDelivery check X-OpenVibe-Signature over the raw body', async () => {
         const secret = `whsec_${'ab'.repeat(32)}`;
-        const raw = Buffer.from(JSON.stringify({ event: { event_id: 'evt_1', event_type: 'media.vod.ready' }, seq: 7 }));
+        const raw = Buffer.from(JSON.stringify({ event: { event_id: 'evt_1', event_type: 'media.vod.ready' } }));
         const sig = signDelivery(raw, secret);
         assert.equal(sig, `sha256=${crypto.createHmac('sha256', secret).update(raw).digest('hex')}`);
         assert.equal(verifyDelivery(raw, sig, secret), true);
         assert.equal(verifyDelivery(raw.toString(), ` ${sig} `, secret), true);
         assert.equal(verifyDelivery(new Uint8Array(raw), sig, secret), true);
         assert.equal(verifyDelivery(raw, sig, 'other-secret'), false);
-        assert.equal(verifyDelivery(Buffer.from(raw.toString().replace('7', '8')), sig, secret), false);
+        assert.equal(verifyDelivery(Buffer.from(raw.toString().replace('evt_1', 'evt_2')), sig, secret), false);
         assert.equal(verifyDelivery(raw, 'sha256=00', secret), false);
         assert.equal(verifyDelivery(raw, undefined, secret), false);
         assert.equal(verifyDelivery(raw, sig, ''), false);
         const d = parseDelivery(raw, { 'x-openvibe-signature': sig, 'x-openvibe-subscription-id': 'sub_1', 'x-openvibe-delivery-attempt': '2' }, secret);
-        assert.deepEqual(d, { event: { event_id: 'evt_1', event_type: 'media.vod.ready' }, seq: 7, subscriptionId: 'sub_1', attempt: 2 });
+        assert.deepEqual(d, { event: { event_id: 'evt_1', event_type: 'media.vod.ready' }, subscriptionId: 'sub_1', attempt: 2 });
         assert.equal(parseDelivery(raw, new Headers({ 'X-OpenVibe-Signature': 'sha256=bad' }), secret), null);
     }],
 
     ['verifyDeliveryV2 checks X-OpenVibe-Signature-V2 (HMAC of "<t>.<raw body>") and the ±300 s window', async () => {
         const secret = `whsec_${'ab'.repeat(32)}`;
-        const raw = Buffer.from(JSON.stringify({ event: { event_id: 'evt_1', event_type: 'media.vod.ready' }, seq: 7 }));
+        const raw = Buffer.from(JSON.stringify({ event: { event_id: 'evt_1', event_type: 'media.vod.ready' } }));
         const now = 1790000000000;
         const t = now / 1000;
         const v2 = signDeliveryV2(raw, secret, t);
@@ -190,7 +196,7 @@ run([
         assert.equal(verifyDeliveryV2(raw, headers, secret, { now: now + 600000, toleranceSec: 600 }), true, 'toleranceSec');
         assert.equal(verifyDeliveryV2(raw, headers, secret), false, 'defaults to Date.now()');
         assert.equal(verifyDeliveryV2(raw, headers, 'other-secret', { now }), false);
-        assert.equal(verifyDeliveryV2(Buffer.from(raw.toString().replace('7', '8')), headers, secret, { now }), false, 'body changed');
+        assert.equal(verifyDeliveryV2(Buffer.from(raw.toString().replace('evt_1', 'evt_9')), headers, secret, { now }), false, 'body changed');
         assert.equal(verifyDeliveryV2(raw, { ...headers, 'x-openvibe-signature-v2': v2.replace(`t=${t}`, `t=${t + 1}`) }, secret, { now }), false, 'timestamp changed');
         assert.equal(verifyDeliveryV2(raw, { ...headers, 'x-openvibe-timestamp': String(t - 1) }, secret, { now }), false, 'X-OpenVibe-Timestamp disagrees with t');
         assert.equal(verifyDeliveryV2(raw, { 'x-openvibe-signature-v2': `${v2},v2=${'0'.repeat(64)}` }, secret, { now }), true, 'one of several v2 values');
@@ -209,10 +215,10 @@ run([
 
     ['parseDelivery: a present v2 must verify and be fresh (no v1 fallback); requireV2 refuses v1-only', async () => {
         const secret = `whsec_${'cd'.repeat(32)}`;
-        const raw = Buffer.from(JSON.stringify({ event: { event_id: 'evt_2', event_type: 'media.vod.ready' }, seq: 9 }));
+        const raw = Buffer.from(JSON.stringify({ event: { event_id: 'evt_2', event_type: 'media.vod.ready' } }));
         const now = 1790000000000;
         const signed = signDeliveryHeaders(raw, secret, { now });
-        const want = { event: { event_id: 'evt_2', event_type: 'media.vod.ready' }, seq: 9, subscriptionId: null, attempt: 1 };
+        const want = { event: { event_id: 'evt_2', event_type: 'media.vod.ready' }, subscriptionId: null, attempt: 1 };
         const v1only = { 'x-openvibe-signature': signDelivery(raw, secret) };
         // v2 (what Events sends): v2 decides.
         assert.deepEqual(parseDelivery(raw, signed, secret, { now }), want);
@@ -239,7 +245,8 @@ run([
         // The mock's cursor format, decoded only to label the log readably; a consumer never parses a cursor.
         const at = (c) => Number(Buffer.from(String(c).split('.')[2], 'base64url').toString('utf8'));
         const consume = async (failAt) => {
-            for await (const { seq } of events.iterate({ topic: 'media.vod.*', after: saved, limit: 3, onPage: (p) => { log.push(`page ${at(p.next_cursor)}`); saved = p.next_cursor; } })) {
+            for await (const { cursor } of events.iterate({ topic: 'media.vod.*', after: saved, limit: 3, onPage: (p) => { log.push(`page ${at(p.next_cursor)}`); saved = p.next_cursor; } })) {
+                const seq = posOf(cursor);
                 if (seq === failAt) throw new Error(`crash at ${seq}`);
                 log.push(`item ${seq}`);
             }
@@ -267,21 +274,21 @@ run([
         assert.equal(platform.pruneEvents(3), 3);
         const page = await events.pull({ topic: 'media.vod.*', after: cur(1) });
         assert.deepEqual(page.gap, { from_seq: 2, to_seq: 3 });
-        assert.deepEqual(page.events.map((e) => e.seq), [4, 5]);
+        assert.deepEqual(page.events.map((e) => posOf(e.cursor)), [4, 5]);
         assert.equal((await events.pull({ topic: 'media.vod.*', after: cur(3) })).gap, undefined);
         const gaps = [];
         const seqs = [];
-        for await (const e of events.iterate({ topic: 'media.vod.*', onGap: (g) => gaps.push(g) })) seqs.push(e.seq);
+        for await (const e of events.iterate({ topic: 'media.vod.*', onGap: (g) => gaps.push(g) })) seqs.push(posOf(e.cursor));
         assert.deepEqual(gaps, [{ from_seq: 1, to_seq: 3 }]);
         assert.deepEqual(seqs, [4, 5]);
         const rtGaps = [];
         const got = [];
-        const sub = subscribe('media.vod.*', (ev, { seq }) => got.push(seq), { client: createClient({ fetch: platform.fetch }), fetch: platform.fetch, transport: 'fetch', lastEventId: cur(1), onGap: (g) => rtGaps.push(g) });
+        const sub = subscribe('media.vod.*', (ev, { cursor }) => got.push(posOf(cursor)), { client: createClient({ fetch: platform.fetch }), fetch: platform.fetch, transport: 'fetch', lastEventId: cur(1), onGap: (g) => rtGaps.push(g) });
         await waitFor(() => got.length === 2);
         sub.close();
         assert.deepEqual(rtGaps, [{ reason: 'retention', from_seq: 2, to_seq: 3, latest_seq: 5 }]);
         platform.publishEvent({ event_type: 'media.vod.ready', source: 'media', actor, subject: { type: 'vod', id: '6' } });
-        assert.equal((await events.pull({ after: cur(5) })).events[0].seq, 6, 'positions keep counting after a prune');
+        assert.equal(posOf((await events.pull({ after: cur(5) })).events[0].cursor), 6, 'positions keep counting after a prune');
     }],
 
     ['deliverEvents: signed deliveries to a local endpoint, retried in order, dead after max attempts', async () => {
@@ -296,7 +303,8 @@ run([
             const d = parseDelivery(body, req.headers, secret, { requireV2: true });
             if (!d) return send(res, 401, { error: 'bad signature' });
             if (failNext > 0) { failNext--; return send(res, 503, { error: 'busy' }); }
-            const r = inbox.once('webhook', d.event.event_id, () => handled.push([d.seq, d.attempt, req.headers['x-openvibe-event-type']]));
+            assert.ok(!('seq' in d) && !('seq' in JSON.parse(body)) && req.headers['x-openvibe-seq'] === undefined, 'a delivery carries no sequence number');
+            const r = inbox.once('webhook', d.event.event_id, () => handled.push([d.event.subject.id, d.attempt, req.headers['x-openvibe-event-type']]));
             return send(res, 200, { duplicate: r.duplicate });
         });
         platform.publishEvent({ event_type: 'media.vod.ready', source: 'media', actor, subject: { type: 'vod', id: '0' } });   // before the subscription: not delivered
@@ -308,7 +316,7 @@ run([
         assert.deepEqual([first.delivered, first.failed, first.dead], [0, 1, 0], 'the first attempt failed: the subscription waits');
         const second = await platform.deliverEvents();
         assert.deepEqual([second.delivered, second.failed], [2, 0]);
-        assert.deepEqual(handled, [[2, 2, 'media.vod.ready'], [4, 1, 'media.vod.ready']], 'in seq order, attempt counted, non-matching skipped');
+        assert.deepEqual(handled, [['1', 2, 'media.vod.ready'], ['3', 1, 'media.vod.ready']], 'in order, attempt counted, non-matching skipped');
         const req = srv.requests.at(-1);
         assert.equal(req.headers['x-openvibe-subscription-id'], sub.id);
         assert.equal(req.headers['x-openvibe-signature'], undefined, 'no v1 header, like Events');
@@ -335,8 +343,8 @@ run([
     ['iterate pages by cursor alone: the unchanged cursor or latest_cursor ends it', async () => {
         const asked = [];
         // A server that omits latest_cursor: the page that does not move the position ends the walk.
-        const pages = { '': { events: [{ seq: 1, cursor: 'c1', event: { id: 'a' } }], next_cursor: 'c1' },
-            c1: { events: [{ seq: 2, cursor: 'c2', event: { id: 'b' } }], next_cursor: 'c2' },
+        const pages = { '': { events: [{ cursor: 'c1', event: { id: 'a' } }], next_cursor: 'c1' },
+            c1: { events: [{ cursor: 'c2', event: { id: 'b' } }], next_cursor: 'c2' },
             c2: { events: [], next_cursor: 'c2' } };
         const fetch = async (url) => {
             const u = new URL(url);

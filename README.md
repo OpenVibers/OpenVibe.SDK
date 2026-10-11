@@ -254,7 +254,7 @@ Server-only subpaths are declared `"browser": null` in the exports map, so a bun
 
 ### Receiving event webhooks
 
-OpenVibe.Events POSTs each delivery as `{ event, seq }` with two signatures:
+OpenVibe.Events POSTs each delivery as `{ event }` (no sequence number: dedupe on `event.event_id`) with two signatures:
 
 - `X-OpenVibe-Signature: sha256=<hex HMAC-SHA256 of the raw body>` (v1). It covers only the body, so a captured delivery verifies forever.
 - `X-OpenVibe-Timestamp: <unix seconds>` and `X-OpenVibe-Signature-V2: t=<that timestamp>,v2=<hex HMAC-SHA256 of "<t>.<raw body>">` (v2). Every attempt, retries included, is signed with the time it is sent, so a delivery stops verifying 300 s later.

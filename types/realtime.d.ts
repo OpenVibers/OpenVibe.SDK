@@ -1,8 +1,8 @@
 import type { OpenVibeClient, EventEnvelope, FetchLike, TokenContext } from './core';
 
 export interface RealtimeGap { reason: 'retention' | 'replay_limit' | 'cursor_ahead' | string; from_seq: number; to_seq: number; latest_seq?: number; }
-/** `cursor` is the position to save; `seq` is informational. */
-export interface RealtimeMeta { seq: number | null; cursor: string | null; }
+/** `cursor` is the position to save (dedupe is by event_id, inside the client). */
+export interface RealtimeMeta { cursor: string | null; }
 export interface SubscribeOptions {
     client?: OpenVibeClient;
     /** Events origin or the full …/realtime/stream URL; default from the client's registry, else https://openvibe.events */
