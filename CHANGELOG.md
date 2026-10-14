@@ -3,6 +3,14 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.46.0 (2026-10-13)
+
+- `startTelemetryRetention({ db, table?, olderThanDays = 30, everyMs = 24 h, delayMs = 60 s, log? })` → `{ run(), stop() }`:
+  the scheduled form of `pruneTelemetry()`. It first prunes `delayMs` after the call, then every `everyMs`, on unref'd
+  timers. A service that waited a full day for the first prune never pruned when it was redeployed more often than that
+  (found in review of OpenVibe.Blog#42). A failing prune is logged and retried at the next tick; runs never overlap;
+  `stop()` cancels the timers and waits for a run in flight.
+
 ## 0.45.0 (2026-10-13)
 
 The telemetry sink every service stores into (plan T1, step 10). Step 5 left `createTelemetry({ sink })` and

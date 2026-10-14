@@ -40,3 +40,9 @@ export declare function telemetrySchema(table?: string): string;
 export declare function createPgTelemetrySink(opts: { db: TelemetryDb; table?: string; log?: { warn(...a: unknown[]): void } }): (samples: TelemetrySample[]) => Promise<void>;
 /** Retention: deletes rows whose `at` is older than olderThanDays (default 30); resolves with the count. */
 export declare function pruneTelemetry(opts: { db: TelemetryDb; table?: string; olderThanDays?: number }): Promise<number>;
+/** Scheduled retention: pruneTelemetry() delayMs after the call (default 60000) and then every everyMs (default
+ *  86400000), on unref'd timers, so a service redeployed more than daily still prunes. A failing prune is logged
+ *  and retried at the next tick; runs never overlap. run() prunes now (resolves with the count, 0 on failure);
+ *  stop() cancels the timers and waits for a run in flight. */
+export declare function startTelemetryRetention(opts: { db: TelemetryDb; table?: string; olderThanDays?: number; everyMs?: number; delayMs?: number;
+    log?: { error(...a: unknown[]): void } }): { run(): Promise<number>; stop(): Promise<void> };
