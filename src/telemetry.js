@@ -10,6 +10,9 @@
  *   t.record('deliver', 28, { subject, resource, status: 'ok' });   // { service, instance, operation, at, latency_ms, ...labels }
  *   t.count('cache.miss');                                          // a convenience wrapper around record()
  *   stop: [() => t.stop()],                                          // a gracefulStop stop step: one flush
+ *
+ * Where samples land: each service's own PostgreSQL table (telemetrySchema() in a migration, createPgTelemetrySink()
+ * as the sink, pruneTelemetry() for retention), not a central ingest; docs/service.md says why.
  */
 
 /** The fields platform.telemetry-sample@1 requires or allows, in the schema's order; null/undefined are stripped. */
@@ -137,4 +140,100 @@ function createTelemetry({ service = null, instance = null, sink = null, interva
     return { record, gauge, count, flush, stop };
 }
 
-module.exports = { telemetrySample, validateTelemetrySample, createTelemetry };
+const TABLE_RE = /^[a-z_][a-z0-9_]{0,62}$/;
+
+function checkTable(table, who) {
+    if (typeof table !== 'string' || !TABLE_RE.test(table)) throw new TypeError(`${who}: bad telemetry table name (lowercase letters, digits and _, at most 63)`);
+    return table;
+}
+
+/** The table's columns in platform.telemetry-sample@1 order (no `instance`: the schema has none), then `extra`. */
+const COLUMNS = ['at', 'service', 'project', 'subject', 'resource', 'provider', 'node', 'cell', 'region', 'operation',
+    'latency_ms', 'queue_delay_ms', 'ttfb_ms', 'throughput_per_second', 'bytes', 'status', 'cache_status',
+    'cost_estimate', 'route_epoch', 'trace_id', 'extra'];
+const TEXT = new Set(['project', 'subject', 'resource', 'provider', 'node', 'cell', 'region', 'status', 'cache_status', 'trace_id']);
+const NUMBER = new Set(['latency_ms', 'queue_delay_ms', 'ttfb_ms', 'throughput_per_second', 'cost_estimate']);
+const INTEGER = new Set(['bytes', 'route_epoch']);
+// PostgreSQL binds at most 65535 parameters per statement: past this many rows a flush takes a second INSERT.
+const MAX_ROWS = Math.floor(65535 / COLUMNS.length);
+
+/** The telemetry table's DDL, for a service migration (and tests): 21 columns, `extra` jsonb, and two indexes. */
+function telemetrySchema(table = 'telemetry_samples') {
+    checkTable(table, 'telemetrySchema');
+    return `CREATE TABLE IF NOT EXISTS ${table} (
+    id                    bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    at                    timestamptz NOT NULL,
+    service               text NOT NULL,
+    project               text,
+    subject               text,
+    resource              text,
+    provider              text,
+    node                  text,
+    cell                  text,
+    region                text,
+    operation             text NOT NULL,
+    latency_ms            double precision,
+    queue_delay_ms        double precision,
+    ttfb_ms               double precision,
+    throughput_per_second double precision,
+    bytes                 bigint,
+    status                text,
+    cache_status          text,
+    cost_estimate         double precision,
+    route_epoch           bigint,
+    trace_id              text,
+    extra                 jsonb NOT NULL DEFAULT '{}'::jsonb
+);
+CREATE INDEX IF NOT EXISTS ${table}_at_idx ON ${table} (at);
+CREATE INDEX IF NOT EXISTS ${table}_service_idx ON ${table} (service, operation, at);`;
+}
+
+/** Whether a row would insert: one bad field must not fail (and, kept by the collector, block) the whole batch. */
+function storable(s) {
+    if (!s || typeof s !== 'object' || Array.isArray(s)) return false;
+    if (typeof s.service !== 'string' || !s.service || typeof s.operation !== 'string' || !s.operation) return false;
+    if (typeof s.at !== 'string' || Number.isNaN(Date.parse(s.at))) return false;
+    for (const c of TEXT) if (s[c] != null && typeof s[c] !== 'string') return false;
+    for (const c of NUMBER) if (s[c] != null && !Number.isFinite(s[c])) return false;
+    for (const c of INTEGER) if (s[c] != null && !Number.isSafeInteger(s[c])) return false;
+    if (s.extra != null && (typeof s.extra !== 'object' || Array.isArray(s.extra))) return false;
+    return true;
+}
+
+/**
+ * A createTelemetry() / createHttpTelemetry() sink that stores each flush in `table` with one multi-row
+ * parameterized INSERT (a second one only past MAX_ROWS rows). A malformed sample (no service, operation or
+ * parseable `at`, or a field of the wrong type) is dropped with one warning per flush and the rest are stored;
+ * a missing field is NULL, `extra` is JSON ('{}' when absent). A rejected db.query propagates, so the collector
+ * logs it and keeps the batch for its next flush.
+ */
+function createPgTelemetrySink({ db, table = 'telemetry_samples', log = console } = {}) {
+    if (!db || typeof db.query !== 'function') throw new TypeError('createPgTelemetrySink: an openvibe-sdk/db handle is required');
+    checkTable(table, 'createPgTelemetrySink');
+    return async function sink(samples) {
+        const all = Array.isArray(samples) ? samples : [];
+        const rows = all.filter(storable);
+        if (rows.length < all.length) log.warn(`[telemetry] ${table}: dropped ${all.length - rows.length} malformed sample(s), stored ${rows.length}`);
+        for (let start = 0; start < rows.length; start += MAX_ROWS) {
+            const chunk = rows.slice(start, start + MAX_ROWS);
+            const values = [];
+            const tuples = chunk.map((s) => `(${COLUMNS.map((c) => {
+                values.push(c === 'extra' ? JSON.stringify(s.extra || {}) : (s[c] == null ? null : s[c]));
+                return `$${values.length}`;
+            }).join(', ')})`);
+            await db.query(`INSERT INTO ${table} (${COLUMNS.join(', ')}) VALUES ${tuples.join(', ')}`, values);
+        }
+    };
+}
+
+/** Retention: deletes the rows older than `olderThanDays` (default 30) and resolves with how many went. A
+ *  service runs it from a daily job or timer; the `at` index keeps it cheap. */
+async function pruneTelemetry({ db, table = 'telemetry_samples', olderThanDays = 30 } = {}) {
+    if (!db || typeof db.query !== 'function') throw new TypeError('pruneTelemetry: an openvibe-sdk/db handle is required');
+    checkTable(table, 'pruneTelemetry');
+    if (!(Number.isFinite(olderThanDays) && olderThanDays > 0)) throw new TypeError('pruneTelemetry: olderThanDays must be a positive number');
+    const r = await db.query(`DELETE FROM ${table} WHERE at < now() - make_interval(secs => $1)`, [olderThanDays * 86400]);
+    return r.rowCount;
+}
+
+module.exports = { telemetrySample, validateTelemetrySample, createTelemetry, telemetrySchema, createPgTelemetrySink, pruneTelemetry };
