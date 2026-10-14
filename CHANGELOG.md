@@ -3,6 +3,21 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.45.0 (2026-10-13)
+
+The telemetry sink every service stores into (plan T1, step 10). Step 5 left `createTelemetry({ sink })` and
+`createHttpTelemetry({ sink })` without a sink for any service but Network; `openvibe-sdk/telemetry` now ships one,
+a per-service PostgreSQL table (the decision and its reason are in `docs/service.md`, "Where the samples go"):
+
+- `telemetrySchema(table = 'telemetry_samples')`: the DDL for a service migration, `platform.telemetry-sample@1`'s
+  21 columns in schema order (no `instance`), `extra` jsonb, indexes on `(at)` and `(service, operation, at)`.
+- `createPgTelemetrySink({ db, table?, log? })`: the sink. One multi-row parameterized INSERT per flush; a malformed
+  sample (no service, operation or parseable `at`, or a field of the wrong type) is dropped with one warning and the
+  rest stored; a rejected `db.query` propagates, so the collector keeps the batch for its next flush.
+- `pruneTelemetry({ db, table?, olderThanDays = 30 })`: the retention delete.
+- A table name that does not match `/^[a-z_][a-z0-9_]{0,62}$/` throws, so no SQL goes in through it.
+- **Tests:** `test/telemetry-sink.test.js` on PGlite.
+
 ## 0.44.0 (2026-10-11)
 
 The SQLite kits are gone (plan T1, the deletion ledger): every OpenVibe service has run on PostgreSQL since

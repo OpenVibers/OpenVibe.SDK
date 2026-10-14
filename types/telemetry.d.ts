@@ -28,3 +28,15 @@ export interface TelemetryCollector {
  *  past maxBuffered the oldest sample is dropped, with a warning at most once a minute. */
 export declare function createTelemetry(opts: { service?: string | null; instance?: string | null; sink: (samples: TelemetrySample[]) => Promise<void> | void;
     intervalMs?: number; now?: () => number; log?: { warn(...a: unknown[]): void; error(...a: unknown[]): void }; maxBuffered?: number }): TelemetryCollector;
+/** Anything with openvibe-sdk/db's query(text, values) (a handle or a transaction's). */
+export type TelemetryDb = { query(text: string, values?: unknown[]): Promise<{ rows: unknown[]; rowCount: number }> };
+/** The telemetry table's DDL for a service migration: platform.telemetry-sample@1's 21 columns in order (no
+ *  `instance`), `extra` jsonb, indexes on (at) and (service, operation, at). The table name must match
+ *  /^[a-z_][a-z0-9_]{0,62}$/ or it throws. Default `telemetry_samples`. */
+export declare function telemetrySchema(table?: string): string;
+/** A sink for createTelemetry() / createHttpTelemetry(): one multi-row parameterized INSERT per flush. A malformed
+ *  sample is dropped with one warning and the rest stored; missing fields are NULL, `extra` is JSON; a rejected
+ *  db.query propagates (the collector keeps the batch). */
+export declare function createPgTelemetrySink(opts: { db: TelemetryDb; table?: string; log?: { warn(...a: unknown[]): void } }): (samples: TelemetrySample[]) => Promise<void>;
+/** Retention: deletes rows whose `at` is older than olderThanDays (default 30); resolves with the count. */
+export declare function pruneTelemetry(opts: { db: TelemetryDb; table?: string; olderThanDays?: number }): Promise<number>;

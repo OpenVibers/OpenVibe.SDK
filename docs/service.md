@@ -174,7 +174,7 @@ that matched no route is `unmatched`, and the per-flush key map and latency samp
 const svc = require('openvibe-sdk/service');
 const collector = svc.createHttpTelemetry({
     service: 'blog',                                     // the schema's service; there is no `instance` field
-    sink: (samples) => post('/internal/telemetry', samples),   // one batch per flush
+    sink: createPgTelemetrySink({ db, log }),             // one batch per flush (see below)
     intervalMs: 15000,                                   // also the p95 window
     skipPrefixes: ['/shared'],                           // default ['/shared']; Network passes '/shared', '/api/chrome'
     routeLabel: (req) => metrics.routeLabel(req),        // optional; default reads req.route.path under req.baseUrl
@@ -197,6 +197,36 @@ svc.gracefulStop({ name: 'Blog', server, stop: [() => svc.telemetry.stop()] }); 
 and the counts in `extra`; the p95 gauge carries its value in `latency_ms` (it is a latency); the active-requests
 and event-loop-lag gauges carry theirs in `extra`, never in `latency_ms` (which a consumer reads as a response
 time). `registerSignals({ start, stop, lag })` injects a service's own monitor in place of the default.
+
+### Where the samples go
+
+**Decision (T1 step 10): each service stores its samples in its own PostgreSQL table**, not in a central ingest
+(a Network `/internal/telemetry` route behind service-token auth). Why:
+
+- Every service already has an `openvibe-sdk/db` handle and a migration directory; a sink that is an INSERT adds no
+  network hop, no token, no new route and no new failure mode. A central route would make Network a dependency of
+  every service's telemetry, and an outage there would turn into buffered (then dropped) samples everywhere.
+- It is the pattern the SDK already ships for the outbox and the usage relay (`outboxSchema()` in a migration, a
+  helper on the handle), so a service adds one migration file and one argument.
+- A row costs the service's own database, which the placement and cost work (T5/T13) can already see per service;
+  a consumer that needs the fleet view reads the tables (or a later relay copies them) without changing any emitter.
+
+```js
+const { telemetrySchema, createPgTelemetrySink, pruneTelemetry } = require('openvibe-sdk/telemetry');
+// migrations/NNN_telemetry.sql: the text of telemetrySchema() (21 columns in platform.telemetry-sample@1 order,
+// no `instance`, `extra` jsonb, indexes on (at) and (service, operation, at)); the default table is telemetry_samples.
+const collector = svc.createHttpTelemetry({ service: 'blog', sink: createPgTelemetrySink({ db, log }) });
+svc.gracefulStop({ name: 'Blog', server, stop: [() => collector.stop()] });   // the last flush is one INSERT
+await pruneTelemetry({ db });   // a daily job: DELETE … WHERE at < now() - 30 days (olderThanDays to change it)
+```
+
+The sink does one multi-row parameterized INSERT per flush (a second only past 3120 rows, PostgreSQL's 65535
+parameter limit). A malformed sample (no `service`, `operation` or parseable `at`, a text field that is not a string,
+a number that is not finite, a non-integer `bytes`/`route_epoch`, an `extra` that is not an object) is dropped with
+one warning per flush and the rest stored, so one bad sample never blocks a batch the collector would otherwise
+retry forever. A missing field is NULL and a missing `extra` is `{}`. A rejected `db.query` propagates: the collector
+logs it and keeps the batch for the next flush. The table name must match `/^[a-z_][a-z0-9_]{0,62}$/` or the helpers
+throw, so no SQL goes in through it.
 
 **Network and Community** delete `server/telemetry.js` and the telemetry block of `server/observability.js`
 (`telemetrySkipped`/`telemetryMiddleware`/the loop monitor) and register the kit's middleware with
