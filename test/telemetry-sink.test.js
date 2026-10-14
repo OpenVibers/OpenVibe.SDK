@@ -7,7 +7,7 @@
 const assert = require('node:assert/strict');
 const { run } = require('./helpers');
 const { createDb } = require('../src/db');
-const { telemetrySample, createTelemetry, telemetrySchema, createPgTelemetrySink, pruneTelemetry } = require('../src/telemetry');
+const { telemetrySample, createTelemetry, telemetrySchema, createPgTelemetrySink, pruneTelemetry, startTelemetryRetention } = require('../src/telemetry');
 
 const COLUMNS = ['id', 'at', 'service', 'project', 'subject', 'resource', 'provider', 'node', 'cell', 'region', 'operation',
     'latency_ms', 'queue_delay_ms', 'ttfb_ms', 'throughput_per_second', 'bytes', 'status', 'cache_status',
@@ -136,6 +136,30 @@ run([
             assert.deepEqual((await db.many('SELECT operation FROM telemetry_samples ORDER BY id')).map((r) => r.operation), ['d29', 'd1']);
             assert.equal(await pruneTelemetry({ db, olderThanDays: 7 }), 1);
             await assert.rejects(pruneTelemetry({ db, olderThanDays: 0 }), /olderThanDays/);
+        } finally { await db.close(); }
+    }],
+
+    ['startTelemetryRetention prunes soon after start (not a day later), then again, logs a failure and stops', async () => {
+        const db = await open();
+        try {
+            const old = new Date(Date.now() - 40 * 86400e3).toISOString();
+            await createPgTelemetrySink({ db, log: logger() })([{ service: 'blog', operation: 'old', at: old }, { service: 'blog', operation: 'new', at: new Date().toISOString() }]);
+            const errors = [];
+            const r = startTelemetryRetention({ db, delayMs: 20, everyMs: 60, log: { error: (m) => errors.push(String(m)) } });
+            await new Promise((ok) => setTimeout(ok, 250));
+            assert.deepEqual((await db.many('SELECT operation FROM telemetry_samples')).map((x) => x.operation), ['new']);
+            assert.equal(errors.length, 0);
+            assert.equal(await r.run(), 0);
+            await r.stop();
+            await createPgTelemetrySink({ db, log: logger() })([{ service: 'blog', operation: 'old2', at: old }]);
+            await new Promise((ok) => setTimeout(ok, 150));
+            assert.equal(await db.value('SELECT count(*)::int FROM telemetry_samples'), 2, 'nothing prunes after stop()');
+            const bad = startTelemetryRetention({ db: { query: async () => { throw new Error('db down'); } }, delayMs: 5, everyMs: 1000, log: { error: (m) => errors.push(String(m)) } });
+            assert.equal(await bad.run(), 0);
+            await bad.stop();
+            assert.match(errors[0], /retention prune failed: db down/);
+            assert.throws(() => startTelemetryRetention({ db, everyMs: 0 }), /everyMs/);
+            assert.throws(() => startTelemetryRetention({ db, table: 'x; drop' }), /bad telemetry table name/);
         } finally { await db.close(); }
     }],
 ]);

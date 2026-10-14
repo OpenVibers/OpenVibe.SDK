@@ -3,5 +3,6 @@ import cjs from '../src/telemetry.js';
 
 export const {
     telemetrySample, validateTelemetrySample, createTelemetry, telemetrySchema, createPgTelemetrySink, pruneTelemetry,
+    startTelemetryRetention,
 } = cjs;
 export default cjs;

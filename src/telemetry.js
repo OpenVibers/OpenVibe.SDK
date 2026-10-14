@@ -12,7 +12,7 @@
  *   stop: [() => t.stop()],                                          // a gracefulStop stop step: one flush
  *
  * Where samples land: each service's own PostgreSQL table (telemetrySchema() in a migration, createPgTelemetrySink()
- * as the sink, pruneTelemetry() for retention), not a central ingest; docs/service.md says why.
+ * as the sink, pruneTelemetry() for retention, startTelemetryRetention() to schedule it), not a central ingest; docs/service.md says why.
  */
 
 /** The fields platform.telemetry-sample@1 requires or allows, in the schema's order; null/undefined are stripped. */
@@ -236,4 +236,34 @@ async function pruneTelemetry({ db, table = 'telemetry_samples', olderThanDays =
     return r.rowCount;
 }
 
-module.exports = { telemetrySample, validateTelemetrySample, createTelemetry, telemetrySchema, createPgTelemetrySink, pruneTelemetry };
+/** Scheduled retention: runs pruneTelemetry() `delayMs` after the call (default 60 s) and then every `everyMs`
+ *  (default 24 h), both on unref'd timers. The first run is soon, not a day out, so a service that is redeployed
+ *  more often than once a day still prunes. A failing prune is logged and tried again at the next tick; runs never
+ *  overlap. `run()` prunes now; `stop()` cancels the timers. */
+function startTelemetryRetention({ db, table = 'telemetry_samples', olderThanDays = 30, everyMs = 86400e3, delayMs = 60e3, log = console } = {}) {
+    // pruneTelemetry validates db, table and olderThanDays; fail here, not inside a timer
+    if (!db || typeof db.query !== 'function') throw new TypeError('startTelemetryRetention: an openvibe-sdk/db handle is required');
+    checkTable(table, 'startTelemetryRetention');
+    if (!(Number.isFinite(olderThanDays) && olderThanDays > 0)) throw new TypeError('startTelemetryRetention: olderThanDays must be a positive number');
+    if (!(Number.isFinite(everyMs) && everyMs > 0)) throw new TypeError('startTelemetryRetention: everyMs must be a positive number');
+    if (!(Number.isFinite(delayMs) && delayMs >= 0)) throw new TypeError('startTelemetryRetention: delayMs must be a non-negative number');
+    let running = null;
+    let stopped = false;
+    const run = () => {
+        if (running) return running;
+        running = pruneTelemetry({ db, table, olderThanDays })
+            .catch((err) => { log.error(`[telemetry] ${table}: retention prune failed: ${err && err.message}`); return 0; })
+            .finally(() => { running = null; });
+        return running;
+    };
+    const first = setTimeout(() => { if (!stopped) run(); }, delayMs);
+    const every = setInterval(() => { if (!stopped) run(); }, everyMs);
+    if (first.unref) first.unref();
+    if (every.unref) every.unref();
+    return {
+        run,
+        async stop() { stopped = true; clearTimeout(first); clearInterval(every); if (running) await running; },
+    };
+}
+
+module.exports = { telemetrySample, validateTelemetrySample, createTelemetry, telemetrySchema, createPgTelemetrySink, pruneTelemetry, startTelemetryRetention };

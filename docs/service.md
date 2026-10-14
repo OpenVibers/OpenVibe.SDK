@@ -212,12 +212,13 @@ time). `registerSignals({ start, stop, lag })` injects a service's own monitor i
   a consumer that needs the fleet view reads the tables (or a later relay copies them) without changing any emitter.
 
 ```js
-const { telemetrySchema, createPgTelemetrySink, pruneTelemetry } = require('openvibe-sdk/telemetry');
+const { telemetrySchema, createPgTelemetrySink, startTelemetryRetention } = require('openvibe-sdk/telemetry');
 // migrations/NNN_telemetry.sql: the text of telemetrySchema() (21 columns in platform.telemetry-sample@1 order,
 // no `instance`, `extra` jsonb, indexes on (at) and (service, operation, at)); the default table is telemetry_samples.
 const collector = svc.createHttpTelemetry({ service: 'blog', sink: createPgTelemetrySink({ db, log }) });
 svc.gracefulStop({ name: 'Blog', server, stop: [() => collector.stop()] });   // the last flush is one INSERT
-await pruneTelemetry({ db });   // a daily job: DELETE … WHERE at < now() - 30 days (olderThanDays to change it)
+const retention = startTelemetryRetention({ db, log });   // DELETE … WHERE at < now() - 30 days: 60 s after start, then daily
+// add `() => retention.stop()` to the stop steps; pruneTelemetry({ db }) is the one-off delete it calls
 ```
 
 The sink does one multi-row parameterized INSERT per flush (a second only past 3120 rows, PostgreSQL's 65535
