@@ -52,6 +52,7 @@ const ENTRIES = {
     'projects.mjs': '../src/projects.js',
     'geo.mjs': '../src/geo.js',
     'openre.mjs': '../src/openre.js',
+    'play.mjs': '../src/play.js',
     'quest.mjs': '../src/quest.js',
     'vip.mjs': '../src/vip.js',
     'frame.mjs': '../src/frame.js',
