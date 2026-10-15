@@ -16,6 +16,7 @@ export * as tools from './tools';
 export * as projects from './projects';
 export * as resources from './resources';
 export * as vip from './vip';
+export * as quest from './quest';
 export * as openre from './openre';
 export * as geo from './geo';
 export * as usage from './usage';
