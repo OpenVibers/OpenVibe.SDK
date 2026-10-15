@@ -3,6 +3,13 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.47.0 (2026-10-15)
+
+- `openvibe-sdk/quest`: `createQuestClient(client)` → `appQuests.define(slug, quest)`, `appQuests.list()`,
+  `appQuests.retire(slug)`, and `eventType(projectId, name)` / `projectKey(projectId)` for the `app.<project_key>.<name>`
+  events an app publishes. App quests (contracts 0.193.0, `quest.app_quest.manage`): a developer app defines quests on
+  its own events on OpenVibe.Quest; the reward is a badge named for the app, never OpenCoins.
+
 ## 0.46.0 (2026-10-13)
 
 - `startTelemetryRetention({ db, table?, olderThanDays = 30, everyMs = 24 h, delayMs = 60 s, log? })` → `{ run(), stop() }`:
