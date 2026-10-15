@@ -12,7 +12,14 @@
  *       routeLabel: (req) => metrics.routeLabel(req),              // optional; the default reads req.route.path
  *   });
  *   app.use(collector.middleware());
- *   svc.gracefulStop({ name: 'Blog', server, stop: [() => collector.stop()] });   // one flush at shutdown
+ *   const tick = setInterval(() => { collector.flush().catch(() => {}); }, 15000);   // the caller's timer, see below
+ *   tick.unref();
+ *   svc.gracefulStop({ name: 'Blog', server, stop: [() => { clearInterval(tick); return collector.stop(); }] });
+ *
+ * A collector made with createHttpTelemetry() has NO timer of its own: each interval's requests stay in its
+ * aggregation map until flush() or stop() emits them (the inner buffer's timer only flushes samples already
+ * emitted). Call flush() on a timer, as above, or use the singleton below, whose init() runs that timer; with
+ * neither, a service writes its request samples only when it stops (Blog and eight services did, 2026-10-15).
  *
  * The process-wide singleton keeps Network's shape, for services that just want it wired at boot:
  * `svc.telemetry.init({ service, sink, … })` starts the flush timer and the event-loop monitor,
