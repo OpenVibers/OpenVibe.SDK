@@ -19,7 +19,7 @@
  * A collector made with createHttpTelemetry() has NO timer of its own: each interval's requests stay in its
  * aggregation map until flush() or stop() emits them (the inner buffer's timer only flushes samples already
  * emitted). Call flush() on a timer, as above, or use the singleton below, whose init() runs that timer; with
- * neither, a service writes its request samples only when it stops (Blog and nine services did, 2026-10-15).
+ * neither, a service writes its request samples only when it stops (Blog and eight services did, 2026-10-15).
  *
  * The process-wide singleton keeps Network's shape, for services that just want it wired at boot:
  * `svc.telemetry.init({ service, sink, … })` starts the flush timer and the event-loop monitor,
