@@ -37,7 +37,7 @@ export declare function telemetrySchema(table?: string): string;
 /** A sink for createTelemetry() / createHttpTelemetry(): one multi-row parameterized INSERT per flush. A malformed
  *  sample is dropped with one warning and the rest stored; missing fields are NULL, `extra` is JSON; a rejected
  *  db.query propagates (the collector keeps the batch). */
-export declare function createPgTelemetrySink(opts: { db: TelemetryDb; table?: string; log?: { warn(...a: unknown[]): void } }): (samples: TelemetrySample[]) => Promise<void>;
+export declare function createPgTelemetrySink(opts: { db: TelemetryDb; table?: string; log?: { warn(...a: unknown[]): void } }): (samples: ReadonlyArray<Partial<TelemetrySample>>) => Promise<void>;
 /** Retention: deletes rows whose `at` is older than olderThanDays (default 30); resolves with the count. */
 export declare function pruneTelemetry(opts: { db: TelemetryDb; table?: string; olderThanDays?: number }): Promise<number>;
 /** Scheduled retention: pruneTelemetry() delayMs after the call (default 60000) and then every everyMs (default
