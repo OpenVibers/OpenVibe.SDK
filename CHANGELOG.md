@@ -3,6 +3,14 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.48.0 (2026-10-15)
+
+- `openvibe-sdk/play`: `createPlayClient(client)` for OpenVibe.Play's game services (the owner's "game services in the
+  SDK"): `titles.define/list/get`, `scores.post`, `achievements.unlock`, `players.adopt/achievements`, `boards.get`.
+  Writes use the game's own principal (audience `openvibe.play`, `play.title.manage` / `play.result.write` /
+  `play.player.read`); titles and leaderboards are public reads without a token; a player is checked (usr_… or
+  guest:<opaque>) before the request leaves.
+
 ## 0.47.0 (2026-10-15)
 
 - `openvibe-sdk/quest`: `createQuestClient(client)` → `appQuests.define(slug, quest)`, `appQuests.list()`,
