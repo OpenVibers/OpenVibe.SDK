@@ -8,6 +8,6 @@ export const {
     registry, identity, modules, events, realtime, media,
     community, bot, search, chat, ai, jobs,
     tools, projects, resources, vip, quest, play,
-    openre, geo, usage, commerce, telemetry,
+    download, openre, geo, usage, commerce, telemetry,
 } = cjs;
 export default cjs;
