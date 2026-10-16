@@ -3,6 +3,12 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.49.1 (2026-10-16)
+
+- Outbox: Events' `409 events.loop_detected` is a permanent refusal: the row is marked rejected instead of being
+  retried with backoff forever (Search retried 18 such events up to 35 times each after a Reviews loop was fixed).
+  Every other 409 is still retried.
+
 ## 0.49.0 (2026-10-15)
 
 - `openvibe-sdk/download`: `createDownloadClient({ key })` for OpenVibe.Download (the owner's "file storage and backup"):

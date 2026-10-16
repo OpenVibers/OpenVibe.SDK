@@ -17,7 +17,9 @@
  *
  * Delivery is at least once: a crash between publish and mark-sent republishes the same event_id,
  * which OpenVibe.Events answers as a duplicate. A 4xx other than 401/408/409/425/429 is permanent
- * (the row is marked rejected and never retried); anything else is retried with backoff.
+ * (the row is marked rejected and never retried), and so is Events' 409 events.loop_detected (a trace that already
+ * carries too many hops of that type is refused for good: retrying it only repeats the refusal); anything else is
+ * retried with backoff.
  */
 
 const TRACEPARENT_RE = /^00-([0-9a-f]{32})-[0-9a-f]{16}-[0-9a-f]{2}$/;
@@ -44,6 +46,7 @@ function serialFlush(pass) {
 function isPermanent(err) {
     const s = err && err.status;
     if (err && typeof err.url === 'string' && /\/oauth\/token(\?|$)/.test(err.url)) return false;
+    if (s === 409 && err.code === 'events.loop_detected') return true;
     return Number.isInteger(s) && s >= 400 && s < 500 && !RETRYABLE_4XX.has(s);
 }
 

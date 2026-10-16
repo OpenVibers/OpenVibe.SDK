@@ -93,6 +93,22 @@ function cases(label, open) {
                 assert.equal(await outbox.pending(), 1);
             } finally { await done(); }
         }],
+        [`${label}: Events' loop refusal (409 events.loop_detected) rejects the row; any other 409 is retried`, async () => {
+            const { db, done } = await open();
+            try {
+                const { events } = eventsClient();
+                // Like Events: a batch holding the looped event is refused as a loop, so the relay tries each row alone.
+                const looped = { prepare: events.prepare, publish: (env) => Promise.reject(Object.assign(new Error('loop'), { status: 409, code: (Array.isArray(env) ? env : [env]).some((e) => e.subject.id === 'loop') ? 'events.loop_detected' : 'events.conflict' })) };
+                const outbox = createPgOutbox(db, { events: looped });
+                await db.tx(async (t) => {
+                    await outbox.enqueue(t, { event_type: 'live.stream.started', actor, subject: { type: 'stream', id: 'loop' } });
+                    await outbox.enqueue(t, { event_type: 'live.stream.started', actor, subject: { type: 'stream', id: 'busy' } });
+                });
+                assert.deepEqual(await outbox.flush(), { sent: 0, failed: 1, rejected: 1 });
+                assert.equal(await outbox.rejected(), 1, 'the looped event is not retried');
+                assert.equal(await outbox.pending(), 1, 'the other conflict waits for its retry');
+            } finally { await done(); }
+        }],
         [`${label}: a flush during a pass also publishes what was committed after that pass claimed`, async () => {
             const { db, done } = await open();
             try {
