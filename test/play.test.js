@@ -32,7 +32,25 @@ const { OpenVibeError } = require('../src/core/errors');
     assert.deepStrictEqual(calls[3].json, { person: KIM });
     assert.deepStrictEqual(calls[5].query, { period: 'week', page: undefined });
     assert.throws(() => play.achievements.unlock('gem-run', { player: 'kim', achievements: ['x'] }), /player/);
+
+    // Cloud saves: the title's own token, the slot in the path, the version only when given.
+    calls.length = 0;
+    await play.saves.put('gem-run', KIM, 'main', { data: { level: 3 }, version: 0 });
+    await play.saves.put('gem-run', KIM, 'main', { data: { level: 4 } });
+    await play.saves.get('gem-run', KIM, 'main');
+    await play.saves.list('gem-run', KIM);
+    await play.saves.remove('gem-run', KIM, 'main');
+    assert.deepStrictEqual(calls.map((c) => [c.method || 'GET', c.path, c.audience]), [
+        ['PUT', `/api/v1/titles/gem-run/players/${KIM}/saves/main`, 'openvibe.play'],
+        ['PUT', `/api/v1/titles/gem-run/players/${KIM}/saves/main`, 'openvibe.play'],
+        ['GET', `/api/v1/titles/gem-run/players/${KIM}/saves/main`, 'openvibe.play'],
+        ['GET', `/api/v1/titles/gem-run/players/${KIM}/saves`, 'openvibe.play'],
+        ['DELETE', `/api/v1/titles/gem-run/players/${KIM}/saves/main`, 'openvibe.play'],
+    ]);
+    assert.deepStrictEqual([calls[0].json, calls[1].json], [{ data: { level: 3 }, version: 0 }, { data: { level: 4 } }]);
+    assert.throws(() => play.saves.get('gem-run', 'kim', 'main'), /player/);
     missing = true;
+    assert.strictEqual(await play.saves.get('gem-run', KIM, 'empty'), null, 'an empty slot is null');
     assert.strictEqual(await play.titles.get('nope'), null);
     assert.strictEqual(await play.boards.get('gem-run', 'nope'), null);
     await assert.rejects(play.titles.define('nope', { name: 'x' }), (e) => e.status === 404, 'a write is not swallowed');

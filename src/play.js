@@ -1,6 +1,6 @@
 'use strict';
 /**
- * openvibe-sdk/play — OpenVibe.Play, the network's game services (achievements and leaderboards, Steamworks-style),
+ * openvibe-sdk/play — OpenVibe.Play, the network's game services (achievements, leaderboards and cloud saves, Steamworks-style),
  * for any game: register a title, post scores and unlocks, read a player's achievements. Server-side: a game posts
  * with its own principal's token (audience openvibe.play): a first-party service token, or a developer app's token
  * granted play.title.manage / play.result.write / play.player.read. The principal that registers a title is its only
@@ -17,6 +17,9 @@
  *   await play.players.adopt('gem-run', 'abc12345', 'usr_…');              // a guest signed in: their rows become the person's
  *   await play.players.achievements('gem-run', 'usr_…');                   // play.player-achievements@1
  *   await play.boards.get('gem-run', 'high-score', { period: 'week' });    // public: rank, name, score (never a player id)
+ *   await play.saves.put('gem-run', 'usr_…', 'main', { data: { level: 3 }, version: 0 });   // → { slot, version: 1, … }
+ *   await play.saves.get('gem-run', 'usr_…', 'main');                      // → { slot, version, data, … } or null
+ *   // a stale version is OpenVibeError 409 play.save_conflict: read again, merge, write with the new version
  *
  * Shapes: Contracts play.title-definition@1, play.result-request@1, play.result-response@1, play.title-result@1,
  * play.player-achievements@1. Errors are OpenVibeError (status, code); a missing title or board is null from get().
@@ -61,6 +64,20 @@ function createPlayClient(client, { baseUrl } = {}) {
             adopt: (title, guest, person, { signal } = {}) => call({ method: 'POST', path: `/api/v1/titles/${enc(title)}/players/${enc(guest)}/adopt`, json: { person }, signal, idempotencyKey: false }),
             /** A player's unlocks in a title you manage (play.player.read). */
             achievements: (title, who, { signal } = {}) => call({ path: `/api/v1/titles/${enc(title)}/players/${enc(player(who))}/achievements`, signal }),
+        },
+        saves: {
+            /** Write a player's save slot (play.result.write): any JSON up to 64 KB. `version` is the one you read (0 for a
+             *  new slot); a stale one is refused (409 play.save_conflict). Leave it out to overwrite. At most 8 slots. */
+            put: (title, who, slot, { data, version } = {}, { signal } = {}) => call({
+                method: 'PUT', path: `/api/v1/titles/${enc(title)}/players/${enc(player(who))}/saves/${enc(slot)}`, signal, idempotencyKey: false,
+                json: { data, ...(version !== undefined && version !== null ? { version } : {}) },
+            }),
+            /** One slot with its data (play.player.read), or null when the slot is empty. */
+            get: (title, who, slot, { signal } = {}) => orNull(call({ path: `/api/v1/titles/${enc(title)}/players/${enc(player(who))}/saves/${enc(slot)}`, signal })),
+            /** A player's slots in your title, without their data (play.player.read). */
+            list: (title, who, { signal } = {}) => call({ path: `/api/v1/titles/${enc(title)}/players/${enc(player(who))}/saves`, signal }),
+            /** Delete a slot (play.result.write). */
+            remove: (title, who, slot, { signal } = {}) => call({ method: 'DELETE', path: `/api/v1/titles/${enc(title)}/players/${enc(player(who))}/saves/${enc(slot)}`, signal, idempotencyKey: false }),
         },
         boards: {
             /** Public: a leaderboard page (rank, name, score; never a player id), or null. period: e.g. 'all', 'week'. */

@@ -3,6 +3,12 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.50.0 (2026-10-16)
+
+- `openvibe-sdk/play`: **cloud saves** — `play.saves.put(title, player, slot, { data, version })`, `get` (null when the
+  slot is empty), `list` and `remove`, for OpenVibe.Play's new save slots (8 per player per title, 64 KB of JSON each,
+  versioned: a stale `version` is `409 play.save_conflict`). Same token and capabilities as scores and achievements.
+
 ## 0.49.1 (2026-10-16)
 
 - Outbox: Events' `409 events.loop_detected` is a permanent refusal: the row is marked rejected instead of being
