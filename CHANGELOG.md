@@ -3,6 +3,17 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.49.0 (2026-10-15)
+
+- `openvibe-sdk/download`: `createDownloadClient({ key })` for OpenVibe.Download (the owner's "file storage and backup"):
+  `files.list/all/get/remove`, `folders.list/create/ensurePath`, `upload({ path | data, name, folderId })` in the
+  drive's parts, `usage()`, and `sync(dir, { to, delete, dryRun, exclude, onEvent })`, which keeps a local folder backed
+  up (only what is new or changed: size, and sha256 when the drive has one; folders mirrored; `delete` removes drive
+  copies whose local file is gone). Authenticates with a sync key from openvibe.download/sync, or a person's token;
+  waits out 429s; stops on the drive's daily cap or quota with the reason.
+- The `openvibe-download` command (`bin`): `sync <folder> --to <drive/path> [--delete] [--dry-run] [--exclude NAME]`,
+  `ls [path]`, `usage`, with `OPENVIBE_DOWNLOAD_KEY`.
+
 ## 0.48.0 (2026-10-15)
 
 - `openvibe-sdk/play`: `createPlayClient(client)` for OpenVibe.Play's game services (the owner's "game services in the
