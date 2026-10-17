@@ -85,6 +85,30 @@ run([
         assert.equal(calls[4].init.headers['Idempotency-Key'], undefined);
         assert.equal(client.baseUrl(), 'http://billing.test');
     }],
+    ['tiers: the tier on a subscription checkout and a credit period; listTiers and setTier use billing.tier.manage', async () => {
+        const { client: noTierCap, calls: readCalls } = rig([json(200, { tiers: [] })]);
+        await noTierCap.listTiers('u2');
+        assert.equal(readCalls[0].init.headers.Authorization, 'Bearer intent', 'listTiers without caps.tier reads with the intent capability');
+        const calls = [];
+        const fetchImpl = async (url, init) => { calls.push({ url, init }); return json(200, { ok: true }); };
+        const mk = (name) => ({ authHeaders: async () => ({ Authorization: `Bearer ${name}` }), invalidate: () => {} });
+        const client = createCommerceClient(CONFIG, { caps: { ...CAPS, tier: 'billing.tier.manage' }, fetchImpl, tokenClients: { intent: mk('intent'), subscription: mk('subscription'), tier: mk('tier') } });
+        await client.createIntent({ provider: 'powerchat', kind: 'subscription', subject: 'u1', creator: 'u2', tier: 2, key: 'k' });
+        await client.subscribeWithCredit({ subscriber: 'a', creator: 'b', tier: 3, key: 's' });
+        await client.listTiers('u 2');
+        await client.setTier({ creator: 'u2', tier: 2, priceCents: 1500, key: 't' });
+        await client.setTier({ creator: 'u2', tier: 2, priceCents: 1500, status: 'archived', key: 't2' });
+        assert.equal(JSON.parse(calls[0].init.body).tier, 2);
+        assert.equal(JSON.parse(calls[1].init.body).tier, 3);
+        assert.deepEqual(calls.slice(2, 5).map((c) => [c.init.method, c.url.replace('http://billing.test', '')]), [['GET', '/api/v1/tiers/u%202'], ['PUT', '/api/v1/tiers/u2/2'], ['PUT', '/api/v1/tiers/u2/2']]);
+        assert.deepEqual(calls.slice(2, 5).map((c) => c.init.headers.Authorization), ['Bearer tier', 'Bearer tier', 'Bearer tier']);
+        assert.deepEqual(JSON.parse(calls[3].init.body), { price_cents: 1500 });
+        assert.deepEqual(JSON.parse(calls[4].init.body), { price_cents: 1500, status: 'archived' });
+        assert.equal(calls[3].init.headers['Idempotency-Key'], 't');
+        const plain = rig([json(200, {})]);
+        await plain.client.subscribeWithCredit({ subscriber: 'a', creator: 'b' });
+        assert.equal('tier' in JSON.parse(plain.calls[0].init.body), false, 'no tier unless asked: Billing sells tier 1');
+    }],
     ['a 401 invalidates the token and retries once with the same Idempotency-Key', async () => {
         const { client, calls, invalidated } = rig([json(401, { code: 'unauthorized' }), json(200, { transaction: { id: 't' } })]);
         const out = await client.createTransfer({ from: 'a', to: 'b', amount: 1, kind: 'tip', key: 'tip:i1' });

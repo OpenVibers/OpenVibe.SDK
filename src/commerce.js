@@ -45,7 +45,7 @@ const qs = (o) => {
 /**
  * `config`: { billing: { url, audience, timeoutMs = 10000 }, network: { internalUrl }, oauth: { clientId, clientSecret } }.
  * `caps` maps the logical keys intent / transfer / subscription / entitlement (and optionally rates, default
- * entitlement) to capability strings; a client is created per distinct capability string, so two keys that map to
+ * entitlement, and tier: billing.tier.manage, which setTier needs and listTiers prefers over intent) to capability strings; a client is created per distinct capability string, so two keys that map to
  * one string (or a space-separated scope) share one token. `tokenClients` may be keyed by logical key or by
  * capability string; any other capability gets a serviceAuth token client with scope = the capability.
  */
@@ -96,11 +96,11 @@ function createCommerceClient(config, { caps, fetchImpl = globalThis.fetch, toke
     }
 
     return {
-        /** { intent, checkout_url }: kind purchase buys `bits` of credit; kind subscription is a checkout for `subject` to `creator`. */
-        createIntent: async ({ provider, kind = 'purchase', subject, bits, creator, autoRenew, successUrl, cancelUrl, key, traceparent }) => await call('intent', 'POST', '/api/v1/intents', {
+        /** { intent, checkout_url }: kind purchase buys `bits` of credit; kind subscription is a checkout for `subject` to `creator` (at `tier`'s price, 1 by default). */
+        createIntent: async ({ provider, kind = 'purchase', subject, bits, creator, tier, autoRenew, successUrl, cancelUrl, key, traceparent }) => await call('intent', 'POST', '/api/v1/intents', {
             body: {
                 provider, kind, subject: user(subject),
-                ...(kind === 'subscription' ? { streamer: user(creator), auto_renew: !!autoRenew } : { bits }),
+                ...(kind === 'subscription' ? { streamer: user(creator), auto_renew: !!autoRenew, ...(tier != null ? { tier } : {}) } : { bits }),
                 success_url: successUrl, cancel_url: cancelUrl,
             },
             key, traceparent,
@@ -111,9 +111,9 @@ function createCommerceClient(config, { caps, fetchImpl = globalThis.fetch, toke
             key, traceparent,
         }),
         refundTransfer: async ({ txnId, amount, reason, key }) => await call('transfer', 'POST', `/api/v1/transfers/${encodeURIComponent(txnId)}/refund`, { body: { amount, reason }, key }),
-        /** { subscription, entitlement, transaction }: one period paid from the member's credit. */
-        subscribeWithCredit: async ({ subscriber, creator, autoRenew, key, traceparent }) => await call('subscription', 'POST', '/api/v1/subscriptions', {
-            body: { subscriber: user(subscriber), streamer: user(creator), source: 'credit', auto_renew: autoRenew !== false },
+        /** { subscription, entitlement, transaction }: one period paid from the member's credit (at `tier`'s price, 1 by default). */
+        subscribeWithCredit: async ({ subscriber, creator, tier, autoRenew, key, traceparent }) => await call('subscription', 'POST', '/api/v1/subscriptions', {
+            body: { subscriber: user(subscriber), streamer: user(creator), source: 'credit', auto_renew: autoRenew !== false, ...(tier != null ? { tier } : {}) },
             key, traceparent,
         }),
         cancelSubscription: async ({ id, key, traceparent }) => await call('subscription', 'POST', `/api/v1/subscriptions/${encodeURIComponent(id)}/cancel`, { body: {}, key, traceparent }),
@@ -122,6 +122,12 @@ function createCommerceClient(config, { caps, fetchImpl = globalThis.fetch, toke
         /** { active, expires_at, subscription }: the authoritative answer. */
         entitlement: async (subject, creator) => await call('entitlement', 'GET', `/api/v1/entitlements/${encodeURIComponent(subject)}${qs({ streamer: creator })}`),
         rates: async () => await call(caps.rates ? 'rates' : 'entitlement', 'GET', '/api/v1/rates'),
+        /** { streamer, tiers: [{ tier, price_cents, status }], default_price_cents, min_price_cents, max_price_cents, max_tiers }: Billing prices a creator's tiers. */
+        listTiers: async (creator) => await call(caps.tier ? 'tier' : 'intent', 'GET', `/api/v1/tiers/${encodeURIComponent(creator)}`),
+        /** { tier }: set the monthly price (USD cents) of one of `creator`'s tiers (billing.tier.manage; status active or archived). */
+        setTier: async ({ creator, tier, priceCents, status, key, traceparent }) => await call('tier', 'PUT', `/api/v1/tiers/${encodeURIComponent(creator)}/${encodeURIComponent(tier)}`, {
+            body: { price_cents: priceCents, ...(status ? { status } : {}) }, key, traceparent,
+        }),
         baseUrl: () => base,
     };
 }
