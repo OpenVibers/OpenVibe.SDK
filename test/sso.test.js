@@ -101,7 +101,7 @@ run([
         for (const [what, tok] of [['a FedCM assertion', session({ typ: 'fedcm', nonce: 'n' })], ['a service token', session({ sub: 'svc:live', actor_type: 'service' })], ['expired', session({ exp: now() - 600 })], ['another audience', session({ aud: ['openvibe.elsewhere'] })]]) {
             const r = fakeRes();
             await sso.handlers.me({ headers: { authorization: `Bearer ${tok}` } }, r);
-            assert.equal(r.statusCode, 401, what);
+            assert.deepEqual([r.statusCode, r.body.user], [200, null], `${what}: signed out answers 200 with no user`);
         }
         const req = { headers: { authorization: `Bearer ${session()}` } };
         await new Promise((done) => sso.optionalAuth()(req, {}, done));

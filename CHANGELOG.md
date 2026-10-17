@@ -3,6 +3,12 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.51.1 (2026-10-17)
+
+- `openvibe-sdk/sso`: `GET /auth/me` for a signed-out visitor (or an expired, foreign or non-session token) answers
+  `200 { user: null }` instead of 401, as Blog, Community and Wiki do. The shared navbar treats both the same; the 401
+  showed as a failed request in every signed-out visitor's console.
+
 ## 0.51.0 (2026-10-17)
 
 - `openvibe-sdk/commerce`: subscription tiers priced by OpenVibe.Billing (openvibe-contracts 0.201.0). `createIntent`

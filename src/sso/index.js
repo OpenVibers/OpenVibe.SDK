@@ -292,7 +292,9 @@ function createSsoClient(opts = {}) {
 
         async me(req, res) {
             const claims = await verify(extractToken(req));
-            if (!claims) return res.status(401).json({ error: 'Not signed in' });
+            // Signed out answers 200 with no user, as Blog, Community and Wiki do: the shared navbar reads this on every page,
+            // and a 401 showed as a failed request in every signed-out visitor's console.
+            if (!claims) return res.json({ user: null });
             return res.json({ user: claimsToUser(claims), expires_at: claims.exp ? claims.exp * 1000 : null });
         },
 
