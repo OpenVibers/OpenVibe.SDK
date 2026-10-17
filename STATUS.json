@@ -31,5 +31,5 @@
     "the telemetry sink (openvibe-sdk/telemetry): telemetrySchema() DDL, createPgTelemetrySink() and pruneTelemetry(), a per-service PostgreSQL table every service stores platform.telemetry-sample@1 into",
     "resources (openvibe-sdk/resources): the ADR-048 resource index fan-out and the idempotent control client"
   ],
-  "updated": "2026-10-15"
+  "updated": "2026-10-17"
 }
