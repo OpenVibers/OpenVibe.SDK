@@ -3,6 +3,13 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.51.0 (2026-10-17)
+
+- `openvibe-sdk/commerce`: subscription tiers priced by OpenVibe.Billing (openvibe-contracts 0.201.0). `createIntent`
+  (kind subscription) and `subscribeWithCredit` take an optional `tier`; `listTiers(creator)` reads a creator's tier
+  prices and `setTier({ creator, tier, priceCents, status?, key })` sets one (`caps.tier` = `billing.tier.manage`;
+  `listTiers` reads with the intent capability when `caps.tier` is not given). Without a tier nothing changes.
+
 ## 0.50.1 (2026-10-17)
 
 - `openvibe-sdk/db`: a nested `db.tx` (a savepoint) marks its scope done when it ends, like the outermost one. Async
