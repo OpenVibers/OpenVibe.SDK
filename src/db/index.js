@@ -154,11 +154,16 @@ function createDb(o = {}) {
             const name = `sp_${depth}`;
             const mark = hooks.length;
             await timed(conn, `SAVEPOINT ${name}`, []);
+            // Marked done when the savepoint ends, like the outermost scope: async work started inside it and still
+            // running afterwards (a timer, a fire-and-forget call) must not keep using this connection, which goes
+            // back to the pool when the transaction ends.
+            const scope = { conn, depth: depth + 1, done: false, hooks };
             try {
-                const out = await inScope({ conn, depth: depth + 1, done: false, hooks }, () => fn(txApi(conn, depth + 1, hooks)));
+                const out = await inScope(scope, () => fn(txApi(conn, depth + 1, hooks)));
+                scope.done = true;
                 await timed(conn, `RELEASE SAVEPOINT ${name}`, []);
                 return out;
-            } catch (err) { hooks.length = mark; await timed(conn, `ROLLBACK TO SAVEPOINT ${name}`, []).catch(() => {}); throw err; }
+            } catch (err) { scope.done = true; hooks.length = mark; await timed(conn, `ROLLBACK TO SAVEPOINT ${name}`, []).catch(() => {}); throw err; }
         }
         const iso = ISOLATION[opts.isolation || 'read committed'];
         if (!iso) throw new TypeError(`openvibe-sdk/db: isolation must be one of ${Object.keys(ISOLATION).join(', ')}`);

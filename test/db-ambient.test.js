@@ -31,6 +31,32 @@ function cases(label, open) {
                 assert.equal(await count.get(), 1);
             } finally { await done(); }
         }],
+        [`${label}: work started inside a savepoint and still running after the transaction is outside it`, async () => {
+            const { db, done } = await open();
+            try {
+                // A timer (an outbox kick, a fire-and-forget call) started inside a nested db.tx keeps its async
+                // context. The savepoint's scope used to stay "running" forever, so that work kept the outer
+                // transaction's connection after it went back to the pool (OpenVibe.Network, 2026-10-16).
+                let later = null;
+                await db.tx(async () => {
+                    await db.tx(async () => {
+                        later = new Promise((resolve) => setTimeout(() => resolve(db.inTransaction()), 30));
+                        assert.equal(db.inTransaction(), true);
+                    });
+                    assert.equal(db.inTransaction(), true);
+                });
+                assert.equal(await later, false, 'after the transaction, the savepoint\'s timer is outside it');
+                const failed = [];
+                await assert.rejects(db.tx(async () => {
+                    await assert.rejects(db.tx(async () => {
+                        failed.push(new Promise((resolve) => setTimeout(() => resolve(db.inTransaction()), 30)));
+                        throw new Error('inner');
+                    }), /inner/);
+                    throw new Error('outer');
+                }), /outer/);
+                assert.equal(await failed[0], false, 'a rolled-back savepoint too');
+            } finally { await done(); }
+        }],
         [`${label}: afterCommit runs after the commit, in order, never after a rollback; a failed savepoint drops its hooks`, async () => {
             const { db, done } = await open();
             try {

@@ -3,6 +3,16 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.50.1 (2026-10-17)
+
+- `openvibe-sdk/db`: a nested `db.tx` (a savepoint) marks its scope done when it ends, like the outermost one. Async
+  work started inside a savepoint and still running afterwards (a timer, a fire-and-forget call) no longer keeps
+  using the transaction's connection after it goes back to the pool.
+- Outbox: the relay's timers run in the async context the outbox was created in. A `kick()` from inside a
+  transaction that stays open (an inbox handler that goes on fanning out) used to make the relay's ticks run inside
+  that transaction, on its connection. OpenVibe.Network logged "Client was closed and is not queryable" for about a
+  minute after each go-live notice.
+
 ## 0.50.0 (2026-10-16)
 
 - `openvibe-sdk/play`: **cloud saves** — `play.saves.put(title, player, slot, { data, version })`, `get` (null when the
