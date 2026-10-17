@@ -1,4 +1,5 @@
 'use strict';
+const { AsyncResource } = require('node:async_hooks');
 /**
  * openvibe-sdk/events (server): transactional outbox and inbox (ADR-004) on the service's own PostgreSQL database
  * (an openvibe-sdk/db handle, ADR-035): createPgOutbox / createPgInbox, with outboxSchema / inboxSchema for the
@@ -165,14 +166,21 @@ function createPgOutbox(db, {
         return total;
     }
     const flush = serialFlush(doFlush);
+    // The relay's timers run in the async context the outbox was made in (a service's boot), never the caller's.
+    // kick() is often called inside a transaction that stays open (an inbox handler that goes on fanning out): a
+    // timer made there inherited it through openvibe-sdk/db's AsyncLocalStorage, so its ticks ran inside that
+    // transaction on its connection, and when the connection died mid-transaction every tick failed until the
+    // handler finished ("Client was closed and is not queryable" on OpenVibe.Network, 2026-10-16, for about a
+    // minute after each go-live notice).
+    const home = new AsyncResource('openvibe-outbox');
     function schedule(ms) {
         if (!running) return;
         clearTimeout(timer);
-        timer = setTimeout(async () => {
+        timer = home.runInAsyncScope(() => setTimeout(async () => {
             timer = null;
             try { await flush(); } catch (err) { if (onError) { try { onError(err); } catch { /* ignore */ } } }
             schedule(intervalMs);
-        }, ms);
+        }, ms));
         if (timer.unref) timer.unref();
     }
     return {

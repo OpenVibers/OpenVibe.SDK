@@ -26,6 +26,35 @@ function eventsClient() {
 
 function cases(label, open) {
     return [
+        [`${label}: a kick() from inside a transaction never hands the relay that transaction`, async () => {
+            const { db, done } = await open();
+            try {
+                const { platform, events } = eventsClient();
+                // Every claim the relay makes records whether it ran inside an ambient transaction.
+                const inTx = [];
+                const watched = new Proxy(db, {
+                    get(target, key) {
+                        if (key === 'many') return (...args) => { inTx.push(target.inTransaction()); return target.many(...args); };
+                        const v = target[key];
+                        return typeof v === 'function' ? v.bind(target) : v;
+                    },
+                });
+                const outbox = createPgOutbox(watched, { events, intervalMs: 15 });
+                outbox.start();
+                // An inbox handler: the event's row and the wake-up happen inside the handler's transaction, which
+                // stays open a while after (Network's go-live notice fans out to every follower before it commits).
+                await db.tx(async (t) => {
+                    await outbox.enqueue(t, { event_type: 'live.stream.started', actor, subject });
+                    outbox.kick();
+                    await new Promise((r) => setTimeout(r, 80));
+                });
+                await new Promise((r) => setTimeout(r, 120));
+                await outbox.stop();
+                assert.equal(platform.state.events.length, 1, 'the event went out');
+                assert.ok(inTx.length >= 3, `the relay kept ticking (${inTx.length} claims)`);
+                assert.ok(inTx.every((x) => x === false), 'no tick ran inside the handler\'s transaction');
+            } finally { await done(); }
+        }],
         [`${label}: enqueue needs the transaction; a rollback leaves no event; a commit publishes once`, async () => {
             const { db, done } = await open();
             try {
