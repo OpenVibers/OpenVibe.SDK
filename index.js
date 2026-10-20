@@ -26,6 +26,7 @@ module.exports = {
     resources: require('./src/resources'),
     vip: require('./src/vip'),
     quest: require('./src/quest'),
+    live: require('./src/live'),
     play: require('./src/play'),
     download: require('./src/download'),
     openre: require('./src/openre'),
