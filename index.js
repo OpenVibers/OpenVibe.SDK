@@ -30,6 +30,8 @@ module.exports = {
     inventory: require('./src/inventory'),
     tips: require('./src/tips'),
     blog: require('./src/blog'),
+    reviews: require('./src/reviews'),
+    wiki: require('./src/wiki'),
     food: require('./src/food'),
     actor: require('./src/actor'),
     run: require('./src/run'),

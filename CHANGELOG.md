@@ -3,6 +3,15 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.57.0 (2026-10-20)
+
+- **`openvibe-sdk/reviews`** (`createReviewsClient`): OpenVibe.Reviews for apps, whose reads became public in
+  openvibe-contracts 0.207.0: resolve a business, product or place from its identifiers (a match or candidates), list
+  and read entities with their aggregate, signals, summary and history, and send a correction to the editors for the
+  person (never retried on its own).
+- **`openvibe-sdk/wiki`** (`createWikiClient`): OpenVibe.Wiki's reads: search, spaces, and pages with their revisions,
+  diffs and citations, as the person may read them (without one, public pages only).
+
 ## 0.56.0 (2026-10-20)
 
 - **`openvibe-sdk/blog`** (`createBlogClient`): OpenVibe.Blog, the first product whose API only its own site could use
