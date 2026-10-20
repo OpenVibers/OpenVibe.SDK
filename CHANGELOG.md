@@ -3,6 +3,16 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.52.0 (2026-10-20)
+
+- **`openvibe-sdk/live`**: OpenVibe.Live in the SDK, its flagship product had no module. `createLiveClient(client)`
+  covers the routes documented at openvibe.live/documentation: who is live (`streams.list`, `recentlyOnline`), a
+  channel (`channels.get`, `url`, `toggleFollow`), slots (`slots.create` … `regenerateKey`), going live
+  (`goLive(slotId, opts)` → `{ stream, endpoint }`), the session (`update`, `heartbeat`, `endpoint`, `end`), the content
+  feeds (`content.feed`, `content.moments`), and WHIP publishing (`whip.url`, `whip.publish` → `{ answer, location }`,
+  `whip.end`). Signed calls carry the person's Network token; `/whip` gets only the stream key, never the client's
+  token. Writes carry no idempotency key and are never retried (a second go-live is a second session).
+
 ## 0.51.1 (2026-10-17)
 
 - `openvibe-sdk/sso`: `GET /auth/me` for a signed-out visitor (or an expired, foreign or non-session token) answers
