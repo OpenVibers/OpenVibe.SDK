@@ -56,6 +56,7 @@ const ENTRIES = {
     'download.mjs': '../src/download.js',
     'quest.mjs': '../src/quest.js',
     'live.mjs': '../src/live.js',
+    'inventory.mjs': '../src/inventory.js',
     'vip.mjs': '../src/vip.js',
     'frame.mjs': '../src/frame.js',
     'service.mjs': '../src/service/index.js',
