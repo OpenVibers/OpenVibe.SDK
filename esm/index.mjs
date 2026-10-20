@@ -9,8 +9,8 @@ export const {
     community, bot, search, chat, ai, jobs,
     tools, projects, resources, vip, quest, live,
     inventory, tips, blog, reviews, wiki, coupons,
-    deals, trade, space, food, actor, run,
-    video, work, zone, play, download, openre,
-    geo, usage, commerce, telemetry,
+    deals, trade, space, host, news, food,
+    actor, run, video, work, zone, play,
+    download, openre, geo, usage, commerce, telemetry,
 } = cjs;
 export default cjs;
