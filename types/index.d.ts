@@ -26,6 +26,7 @@ export * as wiki from './wiki';
 export * as coupons from './coupons';
 export * as deals from './deals';
 export * as trade from './trade';
+export * as space from './space';
 export * as food from './food';
 export * as actor from './actor';
 export * as run from './run';

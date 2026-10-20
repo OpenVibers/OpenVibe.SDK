@@ -3,6 +3,14 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.59.0 (2026-10-20)
+
+- **`openvibe-sdk/space`** (`createSpaceClient`): OpenVibe.Space for apps and CI, public in openvibe-contracts 0.209.0.
+  Deploy a static site as a tar.gz archive or files with their paths (activate at once, or keep a preview), activate,
+  roll back, read a deploy's log; manage projects (members as deployer, maintainer or owner), sites, their serving
+  settings and Git source, and custom domains. An app is a principal of its own in Space and reaches only the
+  projects a person added it to. Uploads and creations are never retried on their own.
+
 ## 0.58.0 (2026-10-20)
 
 - **`openvibe-sdk/coupons`**, **`openvibe-sdk/deals`** and **`openvibe-sdk/trade`**: what a person does for themselves
