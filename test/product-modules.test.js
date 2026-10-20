@@ -1,5 +1,5 @@
 'use strict';
-// openvibe-sdk/food, /actor, /run, /video, /work, /zone, /blog, /reviews and /wiki through a real core client against one local stub: every
+// openvibe-sdk/food, /actor, /run, /video, /work, /zone, /blog, /reviews, /wiki, /coupons, /deals and /trade through a real core client against one local stub: every
 // route and method, the token audience, which writes are retried (keyed or idempotent) and which never are, the SSE
 // followers (Actor's task events, Run's job stream), and the id checks done before any call.
 const assert = require('assert');
@@ -14,9 +14,12 @@ const { createZoneClient } = require('../src/zone');
 const { createBlogClient } = require('../src/blog');
 const { createReviewsClient } = require('../src/reviews');
 const { createWikiClient } = require('../src/wiki');
+const { createCouponsClient } = require('../src/coupons');
+const { createDealsClient } = require('../src/deals');
+const { createTradeClient } = require('../src/trade');
 
 const ULID = '01JAB2C3D4E5F6G7H8J9K0MNPQ';
-const ids = { plan: `pln_${ULID}`, task: `tsk_${ULID}`, agent: `agt_${ULID}`, mem: `mem_${ULID}`, job: `job_${ULID}`, playlist: `vpl_${ULID}`, app: `wap_${ULID}`, project: `prj_${ULID}`, zone: `zon_${ULID}`, post: `pst_${ULID}`, page: `pg_${ULID}` };
+const ids = { plan: `pln_${ULID}`, task: `tsk_${ULID}`, agent: `agt_${ULID}`, mem: `mem_${ULID}`, job: `job_${ULID}`, playlist: `vpl_${ULID}`, app: `wap_${ULID}`, project: `prj_${ULID}`, zone: `zon_${ULID}`, post: `pst_${ULID}`, page: `pg_${ULID}`, coupon: `cpn_${ULID}` };
 
 (async () => {
     const seen = [];
@@ -47,7 +50,7 @@ const ids = { plan: `pln_${ULID}`, task: `tsk_${ULID}`, agent: `agt_${ULID}`, me
     const base = `http://127.0.0.1:${server.address().port}`;
     const audiences = [];
     const client = createClient({
-        baseUrls: { food: `${base}/food`, actor: `${base}/actor`, run: `${base}/run`, 'media-hub': `${base}/video`, work: `${base}/work`, zone: `${base}/zone`, blog: `${base}/blog`, reviews: `${base}/reviews`, wiki: `${base}/wiki` },
+        baseUrls: { food: `${base}/food`, actor: `${base}/actor`, run: `${base}/run`, 'media-hub': `${base}/video`, work: `${base}/work`, zone: `${base}/zone`, blog: `${base}/blog`, reviews: `${base}/reviews`, wiki: `${base}/wiki`, coupons: `${base}/coupons`, deals: `${base}/deals`, trade: `${base}/trade` },
         getToken: ({ audience }) => { audiences.push(audience); return `tok-${audience}`; },
         retries: 2, retryDelayMs: 1, maxRetryDelayMs: 2,
     });
@@ -290,13 +293,95 @@ const ids = { plan: `pln_${ULID}`, task: `tsk_${ULID}`, agent: `agt_${ULID}`, me
         assert.throws(() => wiki.pages.get('page_1'), /pg_/);
         assert.throws(() => wiki.pages.diff(ids.page, { from: 0, to: 2 }), /revision number/);
 
+        // ── Coupons ───────────────────────────────────────────
+        const coupons = createCouponsClient(client);
+        mark = since();
+        await coupons.merchants.resolve('www.example-store.com');
+        await coupons.merchants.get('mer_1');
+        await coupons.merchants.coupons('mer_1');
+        await coupons.get(ids.coupon);
+        await busyOnce(() => coupons.submit({ host: 'example-store.com', code: 'SAVE10', title: '10% off' }));
+        await coupons.report(ids.coupon, { outcome: 'failed', reason: 'expired' });   // only the latest counts: retried
+        const C = `/api/v1/coupons/${ids.coupon}`;
+        const cp = mark();
+        assert.deepStrictEqual(cp.map((x) => `${x.method} ${x.url}`), [
+            'GET /api/v1/merchants/resolve?host=www.example-store.com', 'GET /api/v1/merchants/mer_1', 'GET /api/v1/merchants/mer_1/coupons', `GET ${C}`,
+            'POST /api/v1/coupons/submit', `POST ${C}/report`, `POST ${C}/report`,
+        ]);
+        assert.deepStrictEqual(cp[5].body, { outcome: 'failed', reason: 'expired' });
+        assert.throws(() => coupons.submit({ code: 'X', title: 'Y' }), /merchant_id, host or url/);
+        assert.throws(() => coupons.report(ids.coupon, { outcome: 'maybe' }), /worked/);
+        assert.throws(() => coupons.get('coupon_1'), /cpn_/);
+
+        // ── Deals ─────────────────────────────────────────────
+        const deals = createDealsClient(client);
+        mark = since();
+        await deals.offers.list({ sort: 'hot', page: 2 });
+        await deals.offers.get('gpu-299');
+        await deals.offers.hotness('gpu-299');
+        await busyOnce(() => deals.offers.submit({ url: 'https://shop.example/gpu', title: 'GPU at $299', price: 299, currency: 'USD' }));
+        await deals.offers.update('off_1', { title: 'GPU at $279' });
+        await busyOnce(() => deals.offers.observe('off_1', { price: 279, currency: 'USD' }));
+        await deals.offers.vote('off_2', -1);   // PUT: retried
+        await deals.offers.unvote('off_2');
+        await busyOnce(() => deals.offers.flag('off_2', { kind: 'expired' }));
+        await deals.products.get('rtx-4070');
+        await deals.stores.get('shop.example');
+        await deals.watches.list();
+        await busyOnce(() => deals.watches.create({ kind: 'price_below', product: 'rtx-4070', max_price: 450, currency: 'USD' }));
+        await deals.watches.remove('wat_1');
+        const dl = mark();
+        assert.deepStrictEqual(dl.map((x) => `${x.method} ${x.url}`), [
+            'GET /api/v1/offers?sort=hot&page=2', 'GET /api/v1/offers/gpu-299', 'GET /api/v1/offers/gpu-299/hotness', 'POST /api/v1/offers',
+            'PATCH /api/v1/offers/off_1', 'PATCH /api/v1/offers/off_1', 'POST /api/v1/offers/off_1/observations', 'PUT /api/v1/offers/off_2/vote',
+            'PUT /api/v1/offers/off_2/vote', 'DELETE /api/v1/offers/off_2/vote', 'DELETE /api/v1/offers/off_2/vote', 'POST /api/v1/offers/off_2/flags',
+            'GET /api/v1/products/rtx-4070', 'GET /api/v1/stores/shop.example', 'GET /api/v1/watches', 'POST /api/v1/watches',
+            'DELETE /api/v1/watches/wat_1', 'DELETE /api/v1/watches/wat_1',
+        ]);
+        assert.deepStrictEqual(dl[7].body, { value: -1 });
+        assert.throws(() => deals.offers.vote('off_2', 2), /1 or -1/);
+        assert.throws(() => deals.offers.flag('off_2', { kind: 'meh' }), /kind is one of/);
+        assert.throws(() => deals.offers.list({ sort: 'top' }), /hot/);
+
+        // ── Trade ─────────────────────────────────────────────
+        const trade = createTradeClient(client);
+        mark = since();
+        await trade.instruments.resolve('AAPL');
+        await trade.instruments.list({ limit: 5 });
+        await trade.instruments.get('AAPL');
+        await trade.instruments.observations('AAPL', { metric: 'price', limit: 30 });
+        await trade.instruments.documents('AAPL', { limit: 3 });
+        await trade.sources();
+        await trade.watchlists.list();
+        await busyOnce(() => trade.watchlists.create({ name: 'Robots' }));
+        await trade.watchlists.get('wl_1');
+        await trade.watchlists.rename('wl_1', 'Robot makers');
+        await trade.watchlists.add('wl_1', 'AAPL');
+        await trade.watchlists.removeItem('wl_1', 'AAPL');
+        await trade.watchlists.remove('wl_1');
+        await trade.alerts.list();
+        await trade.alerts.deliveries({ limit: 10 });
+        await busyOnce(() => trade.alerts.create({ symbol: 'AAPL', kind: 'filing_type', form_types: ['8-K'] }));
+        await trade.alerts.remove('alr_1');
+        const tr = mark();
+        assert.deepStrictEqual(tr.map((x) => `${x.method} ${x.url}`), [
+            'GET /api/v1/instruments/resolve?q=AAPL', 'GET /api/v1/instruments?limit=5', 'GET /api/v1/instruments/AAPL',
+            'GET /api/v1/instruments/AAPL/observations?metric=price&limit=30', 'GET /api/v1/instruments/AAPL/documents?limit=3', 'GET /api/v1/sources',
+            'GET /api/v1/watchlists', 'POST /api/v1/watchlists', 'GET /api/v1/watchlists/wl_1', 'PATCH /api/v1/watchlists/wl_1', 'PATCH /api/v1/watchlists/wl_1',
+            'PUT /api/v1/watchlists/wl_1/items/AAPL', 'PUT /api/v1/watchlists/wl_1/items/AAPL', 'DELETE /api/v1/watchlists/wl_1/items/AAPL',
+            'DELETE /api/v1/watchlists/wl_1/items/AAPL', 'DELETE /api/v1/watchlists/wl_1', 'DELETE /api/v1/watchlists/wl_1', 'GET /api/v1/alerts',
+            'GET /api/v1/alerts/deliveries?limit=10', 'POST /api/v1/alerts', 'DELETE /api/v1/alerts/alr_1', 'DELETE /api/v1/alerts/alr_1',
+        ]);
+        assert.throws(() => trade.alerts.create({ symbol: 'AAPL', kind: 'rumour' }), /kind/);
+        assert.throws(() => trade.watchlists.create({}), /name/);
+
         // Each product's token is for its own audience (Video's is the media hub's, openvibe.download).
-        assert.deepStrictEqual([...new Set(audiences)].sort(), ['openvibe.actor', 'openvibe.blog', 'openvibe.download', 'openvibe.food', 'openvibe.reviews', 'openvibe.run', 'openvibe.wiki', 'openvibe.work', 'openvibe.zone']);
-        assert.ok(seen.every((x) => x.auth === `Bearer tok-${{ food: 'openvibe.food', actor: 'openvibe.actor', run: 'openvibe.run', video: 'openvibe.download', work: 'openvibe.work', zone: 'openvibe.zone', blog: 'openvibe.blog', reviews: 'openvibe.reviews', wiki: 'openvibe.wiki' }[x.svc]}`));
+        assert.deepStrictEqual([...new Set(audiences)].sort(), ['openvibe.actor', 'openvibe.blog', 'openvibe.coupons', 'openvibe.deals', 'openvibe.download', 'openvibe.food', 'openvibe.reviews', 'openvibe.run', 'openvibe.trade', 'openvibe.wiki', 'openvibe.work', 'openvibe.zone']);
+        assert.ok(seen.every((x) => x.auth === `Bearer tok-${{ food: 'openvibe.food', actor: 'openvibe.actor', run: 'openvibe.run', video: 'openvibe.download', work: 'openvibe.work', zone: 'openvibe.zone', blog: 'openvibe.blog', reviews: 'openvibe.reviews', wiki: 'openvibe.wiki', coupons: 'openvibe.coupons', deals: 'openvibe.deals', trade: 'openvibe.trade' }[x.svc]}`));
 
         // Each client needs a core client.
-        for (const make of [createFoodClient, createActorClient, createRunClient, createVideoClient, createWorkClient, createZoneClient, createBlogClient, createReviewsClient, createWikiClient]) assert.throws(() => make({}), /core client/);
-        console.log('product modules (food, actor, run, video, work, zone, blog, reviews, wiki): all checks passed');
+        for (const make of [createFoodClient, createActorClient, createRunClient, createVideoClient, createWorkClient, createZoneClient, createBlogClient, createReviewsClient, createWikiClient, createCouponsClient, createDealsClient, createTradeClient]) assert.throws(() => make({}), /core client/);
+        console.log('product modules (food, actor, run, video, work, zone, blog, reviews, wiki, coupons, deals, trade): all checks passed');
     } finally {
         server.close();
     }
