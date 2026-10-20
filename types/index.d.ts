@@ -20,6 +20,7 @@ export * as quest from './quest';
 export * as live from './live';
 export * as inventory from './inventory';
 export * as tips from './tips';
+export * as blog from './blog';
 export * as food from './food';
 export * as actor from './actor';
 export * as run from './run';

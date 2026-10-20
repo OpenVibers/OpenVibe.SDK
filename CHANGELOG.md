@@ -3,6 +3,14 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.56.0 (2026-10-20)
+
+- **`openvibe-sdk/blog`** (`createBlogClient`): OpenVibe.Blog, the first product whose API only its own site could use
+  (its capabilities became public in openvibe-contracts 0.206.0). Read a blog's published posts and feed; for the
+  person who authorized the app, create drafts, edit (a new revision, `expected_revision` guards a race), publish,
+  unpublish, schedule, revert and delete posts. Blog acts for an app only as its `on_behalf_of` person. Creating a
+  post or reverting makes a new one each time and is never retried on its own.
+
 ## 0.55.0 (2026-10-20)
 
 - Six more products through the SDK, each a server module over the routes its capabilities name in Contracts:
