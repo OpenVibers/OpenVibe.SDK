@@ -29,6 +29,7 @@ module.exports = {
     live: require('./src/live'),
     inventory: require('./src/inventory'),
     tips: require('./src/tips'),
+    blog: require('./src/blog'),
     food: require('./src/food'),
     actor: require('./src/actor'),
     run: require('./src/run'),

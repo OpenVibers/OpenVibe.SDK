@@ -58,6 +58,7 @@ const ENTRIES = {
     'live.mjs': '../src/live.js',
     'inventory.mjs': '../src/inventory.js',
     'tips.mjs': '../src/tips.js',
+    'blog.mjs': '../src/blog.js',
     'food.mjs': '../src/food.js',
     'actor.mjs': '../src/actor.js',
     'run.mjs': '../src/run.js',
