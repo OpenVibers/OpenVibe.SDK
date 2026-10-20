@@ -64,6 +64,7 @@ const ENTRIES = {
     'coupons.mjs': '../src/coupons.js',
     'deals.mjs': '../src/deals.js',
     'trade.mjs': '../src/trade.js',
+    'space.mjs': '../src/space.js',
     'food.mjs': '../src/food.js',
     'actor.mjs': '../src/actor.js',
     'run.mjs': '../src/run.js',

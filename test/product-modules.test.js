@@ -1,5 +1,5 @@
 'use strict';
-// openvibe-sdk/food, /actor, /run, /video, /work, /zone, /blog, /reviews, /wiki, /coupons, /deals and /trade through a real core client against one local stub: every
+// openvibe-sdk/food, /actor, /run, /video, /work, /zone, /blog, /reviews, /wiki, /coupons, /deals, /trade and /space through a real core client against one local stub: every
 // route and method, the token audience, which writes are retried (keyed or idempotent) and which never are, the SSE
 // followers (Actor's task events, Run's job stream), and the id checks done before any call.
 const assert = require('assert');
@@ -17,6 +17,7 @@ const { createWikiClient } = require('../src/wiki');
 const { createCouponsClient } = require('../src/coupons');
 const { createDealsClient } = require('../src/deals');
 const { createTradeClient } = require('../src/trade');
+const { createSpaceClient } = require('../src/space');
 
 const ULID = '01JAB2C3D4E5F6G7H8J9K0MNPQ';
 const ids = { plan: `pln_${ULID}`, task: `tsk_${ULID}`, agent: `agt_${ULID}`, mem: `mem_${ULID}`, job: `job_${ULID}`, playlist: `vpl_${ULID}`, app: `wap_${ULID}`, project: `prj_${ULID}`, zone: `zon_${ULID}`, post: `pst_${ULID}`, page: `pg_${ULID}`, coupon: `cpn_${ULID}` };
@@ -30,7 +31,8 @@ const ids = { plan: `pln_${ULID}`, task: `tsk_${ULID}`, agent: `agt_${ULID}`, me
         req.on('end', () => {
             const svc = req.url.split('/')[1];
             const url = req.url.slice(svc.length + 1);
-            seen.push({ svc, method: req.method, url, idem: req.headers['idempotency-key'] || null, project: req.headers['x-ov-project'] || null, lastEvent: req.headers['last-event-id'] || null, auth: req.headers.authorization || null, body: body ? JSON.parse(body) : null });
+            const type = String(req.headers['content-type'] || '');
+            seen.push({ svc, method: req.method, url, type, raw: body, idem: req.headers['idempotency-key'] || null, project: req.headers['x-ov-project'] || null, lastEvent: req.headers['last-event-id'] || null, auth: req.headers.authorization || null, body: body && type.startsWith('application/json') ? JSON.parse(body) : null });
             const json = (status, obj) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); };
             const key = `${req.method} ${req.url} ${body}`;   // one 503 per distinct request
             attempts[key] = (attempts[key] || 0) + 1;
@@ -50,7 +52,7 @@ const ids = { plan: `pln_${ULID}`, task: `tsk_${ULID}`, agent: `agt_${ULID}`, me
     const base = `http://127.0.0.1:${server.address().port}`;
     const audiences = [];
     const client = createClient({
-        baseUrls: { food: `${base}/food`, actor: `${base}/actor`, run: `${base}/run`, 'media-hub': `${base}/video`, work: `${base}/work`, zone: `${base}/zone`, blog: `${base}/blog`, reviews: `${base}/reviews`, wiki: `${base}/wiki`, coupons: `${base}/coupons`, deals: `${base}/deals`, trade: `${base}/trade` },
+        baseUrls: { food: `${base}/food`, actor: `${base}/actor`, run: `${base}/run`, 'media-hub': `${base}/video`, work: `${base}/work`, zone: `${base}/zone`, blog: `${base}/blog`, reviews: `${base}/reviews`, wiki: `${base}/wiki`, coupons: `${base}/coupons`, deals: `${base}/deals`, trade: `${base}/trade`, space: `${base}/space` },
         getToken: ({ audience }) => { audiences.push(audience); return `tok-${audience}`; },
         retries: 2, retryDelayMs: 1, maxRetryDelayMs: 2,
     });
@@ -375,13 +377,56 @@ const ids = { plan: `pln_${ULID}`, task: `tsk_${ULID}`, agent: `agt_${ULID}`, me
         assert.throws(() => trade.alerts.create({ symbol: 'AAPL', kind: 'rumour' }), /kind/);
         assert.throws(() => trade.watchlists.create({}), /name/);
 
+        // ── Space ─────────────────────────────────────────────
+        const space = createSpaceClient(client);
+        mark = since();
+        await space.projects.list();
+        await busyOnce(() => space.projects.create({ name: 'my-site' }));
+        await space.projects.members.set('prj_1', 'app:app_9', 'deployer');
+        await space.projects.sites('prj_1');
+        await busyOnce(() => space.sites.create('prj_1', { name: 'docs' }));
+        await space.sites.config.set('site_1', { spa: true, headers: { 'X-Frame-Options': 'DENY' } });
+        await busyOnce(() => space.deploys.uploadArchive('site_1', Buffer.from('fake tar.gz bytes'), { activate: true }));
+        await busyOnce(() => space.deploys.uploadFiles('site_1', [{ path: 'index.html', data: '<h1>Hi</h1>', type: 'text/html' }, { path: 'css/site.css', data: 'h1{}' }], { preview: true }));
+        await busyOnce(() => space.deploys.uploadSourceBuild('site_1', Buffer.from('tar'), { ref: 'main', commit_sha: 'a'.repeat(40), gzip: false }));
+        await space.deploys.activate('dep_1', { expected_active: null });
+        await space.deploys.rollback('site_1', { deploy_id: 'dep_0' });
+        await space.deploys.log('dep_1');
+        await busyOnce(() => space.domains.add('site_1', { hostname: 'docs.example.com' }));
+        await space.domains.verify('dom_1');
+        await space.domains.remove('dom_1');
+        const sp = mark();
+        assert.deepStrictEqual(sp.map((x) => `${x.method} ${x.url}`), [
+            'GET /api/v1/projects', 'POST /api/v1/projects', 'PUT /api/v1/projects/prj_1/members/app%3Aapp_9', 'PUT /api/v1/projects/prj_1/members/app%3Aapp_9',
+            'GET /api/v1/projects/prj_1/sites', 'POST /api/v1/projects/prj_1/sites', 'PUT /api/v1/sites/site_1/config', 'PUT /api/v1/sites/site_1/config',
+            'POST /api/v1/sites/site_1/deploys?activate=1', 'POST /api/v1/sites/site_1/deploys?preview=1',
+            `POST /api/v1/sites/site_1/source/deploys?ref=main&commit_sha=${'a'.repeat(40)}`, 'POST /api/v1/deploys/dep_1/activate',
+            'POST /api/v1/deploys/dep_1/activate', 'POST /api/v1/sites/site_1/rollback', 'POST /api/v1/sites/site_1/rollback', 'GET /api/v1/deploys/dep_1/log',
+            'POST /api/v1/sites/site_1/domains', 'POST /api/v1/domains/dom_1/verify', 'POST /api/v1/domains/dom_1/verify', 'DELETE /api/v1/domains/dom_1',
+            'DELETE /api/v1/domains/dom_1',
+        ]);
+        // Uploads and creations surface the 503 (a second try would be a second deploy); settings, activate, rollback and verify are retried.
+        assert.deepStrictEqual(sp[3].body, { role: 'deployer' });
+        assert.deepStrictEqual(sp[7].body, { spa: true, headers: { 'X-Frame-Options': 'DENY' } });
+        assert.strictEqual(sp[8].type, 'application/gzip', 'an archive is the body, gzip by default');
+        assert.strictEqual(sp[8].raw, 'fake tar.gz bytes');
+        assert.match(sp[9].type, /^multipart\/form-data; boundary=/);
+        assert.match(sp[9].raw, /name="files"; filename="css\/site\.css"/, "each file's path is its part's filename");
+        assert.match(sp[9].raw, /<h1>Hi<\/h1>/);
+        assert.strictEqual(sp[10].type, 'application/x-tar');
+        assert.deepStrictEqual(sp[12].body, { expected_active: null });
+        assert.deepStrictEqual(sp[14].body, { deploy_id: 'dep_0' });
+        assert.throws(() => space.projects.members.set('prj_1', 'usr_1', 'admin'), /deployer, maintainer or owner/);
+        assert.throws(() => space.deploys.uploadFiles('site_1', []), /at least one/);
+        assert.throws(() => space.deploys.uploadArchive('site_1'), /archive/);
+
         // Each product's token is for its own audience (Video's is the media hub's, openvibe.download).
-        assert.deepStrictEqual([...new Set(audiences)].sort(), ['openvibe.actor', 'openvibe.blog', 'openvibe.coupons', 'openvibe.deals', 'openvibe.download', 'openvibe.food', 'openvibe.reviews', 'openvibe.run', 'openvibe.trade', 'openvibe.wiki', 'openvibe.work', 'openvibe.zone']);
-        assert.ok(seen.every((x) => x.auth === `Bearer tok-${{ food: 'openvibe.food', actor: 'openvibe.actor', run: 'openvibe.run', video: 'openvibe.download', work: 'openvibe.work', zone: 'openvibe.zone', blog: 'openvibe.blog', reviews: 'openvibe.reviews', wiki: 'openvibe.wiki', coupons: 'openvibe.coupons', deals: 'openvibe.deals', trade: 'openvibe.trade' }[x.svc]}`));
+        assert.deepStrictEqual([...new Set(audiences)].sort(), ['openvibe.actor', 'openvibe.blog', 'openvibe.coupons', 'openvibe.deals', 'openvibe.download', 'openvibe.food', 'openvibe.reviews', 'openvibe.run', 'openvibe.space', 'openvibe.trade', 'openvibe.wiki', 'openvibe.work', 'openvibe.zone']);
+        assert.ok(seen.every((x) => x.auth === `Bearer tok-${{ food: 'openvibe.food', actor: 'openvibe.actor', run: 'openvibe.run', video: 'openvibe.download', work: 'openvibe.work', zone: 'openvibe.zone', blog: 'openvibe.blog', reviews: 'openvibe.reviews', wiki: 'openvibe.wiki', coupons: 'openvibe.coupons', deals: 'openvibe.deals', trade: 'openvibe.trade', space: 'openvibe.space' }[x.svc]}`));
 
         // Each client needs a core client.
-        for (const make of [createFoodClient, createActorClient, createRunClient, createVideoClient, createWorkClient, createZoneClient, createBlogClient, createReviewsClient, createWikiClient, createCouponsClient, createDealsClient, createTradeClient]) assert.throws(() => make({}), /core client/);
-        console.log('product modules (food, actor, run, video, work, zone, blog, reviews, wiki, coupons, deals, trade): all checks passed');
+        for (const make of [createFoodClient, createActorClient, createRunClient, createVideoClient, createWorkClient, createZoneClient, createBlogClient, createReviewsClient, createWikiClient, createCouponsClient, createDealsClient, createTradeClient, createSpaceClient]) assert.throws(() => make({}), /core client/);
+        console.log('product modules (food, actor, run, video, work, zone, blog, reviews, wiki, coupons, deals, trade, space): all checks passed');
     } finally {
         server.close();
     }

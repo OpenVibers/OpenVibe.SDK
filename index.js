@@ -35,6 +35,7 @@ module.exports = {
     coupons: require('./src/coupons'),
     deals: require('./src/deals'),
     trade: require('./src/trade'),
+    space: require('./src/space'),
     food: require('./src/food'),
     actor: require('./src/actor'),
     run: require('./src/run'),
