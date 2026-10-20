@@ -3,6 +3,15 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.58.0 (2026-10-20)
+
+- **`openvibe-sdk/coupons`**, **`openvibe-sdk/deals`** and **`openvibe-sdk/trade`**: what a person does for themselves
+  on those sites, public in openvibe-contracts 0.208.0. Coupons: which store a site is, its codes, submitting a code and
+  reporting whether one worked (what a browser extension needs). Deals: hot and new offers, posting, price
+  observations, votes, flags and watches. Trade: instruments with their sourced observations and filings, and the
+  person's watchlists and alert rules. Moderation stays with each site. Writes that make a new row each time are
+  never retried on their own.
+
 ## 0.57.0 (2026-10-20)
 
 - **`openvibe-sdk/reviews`** (`createReviewsClient`): OpenVibe.Reviews for apps, whose reads became public in
