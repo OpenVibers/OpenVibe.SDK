@@ -3,6 +3,25 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.55.0 (2026-10-20)
+
+- Six more products through the SDK, each a server module over the routes its capabilities name in Contracts:
+  - **`openvibe-sdk/food`** (`createFoodClient`): places to get food, the food list with prices, meal plans, a
+    person's pantry with its "what can I make" matches, and AI recipe ideas.
+  - **`openvibe-sdk/actor`** (`createActorClient`): tasks for AI agent systems (create, list, get, cancel, and
+    `tasks.events`, the SSE stream until the task ends), the public agent list and dry-run routing, and a person's
+    own agents with their runs and memory.
+  - **`openvibe-sdk/run`** (`createRunClient`): jobs on worker nodes (submit with an Idempotency-Key, list, get,
+    cancel, `jobs.events` until `end`, a browser stream ticket), `forProject` for X-OV-Project.
+  - **`openvibe-sdk/video`** (`createVideoClient`): OpenVibe.Video's playlists of recordings and clips, and a
+    person's public playlists.
+  - **`openvibe-sdk/work`** (`createWorkClient`): the job board's search and sources, saved searches, tracked
+    applications and the agent's help with one.
+  - **`openvibe-sdk/zone`** (`createZoneClient`): a project's object zones and their usage.
+- A write that makes something new each time (a plan, recipe ideas, an agent, a run, a memory note, a playlist or an
+  item in it, a saved search, an application without a listing) is never retried on its own. Keyed writes (Run's
+  submit, Zone's create, an Actor task with an idempotency_key, an application for a listing) and changes are.
+
 ## 0.54.0 (2026-10-20)
 
 - **`openvibe-sdk/tips`**: OpenVibe.Tips through the SDK (it had 19 capabilities and no module). `createTipsClient(client)`
