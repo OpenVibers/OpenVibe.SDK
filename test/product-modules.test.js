@@ -1,5 +1,5 @@
 'use strict';
-// openvibe-sdk/food, /actor, /run, /video, /work, /zone, /blog, /reviews, /wiki, /coupons, /deals, /trade and /space through a real core client against one local stub: every
+// openvibe-sdk/food, /actor, /run, /video, /work, /zone, /blog, /reviews, /wiki, /coupons, /deals, /trade, /space, /host and /news through a real core client against one local stub: every
 // route and method, the token audience, which writes are retried (keyed or idempotent) and which never are, the SSE
 // followers (Actor's task events, Run's job stream), and the id checks done before any call.
 const assert = require('assert');
@@ -18,6 +18,8 @@ const { createCouponsClient } = require('../src/coupons');
 const { createDealsClient } = require('../src/deals');
 const { createTradeClient } = require('../src/trade');
 const { createSpaceClient } = require('../src/space');
+const { createHostClient } = require('../src/host');
+const { createNewsClient } = require('../src/news');
 
 const ULID = '01JAB2C3D4E5F6G7H8J9K0MNPQ';
 const ids = { plan: `pln_${ULID}`, task: `tsk_${ULID}`, agent: `agt_${ULID}`, mem: `mem_${ULID}`, job: `job_${ULID}`, playlist: `vpl_${ULID}`, app: `wap_${ULID}`, project: `prj_${ULID}`, zone: `zon_${ULID}`, post: `pst_${ULID}`, page: `pg_${ULID}`, coupon: `cpn_${ULID}` };
@@ -52,7 +54,7 @@ const ids = { plan: `pln_${ULID}`, task: `tsk_${ULID}`, agent: `agt_${ULID}`, me
     const base = `http://127.0.0.1:${server.address().port}`;
     const audiences = [];
     const client = createClient({
-        baseUrls: { food: `${base}/food`, actor: `${base}/actor`, run: `${base}/run`, 'media-hub': `${base}/video`, work: `${base}/work`, zone: `${base}/zone`, blog: `${base}/blog`, reviews: `${base}/reviews`, wiki: `${base}/wiki`, coupons: `${base}/coupons`, deals: `${base}/deals`, trade: `${base}/trade`, space: `${base}/space` },
+        baseUrls: { food: `${base}/food`, actor: `${base}/actor`, run: `${base}/run`, 'media-hub': `${base}/video`, work: `${base}/work`, zone: `${base}/zone`, blog: `${base}/blog`, reviews: `${base}/reviews`, wiki: `${base}/wiki`, coupons: `${base}/coupons`, deals: `${base}/deals`, trade: `${base}/trade`, space: `${base}/space`, host: `${base}/host`, news: `${base}/news` },
         getToken: ({ audience }) => { audiences.push(audience); return `tok-${audience}`; },
         retries: 2, retryDelayMs: 1, maxRetryDelayMs: 2,
     });
@@ -420,13 +422,43 @@ const ids = { plan: `pln_${ULID}`, task: `tsk_${ULID}`, agent: `agt_${ULID}`, me
         assert.throws(() => space.deploys.uploadFiles('site_1', []), /at least one/);
         assert.throws(() => space.deploys.uploadArchive('site_1'), /archive/);
 
+        // ── Host and News: public reads, never a token ──────────
+        const host = createHostClient(client);
+        const news = createNewsClient(client);
+        mark = since();
+        await host.providers.list();
+        await host.providers.get('linode');
+        await host.plans.list({ kind: 'vps', max_price: 10, currency: 'USD', sort: 'price_per_gb_ram' });
+        await host.plans.get('pln_9');
+        await host.promos.list();
+        await host.offers.list({ sort: 'new', priced: 1, cursor: 'c2' });
+        await host.domains.list({ cursor: 'c1' });
+        await host.domains.tld('dev');
+        await host.domains.check('example.dev');
+        await host.benchmarks.list();
+        await host.benchmarks.get('bm_1');
+        await news.topics();
+        await news.stories.list({ topic: 'space', limit: 10 });
+        await news.stories.get('moon-landing-2026');
+        const pub = mark();
+        assert.deepStrictEqual(pub.map((x) => `${x.method} ${x.url}`), [
+            'GET /api/v1/catalog/providers', 'GET /api/v1/catalog/providers/linode',
+            'GET /api/v1/catalog/plans?kind=vps&max_price=10&currency=USD&sort=price_per_gb_ram', 'GET /api/v1/catalog/plans/pln_9',
+            'GET /api/v1/catalog/promos', 'GET /api/v1/catalog/offers?sort=new&priced=1&cursor=c2', 'GET /api/v1/catalog/domains?cursor=c1',
+            'GET /api/v1/catalog/domains/dev', 'GET /api/v1/catalog/domains/check?name=example.dev', 'GET /api/v1/catalog/benchmarks',
+            'GET /api/v1/catalog/benchmarks/bm_1', 'GET /api/v1/topics', 'GET /api/v1/stories?topic=space&limit=10', 'GET /api/v1/stories/moon-landing-2026',
+        ]);
+        assert.ok(pub.every((x) => x.auth === null), 'public reads go without a token, even from a client that has one');
+        assert.throws(() => host.domains.check('example'), /domain name/);
+        assert.throws(() => news.stories.get(''), /story/);
+
         // Each product's token is for its own audience (Video's is the media hub's, openvibe.download).
         assert.deepStrictEqual([...new Set(audiences)].sort(), ['openvibe.actor', 'openvibe.blog', 'openvibe.coupons', 'openvibe.deals', 'openvibe.download', 'openvibe.food', 'openvibe.reviews', 'openvibe.run', 'openvibe.space', 'openvibe.trade', 'openvibe.wiki', 'openvibe.work', 'openvibe.zone']);
-        assert.ok(seen.every((x) => x.auth === `Bearer tok-${{ food: 'openvibe.food', actor: 'openvibe.actor', run: 'openvibe.run', video: 'openvibe.download', work: 'openvibe.work', zone: 'openvibe.zone', blog: 'openvibe.blog', reviews: 'openvibe.reviews', wiki: 'openvibe.wiki', coupons: 'openvibe.coupons', deals: 'openvibe.deals', trade: 'openvibe.trade', space: 'openvibe.space' }[x.svc]}`));
+        assert.ok(seen.filter((x) => x.svc !== 'host' && x.svc !== 'news').every((x) => x.auth === `Bearer tok-${{ food: 'openvibe.food', actor: 'openvibe.actor', run: 'openvibe.run', video: 'openvibe.download', work: 'openvibe.work', zone: 'openvibe.zone', blog: 'openvibe.blog', reviews: 'openvibe.reviews', wiki: 'openvibe.wiki', coupons: 'openvibe.coupons', deals: 'openvibe.deals', trade: 'openvibe.trade', space: 'openvibe.space' }[x.svc]}`));
 
         // Each client needs a core client.
-        for (const make of [createFoodClient, createActorClient, createRunClient, createVideoClient, createWorkClient, createZoneClient, createBlogClient, createReviewsClient, createWikiClient, createCouponsClient, createDealsClient, createTradeClient, createSpaceClient]) assert.throws(() => make({}), /core client/);
-        console.log('product modules (food, actor, run, video, work, zone, blog, reviews, wiki, coupons, deals, trade, space): all checks passed');
+        for (const make of [createFoodClient, createActorClient, createRunClient, createVideoClient, createWorkClient, createZoneClient, createBlogClient, createReviewsClient, createWikiClient, createCouponsClient, createDealsClient, createTradeClient, createSpaceClient, createHostClient, createNewsClient]) assert.throws(() => make({}), /core client/);
+        console.log('product modules (food, actor, run, video, work, zone, blog, reviews, wiki, coupons, deals, trade, space, host, news): all checks passed');
     } finally {
         server.close();
     }

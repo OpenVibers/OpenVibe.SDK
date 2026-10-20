@@ -3,6 +3,14 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.60.0 (2026-10-20)
+
+- **`openvibe-sdk/host`** and **`openvibe-sdk/news`**: the public reads of the last two products without a module.
+  Host: the hosting catalog (providers, plans, promos, community offers, domain endings with registrar prices, a
+  name's availability, YABS benchmarks), with Host's own filters (any other key is refused). News: topics and the
+  published and retracted stories with their sources, timeline and perspectives. Both are sent without a token;
+  editing stays with each site's editors.
+
 ## 0.59.0 (2026-10-20)
 
 - **`openvibe-sdk/space`** (`createSpaceClient`): OpenVibe.Space for apps and CI, public in openvibe-contracts 0.209.0.
