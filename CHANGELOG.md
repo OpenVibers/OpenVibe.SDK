@@ -3,6 +3,16 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.53.0 (2026-10-20)
+
+- **`openvibe-sdk/inventory`**: OpenVibe.Inventory through the SDK, as the owner asked of it ("cross site network wide
+  shared multi purpose modular system … through sdk / api"). `createInventoryClient(client)` covers its `/api/v1`: the
+  public reads (`kinds`, `definitions`, a person's `items` and `equipped`, `equipped([subjects])` for up to 100 at once),
+  the person's own (`me.items`, `me.equip`, `instance_id: null` clears a slot), and an issuer's (`definitions.create` /
+  `update`, `grants.create` → `{ instance, created }`, `instances.consume` / `revoke`). A grant is retried safely: its
+  body's `idempotency_key` is what Inventory dedupes on. `forPerson(usr_…)` is the same client sending `X-OV-Subject`
+  for a service acting for a person. Ids are checked against Inventory's own rules before any call.
+
 ## 0.52.0 (2026-10-20)
 
 - **`openvibe-sdk/live`**: OpenVibe.Live in the SDK, its flagship product had no module. `createLiveClient(client)`
