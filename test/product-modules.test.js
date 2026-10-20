@@ -1,5 +1,5 @@
 'use strict';
-// openvibe-sdk/food, /actor, /run, /video, /work, /zone and /blog through a real core client against one local stub: every
+// openvibe-sdk/food, /actor, /run, /video, /work, /zone, /blog, /reviews and /wiki through a real core client against one local stub: every
 // route and method, the token audience, which writes are retried (keyed or idempotent) and which never are, the SSE
 // followers (Actor's task events, Run's job stream), and the id checks done before any call.
 const assert = require('assert');
@@ -12,9 +12,11 @@ const { createVideoClient } = require('../src/video');
 const { createWorkClient } = require('../src/work');
 const { createZoneClient } = require('../src/zone');
 const { createBlogClient } = require('../src/blog');
+const { createReviewsClient } = require('../src/reviews');
+const { createWikiClient } = require('../src/wiki');
 
 const ULID = '01JAB2C3D4E5F6G7H8J9K0MNPQ';
-const ids = { plan: `pln_${ULID}`, task: `tsk_${ULID}`, agent: `agt_${ULID}`, mem: `mem_${ULID}`, job: `job_${ULID}`, playlist: `vpl_${ULID}`, app: `wap_${ULID}`, project: `prj_${ULID}`, zone: `zon_${ULID}`, post: `pst_${ULID}` };
+const ids = { plan: `pln_${ULID}`, task: `tsk_${ULID}`, agent: `agt_${ULID}`, mem: `mem_${ULID}`, job: `job_${ULID}`, playlist: `vpl_${ULID}`, app: `wap_${ULID}`, project: `prj_${ULID}`, zone: `zon_${ULID}`, post: `pst_${ULID}`, page: `pg_${ULID}` };
 
 (async () => {
     const seen = [];
@@ -45,7 +47,7 @@ const ids = { plan: `pln_${ULID}`, task: `tsk_${ULID}`, agent: `agt_${ULID}`, me
     const base = `http://127.0.0.1:${server.address().port}`;
     const audiences = [];
     const client = createClient({
-        baseUrls: { food: `${base}/food`, actor: `${base}/actor`, run: `${base}/run`, 'media-hub': `${base}/video`, work: `${base}/work`, zone: `${base}/zone`, blog: `${base}/blog` },
+        baseUrls: { food: `${base}/food`, actor: `${base}/actor`, run: `${base}/run`, 'media-hub': `${base}/video`, work: `${base}/work`, zone: `${base}/zone`, blog: `${base}/blog`, reviews: `${base}/reviews`, wiki: `${base}/wiki` },
         getToken: ({ audience }) => { audiences.push(audience); return `tok-${audience}`; },
         retries: 2, retryDelayMs: 1, maxRetryDelayMs: 2,
     });
@@ -247,13 +249,54 @@ const ids = { plan: `pln_${ULID}`, task: `tsk_${ULID}`, agent: `agt_${ULID}`, me
         assert.throws(() => blog.posts.create('goosely', { body: 'no title' }), /title/);
         assert.throws(() => blog.posts.schedule(ids.post, { at: 'tomorrow' }), /ISO 8601/);
 
+        // ── Reviews ───────────────────────────────────────────
+        const reviews = createReviewsClient(client);
+        mark = since();
+        await reviews.resolve({ name: 'Blue Star Donuts', url: 'https://bluestardonuts.com' });   // a lookup: retried
+        await reviews.entities.list({ q: 'donuts', limit: 20 });
+        await reviews.entities.get('blue-star-donuts');
+        await reviews.entities.history('blue-star-donuts');
+        await reviews.entities.aggregate('blue-star-donuts');
+        await reviews.entities.summaryRevision('blue-star-donuts', 3);
+        await busyOnce(() => reviews.corrections.submit('blue-star-donuts', { target_type: 'entity', body: 'Closed on Mondays now', evidence_url: 'https://example.com/hours' }));
+        const rv = mark();
+        assert.deepStrictEqual(rv.map((x) => `${x.method} ${x.url}`), [
+            'POST /api/v1/resolve', 'POST /api/v1/resolve', 'GET /api/v1/entities?q=donuts&limit=20', 'GET /api/v1/entities/blue-star-donuts',
+            'GET /api/v1/entities/blue-star-donuts/history', 'GET /api/v1/entities/blue-star-donuts/aggregate',
+            'GET /api/v1/entities/blue-star-donuts/summary/revisions/3', 'POST /api/v1/entities/blue-star-donuts/corrections',
+        ]);
+        assert.deepStrictEqual(rv[7].body, { body: 'Closed on Mondays now', target_type: 'entity', evidence_url: 'https://example.com/hours' });
+        assert.throws(() => reviews.resolve({}), /identifier/);
+        assert.throws(() => reviews.corrections.submit('x', { body: 'y', target_type: 'opinion' }), /target_type/);
+        assert.throws(() => reviews.corrections.submit('x', { body: ' ' }), /body/);
+
+        // ── Wiki ──────────────────────────────────────────────
+        const wiki = createWikiClient(client);
+        mark = since();
+        await wiki.search('restreaming', { space: 'openvibe', limit: 5 });
+        await wiki.spaces.list();
+        await wiki.spaces.get('openvibe');
+        await wiki.pages.get(ids.page, { revision: 4 });
+        await wiki.pages.revisions(ids.page, { limit: 10 });
+        await wiki.pages.revision(ids.page, 4);
+        await wiki.pages.diff(ids.page, { from: 3, to: 4, mode: 'words' });
+        await wiki.pages.citations(ids.page, 4);
+        const W = `/api/v1/pages/${ids.page}`;
+        assert.deepStrictEqual(mark().map((x) => `${x.method} ${x.url}`), [
+            'GET /api/v1/search?q=restreaming&space=openvibe&limit=5', 'GET /api/v1/spaces', 'GET /api/v1/spaces/openvibe', `GET ${W}?revision=4`,
+            `GET ${W}/revisions?limit=10`, `GET ${W}/revisions/4`, `GET ${W}/diff?from=3&to=4&mode=words`, `GET ${W}/revisions/4/citations`,
+        ]);
+        assert.throws(() => wiki.search(''), /search for/);
+        assert.throws(() => wiki.pages.get('page_1'), /pg_/);
+        assert.throws(() => wiki.pages.diff(ids.page, { from: 0, to: 2 }), /revision number/);
+
         // Each product's token is for its own audience (Video's is the media hub's, openvibe.download).
-        assert.deepStrictEqual([...new Set(audiences)].sort(), ['openvibe.actor', 'openvibe.blog', 'openvibe.download', 'openvibe.food', 'openvibe.run', 'openvibe.work', 'openvibe.zone']);
-        assert.ok(seen.every((x) => x.auth === `Bearer tok-${{ food: 'openvibe.food', actor: 'openvibe.actor', run: 'openvibe.run', video: 'openvibe.download', work: 'openvibe.work', zone: 'openvibe.zone', blog: 'openvibe.blog' }[x.svc]}`));
+        assert.deepStrictEqual([...new Set(audiences)].sort(), ['openvibe.actor', 'openvibe.blog', 'openvibe.download', 'openvibe.food', 'openvibe.reviews', 'openvibe.run', 'openvibe.wiki', 'openvibe.work', 'openvibe.zone']);
+        assert.ok(seen.every((x) => x.auth === `Bearer tok-${{ food: 'openvibe.food', actor: 'openvibe.actor', run: 'openvibe.run', video: 'openvibe.download', work: 'openvibe.work', zone: 'openvibe.zone', blog: 'openvibe.blog', reviews: 'openvibe.reviews', wiki: 'openvibe.wiki' }[x.svc]}`));
 
         // Each client needs a core client.
-        for (const make of [createFoodClient, createActorClient, createRunClient, createVideoClient, createWorkClient, createZoneClient, createBlogClient]) assert.throws(() => make({}), /core client/);
-        console.log('product modules (food, actor, run, video, work, zone, blog): all checks passed');
+        for (const make of [createFoodClient, createActorClient, createRunClient, createVideoClient, createWorkClient, createZoneClient, createBlogClient, createReviewsClient, createWikiClient]) assert.throws(() => make({}), /core client/);
+        console.log('product modules (food, actor, run, video, work, zone, blog, reviews, wiki): all checks passed');
     } finally {
         server.close();
     }

@@ -59,6 +59,8 @@ const ENTRIES = {
     'inventory.mjs': '../src/inventory.js',
     'tips.mjs': '../src/tips.js',
     'blog.mjs': '../src/blog.js',
+    'reviews.mjs': '../src/reviews.js',
+    'wiki.mjs': '../src/wiki.js',
     'food.mjs': '../src/food.js',
     'actor.mjs': '../src/actor.js',
     'run.mjs': '../src/run.js',
