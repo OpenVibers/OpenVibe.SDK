@@ -28,6 +28,7 @@ module.exports = {
     quest: require('./src/quest'),
     live: require('./src/live'),
     inventory: require('./src/inventory'),
+    tips: require('./src/tips'),
     play: require('./src/play'),
     download: require('./src/download'),
     openre: require('./src/openre'),

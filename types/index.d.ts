@@ -19,6 +19,7 @@ export * as vip from './vip';
 export * as quest from './quest';
 export * as live from './live';
 export * as inventory from './inventory';
+export * as tips from './tips';
 export * as play from './play';
 export * as download from './download';
 export * as openre from './openre';

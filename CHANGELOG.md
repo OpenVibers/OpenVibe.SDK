@@ -3,6 +3,15 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.54.0 (2026-10-20)
+
+- **`openvibe-sdk/tips`**: OpenVibe.Tips through the SDK (it had 19 capabilities and no module). `createTipsClient(client)`
+  covers its `/api/v1`: a creator's tip page (`profiles`), tipping (`tip` → `{ interaction, checkout_url,
+  checkout_ref }`) and paid messages, TTS, media and sound requests (`send.*`), receipts and external tips
+  (`interactions`), `goals`, `moderation` (queue, log, moderators), `overlays` (tokens, configs, a test alert) and the
+  supporter's own `me.export` / `erase`. Tips replays an Idempotency-Key once, so every write carries one and a
+  retried tip is safe.
+
 ## 0.53.0 (2026-10-20)
 
 - **`openvibe-sdk/inventory`**: OpenVibe.Inventory through the SDK, as the owner asked of it ("cross site network wide
