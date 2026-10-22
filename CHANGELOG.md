@@ -3,6 +3,13 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.61.0 (2026-10-22)
+
+- **`openvibe-sdk/no-looks`**: the owner's rule that public AI text never describes a person, as one shared filter.
+  `noLooks(text)`, `noLooksTags(tags)`, `hasLooks(title)` and `RULES_VERSION`, moved from OpenVibe.Live
+  (Live#298–#302) with its test corpus, so Community, Search, MediaHub and every service that stores public AI text
+  run the same rules. Pure and dependency-free (Node and browsers).
+
 ## 0.60.0 (2026-10-20)
 
 - **`openvibe-sdk/host`** and **`openvibe-sdk/news`**: the public reads of the last two products without a module.
