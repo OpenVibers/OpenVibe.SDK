@@ -80,6 +80,26 @@ const _POSE = /,?\s*(?:(?:appearing|seeming|seemingly)\s+(?:to\s+be\s+)?)?(?:(?:
 const _GENDERED = 'man|woman|guy|gal|lady|gentleman';
 const _GENDERED_ONE = new RegExp(`\\b(a|an|the|one|another|this|that|each|every)\\s+(?:${_GENDERED})\\b(?!-)`, 'gi');
 const _GENDERED_MANY = new RegExp(`\\b(two|three|four|five|several|some|the|both|many|other|few|these|those|\\d+)\\s+(?:men|women|guys|gals|ladies|gentlemen)\\b`, 'gi');
+// A pronoun is a guessed gender too: he and she are "the person", his and her (before a word) "their", him and her
+// (after a verb or a preposition, or at the end) "them", himself and herself "themself", hers "theirs". Outside
+// quotes only: what someone said stays word for word. "The person" keeps the verb as written ("he looks" → "the person
+// looks"), which "they" would not.
+const _HE_SHE = /\b(?:he|she)\b(?:'(s|d|ll)\b)?/gi;
+const _HER_OBJECT = /\bher\b(?=\s*(?:[.,;:!?)\]"”]|$)|\s+(?:and|or|but|to|from|with|in|on|at|for|as|while|when|because|so|if|the|a|an|this|that|is|was|again|back|up|down|out|off|away|over|now|too|here|there|more|about|into|onto)\b)/gi;
+const _PRONOUNS = [
+    [/\b(?:himself|herself)\b/gi, 'themself'],
+    [/\bhers\b/gi, 'theirs'],
+    [/\bhim\b/gi, 'them'],
+    [_HER_OBJECT, 'them'],
+    [/\b(?:his|her)\b(?=\s+[\w'-])/gi, 'their'],
+    [/\bhis\b/gi, 'theirs'],
+];
+const _CONTRACTED = { s: "'s", d: ' would', ll: ' will' };
+function _noPronouns(part) {
+    let out = part.replace(_HE_SHE, (m, c) => _cap(m, `the person${c ? _CONTRACTED[c.toLowerCase()] : ''}`));
+    for (const [re, word] of _PRONOUNS) out = out.replace(re, (m) => _cap(m, word));
+    return out;
+}
 const _GENDER_ADJ = /\b(?:(?:a|an)\s+)?(?:male|female)\s+(?:or|and|\/)\s+(?:male|female)\s+|\b(?:male|female)\s+(?=(?:hosts?|streamers?|players?|speakers?|presenters?|gamers?|voices?|narrators?|commentators?|figures?|characters?|broadcasters?|viewers?|individuals?|persons?|people)\b)/gi;
 // What is left of a sentence about someone's hair, clothes or body ("a person adjusts their hair or clothing near the
 // counter") cannot be repaired word by word: the sentence goes.
@@ -95,7 +115,7 @@ function _noGender(text) {
         .replace(_GENDERED_ONE, (m, art) => _cap(m, `${/^an$/i.test(art) ? 'a' : art.toLowerCase()} person`))
         .replace(_GENDERED_MANY, (m, n) => _cap(m, `${n.toLowerCase()} people`))
         .replace(/\ba\s+(?=[aeiou]\w*\s+(?:host|streamer|player|speaker|presenter|gamer|figure|character|broadcaster|person)\b)/gi, (m) => _cap(m, 'an '))
-        .replace(/ {2,}/g, ' '))).join('');
+        .replace(/ {2,}/g, ' '))).map((part, i) => (i % 2 ? part : _noPronouns(part))).join('');
 }
 function _noGrooming(text) {
     const sentences = text.match(/[^.!?]+(?:[.!?]+(?:["”])?|$)\s*/g) || [text];
@@ -129,6 +149,6 @@ function _hash(text) {
     return a.toString(16).padStart(8, '0') + b.toString(16).padStart(8, '0');
 }
 const RULES_VERSION = _hash([_LOOKS, _PEOPLE, _WORN, _WORN_ANY, _FACE, _WITH_CLOTHES, _GENDER_ADJ, _GROOMING, _LOOKS_TAG, _LOOKS_WORD, _POSE,
-    _noLooks, _noLooksWords, _noGender, _noGrooming, _noClothing].map(String).join('|'));
+    _noLooks, _noLooksWords, _noGender, _noGrooming, _noClothing, _HE_SHE, _HER_OBJECT, _PRONOUNS.map(([re, w]) => `${re}${w}`).join(','), _noPronouns].map(String).join('|'));
 
 module.exports = { noLooks: _noLooks, noLooksTags: _noLooksTags, hasLooks: _hasLooks, RULES_VERSION };

@@ -3,6 +3,22 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.62.0 (2026-10-23)
+
+- **`openvibe-sdk/no-looks`: pronouns.** A pronoun is a guessed gender too, so the 27 Community summaries repaired on
+  10-22 that still said "he looks at the camera" or "on his device" are covered. Outside quotes:
+  - he and she become "the person" (the verb stays as written: "he looks" → "the person looks"; he'll → the person
+    will, he'd → the person would);
+  - his and her before a word become "their"; him, and her after a verb, a preposition or at the end, become "them";
+  - himself and herself become "themself", hers and a final his "theirs".
+  Quoted speech stays word for word. `RULES_VERSION` changes, so services that repair stored rows run their repair
+  once more.
+- **`openvibe-sdk/live`: where a slot publishes.** `live.slots.profile(slotId)` reads a slot's settings and ingest
+  (`GET /api/streams/managed/:id/profile`, owner): its stream key, Live's WHIP origin and RTMP URL, or, for a slot
+  OpenRestream ingests, OpenRestream's own WHIP and RTMP URLs and no key. `live.whip.forSlot(slotId)` turns that into
+  `{ url, key, authority }` to pass to `live.whip.publish()`, so going live from code no longer builds the WHIP URL by
+  hand (OpenVibe.Examples' go-live example, plan G2).
+
 ## 0.61.0 (2026-10-22)
 
 - **`openvibe-sdk/no-looks`**: the owner's rule that public AI text never describes a person, as one shared filter.

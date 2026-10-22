@@ -22,6 +22,10 @@ const { createLiveClient } = require('../src/live');
                 return res.end('v=0\r\no=answer\r\n');
             }
             if (req.method === 'POST' && req.url === '/api/streams') return json(201, { stream: { id: 77 }, endpoint: { whipUrlBase: 'x' } });
+            // A slot's profile: Live's own ingest (5), OpenRestream's (6), and one with no WHIP address (7).
+            if (req.url === '/api/streams/managed/5/profile') return json(200, { managed_stream: { id: 5 }, stream_key: 'sk_live_5', whip_url_base: 'https://whip.example.test/', rtmp_url: 'rtmp://x/live' });
+            if (req.url === '/api/streams/managed/6/profile') return json(200, { managed_stream: { id: 6 }, stream_key: null, whip_url_base: null, ingest_authority: 'openre', whip_url: 'https://openre.example.test/whip/k6' });
+            if (req.url === '/api/streams/managed/7/profile') return json(200, { managed_stream: { id: 7 }, stream_key: 'sk_live_7', whip_url_base: null });
             return json(200, { ok: true });
         });
     });
@@ -83,6 +87,16 @@ const { createLiveClient } = require('../src/live');
         await assert.rejects(live.whip.publish(live.whip.url('bad-key'), 'v=0'), (err) => err.status === 401 && err.code === 'invalid_stream_key');
         assert.strictEqual(seen.filter((s) => s.url === '/whip/bad-key').length, 1, 'a refused offer is not retried');
         await assert.rejects(live.whip.url('../x'), /stream key/);
+
+        // A slot's profile and where it publishes.
+        seen.length = 0;
+        const prof = await live.slots.profile(5);
+        assert.strictEqual(prof.stream_key, 'sk_live_5');
+        assert.strictEqual(last().url, '/api/streams/managed/5/profile');
+        assert.deepStrictEqual(await live.whip.forSlot(5), { url: 'https://whip.example.test/whip/sk_live_5', key: 'sk_live_5', authority: 'live' });
+        assert.deepStrictEqual(await live.whip.forSlot(6), { url: 'https://openre.example.test/whip/k6', key: null, authority: 'openre' });
+        await assert.rejects(live.whip.forSlot(7), /no WHIP address/);
+        assert.throws(() => live.slots.profile('5/../x'), /slot id/);
 
         assert.throws(() => createLiveClient({ json() {} }), /core client/);
         console.log('live: all checks passed');
