@@ -75,6 +75,25 @@ run([
             assert.deepEqual([b.payload.target.owner_subject, b.actor], [null, { type: 'service', id: 'trade' }]);
         } finally { await db.close(); }
     }],
+    ['sent rows older than pruneAfterMs go (prune()), unsent and recent ones stay; false keeps everything', async () => {
+        const db = await open(); const p = platform();
+        try {
+            let t = 1_000_000_000;
+            const out = make(db, p, { now: () => t, pruneAfterMs: 1000 });
+            await db.tx((tx) => out.emitIn(tx, { event_type: 'trade.observation.created', actor, subject }));
+            await out.outbox.flush();
+            t += 500;
+            await db.tx((tx) => out.emitIn(tx, { event_type: 'trade.observation.created', actor, subject: { ...subject, id: 'later' } }));
+            await out.outbox.flush();
+            await db.tx((tx) => out.emitIn(tx, { event_type: 'trade.observation.created', actor, subject: { ...subject, id: 'unsent' } }));
+            t += 800;   // the first sent row is 1,300 ms old, the second 800 ms
+            assert.equal(await out.prune(), 1);
+            assert.equal(await db.value(sql`SELECT count(*)::int FROM event_outbox`), 2, 'the recent sent row and the unsent one stay');
+            const keep = make(db, p, { now: () => t + 10_000, pruneAfterMs: false });
+            assert.equal(await keep.prune(), 0, 'false: nothing is pruned');
+            out.start(); await out.stop();   // start() schedules the prune timers and stop() clears them (the test would hang otherwise)
+        } finally { await db.close(); }
+    }],
     ['a service with its own table name; misuse is a TypeError', async () => {
         const db = await open('tips_event_outbox'); const p = platform();
         try {

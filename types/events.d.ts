@@ -171,6 +171,8 @@ export interface ServiceOutboxOptions {
     autoDiscover?: boolean;
     /** false: <source>.moderation.action withholds target.owner_subject. */
     moderationOwnerSubject?: boolean;
+    /** Sent rows older than this are pruned every 6 hours while the relay runs (default 7 days); false keeps them. */
+    pruneAfterMs?: number | false;
 }
 export interface ServiceOutbox {
     /** Inside the change's ambient openvibe-sdk/db transaction. */
@@ -181,6 +183,8 @@ export interface ServiceOutbox {
     outbox: PgOutbox;
     events: EventsClient;
     enabled: boolean;
+    /** Prunes sent rows older than pruneAfterMs now; resolves with the count (0 when off or on failure). */
+    prune(): Promise<number>;
     start(): void;
     stop(): Promise<unknown>;
     kick(): Promise<void>;
