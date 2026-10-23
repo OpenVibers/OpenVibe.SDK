@@ -161,7 +161,7 @@ run([
         await assert.rejects(events.subscribe({ topicPattern: 'media.vod.*', endpoint: 'http://127.0.0.1:3000/internal/events' }), { status: 409, code: 'events.subscription_exists' });
     }],
 
-    ['verifyDelivery / parseDelivery check X-OpenVibe-Signature over the raw body', async () => {
+    ['verifyDelivery / parseDelivery (requireV2: false, deprecated) check X-OpenVibe-Signature over the raw body', async () => {
         const secret = `whsec_${'ab'.repeat(32)}`;
         const raw = Buffer.from(JSON.stringify({ event: { event_id: 'evt_1', event_type: 'media.vod.ready' } }));
         const sig = signDelivery(raw, secret);
@@ -174,9 +174,9 @@ run([
         assert.equal(verifyDelivery(raw, 'sha256=00', secret), false);
         assert.equal(verifyDelivery(raw, undefined, secret), false);
         assert.equal(verifyDelivery(raw, sig, ''), false);
-        const d = parseDelivery(raw, { 'x-openvibe-signature': sig, 'x-openvibe-subscription-id': 'sub_1', 'x-openvibe-delivery-attempt': '2' }, secret);
+        const d = parseDelivery(raw, { 'x-openvibe-signature': sig, 'x-openvibe-subscription-id': 'sub_1', 'x-openvibe-delivery-attempt': '2' }, secret, { requireV2: false });
         assert.deepEqual(d, { event: { event_id: 'evt_1', event_type: 'media.vod.ready' }, subscriptionId: 'sub_1', attempt: 2 });
-        assert.equal(parseDelivery(raw, new Headers({ 'X-OpenVibe-Signature': 'sha256=bad' }), secret), null);
+        assert.equal(parseDelivery(raw, new Headers({ 'X-OpenVibe-Signature': 'sha256=bad' }), secret, { requireV2: false }), null);
     }],
 
     ['verifyDeliveryV2 checks X-OpenVibe-Signature-V2 (HMAC of "<t>.<raw body>") and the ±300 s window', async () => {
@@ -230,8 +230,9 @@ run([
         assert.equal(parseDelivery(raw, { ...signed, 'X-OpenVibe-Signature-V2': '' }, secret, { now }), null, 'an empty v2 header is present and bad');
         assert.equal(parseDelivery(raw, { ...v1only, 'x-openvibe-signature-v2': signed['X-OpenVibe-Signature-V2'] }, secret, { now: now + 200000, toleranceSec: 100 }), null, 'toleranceSec is passed through');
         // No v2 header: v1 only while requireV2 is off.
-        assert.deepEqual(parseDelivery(raw, v1only, secret), want, 'v1-only still parses by default (backward compatible)');
+        assert.equal(parseDelivery(raw, v1only, secret), null, 'v2 is required by default (0.64.0): a v1-only delivery is replayable');
         assert.equal(parseDelivery(raw, v1only, secret, { requireV2: true }), null, 'requireV2 refuses a v1-only (replayable) delivery');
+        assert.deepEqual(parseDelivery(raw, v1only, secret, { requireV2: false }), want, 'requireV2: false still accepts v1 (deprecated)');
         assert.equal(parseDelivery(raw, { 'x-openvibe-signature': 'sha256=bad' }, secret), null);
         // A v2 delivery with a bad v1 still parses: v1 is not consulted once v2 is there.
         assert.deepEqual(parseDelivery(raw, { ...signed, 'X-OpenVibe-Signature': 'sha256=bad' }, secret, { now }), want);

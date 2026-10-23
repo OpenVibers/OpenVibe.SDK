@@ -3,6 +3,22 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.64.0 (2026-10-25)
+
+- **`parseDelivery` requires a v2 signature by default.** A delivery without `X-OpenVibe-Signature-V2` is refused
+  unless the caller passes `{ requireV2: false }`, which is deprecated. A v1 signature (`X-OpenVibe-Signature`) signs no
+  time, so a captured delivery verified forever. OpenVibe.Events sends only v2, and every production receiver
+  already passed `requireV2: true`, so nothing that runs changes. A test that signs with `signDelivery` and parses
+  without options now gets `null`: sign with `signDeliveryHeaders` instead.
+- **`signDelivery` and `verifyDelivery` are deprecated** and leave in 1.0, with `createCodeVerifier` and
+  `pkceChallenge` (the halves of `createPkcePair`, unused anywhere).
+- **What 1.0 freezes, name by name.** [docs/one-point-oh.md](docs/one-point-oh.md) puts each name of the five core
+  entries in a tier (frozen, platform or leaving), with the reasons and how many repositories use it.
+  `docs/one-point-oh.json` holds the lists. `test/surface.test.js` fails when a name there has no tier, and
+  `scripts/surface.js --check` marks a breaking change with its tier.
+- `types/events.d.ts`: `signDeliveryHeaders` returns the timestamp and the v2 header. The type had also listed a v1
+  header that the function never set.
+
 ## 0.63.0 (2026-10-24)
 
 - **The public surface is pinned.** `docs/api-surface.json` lists every name each of the 66 entries exports and what it

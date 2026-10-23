@@ -20,12 +20,19 @@ const { startSpan } = require('./core/trace');
 
 // ── Webhook signatures ───────────────────────────────────────
 
-/** `sha256=<hex HMAC-SHA256 of the raw body>`, the value of X-OpenVibe-Signature. */
+/**
+ * `sha256=<hex HMAC-SHA256 of the raw body>`, the value of X-OpenVibe-Signature (v1).
+ * @deprecated v1 signs no time, so a captured delivery verifies forever; OpenVibe.Events sends only v2. Leaves in 1.0
+ * (docs/one-point-oh.md): use signDeliveryHeaders / signDeliveryV2.
+ */
 function signDelivery(rawBody, secret) {
     return `sha256=${crypto.createHmac('sha256', String(secret)).update(toBuffer(rawBody)).digest('hex')}`;
 }
 
-/** Constant-time check of a delivery's X-OpenVibe-Signature against the RAW request body. */
+/**
+ * Constant-time check of a delivery's X-OpenVibe-Signature (v1) against the RAW request body.
+ * @deprecated replayable (no time in it); leaves in 1.0 (docs/one-point-oh.md): use verifyDeliveryV2 / parseDelivery.
+ */
 function verifyDelivery(rawBody, signatureHeader, secret) {
     if (rawBody == null || typeof signatureHeader !== 'string' || !secret) return false;
     const expected = Buffer.from(signDelivery(rawBody, secret));
@@ -116,11 +123,12 @@ function verifyDeliveryV2(rawBody, headers, secret, { toleranceSec = V2_TOLERANC
  *
  *   X-OpenVibe-Signature-V2 present  it must verify and be within ±toleranceSec (default 300) of
  *                                    `now`; a bad or stale v2 is null, never a fallback to v1
- *   no v2 header                     v1 (X-OpenVibe-Signature) is accepted unless requireV2
+ *   no v2 header                     null; v1 (X-OpenVibe-Signature) only with requireV2: false (deprecated)
  *
- * Set requireV2: true once OpenVibe.Events sends v2 to you: then a replayed v1-only delivery fails.
+ * v2 is required by default since 0.64.0: OpenVibe.Events sends only v2, every service already asked for it, and a v1
+ * signature carries no time, so a captured v1-only delivery would verify forever.
  */
-function parseDelivery(rawBody, headers, secret, { requireV2 = false, toleranceSec, now } = {}) {
+function parseDelivery(rawBody, headers, secret, { requireV2 = true, toleranceSec, now } = {}) {
     const get = (k) => headerValue(headers, k);
     if (get('x-openvibe-signature-v2') !== undefined) {
         if (!verifyDeliveryV2(rawBody, headers, secret, { toleranceSec, now })) return null;
