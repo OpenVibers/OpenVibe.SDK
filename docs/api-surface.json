@@ -1,0 +1,761 @@
+{
+  "openvibe-sdk": {
+    "CONTRACTS_RANGE": "string",
+    "DEFAULT_NETWORK": "string",
+    "OpenVibeError": "class",
+    "SDK_VERSION": "string",
+    "actor": {
+      "object": [
+        "createActorClient"
+      ]
+    },
+    "ai": {
+      "object": [
+        "OPS",
+        "TERMINAL",
+        "createAiClient"
+      ]
+    },
+    "auth": {
+      "object": [
+        "TOKEN_VALID_AFTER",
+        "base64url",
+        "buildAuthorizeUrl",
+        "createCodeVerifier",
+        "createJwksClient",
+        "createNetworkKeys",
+        "createPgRevocationStore",
+        "createPkcePair",
+        "createServiceTokenClient",
+        "createState",
+        "decodeUnverified",
+        "exchangeCode",
+        "jwksClient",
+        "jwksStatus",
+        "pkceChallenge",
+        "readCallback",
+        "refreshUserToken",
+        "revocationSchema",
+        "startAuthorization",
+        "unverifiedClaims",
+        "verifyAppToken",
+        "verifyServiceToken",
+        "verifyUserToken"
+      ]
+    },
+    "blog": {
+      "object": [
+        "createBlogClient"
+      ]
+    },
+    "bot": {
+      "object": [
+        "actingHeaders",
+        "createBotClient"
+      ]
+    },
+    "chat": {
+      "object": [
+        "createChatClient"
+      ]
+    },
+    "commerce": {
+      "object": [
+        "CommerceError",
+        "createCommerceClient",
+        "intentKey",
+        "receipt"
+      ]
+    },
+    "community": {
+      "object": [
+        "actingHeaders",
+        "createCommunityClient"
+      ]
+    },
+    "compareVersions": "function",
+    "contextFromHeaders": "function",
+    "coupons": {
+      "object": [
+        "createCouponsClient"
+      ]
+    },
+    "createClient": "function",
+    "deals": {
+      "object": [
+        "createDealsClient"
+      ]
+    },
+    "download": {
+      "object": [
+        "contentTypeOf",
+        "createDownloadClient"
+      ]
+    },
+    "events": {
+      "object": [
+        "appSource",
+        "createAppEvents",
+        "createEventsClient",
+        "createPgInbox",
+        "createPgOutbox",
+        "createServiceOutbox",
+        "inboxSchema",
+        "outboxSchema",
+        "parseDelivery",
+        "projectKey",
+        "signDelivery",
+        "signDeliveryHeaders",
+        "signDeliveryV2",
+        "verifyDelivery",
+        "verifyDeliveryV2"
+      ]
+    },
+    "food": {
+      "object": [
+        "createFoodClient"
+      ]
+    },
+    "geo": {
+      "object": [
+        "createGeoClient"
+      ]
+    },
+    "host": {
+      "object": [
+        "createHostClient"
+      ]
+    },
+    "identity": {
+      "object": [
+        "createIdentityClient"
+      ]
+    },
+    "inventory": {
+      "object": [
+        "createInventoryClient"
+      ]
+    },
+    "isActingSubjectId": "function",
+    "isOpenVibeError": "function",
+    "jobs": {
+      "object": [
+        "TERMINAL_STATES",
+        "createJobsClient",
+        "isTerminal"
+      ]
+    },
+    "live": {
+      "object": [
+        "createLiveClient"
+      ]
+    },
+    "media": {
+      "object": [
+        "DEFAULT_PUBLIC_ORIGIN",
+        "createMediaClient",
+        "createObjectsClient",
+        "mediaUrls"
+      ]
+    },
+    "modules": {
+      "object": [
+        "createModulesClient"
+      ]
+    },
+    "newEventId": "function",
+    "newIdempotencyKey": "function",
+    "news": {
+      "object": [
+        "createNewsClient"
+      ]
+    },
+    "offsetPager": "function",
+    "openre": {
+      "object": [
+        "createOpenReClient"
+      ]
+    },
+    "paginate": "function",
+    "parseTraceparent": "function",
+    "play": {
+      "object": [
+        "createPlayClient"
+      ]
+    },
+    "projects": {
+      "object": [
+        "createProjectsClient"
+      ]
+    },
+    "quest": {
+      "object": [
+        "createQuestClient",
+        "eventType",
+        "projectKey"
+      ]
+    },
+    "realtime": {
+      "object": [
+        "DEFAULT_ORIGIN",
+        "createRealtimeClient",
+        "parseSSE",
+        "subscribe"
+      ]
+    },
+    "registry": {
+      "object": [
+        "createRegistryClient"
+      ]
+    },
+    "resources": {
+      "object": [
+        "RESOURCE_KINDS",
+        "createResourceClient",
+        "createResourceIndex",
+        "parseResourceName",
+        "resourceName",
+        "resourceNameOf"
+      ]
+    },
+    "reviews": {
+      "object": [
+        "createReviewsClient"
+      ]
+    },
+    "run": {
+      "object": [
+        "RUN_JOB_STATES",
+        "createRunClient"
+      ]
+    },
+    "satisfiesRange": "function",
+    "search": {
+      "object": [
+        "createSearchClient",
+        "queryOf"
+      ]
+    },
+    "space": {
+      "object": [
+        "createSpaceClient"
+      ]
+    },
+    "startSpan": "function",
+    "telemetry": {
+      "object": [
+        "createPgTelemetrySink",
+        "createTelemetry",
+        "pruneTelemetry",
+        "startTelemetryRetention",
+        "telemetrySample",
+        "telemetrySchema",
+        "validateTelemetrySample"
+      ]
+    },
+    "tips": {
+      "object": [
+        "createTipsClient"
+      ]
+    },
+    "tools": {
+      "object": [
+        "ToolRunError",
+        "createToolsClient",
+        "isToolRunError"
+      ]
+    },
+    "trade": {
+      "object": [
+        "createTradeClient"
+      ]
+    },
+    "ulid": "function",
+    "usage": {
+      "object": [
+        "createUsageReporter",
+        "usageKey",
+        "usageSample",
+        "validateUsageSample"
+      ]
+    },
+    "video": {
+      "object": [
+        "createVideoClient"
+      ]
+    },
+    "vip": {
+      "object": [
+        "createVipCache",
+        "createVipClient"
+      ]
+    },
+    "wiki": {
+      "object": [
+        "createWikiClient"
+      ]
+    },
+    "work": {
+      "object": [
+        "WORK_APPLICATION_STATUSES",
+        "createWorkClient"
+      ]
+    },
+    "zone": {
+      "object": [
+        "createZoneClient"
+      ]
+    }
+  },
+  "openvibe-sdk/account-data": {
+    "ACCOUNT_DATA_SCHEMA": "string",
+    "TOPICS": "array",
+    "createAccountData": "function",
+    "createNetworkSender": "function",
+    "startSubscriptions": "function"
+  },
+  "openvibe-sdk/actor": {
+    "createActorClient": "function"
+  },
+  "openvibe-sdk/ai": {
+    "OPS": "array",
+    "TERMINAL": "object",
+    "createAiClient": "function"
+  },
+  "openvibe-sdk/auth": {
+    "TOKEN_VALID_AFTER": "string",
+    "base64url": "function",
+    "buildAuthorizeUrl": "function",
+    "createCodeVerifier": "function",
+    "createJwksClient": "function",
+    "createNetworkKeys": "function",
+    "createPgRevocationStore": "function",
+    "createPkcePair": "function",
+    "createServiceTokenClient": "function",
+    "createState": "function",
+    "decodeUnverified": "function",
+    "exchangeCode": "function",
+    "jwksClient": "function",
+    "jwksStatus": "function",
+    "pkceChallenge": "function",
+    "readCallback": "function",
+    "refreshUserToken": "function",
+    "revocationSchema": "function",
+    "startAuthorization": "function",
+    "unverifiedClaims": "function",
+    "verifyAppToken": "function",
+    "verifyServiceToken": "function",
+    "verifyUserToken": "function"
+  },
+  "openvibe-sdk/auth/browser": {
+    "base64url": "function",
+    "buildAuthorizeUrl": "function",
+    "createCodeVerifier": "function",
+    "createPkcePair": "function",
+    "createState": "function",
+    "decodeUnverified": "function",
+    "pkceChallenge": "function",
+    "readCallback": "function",
+    "startAuthorization": "function",
+    "unverifiedClaims": "function"
+  },
+  "openvibe-sdk/blog": {
+    "createBlogClient": "function"
+  },
+  "openvibe-sdk/bot": {
+    "actingHeaders": "function",
+    "createBotClient": "function"
+  },
+  "openvibe-sdk/cache": {
+    "createCache": "function"
+  },
+  "openvibe-sdk/chat": {
+    "createChatClient": "function"
+  },
+  "openvibe-sdk/commerce": {
+    "CommerceError": "class",
+    "createCommerceClient": "function",
+    "intentKey": "function",
+    "receipt": "function"
+  },
+  "openvibe-sdk/community": {
+    "actingHeaders": "function",
+    "createCommunityClient": "function"
+  },
+  "openvibe-sdk/core": {
+    "CONTRACTS_RANGE": "string",
+    "DEFAULT_NETWORK": "string",
+    "OpenVibeError": "class",
+    "SDK_VERSION": "string",
+    "compareVersions": "function",
+    "contextFromHeaders": "function",
+    "createClient": "function",
+    "isActingSubjectId": "function",
+    "isOpenVibeError": "function",
+    "newEventId": "function",
+    "newIdempotencyKey": "function",
+    "offsetPager": "function",
+    "paginate": "function",
+    "parseTraceparent": "function",
+    "satisfiesRange": "function",
+    "startSpan": "function",
+    "ulid": "function"
+  },
+  "openvibe-sdk/cost": {
+    "costSnapshot": "function",
+    "estimate": "function",
+    "rateCard": "function",
+    "validateCostSnapshot": "function",
+    "validateRateCard": "function"
+  },
+  "openvibe-sdk/coupons": {
+    "createCouponsClient": "function"
+  },
+  "openvibe-sdk/db": {
+    "DbError": "class",
+    "ISOLATION": {
+      "object": [
+        "read committed",
+        "repeatable read",
+        "serializable"
+      ]
+    },
+    "PARSERS": {
+      "object": [
+        "1082",
+        "1114",
+        "114",
+        "1184",
+        "17",
+        "1700",
+        "20",
+        "3802"
+      ]
+    },
+    "createDb": "function",
+    "sql": "function"
+  },
+  "openvibe-sdk/deals": {
+    "createDealsClient": "function"
+  },
+  "openvibe-sdk/delivery": {
+    "deliveryOffer": "function",
+    "validateDeliveryOffer": "function"
+  },
+  "openvibe-sdk/download": {
+    "contentTypeOf": "function",
+    "createDownloadClient": "function"
+  },
+  "openvibe-sdk/events": {
+    "appSource": "function",
+    "createAppEvents": "function",
+    "createEventsClient": "function",
+    "createPgInbox": "function",
+    "createPgOutbox": "function",
+    "createServiceOutbox": "function",
+    "inboxSchema": "function",
+    "outboxSchema": "function",
+    "parseDelivery": "function",
+    "projectKey": "function",
+    "signDelivery": "function",
+    "signDeliveryHeaders": "function",
+    "signDeliveryV2": "function",
+    "verifyDelivery": "function",
+    "verifyDeliveryV2": "function"
+  },
+  "openvibe-sdk/food": {
+    "createFoodClient": "function"
+  },
+  "openvibe-sdk/frame": {
+    "DEFAULT_BASE": "string",
+    "frameConfig": "function",
+    "frameTags": "function",
+    "mountFrame": "function",
+    "scriptUrls": "function"
+  },
+  "openvibe-sdk/geo": {
+    "createGeoClient": "function"
+  },
+  "openvibe-sdk/govern": {
+    "UNITS": "array",
+    "WINDOWS": {
+      "object": [
+        "day",
+        "hour",
+        "minute",
+        "month"
+      ]
+    },
+    "createGovernor": "function"
+  },
+  "openvibe-sdk/host": {
+    "createHostClient": "function"
+  },
+  "openvibe-sdk/identity": {
+    "createIdentityClient": "function"
+  },
+  "openvibe-sdk/inventory": {
+    "createInventoryClient": "function"
+  },
+  "openvibe-sdk/jobs": {
+    "TERMINAL_STATES": "array",
+    "createJobsClient": "function",
+    "isTerminal": "function"
+  },
+  "openvibe-sdk/limits": {
+    "WINDOWS": {
+      "object": [
+        "day",
+        "hour",
+        "minute"
+      ]
+    },
+    "createActorLimiter": "function",
+    "createValkeyLimitStore": "function",
+    "defaultActor": "function"
+  },
+  "openvibe-sdk/live": {
+    "createLiveClient": "function"
+  },
+  "openvibe-sdk/media": {
+    "DEFAULT_PUBLIC_ORIGIN": "string",
+    "createMediaClient": "function",
+    "createObjectsClient": "function",
+    "mediaUrls": "function"
+  },
+  "openvibe-sdk/modules": {
+    "createModulesClient": "function"
+  },
+  "openvibe-sdk/news": {
+    "createNewsClient": "function"
+  },
+  "openvibe-sdk/no-looks": {
+    "RULES_VERSION": "string",
+    "hasLooks": "function",
+    "noLooks": "function",
+    "noLooksTags": "function"
+  },
+  "openvibe-sdk/node": {
+    "nodeCapabilities": "function",
+    "nodeOffers": "function",
+    "validateNodeCapabilities": "function"
+  },
+  "openvibe-sdk/notifications": {
+    "createNotificationsClient": "function"
+  },
+  "openvibe-sdk/openre": {
+    "createOpenReClient": "function"
+  },
+  "openvibe-sdk/placement": {
+    "TRUST_CLASSES": "array",
+    "TRUST_ORDER": "array",
+    "canonical": "function",
+    "createPlanHolder": "function",
+    "excluded": "function",
+    "forecast": "function",
+    "marginalCost": "function",
+    "ownedLoadCost": "function",
+    "pickTwo": "function",
+    "plan": "function",
+    "priceOf": "function",
+    "rendezvous": "function",
+    "signPlan": "function",
+    "verifyPlan": "function"
+  },
+  "openvibe-sdk/play": {
+    "createPlayClient": "function"
+  },
+  "openvibe-sdk/projects": {
+    "createProjectsClient": "function"
+  },
+  "openvibe-sdk/pubsub": {
+    "createPubSub": "function"
+  },
+  "openvibe-sdk/quest": {
+    "createQuestClient": "function",
+    "eventType": "function",
+    "projectKey": "function"
+  },
+  "openvibe-sdk/queue": {
+    "backoff": "function",
+    "createQueue": "function"
+  },
+  "openvibe-sdk/realtime": {
+    "DEFAULT_ORIGIN": "string",
+    "createRealtimeClient": "function",
+    "parseSSE": "function",
+    "subscribe": "function"
+  },
+  "openvibe-sdk/registry": {
+    "createRegistryClient": "function"
+  },
+  "openvibe-sdk/resources": {
+    "RESOURCE_KINDS": "array",
+    "createResourceClient": "function",
+    "createResourceIndex": "function",
+    "parseResourceName": "function",
+    "resourceName": "function",
+    "resourceNameOf": "function"
+  },
+  "openvibe-sdk/reviews": {
+    "createReviewsClient": "function"
+  },
+  "openvibe-sdk/run": {
+    "RUN_JOB_STATES": "array",
+    "createRunClient": "function"
+  },
+  "openvibe-sdk/runtime": {
+    "RUNTIME_CLASSES": "array",
+    "runtimeClass": "function",
+    "runtimeOffer": "function",
+    "validateRuntimeClass": "function",
+    "validateRuntimeOffer": "function"
+  },
+  "openvibe-sdk/search": {
+    "createSearchClient": "function",
+    "queryOf": "function"
+  },
+  "openvibe-sdk/service": {
+    "DEADLINE_MS": "number",
+    "DEFAULT_INTERVAL_MS": "number",
+    "DEFAULT_MAX_ROUTE_KEYS": "number",
+    "DEFAULT_SKIP_PREFIXES": "array",
+    "DRAIN_MS": "number",
+    "HTTP_METHODS": "object",
+    "LATENCY_SAMPLE_CAP": "number",
+    "ServiceError": "class",
+    "asServiceError": "function",
+    "createHttpTelemetry": "function",
+    "createReadiness": "lazy",
+    "createRegistry": "lazy",
+    "createRelease": "lazy",
+    "createServiceError": "function",
+    "createTelemetryMiddleware": "function",
+    "defaultRouteLabel": "function",
+    "eventLoopLagMs": "function",
+    "eventLoopMonitorEnabled": "function",
+    "gracefulStop": "function",
+    "instrument": "lazy",
+    "isLoopbackDirect": "lazy",
+    "jsonBody": "function",
+    "jsonErrors": "function",
+    "metricsHandler": "lazy",
+    "privateNoStore": "function",
+    "problem": "lazy",
+    "registerSignals": "function",
+    "releaseInfo": "lazy",
+    "run": "function",
+    "safeReason": "lazy",
+    "sendError": "function",
+    "sendProblem": "lazy",
+    "skip": "lazy",
+    "startEventLoopMonitor": "function",
+    "stopEventLoopMonitor": "function",
+    "telemetry": {
+      "object": [
+        "count",
+        "flush",
+        "gauge",
+        "init",
+        "middleware",
+        "record",
+        "requestFinished",
+        "requestStarted",
+        "stop"
+      ]
+    },
+    "telemetryMiddleware": "function",
+    "telemetrySample": "function",
+    "telemetrySkipped": "function",
+    "validateTelemetrySample": "function",
+    "within": "function",
+    "wrap": "function"
+  },
+  "openvibe-sdk/space": {
+    "createSpaceClient": "function"
+  },
+  "openvibe-sdk/sso": {
+    "COOKIES": {
+      "object": [
+        "access",
+        "hint",
+        "refresh"
+      ]
+    },
+    "claimsToUser": "function",
+    "createSsoClient": "function",
+    "decodeJwtPayload": "function",
+    "fedcmNonceMatches": "function",
+    "parseCookies": "function",
+    "sanitizeNext": "function",
+    "withParam": "function"
+  },
+  "openvibe-sdk/storage": {
+    "storageOffer": "function",
+    "validateStorageOffer": "function"
+  },
+  "openvibe-sdk/telemetry": {
+    "createPgTelemetrySink": "function",
+    "createTelemetry": "function",
+    "pruneTelemetry": "function",
+    "startTelemetryRetention": "function",
+    "telemetrySample": "function",
+    "telemetrySchema": "function",
+    "validateTelemetrySample": "function"
+  },
+  "openvibe-sdk/testing": {
+    "DEFAULT_APP_CATALOG": "array",
+    "DEFAULT_ORIGINS": {
+      "object": [
+        "community",
+        "events",
+        "media",
+        "network",
+        "tools"
+      ]
+    },
+    "DEFAULT_TOOLS_SATELLITES": "array",
+    "createMockPlatform": "function",
+    "createTestDb": "function",
+    "createTestValkey": "function",
+    "pgAvailable": "function",
+    "valkeyAvailable": "function"
+  },
+  "openvibe-sdk/tips": {
+    "createTipsClient": "function"
+  },
+  "openvibe-sdk/tools": {
+    "ToolRunError": "class",
+    "createToolsClient": "function",
+    "isToolRunError": "function"
+  },
+  "openvibe-sdk/trade": {
+    "createTradeClient": "function"
+  },
+  "openvibe-sdk/usage": {
+    "createUsageReporter": "function",
+    "usageKey": "function",
+    "usageSample": "function",
+    "validateUsageSample": "function"
+  },
+  "openvibe-sdk/valkey": {
+    "createValkey": "function"
+  },
+  "openvibe-sdk/video": {
+    "createVideoClient": "function"
+  },
+  "openvibe-sdk/vip": {
+    "createVipCache": "function",
+    "createVipClient": "function"
+  },
+  "openvibe-sdk/wiki": {
+    "createWikiClient": "function"
+  },
+  "openvibe-sdk/work": {
+    "WORK_APPLICATION_STATUSES": "array",
+    "createWorkClient": "function"
+  },
+  "openvibe-sdk/zone": {
+    "createZoneClient": "function"
+  }
+}

@@ -410,7 +410,8 @@
   "scripts": {
     "test": "node test/run.js",
     "esm": "node scripts/esm.js",
-    "browser-bundle": "node scripts/browser-bundle.js"
+    "browser-bundle": "node scripts/browser-bundle.js",
+    "surface": "node scripts/surface.js"
   },
   "engines": {
     "node": ">=20"
