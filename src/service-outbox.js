@@ -19,6 +19,10 @@
  *   await out.emitIn(t, envelope, { traceparent });                 // or on an explicit transaction handle
  *   await out.moderationAction({ action, target, actorSubject, reason, details });   // <source>.moderation.action
  *   out.start(); out.stop(); await out.kick(); await out.status();  // → { enabled, pending, rejected, last_error }
+ *
+ * Sent rows are pruned once they are `pruneAfterMs` old (default 7 days; false keeps them), every 6 hours while the
+ * relay runs and once soon after start(). Services that never called outbox.prune() kept every event they ever sent
+ * (Work 52,130 rows / 119 MB, Trade, Deals and Help since September or early October, on 2026-10-23).
  */
 const { createClient } = require('./core');
 const { createServiceTokenClient } = require('./auth/tokens');
@@ -26,7 +30,7 @@ const { createServiceTokenClient } = require('./auth/tokens');
 function createServiceOutbox({
     db, source, eventsUrl = null, networkInternalUrl = 'http://127.0.0.1:4000', clientId = null, clientSecret = null,
     table = 'event_outbox', intervalMs, now, fetch: fetchImpl, log = console, eventTypes = null, validate = null,
-    autoDiscover, moderationOwnerSubject = true,
+    autoDiscover, moderationOwnerSubject = true, pruneAfterMs = 7 * 24 * 60 * 60 * 1000,
 } = {}) {
     if (!db) throw new TypeError('createServiceOutbox: db is required');
     if (!source || !/^[a-z][a-z0-9_-]*$/.test(source)) throw new TypeError('createServiceOutbox: source is the service id (e.g. "trade")');
@@ -95,10 +99,26 @@ function createServiceOutbox({
         }, { traceparent });
     }
 
+    const PRUNE_EVERY_MS = 6 * 60 * 60 * 1000;
+    let pruneTimers = [];
+    const prune = () => {
+        if (!(pruneAfterMs > 0)) return Promise.resolve(0);
+        return outbox.prune(pruneAfterMs).catch((err) => { log.warn(`[outbox:${source}] prune failed: ${err && err.message}`); return 0; });
+    };
     return {
-        emit, emitIn, moderationAction, outbox, events, enabled,
-        start() { if (enabled) outbox.start(); },
-        stop: () => outbox.stop(),
+        emit, emitIn, moderationAction, outbox, events, enabled, prune,
+        start() {
+            if (!enabled) return;
+            outbox.start();
+            if (pruneAfterMs > 0 && !pruneTimers.length) {
+                const first = setTimeout(prune, 60 * 1000);
+                const every = setInterval(prune, PRUNE_EVERY_MS);
+                if (first.unref) first.unref();
+                if (every.unref) every.unref();
+                pruneTimers = [first, every];
+            }
+        },
+        stop: () => { for (const t of pruneTimers) { clearTimeout(t); clearInterval(t); } pruneTimers = []; return outbox.stop(); },
         async kick() { if (enabled) await outbox.kick(); },
         status: async () => ({ enabled, pending: await outbox.pending(), rejected: await outbox.rejected(), last_error: lastError }),
     };

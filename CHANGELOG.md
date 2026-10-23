@@ -12,6 +12,11 @@ release may change an API and says so here.
     most an hour.
   - Passes before then send nothing. The refused rows back off as before, and a 429 never rejects a row.
   - Nothing changes for a service that stays under its limit.
+- **`createServiceOutbox` prunes sent rows.** Rows sent more than `pruneAfterMs` ago (default 7 days; `false` keeps
+  them) are deleted every 6 hours while the relay runs, and once a minute after `start()`; `out.prune()` runs it now.
+  - Services that never called `outbox.prune()` kept every event they ever sent: on 2026-10-23, Work had 52,130 rows
+    (119 MB) since 10-10, and Trade, Deals and Help since September or early October.
+  - A service that already prunes itself is unaffected (a second prune finds nothing).
 
 ## 0.62.0 (2026-10-23)
 
