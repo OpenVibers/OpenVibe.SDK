@@ -5,6 +5,10 @@ release may change an API and says so here.
 
 ## 0.63.0 (2026-10-24)
 
+- **The public surface is pinned.** `docs/api-surface.json` lists every name each of the 66 entries exports and what it
+  is; `test/surface.test.js` fails when they disagree, and `node scripts/surface.js --check` names each change as
+  breaking (a name gone, a kind changed, a constant's key gone) or added. The first step toward 1.0's freeze of
+  `core`, `auth`, `events`, `db` and `media`. Nothing in the package's behaviour changes.
 - **Outbox relays pause on a 429.** `createPgOutbox` (and so `createServiceOutbox` and the usage relay) used to hit
   Events' per-actor limit again on every tick after a 429, because the rows it claims next are under the same limit.
   Search's re-index bursts were refused 935 times on 2026-10-23, and every event was delivered only on a retry.

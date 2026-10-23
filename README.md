@@ -477,6 +477,7 @@ Install the drivers the service uses: `pg` and `iovalkey` (production), `@electr
 ## Versioning
 
 - `openvibe-sdk` follows semver. While it is 0.x, a minor release may break an API, and [CHANGELOG.md](CHANGELOG.md) says so. Pin a tag.
+- [docs/api-surface.json](docs/api-surface.json) lists every name each entry exports and what it is (function, class, a plain object's keys, …). `test/surface.test.js` fails when the exports and the file disagree, so a removal or a change of kind is a reviewed line in a diff, never a surprise on a service's next pin round; `node scripts/surface.js --check` names each change as breaking or added, and `node scripts/surface.js` updates the file. 1.0 freezes `core`, `auth`, `events`, `db` and `media` first: a breaking change there is marked `[1.0 core]`.
 - Each release states the openvibe-contracts range it was tested against (`CONTRACTS_RANGE`), and `discover()` checks it at runtime. Contract types are copied into `types/contracts.d.ts`. `test/types.test.js` fails if they differ from the pinned Contracts release, the `openvibe-contracts` devDependency (a release tarball pin, v0.86.0), which the tools tests also use to validate requests and answers. It is never a runtime or peer dependency.
 - A new public capability ships as a minor release: first the contract, then the wrapper here, then the service's route. Removing a wrapper is a major release, after the capability's deprecation window in Contracts has passed.
 
