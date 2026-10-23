@@ -3,6 +3,16 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.63.0 (2026-10-24)
+
+- **Outbox relays pause on a 429.** `createPgOutbox` (and so `createServiceOutbox` and the usage relay) used to hit
+  Events' per-actor limit again on every tick after a 429, because the rows it claims next are under the same limit.
+  Search's re-index bursts were refused 935 times on 2026-10-23, and every event was delivered only on a retry.
+  - A 429 now pauses the whole relay until the limit's window reopens: its `retry_after_seconds`, else a minute, at
+    most an hour.
+  - Passes before then send nothing. The refused rows back off as before, and a 429 never rejects a row.
+  - Nothing changes for a service that stays under its limit.
+
 ## 0.62.0 (2026-10-23)
 
 - **`openvibe-sdk/no-looks`: pronouns.** A pronoun is a guessed gender too, so the 27 Community summaries repaired on

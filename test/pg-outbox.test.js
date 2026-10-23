@@ -110,6 +110,31 @@ function cases(label, open) {
                 assert.equal(await o2.rejected(), 1);
             } finally { await done(); }
         }],
+        [`${label}: a 429 pauses the whole relay for its retry_after_seconds (else a minute), then it drains`, async () => {
+            const { db, done } = await open();
+            try {
+                const { platform, events } = eventsClient();
+                let t = 2_000_000; let limited = 1; let calls = 0;
+                const tooMany = (s) => Object.assign(new Error('rate_limited'), { status: 429, problem: s == null ? null : { code: 'rate_limited', status: 429, retry_after_seconds: s } });
+                const busy = { prepare: events.prepare, publish: (...a) => { calls++; return limited ? Promise.reject(tooMany(limited === 1 ? 20 : null)) : events.publish(...a); } };
+                const outbox = createPgOutbox(db, { events: busy, batchSize: 2, now: () => t });
+                await db.tx(async (tx) => { for (let i = 0; i < 6; i++) await outbox.enqueue(tx, { event_type: 'live.stream.started', actor, subject: { type: 'stream', id: `r${i}` } }); });
+                assert.deepEqual(await outbox.flush(), { sent: 0, failed: 2, rejected: 0 }, 'the first batch is refused');
+                t += 1000;
+                assert.deepEqual(await outbox.flush(), { sent: 0, failed: 0, rejected: 0 }, 'paused: the next rows are not even tried');
+                assert.equal(calls, 1, 'one refused request, not one per tick');
+                t += 20000;
+                limited = 2;   // refused again, with no retry_after_seconds: a minute
+                await outbox.flush();
+                t += 59000;
+                assert.deepEqual(await outbox.flush(), { sent: 0, failed: 0, rejected: 0 }, 'still within the minute');
+                t += 2000; limited = 0;
+                let sent = 0; for (let i = 0; i < 5; i++) sent += (await outbox.flush()).sent;
+                assert.equal(sent, 6, 'every row went out once the window reopened');
+                assert.equal(platform.state.events.length, 6);
+                assert.equal(await outbox.rejected(), 0, 'a 429 never rejects');
+            } finally { await done(); }
+        }],
         [`${label}: a token-endpoint refusal is retried, never rejected`, async () => {
             const { db, done } = await open();
             try {

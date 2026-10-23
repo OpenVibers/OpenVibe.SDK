@@ -107,6 +107,14 @@ function createPgOutbox(db, {
     if (!TABLE_RE.test(table)) throw new TypeError('bad outbox table name');
     let timer = null; let running = false;
     const backoff = (attempts) => backoffMs[Math.min(attempts, backoffMs.length - 1)];
+    // A 429 (Events' per-actor limit) pauses the whole relay until the limit's window reopens (its
+    // retry_after_seconds, else a minute): every row it would claim next is under the same limit, so a burst (a
+    // re-index) was refused on every tick for the rest of the minute (Search, 935 refusals on 2026-10-23).
+    let pausedUntil = 0;
+    const pauseMs = (err) => {
+        const s = Number(err && err.problem && err.problem.retry_after_seconds);
+        return (Number.isFinite(s) && s > 0 ? Math.min(s, 3600) : 60) * 1000;
+    };
 
     async function enqueue(t, envelope, { traceparent } = {}) {
         if (!t || typeof t.query !== 'function' || typeof t.tx !== 'function') throw new TypeError('outbox.enqueue(t, …): pass the transaction handle db.tx gives you');
@@ -144,6 +152,7 @@ function createPgOutbox(db, {
                 [now(), rows.map((r) => r.id)]);
             stats.sent += rows.length;
         } catch (err) {
+            if (err && err.status === 429) pausedUntil = now() + pauseMs(err);
             if (rows.length > 1 && isPermanent(err)) {
                 for (const row of rows) { const s = await publishRows([row]); stats.sent += s.sent; stats.failed += s.failed; stats.rejected += s.rejected; }
             } else {
@@ -157,6 +166,7 @@ function createPgOutbox(db, {
     async function doFlush() {
         const total = { sent: 0, failed: 0, rejected: 0 };
         for (;;) {
+            if (now() < pausedUntil) break;
             const rows = await claim();
             if (!rows.length) break;
             const s = await publishRows(rows);
