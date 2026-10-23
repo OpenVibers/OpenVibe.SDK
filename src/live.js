@@ -9,6 +9,7 @@
  *   const now = await live.streams.list();                                   // everyone live right now
  *   const channel = await live.channels.get('goosely');                      // the channel page's data
  *   const { managed_stream: slot } = await live.slots.create({ title: 'Robot cam', streaming_method: 'whip' });
+ *   const target = await live.whip.forSlot(slot.id);                        // → { url, key, authority } from the slot's profile
  *   const { stream, endpoint } = await live.goLive(slot.id, { title: 'Live now' });
  *   const session = await live.whip.publish(live.whip.url(slot.stream_key), offerSdp);   // → { answer, location }
  *   await live.whip.end(session.location);                                   // the last session ends the stream
@@ -69,6 +70,11 @@ function createLiveClient(client, { baseUrl } = {}) {
         remove: (slotId, { signal } = {}) => call({ method: 'DELETE', path: `/api/streams/managed/${id(slotId, 'a slot id')}`, signal }),
         /** A new stream key for the slot (the old one stops working). */
         regenerateKey: (slotId, { signal } = {}) => call({ method: 'POST', path: `/api/streams/managed/${id(slotId, 'a slot id')}/regenerate-key`, signal }),
+        /**
+         * A slot's settings and where to publish to it (owner) → { managed_stream, stream_key, whip_url_base, rtmp_url,
+         * restream_destinations, … }. A slot OpenRestream ingests answers OpenRestream's own whip_url and rtmp_url and no key.
+         */
+        profile: (slotId, { signal } = {}) => call({ path: `/api/streams/managed/${id(slotId, 'a slot id')}/profile`, signal }),
     };
 
     /** Go live from a slot → { stream, endpoint }. opts: title, category, tags, is_nsfw. */
@@ -95,6 +101,17 @@ function createLiveClient(client, { baseUrl } = {}) {
     };
 
     const whip = {
+        /**
+         * Where a slot publishes, from its profile → { url, key, authority }: Live's WHIP origin with the slot's key, or
+         * OpenRestream's own WHIP URL when it ingests the slot (key null: its URL carries it). Pass the result to publish().
+         */
+        forSlot: async (slotId, { signal } = {}) => {
+            const p = await slots.profile(slotId, { signal });
+            if (p && typeof p.whip_url === 'string' && p.whip_url) return { url: p.whip_url, key: null, authority: p.ingest_authority || 'openre' };
+            const key = p && p.stream_key;
+            if (!key || !p.whip_url_base) throw new TypeError('live.whip.forSlot: this slot has no WHIP address (OpenRestream unreachable, or WHIP is off)');
+            return { url: `${String(p.whip_url_base).replace(/\/+$/, '')}/whip/${enc(key)}`, key, authority: 'live' };
+        },
         /** The WHIP URL for a stream key (or a slot id, with the key sent as the bearer). */
         url: async (keyOrSlot) => {
             const k = String(keyOrSlot || '');

@@ -28,7 +28,7 @@ const cases = [
     ['Panelists discuss while wearing headsets and microphones, with a trophy nearby.', 'Panelists discuss, with a trophy nearby.'],
     ['A man wearing sunglasses on his head looks down at the camera.', 'A person looks down at the camera.'],
     ['A collage of a man in a white shirt and tie wearing dark sunglasses in the left panel.', 'A collage of a person in the left panel.'],
-    ['Behind him a green mat; he wears a blue jacket and is leaning to the left.', 'Behind him a green mat; he is leaning to the left.'],
+    ['Behind him a green mat; he wears a blue jacket and is leaning to the left.', 'Behind them a green mat; the person is leaning to the left.'],
     ['Two men lift weights, one shirtless and sweating.', 'Two people lift weights, one sweating.'],
     ['Two men stand in an alley, one and drinking from a bottle while the other wears a dusty t-shirt; both look tired.', 'Two people stand in an alley, one drinking from a bottle; both look tired.'],
     ['A man wearing a green bucket hat with frog-like eyes sits indoors.', 'A person sits indoors.'],
@@ -62,7 +62,20 @@ const cases = [
 cases.push(
     ['A man lounging on a sofa in a living room, holding a remote and facing camera.', 'A person lounging on a sofa in a living room, holding a remote and facing camera.'],
     ['A man is shown outdoors, smoking a cigarette against a clear blue sky.', 'A person is shown outdoors, smoking a cigarette against a clear blue sky.'],
-    ['A man sitting on a bed reading a book while homework papers and stacked boxes surround him.', 'A person sitting on a bed reading a book while homework papers and stacked boxes surround him.'],
+    ['A man sitting on a bed reading a book while homework papers and stacked boxes surround him.', 'A person sitting on a bed reading a book while homework papers and stacked boxes surround them.'],
+);
+
+// Pronouns are a guessed gender too (27 repaired Community summaries kept "he looks", "on his device"): he and she are
+// "the person", his and her "their", him and her "them"; quoted speech stays.
+cases.push(
+    ['He looks at the camera and adjusts the volume on his device.', 'The person looks at the camera and adjusts the volume on their device.'],
+    ['The streamer checks his phone and laughs at her joke.', 'The streamer checks their phone and laughs at their joke.'],
+    ['Chat cheers for her.', 'Chat cheers for them.'],
+    ['The streamer gives her a wave and thanks him for the raid.', 'The streamer gives them a wave and thanks them for the raid.'],
+    ["She's playing Minecraft with him; he'll join later.", "The person's playing Minecraft with them; the person will join later."],
+    ['He hurt himself, but the win is his.', 'The person hurt themself, but the win is theirs.'],
+    ['A person reads, says "he is lying to her", and waves at her chat.', 'A person reads, says "he is lying to her", and waves at their chat.'],
+    ['Shell, Heather and the theme park stay as written.', 'Shell, Heather and the theme park stay as written.'],
 );
 
 let failed = 0;

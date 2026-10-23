@@ -27,6 +27,8 @@ export interface LiveClient {
         update(slotId: number | string, patch: SlotRequest, opts?: Opts): Promise<LiveJson>;
         remove(slotId: number | string, opts?: Opts): Promise<LiveJson>;
         regenerateKey(slotId: number | string, opts?: Opts): Promise<LiveJson>;
+        /** A slot's settings and where to publish to it (owner): stream_key, whip_url_base, rtmp_url, or OpenRestream's whip_url. */
+        profile(slotId: number | string, opts?: Opts): Promise<LiveJson>;
     };
     /** Go live from a slot → { stream, endpoint }. */
     goLive(slotId: number | string, opts?: GoLiveOptions, extra?: Opts): Promise<{ stream: LiveJson; endpoint: LiveJson }>;
@@ -42,6 +44,8 @@ export interface LiveClient {
         moments(opts?: FeedOptions): Promise<{ items: LiveJson[]; next: string | null; [k: string]: unknown }>;
     };
     whip: {
+        /** Where a slot publishes: Live's WHIP origin with the slot's key, or OpenRestream's WHIP URL (key null). */
+        forSlot(slotId: number | string, opts?: Opts): Promise<{ url: string; key: string | null; authority: string }>;
         url(keyOrSlot: string | number): Promise<string>;
         publish(url: string | Promise<string>, offer: string, opts?: Opts & { key?: string }): Promise<WhipSession>;
         end(location: string, opts?: Opts): Promise<void>;
