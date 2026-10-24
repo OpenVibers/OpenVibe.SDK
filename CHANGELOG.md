@@ -23,6 +23,10 @@ release may change an API and says so here.
   job titled a clip "A Naked Man Lying On Their Back With Legs" on Live's home (2026-10-24), and a Community paste
   read "Noteworthy Half-Naked Moment". `hasLooks` now rejects both, and `noLooks` repairs sentences as it does for
   "shirtless". `RULES_VERSION` changes, so services that repair stored rows run their repair again.
+- **no-looks knows clothes below the waist after "in"** (`shorts`, `jeans`, `pants`, `trousers`, `leggings`, `skirts`,
+  `sweatpants`, `swimwear` and the like): "The streamer in shorts kneels on grass…" had survived every one of
+  Community's repairs since April 2026. A shop word after it ("in the pants department") or a pocket keeps the phrase.
+  Team kits and uniforms are not touched.
 - **`no-looks` gains `isExplicit(...texts)`**: true when AI text says a scene shows sexual content (body parts, sex
   acts, pornography, nudity). The looks rules only remove an adjective ("a man … reaching toward their genitals"), so a
   service asks before it publishes AI text at all. Live's AI auto-clip 483 went public on openvibe.media with such a

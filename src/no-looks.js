@@ -35,7 +35,10 @@ const _FACE = 'beards?|mustaches?|moustaches?|goatees?|stubble|sunglasses|glasse
 const _WORN_ANY = `${_WORN}|microphones?|mics?|earbuds?|earphones?|belts?|gloves|boots|shoes|sneakers|jeans|pants|shorts|necklaces?|chains?|earrings|watch(?:es)?|uniforms?|clothes|clothing|gear|costumes?|wigs?|crowns?|goggles|visors?|lanyards?|tops?|neckties?|bow ties?|ties?|headbands?|garments?|turbans?`;
 const _WORN_NP = `${_ART}(?:[\\w'-]+\\s+){0,3}?\\b(?:${_WORN_ANY})\\b(?:\\s+(?:on|around|over|across)\\s+(?:his|her|their|the|its)\\s+(?:head|neck|face|forehead|shoulders?|ears?|eyes|chest))?(?:\\s+with\\s+(?:(?:a|an)\\s+)?(?:[\\w'-]+\\s+){0,2}?(?:zippers?|logos?|prints?|patterns?|designs?|graphics?|hoods?|stripes?|collars?|text|eyes|ears|horns|patch(?:es)?|badges?|stickers?|emblems?|lettering|writing|trim|buttons|accents|embellishments|details|sleeves))?`;
 const _WEARING = new RegExp(`,?\\s*(?:who\\s+(?:is\\s+)?|while\\s+|and\\s+)?(?<!-)\\b(?:wearing|wears|dressed in|sporting)\\s+${_WORN_NP}(?:\\s*(?:,|and|or|with|over|under)\\s+${_WORN_NP})*`, 'gi');
-const _IN_WORN = new RegExp(`\\s+in\\s+(?:(?:a|an|the|his|her|their)\\s+)?(?:[\\w'-]+\\s+){0,3}?\\b(?:${_WORN})\\b(?:\\s+(?:and|or)\\s+${_ART}(?:[\\w'-]+\\s+){0,2}?\\b(?:${_WORN_ANY})\\b)*`, 'gi');
+// Clothes below the waist say what someone wears as much ("The streamer in shorts kneels on grass…", a Community
+// summary from 2026-04 that every repair left), but "in the pants department" is a place: a shop word after it keeps it.
+const _LOWER = 'shorts|jeans|pants|trousers|leggings|skirts?|sweatpants|joggers|pajamas|pyjamas|swimsuits?|swimwear|bikinis?|underwear|lingerie|overalls|tights|dungarees';
+const _IN_WORN = new RegExp(`\\s+in\\s+(?:(?:a|an|the|his|her|their)\\s+)?(?:[\\w'-]+\\s+){0,3}?\\b(?:${_WORN}|(?:${_LOWER})(?!\\s+(?:department|store|shop|section|aisle|pockets?|drawer)))\\b(?:\\s+(?:and|or)\\s+${_ART}(?:[\\w'-]+\\s+){0,2}?\\b(?:${_WORN_ANY})\\b)*`, 'gi');
 const _PERSON_WITH_WORN = new RegExp(`\\b((?:${_PEOPLE}|broadcaster|host|guy|gamer|player|viewer|someone|people|men|women|speaker|presenter)\\s+)with\\s+${_ART}(?:[\\w'-]+\\s+){0,3}?\\b(?:${_WORN_ANY}|${_FACE})\\b(?:\\s*(?:,|and|or)\\s+${_ART}(?:[\\w'-]+\\s+){0,2}?\\b(?:${_WORN_ANY}|${_FACE})\\b)*\\s*`, 'gi');
 const _WITH_FACE = new RegExp(`\\s+with\\s+${_ART}(?:[\\w'-]+\\s+){0,2}?\\b(?:${_FACE})\\b(?:\\s*(?:,|and|or)\\s+${_ART}(?:[\\w'-]+\\s+){0,2}?\\b(?:${_FACE}|${_WORN})\\b)*`, 'gi');
 const _WEARS_AND = new RegExp(`(?<!-)\\bwears\\s+${_WORN_NP}(?:\\s*(?:,|and|or|with|over|under)\\s+${_WORN_NP})*\\s+and\\s+(?=\\w)`, 'gi');
@@ -161,7 +164,7 @@ function _isExplicit(...texts) {
     return texts.some((t) => t != null && _EXPLICIT.test(String(t)));
 }
 
-const RULES_VERSION = _hash([_EXPLICIT, _NAMED, _LOOKS, _PEOPLE, _WORN, _WORN_ANY, _FACE, _WITH_CLOTHES, _GENDER_ADJ, _GROOMING, _LOOKS_TAG, _LOOKS_WORD, _POSE,
+const RULES_VERSION = _hash([_EXPLICIT, _NAMED, _LOOKS, _PEOPLE, _WORN, _LOWER, _WORN_ANY, _FACE, _WITH_CLOTHES, _GENDER_ADJ, _GROOMING, _LOOKS_TAG, _LOOKS_WORD, _POSE,
     _noLooks, _noLooksWords, _noGender, _noGrooming, _noClothing, _HE_SHE, _HER_OBJECT, _PRONOUNS.map(([re, w]) => `${re}${w}`).join(','), _noPronouns].map(String).join('|'));
 
 module.exports = { noLooks: _noLooks, noLooksTags: _noLooksTags, hasLooks: _hasLooks, isExplicit: _isExplicit, RULES_VERSION };

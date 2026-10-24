@@ -47,6 +47,10 @@ const cases = [
     // Clip overviews found public on 2026-10-22: a guessed gender, a slashed pattern before a shirt, a grooming sentence.
     ['The video features a man in a plaid/checkered shirt delivering a live-streamed explanation or discussion.', 'The video features a person delivering a live-streamed explanation or discussion.'],
     ['The video shows a man in a kitchen setting, appearing to stream live from a couch or kitchen area.', 'The video shows a person in a kitchen setting, appearing to stream live from a couch or kitchen area.'],
+    // Clothes below the waist (a Community screenshot summary of 2026-04); a shop or a pocket is not something worn.
+    ['The streamer in shorts kneels on grass beside a small black dog in an outdoor setting.', 'The streamer kneels on grass beside a small black dog in an outdoor setting.'],
+    ['The host in grey sweatpants and a cap laughs.', 'The host laughs.'],
+    ['Someone in the pants department shops.', 'Someone in the pants department shops.'],
     ['The video centers on a live stream featuring a male or female host wearing headphones, visible in a small webcam window.', 'The video centers on a live stream featuring a host, visible in a small webcam window.'],
     ['A home kitchen where a person adjusts their hair or clothing near the counter. A pot of soup simmers on the stove.', 'A pot of soup simmers on the stove.'],
     ['A female streamer and two guys race karts; the other men cheer.', 'A streamer and two people race karts; the other people cheer.'],
