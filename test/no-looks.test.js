@@ -7,6 +7,9 @@ const esm = import('../esm/no-looks.mjs');
 
 const cases = [
     ['A shirtless man sits in a room with framed pictures on the wall.', 'The streamer sits in a room with framed pictures on the wall.'],
+    // 2026-10-24: the AI moments job titled clip 483 "A Naked Man Lying On Their Back With Legs" on Live's home.
+    ['A naked man lies on his back on a bed.', 'The streamer lies on their back on a bed.'],
+    ['The streamer, half-naked, waves at chat.', 'The streamer waves at chat.'],
     ['A livestream frame showing a shirtless streamer in a small inset while playing a MOBA.', 'A livestream frame showing the streamer in a small inset while playing a MOBA.'],
     ['Chat watches a young boy at a desk build a PC.', 'Chat watches the streamer at a desk build a PC.'],
     ['Young, bearded man plays chess.', 'Streamer plays chess.'],
@@ -98,6 +101,9 @@ assert.deepStrictEqual(noLooksTags([1, '', ' ', 'sofa']), ['sofa']);
 // Titles: one that names looks is replaced, not repaired.
 assert.strictEqual(hasLooks('Orange Shirt Kitchen Chat'), true);
 assert.strictEqual(hasLooks('Minecraft Castle Marathon'), false);
+assert.strictEqual(hasLooks('A Naked Man Lying On Their Back With Legs'), true);
+assert.strictEqual(hasLooks('Noteworthy Half-Naked Moment'), true, 'no person word: the nudity word alone');
+assert.strictEqual(hasLooks('Nude Beach Debate'), true);
 assert.strictEqual(hasLooks(null), false);
 
 // The rules' version: 16 hex digits, stable for these rules.

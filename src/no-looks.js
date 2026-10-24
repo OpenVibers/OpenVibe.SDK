@@ -18,7 +18,7 @@
  * Pure functions, no dependencies: safe in Node and in browsers.
  */
 
-const _LOOKS = 'shirtless|topless|bare-chested|young|younger|teenage|teen|little|bearded|bald|blonde?|(?:dark|long|short|curly|red|gr[ae]y|black|brown)-haired|tattooed|muscular|heavyset|older|elderly|middle-aged|skinny|slim|chubby|attractive|pretty|handsome|cute';
+const _LOOKS = 'shirtless|topless|bare-chested|half-naked|semi-naked|naked|nude|semi-nude|undressed|unclothed|young|younger|teenage|teen|little|bearded|bald|blonde?|(?:dark|long|short|curly|red|gr[ae]y|black|brown)-haired|tattooed|muscular|heavyset|older|elderly|middle-aged|skinny|slim|chubby|attractive|pretty|handsome|cute';
 const _PEOPLE = 'man|woman|boy|girl|guy|gal|kid|child|teen|teenager|lady|gentleman|male|female|person|individual|streamer|youth';
 const _AGE_NOUN = /^(?:boy|girl|kid|child|teen|teenager|youth)$/i;
 const _LOOKED_AT = new RegExp(`\\b(a|an|the|one)\\s+((?:(?:${_LOOKS})[\\s,]+(?:and\\s+)?)*)(${_PEOPLE})\\b`, 'gi');
@@ -130,12 +130,12 @@ function _noLooksWords(text) {
         // Looks named: the person on camera. Only an age ("a child sits nearby"): someone, who may not be the streamer.
         .replace(_LOOKED_AT, (m, art, looks, noun) => (looks ? _cap(m, 'the streamer') : _AGE_NOUN.test(noun) ? _cap(m, /^the$/i.test(art) ? 'the person' : 'someone') : m))
         .replace(_LOOKED_AT_BARE, (m) => _cap(m, 'streamer'))
-        .replace(/\s+(?:is|are)\s+(?:shirtless|topless|bare-chested)\s+and\s+/gi, ' ')
-        .replace(/\b(?:shirtless|topless|bare-chested)\s+and\s+/gi, '')
+        .replace(/\s+(?:is|are)\s+(?:shirtless|topless|bare-chested|half-naked|semi-naked|naked|nude|semi-nude|undressed|unclothed)\s+and\s+/gi, ' ')
+        .replace(/\b(?:shirtless|topless|bare-chested|half-naked|semi-naked|naked|nude|semi-nude|undressed|unclothed)\s+and\s+/gi, '')
         .replace(/\b(one|the other|another),?\s+and\s+(?=\w+ing\b)/gi, '$1 ')
-        .replace(/\s+(?:is|are)\s+(?:shirtless|topless|bare-chested)\b/gi, ' is on camera')
-        .replace(/\s*,\s*(?:shirtless|topless|bare-chested)\s*,/gi, '')
-        .replace(/\b(?:shirtless|topless|bare-chested)\b,?\s*/gi, '');
+        .replace(/\s+(?:is|are)\s+(?:shirtless|topless|bare-chested|half-naked|semi-naked|naked|nude|semi-nude|undressed|unclothed)\b/gi, ' is on camera')
+        .replace(/\s*,\s*(?:shirtless|topless|bare-chested|half-naked|semi-naked|naked|nude|semi-nude|undressed|unclothed)\s*,/gi, '')
+        .replace(/\b(?:shirtless|topless|bare-chested|half-naked|semi-naked|naked|nude|semi-nude|undressed|unclothed)\b,?\s*/gi, '');
 }
 
 // FNV-1a over the rules' source, twice with different offsets: a stable 16-hex-digit version.
