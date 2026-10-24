@@ -367,6 +367,11 @@
       "import": "./esm/no-looks.mjs",
       "default": "./src/no-looks.js"
     },
+    "./front-page": {
+      "types": "./types/front-page.d.ts",
+      "import": "./esm/front-page.mjs",
+      "default": "./src/front-page.js"
+    },
     "./vip": {
       "types": "./types/vip.d.ts",
       "browser": null,

@@ -27,6 +27,11 @@ release may change an API and says so here.
   `sweatpants`, `swimwear` and the like): "The streamer in shorts kneels on grass…" had survived every one of
   Community's repairs since April 2026. A shop word after it ("in the pants department") or a pocket keeps the phrase.
   Team kits and uniforms are not touched.
+- **`openvibe-sdk/front-page`** (new): `frontPageOk(text)` says whether a title or line may lead a front page (no
+  built-in slur category, no strong profanity in five languages, no hate topic), and `containsCoreSlur(text)` is the
+  slur check alone. The categories are OpenVibe.Chat's built-in ones, ported unchanged. An anonymous screenshot titled
+  with a slur sat in OpenVibe.Community's "Most viewed" (2026-10-24), and Live had its own copy of the rule for its
+  quote strip; front pages now share one.
 - **`no-looks` gains `isExplicit(...texts)`**: true when AI text says a scene shows sexual content (body parts, sex
   acts, pornography, nudity). The looks rules only remove an adjective ("a man … reaching toward their genitals"), so a
   service asks before it publishes AI text at all. Live's AI auto-clip 483 went public on openvibe.media with such a
