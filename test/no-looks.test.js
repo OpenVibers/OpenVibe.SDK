@@ -2,7 +2,7 @@
 // openvibe-sdk/no-looks: the shared corpus. Every case here was public AI text on OpenVibe.Live or Community (frame
 // notes, overviews, clip lines, paste picture descriptions) or a near miss that must stay as written.
 const assert = require('assert');
-const { noLooks, noLooksTags, hasLooks, RULES_VERSION } = require('../src/no-looks');
+const { noLooks, noLooksTags, hasLooks, isExplicit, RULES_VERSION } = require('../src/no-looks');
 const esm = import('../esm/no-looks.mjs');
 
 const cases = [
@@ -113,8 +113,21 @@ assert.strictEqual(hasLooks(null), false);
 // The rules' version: 16 hex digits, stable for these rules.
 assert.match(RULES_VERSION, /^[0-9a-f]{16}$/);
 
+// isExplicit: what a scene shows (Live's clip 483 on 2026-10-23, word for word, and after the adjective repair).
+for (const t of [
+    'A naked man lying on their back with legs spread, reaching toward their genitals',
+    noLooks('A naked man lying on their back with legs spread, reaching toward their genitals'),
+    'The video shows the streamer engaging in explicit adult content, with close-up footage of sexual acts on a couch',
+    'Pornographic footage plays on the second monitor', 'The scene contains nudity', 'masturbating on camera',
+]) assert.ok(isExplicit(t), `explicit: ${t}`);
+for (const t of ['A player in Fortnite is sprinting along a pink-purple sunset map', 'They read the news from Essex', 'A sextant and a map', '', null, undefined]) {
+    assert.ok(!isExplicit(t), `not explicit: ${t}`);
+}
+assert.ok(isExplicit('a fine title', null, 'the frame shows sexual activity'), 'any of several texts');
+
 esm.then((m) => {
     assert.strictEqual(m.noLooks, noLooks);
+    assert.strictEqual(m.isExplicit, isExplicit);
     assert.strictEqual(m.RULES_VERSION, RULES_VERSION);
     console.log(`no-looks: ${cases.length} cases, tags, titles and the ESM entry pass (rules ${RULES_VERSION})`);
 }).catch((e) => { console.error(e); process.exit(1); });

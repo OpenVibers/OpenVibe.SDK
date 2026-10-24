@@ -23,6 +23,11 @@ release may change an API and says so here.
   job titled a clip "A Naked Man Lying On Their Back With Legs" on Live's home (2026-10-24), and a Community paste
   read "Noteworthy Half-Naked Moment". `hasLooks` now rejects both, and `noLooks` repairs sentences as it does for
   "shirtless". `RULES_VERSION` changes, so services that repair stored rows run their repair again.
+- **`no-looks` gains `isExplicit(...texts)`**: true when AI text says a scene shows sexual content (body parts, sex
+  acts, pornography, nudity). The looks rules only remove an adjective ("a man … reaching toward their genitals"), so a
+  service asks before it publishes AI text at all. Live's AI auto-clip 483 went public on openvibe.media with such a
+  description on 2026-10-23. Live#344 keeps its own copy of the pattern until it pins this release. `RULES_VERSION`
+  includes it.
 - **A JWKS client with no key retries by itself** on its backoff (1 s up to 5 min) until a fetch succeeds, instead of
   only when a token next needs checking. On 2026-10-23, Trade and the Tools gateway started before Network after the
   reboot and reported "no key" on `/status` for six hours, until a restart; their first sign-in would have waited for

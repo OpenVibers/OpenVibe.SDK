@@ -12,6 +12,8 @@
  *   and so do names (Iron Man, Pac-Man) and things a person holds or reviews (a headset on a desk).
  * - noLooksTags(tags): drops tags that name clothing, hair, face, age or a person by gender ("red-beanie", "man").
  * - hasLooks(text): true when a short text names looks at all; such a title is replaced rather than repaired.
+ * - isExplicit(...texts): true when any text says a scene shows sexual content (body parts, sex acts, pornography,
+ *   nudity). That is not a looks rule and nothing repairs it: such a moment, clip or paste is not published at all.
  * - RULES_VERSION: a short hash of the rules. A service that repairs stored rows records it and runs the repair again
  *   when it changes.
  *
@@ -151,7 +153,15 @@ function _hash(text) {
     }
     return a.toString(16).padStart(8, '0') + b.toString(16).padStart(8, '0');
 }
-const RULES_VERSION = _hash([_NAMED, _LOOKS, _PEOPLE, _WORN, _WORN_ANY, _FACE, _WITH_CLOTHES, _GENDER_ADJ, _GROOMING, _LOOKS_TAG, _LOOKS_WORD, _POSE,
+// What a scene shows, not how someone looks: the looks rules take out an adjective ("a naked man … reaching toward
+// their genitals" → "a man … reaching toward their genitals"), so a service asks isExplicit() before it publishes AI text
+// at all. Live's AI auto-clip 483 went public with such a description on 2026-10-23 (Live#344 had its own copy first).
+const _EXPLICIT = /\b(?:genital(?:s|ia)?|penis(?:es)?|vaginas?|vulvas?|sexual(?:ly)?\s+(?:acts?|activity|content|material|explicit|intercourse)|sex\s+acts?|(?:explicit|adult|pornographic|sexual)\s+(?:content|material|footage|scenes?|imagery|videos?|acts?)|porn(?:o|ography|ographic)?|masturbat\w*|intercourse|nudity|erotica?)\b/i;
+function _isExplicit(...texts) {
+    return texts.some((t) => t != null && _EXPLICIT.test(String(t)));
+}
+
+const RULES_VERSION = _hash([_EXPLICIT, _NAMED, _LOOKS, _PEOPLE, _WORN, _WORN_ANY, _FACE, _WITH_CLOTHES, _GENDER_ADJ, _GROOMING, _LOOKS_TAG, _LOOKS_WORD, _POSE,
     _noLooks, _noLooksWords, _noGender, _noGrooming, _noClothing, _HE_SHE, _HER_OBJECT, _PRONOUNS.map(([re, w]) => `${re}${w}`).join(','), _noPronouns].map(String).join('|'));
 
-module.exports = { noLooks: _noLooks, noLooksTags: _noLooksTags, hasLooks: _hasLooks, RULES_VERSION };
+module.exports = { noLooks: _noLooks, noLooksTags: _noLooksTags, hasLooks: _hasLooks, isExplicit: _isExplicit, RULES_VERSION };

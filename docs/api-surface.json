@@ -532,6 +532,7 @@
   "openvibe-sdk/no-looks": {
     "RULES_VERSION": "string",
     "hasLooks": "function",
+    "isExplicit": "function",
     "noLooks": "function",
     "noLooksTags": "function"
   },
