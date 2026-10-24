@@ -473,6 +473,10 @@
     "mountFrame": "function",
     "scriptUrls": "function"
   },
+  "openvibe-sdk/front-page": {
+    "containsCoreSlur": "function",
+    "frontPageOk": "function"
+  },
   "openvibe-sdk/geo": {
     "createGeoClient": "function"
   },
@@ -532,6 +536,7 @@
   "openvibe-sdk/no-looks": {
     "RULES_VERSION": "string",
     "hasLooks": "function",
+    "isExplicit": "function",
     "noLooks": "function",
     "noLooksTags": "function"
   },

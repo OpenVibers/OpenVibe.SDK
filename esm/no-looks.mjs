@@ -2,6 +2,6 @@
 import cjs from '../src/no-looks.js';
 
 export const {
-    noLooks, noLooksTags, hasLooks, RULES_VERSION,
+    noLooks, noLooksTags, hasLooks, isExplicit, RULES_VERSION,
 } = cjs;
 export default cjs;

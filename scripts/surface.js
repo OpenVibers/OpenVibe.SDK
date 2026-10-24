@@ -22,6 +22,10 @@ const ROOT = path.join(__dirname, '..');
 const FILE = path.join(ROOT, 'docs', 'api-surface.json');
 // What the 1.0 freeze covers first (README, "Versioning"): a change there is marked on its own.
 const CORE = ['openvibe-sdk/core', 'openvibe-sdk/auth', 'openvibe-sdk/events', 'openvibe-sdk/db', 'openvibe-sdk/media'];
+// Inside those entries, each name's tier (docs/one-point-oh.md): frozen in 1.0, platform (exported, not frozen) or
+// leaving before 1.0. test/surface.test.js fails when a name there has no tier.
+const TIERS_FILE = path.join(ROOT, 'docs', 'one-point-oh.json');
+const TIERS = JSON.parse(fs.readFileSync(TIERS_FILE, 'utf8'));
 
 function kindOf(v) {
     if (typeof v === 'function') return /^class[\s{]/.test(Function.prototype.toString.call(v)) ? 'class' : 'function';
@@ -66,7 +70,13 @@ const kindName = (k) => (typeof k === 'string' ? k : 'object');
 function diff(before, after) {
     const breaking = [];
     const added = [];
-    const tag = (spec) => (CORE.includes(spec) ? ' [1.0 core]' : '');
+    const tag = (spec, name) => {
+        if (!CORE.includes(spec)) return '';
+        const t = (name && TIERS[spec]) || {};
+        if ((t.platform || []).includes(name)) return ' [1.0 core entry, platform tier]';
+        if ((t.leaving || []).includes(name)) return ' [1.0 core entry, leaves before 1.0]';
+        return ' [1.0 core]';
+    };
     for (const spec of Object.keys(before)) {
         if (!(spec in after)) { breaking.push(`${spec}: the entry is gone${tag(spec)}`); continue; }
         const was = before[spec];
@@ -74,10 +84,10 @@ function diff(before, after) {
         for (const name of Object.keys(was)) {
             const a = was[name];
             const b = now[name];
-            if (b === undefined) breaking.push(`${spec}: ${name} is gone${tag(spec)}`);
-            else if (a !== 'lazy' && b !== 'lazy' && kindName(a) !== kindName(b)) breaking.push(`${spec}: ${name} was a ${kindName(a)}, now a ${kindName(b)}${tag(spec)}`);
+            if (b === undefined) breaking.push(`${spec}: ${name} is gone${tag(spec, name)}`);
+            else if (a !== 'lazy' && b !== 'lazy' && kindName(a) !== kindName(b)) breaking.push(`${spec}: ${name} was a ${kindName(a)}, now a ${kindName(b)}${tag(spec, name)}`);
             else if (typeof a !== 'string') {
-                for (const k of a.object) if (!b.object.includes(k)) breaking.push(`${spec}: ${name}.${k} is gone${tag(spec)}`);
+                for (const k of a.object) if (!b.object.includes(k)) breaking.push(`${spec}: ${name}.${k} is gone${tag(spec, name)}`);
                 for (const k of b.object) if (!a.object.includes(k)) added.push(`${spec}: ${name}.${k}`);
             }
         }
@@ -109,4 +119,4 @@ function main(argv = process.argv.slice(2)) {
 
 if (require.main === module) process.exitCode = main();
 
-module.exports = { current, describe, diff, render, CORE, FILE };
+module.exports = { current, describe, diff, render, CORE, TIERS, FILE };

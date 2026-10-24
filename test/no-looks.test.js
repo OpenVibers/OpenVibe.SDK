@@ -2,11 +2,14 @@
 // openvibe-sdk/no-looks: the shared corpus. Every case here was public AI text on OpenVibe.Live or Community (frame
 // notes, overviews, clip lines, paste picture descriptions) or a near miss that must stay as written.
 const assert = require('assert');
-const { noLooks, noLooksTags, hasLooks, RULES_VERSION } = require('../src/no-looks');
+const { noLooks, noLooksTags, hasLooks, isExplicit, RULES_VERSION } = require('../src/no-looks');
 const esm = import('../esm/no-looks.mjs');
 
 const cases = [
     ['A shirtless man sits in a room with framed pictures on the wall.', 'The streamer sits in a room with framed pictures on the wall.'],
+    // 2026-10-24: the AI moments job titled clip 483 "A Naked Man Lying On Their Back With Legs" on Live's home.
+    ['A naked man lies on his back on a bed.', 'The streamer lies on their back on a bed.'],
+    ['The streamer, half-naked, waves at chat.', 'The streamer waves at chat.'],
     ['A livestream frame showing a shirtless streamer in a small inset while playing a MOBA.', 'A livestream frame showing the streamer in a small inset while playing a MOBA.'],
     ['Chat watches a young boy at a desk build a PC.', 'Chat watches the streamer at a desk build a PC.'],
     ['Young, bearded man plays chess.', 'Streamer plays chess.'],
@@ -44,6 +47,10 @@ const cases = [
     // Clip overviews found public on 2026-10-22: a guessed gender, a slashed pattern before a shirt, a grooming sentence.
     ['The video features a man in a plaid/checkered shirt delivering a live-streamed explanation or discussion.', 'The video features a person delivering a live-streamed explanation or discussion.'],
     ['The video shows a man in a kitchen setting, appearing to stream live from a couch or kitchen area.', 'The video shows a person in a kitchen setting, appearing to stream live from a couch or kitchen area.'],
+    // Clothes below the waist (a Community screenshot summary of 2026-04); a shop or a pocket is not something worn.
+    ['The streamer in shorts kneels on grass beside a small black dog in an outdoor setting.', 'The streamer kneels on grass beside a small black dog in an outdoor setting.'],
+    ['The host in grey sweatpants and a cap laughs.', 'The host laughs.'],
+    ['Someone in the pants department shops.', 'Someone in the pants department shops.'],
     ['The video centers on a live stream featuring a male or female host wearing headphones, visible in a small webcam window.', 'The video centers on a live stream featuring a host, visible in a small webcam window.'],
     ['A home kitchen where a person adjusts their hair or clothing near the counter. A pot of soup simmers on the stove.', 'A pot of soup simmers on the stove.'],
     ['A female streamer and two guys race karts; the other men cheer.', 'A streamer and two people race karts; the other people cheer.'],
@@ -98,13 +105,33 @@ assert.deepStrictEqual(noLooksTags([1, '', ' ', 'sofa']), ['sofa']);
 // Titles: one that names looks is replaced, not repaired.
 assert.strictEqual(hasLooks('Orange Shirt Kitchen Chat'), true);
 assert.strictEqual(hasLooks('Minecraft Castle Marathon'), false);
+assert.strictEqual(hasLooks('A Naked Man Lying On Their Back With Legs'), true);
+assert.strictEqual(hasLooks('Noteworthy Half-Naked Moment'), true, 'no person word: the nudity word alone');
+assert.strictEqual(hasLooks('Nude Beach Debate'), true);
+assert.strictEqual(hasLooks('Iron Man Speedrun Record'), false, 'a name is not a person');
+assert.strictEqual(hasLooks('Pac-Man Marathon'), false);
+assert.strictEqual(hasLooks('Spider-Man 2 Swing Practice'), false);
+assert.strictEqual(hasLooks('Man Builds A Castle'), true);
 assert.strictEqual(hasLooks(null), false);
 
 // The rules' version: 16 hex digits, stable for these rules.
 assert.match(RULES_VERSION, /^[0-9a-f]{16}$/);
 
+// isExplicit: what a scene shows (Live's clip 483 on 2026-10-23, word for word, and after the adjective repair).
+for (const t of [
+    'A naked man lying on their back with legs spread, reaching toward their genitals',
+    noLooks('A naked man lying on their back with legs spread, reaching toward their genitals'),
+    'The video shows the streamer engaging in explicit adult content, with close-up footage of sexual acts on a couch',
+    'Pornographic footage plays on the second monitor', 'The scene contains nudity', 'masturbating on camera',
+]) assert.ok(isExplicit(t), `explicit: ${t}`);
+for (const t of ['A player in Fortnite is sprinting along a pink-purple sunset map', 'They read the news from Essex', 'A sextant and a map', '', null, undefined]) {
+    assert.ok(!isExplicit(t), `not explicit: ${t}`);
+}
+assert.ok(isExplicit('a fine title', null, 'the frame shows sexual activity'), 'any of several texts');
+
 esm.then((m) => {
     assert.strictEqual(m.noLooks, noLooks);
+    assert.strictEqual(m.isExplicit, isExplicit);
     assert.strictEqual(m.RULES_VERSION, RULES_VERSION);
     console.log(`no-looks: ${cases.length} cases, tags, titles and the ESM entry pass (rules ${RULES_VERSION})`);
 }).catch((e) => { console.error(e); process.exit(1); });

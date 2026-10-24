@@ -72,6 +72,19 @@ run([
         assert.equal(c.status().ready, false);
     }],
 
+    ['no keys at all: it retries on the backoff by itself, so readiness recovers without a token to check', async () => {
+        const w = world(), c = w.client(); w.fail = 'throw';
+        await assert.rejects(c.keys(), { code: 'token.no_key' });
+        assert.equal(c.status().ready, false);
+        w.fail = null; w.t += 1000;   // Network is back; the first backoff (1 s) has passed
+        await new Promise((r) => setTimeout(r, 1100));
+        await tick();
+        assert.equal(w.fetches, 2, 'one retry, by itself');
+        assert.equal(c.status().ready, true, 'ready without a keys() call (a reboot that started it before Network)');
+        assert.ok(w.logs.some(([lvl, m]) => lvl === 'info' && /recovered after 1 failed fetch/.test(m)));
+        c.stop();
+    }],
+
     ['an unknown kid refetches once (a rotation), a flood of them only every 30 s', async () => {
         const w = world(), c = w.client();
         await c.keys();

@@ -6,7 +6,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const { run } = require('./helpers');
-const { current, describe, diff, render, CORE, FILE } = require('../scripts/surface');
+const { current, describe, diff, render, CORE, TIERS, FILE } = require('../scripts/surface');
 
 run([
     ['docs/api-surface.json lists every export (node scripts/surface.js updates it)', async () => {
@@ -20,6 +20,27 @@ run([
         const recorded = JSON.parse(fs.readFileSync(FILE, 'utf8'));
         for (const spec of CORE) assert.ok(Object.keys(recorded[spec] || {}).length > 0, spec);
         assert.equal(recorded['openvibe-sdk/core'].createClient, 'function');
+    }],
+
+    ['every name in the 1.0 core entries has exactly one tier (docs/one-point-oh.json), and every tiered name exists', async () => {
+        const recorded = JSON.parse(fs.readFileSync(FILE, 'utf8'));
+        assert.deepEqual(Object.keys(TIERS).sort(), [...CORE].sort());
+        for (const spec of CORE) {
+            const t = TIERS[spec];
+            const all = [...t.frozen, ...t.platform, ...t.leaving];
+            assert.equal(new Set(all).size, all.length, `${spec}: a name in two tiers`);
+            assert.deepEqual(all.sort(), Object.keys(recorded[spec]).sort(), `${spec}: give each name a tier in docs/one-point-oh.json (and say why in docs/one-point-oh.md)`);
+        }
+        assert.ok(TIERS['openvibe-sdk/events'].leaving.includes('signDelivery'), 'v1 signatures leave before 1.0');
+    }],
+
+    ['a breaking change says the tier of a 1.0 core name', async () => {
+        const before = { 'openvibe-sdk/events': { parseDelivery: 'function', createPgOutbox: 'function', signDelivery: 'function' } };
+        assert.deepEqual(diff(before, { 'openvibe-sdk/events': {} }).breaking, [
+            'openvibe-sdk/events: parseDelivery is gone [1.0 core]',
+            'openvibe-sdk/events: createPgOutbox is gone [1.0 core entry, platform tier]',
+            'openvibe-sdk/events: signDelivery is gone [1.0 core entry, leaves before 1.0]',
+        ]);
     }],
 
     ['what each kind of export records', async () => {
