@@ -18,7 +18,8 @@ release may change an API and says so here.
   `scripts/surface.js --check` marks a breaking change with its tier.
 - `types/events.d.ts`: `signDeliveryHeaders` returns the timestamp and the v2 header. The type had also listed a v1
   header that the function never set.
-- **no-looks knows nudity words** (`naked`, `half-naked`, `nude`, `undressed` and their variants): Live's AI moments
+- **no-looks knows nudity words** (`naked`, `half-naked`, `nude`, `undressed` and their variants), and `hasLooks` skips
+  character names (Iron Man, Pac-Man, Spider-Man), as `noLooks` already did. Live's AI moments
   job titled a clip "A Naked Man Lying On Their Back With Legs" on Live's home (2026-10-24), and a Community paste
   read "Noteworthy Half-Naked Moment". `hasLooks` now rejects both, and `noLooks` repairs sentences as it does for
   "shirtless". `RULES_VERSION` changes, so services that repair stored rows run their repair again.

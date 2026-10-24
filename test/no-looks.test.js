@@ -104,6 +104,10 @@ assert.strictEqual(hasLooks('Minecraft Castle Marathon'), false);
 assert.strictEqual(hasLooks('A Naked Man Lying On Their Back With Legs'), true);
 assert.strictEqual(hasLooks('Noteworthy Half-Naked Moment'), true, 'no person word: the nudity word alone');
 assert.strictEqual(hasLooks('Nude Beach Debate'), true);
+assert.strictEqual(hasLooks('Iron Man Speedrun Record'), false, 'a name is not a person');
+assert.strictEqual(hasLooks('Pac-Man Marathon'), false);
+assert.strictEqual(hasLooks('Spider-Man 2 Swing Practice'), false);
+assert.strictEqual(hasLooks('Man Builds A Castle'), true);
 assert.strictEqual(hasLooks(null), false);
 
 // The rules' version: 16 hex digits, stable for these rules.

@@ -68,7 +68,10 @@ function _noClothing(text) {
 const _LOOKS_TAG = new RegExp(`(?:^|[\\s_-])(?:${_WORN}|${_FACE}|${_LOOKS}|men|women|man|woman|boy|girl|guy|gal|kid|child|teen|teenager|lady|male|female|youth|shirtless|topless|tanktop|selfie)(?=$|[\\s_-])`, 'i');
 // A short AI title that names looks ("Orange Shirt Kitchen Chat") cannot be repaired word by word: it is not used.
 const _LOOKS_WORD = new RegExp(`\\b(?:${_WORN}|${_FACE}|${_LOOKS}|faces?|smil(?:e|ing)|body|skin|men|women|man|woman|boy|girl|guy|kid|child|teen|lady|male|female|shirtless|topless)\\b`, 'i');
-const _hasLooks = (t) => _LOOKS_WORD.test(String(t || ''));
+// Names are not people (as noLooks spares them): "Iron Man Speedrun", "Pac-Man Marathon", "Spider-Man 2" are titles
+// about a game or a character, so a hyphenated name and the few two-word ones are skipped before the word test.
+const _NAMED = /\b(?:iron|mega|pac|ant|spider|bat|he|ray)[\s-]+(?:man|men|woman|women)\b|-(?:man|men|woman|women|boy|girl)\b/gi;
+const _hasLooks = (t) => _LOOKS_WORD.test(String(t || '').replace(_NAMED, ' '));
 function _noLooksTags(tags) {
     return (Array.isArray(tags) ? tags : []).filter((t) => typeof t === 'string' && t.trim() && !_LOOKS_TAG.test(t.trim()));
 }
@@ -148,7 +151,7 @@ function _hash(text) {
     }
     return a.toString(16).padStart(8, '0') + b.toString(16).padStart(8, '0');
 }
-const RULES_VERSION = _hash([_LOOKS, _PEOPLE, _WORN, _WORN_ANY, _FACE, _WITH_CLOTHES, _GENDER_ADJ, _GROOMING, _LOOKS_TAG, _LOOKS_WORD, _POSE,
+const RULES_VERSION = _hash([_NAMED, _LOOKS, _PEOPLE, _WORN, _WORN_ANY, _FACE, _WITH_CLOTHES, _GENDER_ADJ, _GROOMING, _LOOKS_TAG, _LOOKS_WORD, _POSE,
     _noLooks, _noLooksWords, _noGender, _noGrooming, _noClothing, _HE_SHE, _HER_OBJECT, _PRONOUNS.map(([re, w]) => `${re}${w}`).join(','), _noPronouns].map(String).join('|'));
 
 module.exports = { noLooks: _noLooks, noLooksTags: _noLooksTags, hasLooks: _hasLooks, RULES_VERSION };
