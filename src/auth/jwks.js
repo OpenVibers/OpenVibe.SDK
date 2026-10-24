@@ -39,7 +39,7 @@ function keysFromJwks(doc) {
 }
 
 function createJwksClient(url, { fetch: fetchImpl = globalThis.fetch, log = null, ttlMs = TTL_MS, minRefetchMs = MIN_REFETCH_MS, timeoutMs = 5000, now = () => Date.now() } = {}) {
-    const st = { keys: null, fetchedAt: 0, attemptAt: 0, kidAt: 0, failures: 0, nextTryAt: 0, lastError: null, inflight: null, timer: null };
+    const st = { keys: null, fetchedAt: 0, attemptAt: 0, kidAt: 0, failures: 0, nextTryAt: 0, lastError: null, inflight: null, timer: null, retry: null };
     const warn = (msg) => { try { (log && (log.warn || log.error) || console.warn).call(log || console, msg); } catch { /* never throw from logging */ } };
     const info = (msg) => { try { (log && (log.info || log.log) || (() => {})).call(log || console, msg); } catch { /* */ } };
 
@@ -61,6 +61,13 @@ function createJwksClient(url, { fetch: fetchImpl = globalThis.fetch, log = null
                 st.nextTryAt = now() + BACKOFF_MS[Math.min(st.failures - 1, BACKOFF_MS.length - 1)];
                 if (st.failures === 1) warn(`[openvibe-sdk] JWKS ${url} fetch failed (${st.lastError}); ${st.keys ? 'serving the last good keys' : 'no keys yet'}, retrying with backoff`);
                 if (st.keys) return st.keys;
+                // No key at all: retry on the backoff by itself, not only when a token next needs checking. A service
+                // that started before Network (a reboot) otherwise reported "no key" until its first sign-in: Trade and
+                // the Tools gateway showed degraded on /status for six hours on 2026-10-23.
+                if (!st.retry) {
+                    st.retry = setTimeout(() => { st.retry = null; if (!st.keys) refresh().catch(() => { /* logged */ }); }, Math.max(0, st.nextTryAt - now()));
+                    if (st.retry.unref) st.retry.unref();
+                }
                 throw new OpenVibeError({ code: 'token.no_key', status: 503, message: `JWKS ${url}: ${st.lastError}` });
             } finally { st.inflight = null; }
         })();
@@ -106,7 +113,7 @@ function createJwksClient(url, { fetch: fetchImpl = globalThis.fetch, log = null
         if (st.timer.unref) st.timer.unref();
         return api;
     }
-    function stop() { if (st.timer) clearInterval(st.timer); st.timer = null; }
+    function stop() { if (st.timer) clearInterval(st.timer); st.timer = null; if (st.retry) clearTimeout(st.retry); st.retry = null; }
 
     const api = { url, keys, keysForKid, refresh, status, start, stop };
     return api;

@@ -18,6 +18,10 @@ release may change an API and says so here.
   `scripts/surface.js --check` marks a breaking change with its tier.
 - `types/events.d.ts`: `signDeliveryHeaders` returns the timestamp and the v2 header. The type had also listed a v1
   header that the function never set.
+- **A JWKS client with no key retries by itself** on its backoff (1 s up to 5 min) until a fetch succeeds, instead of
+  only when a token next needs checking. On 2026-10-23, Trade and the Tools gateway started before Network after the
+  reboot and reported "no key" on `/status` for six hours, until a restart; their first sign-in would have waited for
+  the fetch.
 
 ## 0.63.0 (2026-10-24)
 
