@@ -87,7 +87,7 @@ export interface FeedEvent {
 export interface InboxVisitor {
     readonly token: string | null;
     config(opts?: Opts): Promise<{ inbox: { id: string; name: string; greeting: string; color: string; ai: boolean; people: boolean } }>;
-    visit(opts?: Opts): Promise<{ token: string; inbox: Json; conversation: Json | null; messages: InboxMessage[] }>;
+    visit(opts?: Opts): Promise<{ token: string; verified?: boolean; inbox: Json; conversation: Json | null; messages: InboxMessage[] }>;
     send(message: string, extra?: { page_url?: string; name?: string }, opts?: Opts): Promise<{ conversation: Json; message: InboxMessage }>;
     messages(query?: { after?: number }, opts?: Opts): Promise<{ conversation: Json | null; messages: InboxMessage[] }>;
     handoff(opts?: Opts): Promise<{ conversation: Json }>;
@@ -99,5 +99,5 @@ export interface FeedPublisher {
     claudeCode(hook: Json, opts?: Opts): Promise<Json>;
 }
 export function createChatClient(client: OpenVibeClient, defaults?: { baseUrl?: string }): ChatClient;
-export function createInboxVisitor(client: OpenVibeClient, options: { inbox: string; token?: string | null; baseUrl?: string }): InboxVisitor;
+export function createInboxVisitor(client: OpenVibeClient, options: { inbox: string; token?: string | null; user?: { id: string; name?: string; email?: string; hash: string } | null; baseUrl?: string }): InboxVisitor;
 export function createFeedPublisher(client: OpenVibeClient, options: { feed: string; key: string; baseUrl?: string }): FeedPublisher;

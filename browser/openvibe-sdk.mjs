@@ -2266,8 +2266,12 @@ function createChatClient(client, defaults = {}) {
  * A support inbox's visitor, for a site that builds its own panel instead of openvibe.chat/widget.js. No account and
  * no cookies: the visitor is the token visit() returns, which the site keeps (and passes back next time to resume the
  * conversation). An inbox that names its allowed sites answers only them. Writes are not retried.
+ *
+ * user (an inbox with verified visitors): { id, name?, email?, hash } where hash is HMAC-SHA256 of id with the inbox's
+ * identity secret, in hex, made on your server; Chat then trusts the name and email and gives the person the same
+ * token on every device. A wrong hash is just an anonymous visitor.
  */
-function createInboxVisitor(client, { inbox, token = null, baseUrl } = {}) {
+function createInboxVisitor(client, { inbox, token = null, user = null, baseUrl } = {}) {
     if (!/^inb_[0-9A-HJKMNP-TV-Z]{26}$/.test(String(inbox || ''))) throw new TypeError('createInboxVisitor: inbox is an inb_ id');
     let current = token || null;
     const call = (opts, o = {}) => client.json({ service: 'chat', baseUrl, auth: false, credentials: 'omit', ...opts, signal: o.signal });
@@ -2279,9 +2283,9 @@ function createInboxVisitor(client, { inbox, token = null, baseUrl } = {}) {
         /** { inbox }: name, greeting, color, whether Vibe answers */
         config: (o = {}) => call({ path: path() }, o),
         /** → { token, inbox, conversation, messages }; a missing or unknown token gets a new one */
-        visit: async (o = {}) => { const d = await call({ method: 'POST', path: path('/visit'), json: { token: current }, ...once }, o); current = d.token; return d; },
+        visit: async (o = {}) => { const d = await call({ method: 'POST', path: path('/visit'), json: { token: current, ...(user ? { user } : {}) }, ...once }, o); current = d.token; return d; },
         /** extra: page_url, name → { conversation, message }; after a resolved conversation this starts a new one */
-        send: (message, extra = {}, o = {}) => call({ method: 'POST', path: path('/messages'), json: { token: current, message, ...extra }, ...once }, o),
+        send: (message, extra = {}, o = {}) => call({ method: 'POST', path: path('/messages'), json: { token: current, message, ...(user ? { user } : {}), ...extra }, ...once }, o),
         /** query: after (a message id) → { conversation, messages } */
         messages: (query = {}, o = {}) => call({ path: path('/messages'), query, headers: { 'X-Visitor-Token': current } }, o),
         /** "Talk to a person" → { conversation } (409 when only Vibe answers in this inbox: config().inbox.people false) */

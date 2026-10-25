@@ -99,6 +99,9 @@ run([
         assert.ok(sent.every((r) => r.headers.authorization === undefined), 'no account token');
         assert.deepEqual(JSON.parse(String(sent[1].body)), { token: 'T'.repeat(32), message: 'hi', page_url: 'https://shop.example/' });
         assert.equal(sent[2].headers['x-visitor-token'], 'T'.repeat(32));
+        const signed = createInboxVisitor(client, { inbox: INBOX, user: { id: 'cust-42', hash: 'a'.repeat(64) } });
+        await signed.visit();
+        assert.deepEqual(JSON.parse(String(srv.requests[srv.requests.length - 1].body)).user, { id: 'cust-42', hash: 'a'.repeat(64) }, 'a verified visitor sends who they are');
         const f = createFeedPublisher(client, { feed: FEED, key: KEY });
         await f.publish([{ eventId: 'e1', eventType: 'prompt', text: 'x' }]);
         const pubs = srv.requests.filter((r) => r.url.endsWith('/events'));
