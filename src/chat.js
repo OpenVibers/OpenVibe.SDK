@@ -111,6 +111,17 @@ function createChatClient(client, defaults = {}) {
             /** status: open | resolved | bot (back to Vibe) */
             setStatus: (id, convId, status, o = {}) => call({ method: 'PATCH', path: `${inbox(id)}/conversations/${enc(convId)}`, json: { status }, ...once }, o),
             read: (id, convId, o = {}) => call({ method: 'POST', path: `${inbox(id)}/conversations/${enc(convId)}/read`, ...once }, o),
+            /** Verified visitors (owner): action on | rotate | off → { identity_secret } (keep it on your server) */
+            identity: (id, action, o = {}) => call({ method: 'POST', path: `${inbox(id)}/identity`, json: { action }, ...once }, o),
+            /** Saved replies: { replies } */
+            replies: (id, o = {}) => call({ path: `${inbox(id)}/replies` }, o),
+            saveReply: (id, shortcut, body, o = {}) => call({ method: 'POST', path: `${inbox(id)}/replies`, json: { shortcut, body }, ...once }, o),
+            deleteReply: (id, replyId, o = {}) => call({ method: 'DELETE', path: `${inbox(id)}/replies/${enc(replyId)}`, ...once }, o),
+            /** Webhooks (owner): { webhooks }; add → { webhook, secret } (the secret once, for signed JSON) */
+            webhooks: (id, o = {}) => call({ path: `${inbox(id)}/webhooks` }, o),
+            addWebhook: (id, url, o = {}) => call({ method: 'POST', path: `${inbox(id)}/webhooks`, json: { url }, ...once }, o),
+            testWebhook: (id, hookId, o = {}) => call({ method: 'POST', path: `${inbox(id)}/webhooks/${enc(hookId)}/test`, ...once }, o),
+            removeWebhook: (id, hookId, o = {}) => call({ method: 'DELETE', path: `${inbox(id)}/webhooks/${enc(hookId)}`, ...once }, o),
         },
         /** Feeds, the owner's side (publishing is createFeedPublisher, with the feed's key). */
         feeds: {

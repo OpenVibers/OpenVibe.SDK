@@ -64,6 +64,8 @@ run([
         await chat.feeds.view('fed_Z', { limit: 5 });
         await chat.feeds.onLive({ slot: [77, 78] });
         await chat.vibe.start('hello');
+        await chat.inboxes.saveReply('inb_X', 'refund', 'Five days.');
+        await chat.inboxes.addWebhook('inb_X', 'https://hooks.slack.com/services/x');
         const got = srv.requests.map((r) => [r.method, r.url, r.body && String(r.body).length ? JSON.parse(String(r.body)) : null]);
         assert.deepEqual(got, [
             ['POST', '/api/chat/inboxes', { name: 'Acme' }],
@@ -75,6 +77,8 @@ run([
             ['GET', '/api/chat/feeds/fed_Z?limit=5', null],
             ['GET', '/api/chat/feeds?slot=77%2C78', null],
             ['POST', '/api/chat/vibe', { message: 'hello' }],
+            ['POST', '/api/chat/inboxes/inb_X/replies', { shortcut: 'refund', body: 'Five days.' }],
+            ['POST', '/api/chat/inboxes/inb_X/webhooks', { url: 'https://hooks.slack.com/services/x' }],
         ]);
         assert.equal(srv.requests[6].headers.authorization, undefined, 'a feed is read without the person\'s token');
         await srv.close();

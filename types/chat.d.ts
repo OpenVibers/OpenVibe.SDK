@@ -55,6 +55,14 @@ export interface ChatClient {
         reply(id: string, convId: string, message: string, opts?: Opts): Promise<{ message: InboxMessage }>;
         setStatus(id: string, convId: string, status: 'open' | 'resolved' | 'bot', opts?: Opts): Promise<{ conversation: Json }>;
         read(id: string, convId: string, opts?: Opts): Promise<Json>;
+        identity(id: string, action: 'on' | 'rotate' | 'off', opts?: Opts): Promise<{ identity_secret: string | null }>;
+        replies(id: string, opts?: Opts): Promise<{ replies: { id: number; shortcut: string; body: string }[] }>;
+        saveReply(id: string, shortcut: string, body: string, opts?: Opts): Promise<{ replies: { id: number; shortcut: string; body: string }[] }>;
+        deleteReply(id: string, replyId: number | string, opts?: Opts): Promise<{ replies: { id: number; shortcut: string; body: string }[] }>;
+        webhooks(id: string, opts?: Opts): Promise<{ webhooks: Json[] }>;
+        addWebhook(id: string, url: string, opts?: Opts): Promise<{ webhook: Json; secret: string | null }>;
+        testWebhook(id: string, hookId: number | string, opts?: Opts): Promise<{ ok: boolean; status: number | null; error: string | null }>;
+        removeWebhook(id: string, hookId: number | string, opts?: Opts): Promise<void | Json>;
     };
     feeds: {
         mine(opts?: Opts): Promise<{ feeds: Json[] }>;
