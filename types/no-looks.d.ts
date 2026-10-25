@@ -4,5 +4,7 @@ export function noLooks<T>(text: T): T;
 export function noLooksTags(tags: unknown): string[];
 /** True when a short text (a title) names looks at all: replace it rather than repair it. */
 export function hasLooks(text: unknown): boolean;
+/** True when any of the texts says a scene shows sexual content (body parts, sex acts, pornography, nudity): publish none of it. */
+export function isExplicit(...texts: unknown[]): boolean;
 /** A 16-hex-digit hash of the rules: record it after repairing stored rows, and repair again when it changes. */
 export const RULES_VERSION: string;

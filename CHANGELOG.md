@@ -3,6 +3,45 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.64.0 (2026-10-25)
+
+- **`parseDelivery` requires a v2 signature by default.** A delivery without `X-OpenVibe-Signature-V2` is refused
+  unless the caller passes `{ requireV2: false }`, which is deprecated. A v1 signature (`X-OpenVibe-Signature`) signs no
+  time, so a captured delivery verified forever. OpenVibe.Events sends only v2, and every production receiver
+  already passed `requireV2: true`, so nothing that runs changes. A test that signs with `signDelivery` and parses
+  without options now gets `null`: sign with `signDeliveryHeaders` instead.
+- **`signDelivery` and `verifyDelivery` are deprecated** and leave in 1.0, with `createCodeVerifier` and
+  `pkceChallenge` (the halves of `createPkcePair`, unused anywhere).
+- **What 1.0 freezes, name by name.** [docs/one-point-oh.md](docs/one-point-oh.md) puts each name of the five core
+  entries in a tier (frozen, platform or leaving), with the reasons and how many repositories use it.
+  `docs/one-point-oh.json` holds the lists. `test/surface.test.js` fails when a name there has no tier, and
+  `scripts/surface.js --check` marks a breaking change with its tier.
+- `types/events.d.ts`: `signDeliveryHeaders` returns the timestamp and the v2 header. The type had also listed a v1
+  header that the function never set.
+- **no-looks knows nudity words** (`naked`, `half-naked`, `nude`, `undressed` and their variants), and `hasLooks` skips
+  character names (Iron Man, Pac-Man, Spider-Man), as `noLooks` already did. Live's AI moments
+  job titled a clip "A Naked Man Lying On Their Back With Legs" on Live's home (2026-10-24), and a Community paste
+  read "Noteworthy Half-Naked Moment". `hasLooks` now rejects both, and `noLooks` repairs sentences as it does for
+  "shirtless". `RULES_VERSION` changes, so services that repair stored rows run their repair again.
+- **no-looks knows clothes below the waist after "in"** (`shorts`, `jeans`, `pants`, `trousers`, `leggings`, `skirts`,
+  `sweatpants`, `swimwear` and the like): "The streamer in shorts kneels on grass…" had survived every one of
+  Community's repairs since April 2026. A shop word after it ("in the pants department") or a pocket keeps the phrase.
+  Team kits and uniforms are not touched.
+- **`openvibe-sdk/front-page`** (new): `frontPageOk(text)` says whether a title or line may lead a front page (no
+  built-in slur category, no strong profanity in five languages, no hate topic), and `containsCoreSlur(text)` is the
+  slur check alone. The categories are OpenVibe.Chat's built-in ones, ported unchanged. An anonymous screenshot titled
+  with a slur sat in OpenVibe.Community's "Most viewed" (2026-10-24), and Live had its own copy of the rule for its
+  quote strip; front pages now share one.
+- **`no-looks` gains `isExplicit(...texts)`**: true when AI text says a scene shows sexual content (body parts, sex
+  acts, pornography, nudity). The looks rules only remove an adjective ("a man … reaching toward their genitals"), so a
+  service asks before it publishes AI text at all. Live's AI auto-clip 483 went public on openvibe.media with such a
+  description on 2026-10-23. Live#344 keeps its own copy of the pattern until it pins this release. `RULES_VERSION`
+  includes it.
+- **A JWKS client with no key retries by itself** on its backoff (1 s up to 5 min) until a fetch succeeds, instead of
+  only when a token next needs checking. On 2026-10-23, Trade and the Tools gateway started before Network after the
+  reboot and reported "no key" on `/status` for six hours, until a restart; their first sign-in would have waited for
+  the fetch.
+
 ## 0.63.0 (2026-10-24)
 
 - **The public surface is pinned.** `docs/api-surface.json` lists every name each of the 66 entries exports and what it

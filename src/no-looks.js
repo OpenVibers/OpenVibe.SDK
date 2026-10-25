@@ -12,13 +12,15 @@
  *   and so do names (Iron Man, Pac-Man) and things a person holds or reviews (a headset on a desk).
  * - noLooksTags(tags): drops tags that name clothing, hair, face, age or a person by gender ("red-beanie", "man").
  * - hasLooks(text): true when a short text names looks at all; such a title is replaced rather than repaired.
+ * - isExplicit(...texts): true when any text says a scene shows sexual content (body parts, sex acts, pornography,
+ *   nudity). That is not a looks rule and nothing repairs it: such a moment, clip or paste is not published at all.
  * - RULES_VERSION: a short hash of the rules. A service that repairs stored rows records it and runs the repair again
  *   when it changes.
  *
  * Pure functions, no dependencies: safe in Node and in browsers.
  */
 
-const _LOOKS = 'shirtless|topless|bare-chested|young|younger|teenage|teen|little|bearded|bald|blonde?|(?:dark|long|short|curly|red|gr[ae]y|black|brown)-haired|tattooed|muscular|heavyset|older|elderly|middle-aged|skinny|slim|chubby|attractive|pretty|handsome|cute';
+const _LOOKS = 'shirtless|topless|bare-chested|half-naked|semi-naked|naked|nude|semi-nude|undressed|unclothed|young|younger|teenage|teen|little|bearded|bald|blonde?|(?:dark|long|short|curly|red|gr[ae]y|black|brown)-haired|tattooed|muscular|heavyset|older|elderly|middle-aged|skinny|slim|chubby|attractive|pretty|handsome|cute';
 const _PEOPLE = 'man|woman|boy|girl|guy|gal|kid|child|teen|teenager|lady|gentleman|male|female|person|individual|streamer|youth';
 const _AGE_NOUN = /^(?:boy|girl|kid|child|teen|teenager|youth)$/i;
 const _LOOKED_AT = new RegExp(`\\b(a|an|the|one)\\s+((?:(?:${_LOOKS})[\\s,]+(?:and\\s+)?)*)(${_PEOPLE})\\b`, 'gi');
@@ -33,7 +35,10 @@ const _FACE = 'beards?|mustaches?|moustaches?|goatees?|stubble|sunglasses|glasse
 const _WORN_ANY = `${_WORN}|microphones?|mics?|earbuds?|earphones?|belts?|gloves|boots|shoes|sneakers|jeans|pants|shorts|necklaces?|chains?|earrings|watch(?:es)?|uniforms?|clothes|clothing|gear|costumes?|wigs?|crowns?|goggles|visors?|lanyards?|tops?|neckties?|bow ties?|ties?|headbands?|garments?|turbans?`;
 const _WORN_NP = `${_ART}(?:[\\w'-]+\\s+){0,3}?\\b(?:${_WORN_ANY})\\b(?:\\s+(?:on|around|over|across)\\s+(?:his|her|their|the|its)\\s+(?:head|neck|face|forehead|shoulders?|ears?|eyes|chest))?(?:\\s+with\\s+(?:(?:a|an)\\s+)?(?:[\\w'-]+\\s+){0,2}?(?:zippers?|logos?|prints?|patterns?|designs?|graphics?|hoods?|stripes?|collars?|text|eyes|ears|horns|patch(?:es)?|badges?|stickers?|emblems?|lettering|writing|trim|buttons|accents|embellishments|details|sleeves))?`;
 const _WEARING = new RegExp(`,?\\s*(?:who\\s+(?:is\\s+)?|while\\s+|and\\s+)?(?<!-)\\b(?:wearing|wears|dressed in|sporting)\\s+${_WORN_NP}(?:\\s*(?:,|and|or|with|over|under)\\s+${_WORN_NP})*`, 'gi');
-const _IN_WORN = new RegExp(`\\s+in\\s+(?:(?:a|an|the|his|her|their)\\s+)?(?:[\\w'-]+\\s+){0,3}?\\b(?:${_WORN})\\b(?:\\s+(?:and|or)\\s+${_ART}(?:[\\w'-]+\\s+){0,2}?\\b(?:${_WORN_ANY})\\b)*`, 'gi');
+// Clothes below the waist say what someone wears as much ("The streamer in shorts kneels on grass…", a Community
+// summary from 2026-04 that every repair left), but "in the pants department" is a place: a shop word after it keeps it.
+const _LOWER = 'shorts|jeans|pants|trousers|leggings|skirts?|sweatpants|joggers|pajamas|pyjamas|swimsuits?|swimwear|bikinis?|underwear|lingerie|overalls|tights|dungarees';
+const _IN_WORN = new RegExp(`\\s+in\\s+(?:(?:a|an|the|his|her|their)\\s+)?(?:[\\w'-]+\\s+){0,3}?\\b(?:${_WORN}|(?:${_LOWER})(?!\\s+(?:department|store|shop|section|aisle|pockets?|drawer)))\\b(?:\\s+(?:and|or)\\s+${_ART}(?:[\\w'-]+\\s+){0,2}?\\b(?:${_WORN_ANY})\\b)*`, 'gi');
 const _PERSON_WITH_WORN = new RegExp(`\\b((?:${_PEOPLE}|broadcaster|host|guy|gamer|player|viewer|someone|people|men|women|speaker|presenter)\\s+)with\\s+${_ART}(?:[\\w'-]+\\s+){0,3}?\\b(?:${_WORN_ANY}|${_FACE})\\b(?:\\s*(?:,|and|or)\\s+${_ART}(?:[\\w'-]+\\s+){0,2}?\\b(?:${_WORN_ANY}|${_FACE})\\b)*\\s*`, 'gi');
 const _WITH_FACE = new RegExp(`\\s+with\\s+${_ART}(?:[\\w'-]+\\s+){0,2}?\\b(?:${_FACE})\\b(?:\\s*(?:,|and|or)\\s+${_ART}(?:[\\w'-]+\\s+){0,2}?\\b(?:${_FACE}|${_WORN})\\b)*`, 'gi');
 const _WEARS_AND = new RegExp(`(?<!-)\\bwears\\s+${_WORN_NP}(?:\\s*(?:,|and|or|with|over|under)\\s+${_WORN_NP})*\\s+and\\s+(?=\\w)`, 'gi');
@@ -68,7 +73,10 @@ function _noClothing(text) {
 const _LOOKS_TAG = new RegExp(`(?:^|[\\s_-])(?:${_WORN}|${_FACE}|${_LOOKS}|men|women|man|woman|boy|girl|guy|gal|kid|child|teen|teenager|lady|male|female|youth|shirtless|topless|tanktop|selfie)(?=$|[\\s_-])`, 'i');
 // A short AI title that names looks ("Orange Shirt Kitchen Chat") cannot be repaired word by word: it is not used.
 const _LOOKS_WORD = new RegExp(`\\b(?:${_WORN}|${_FACE}|${_LOOKS}|faces?|smil(?:e|ing)|body|skin|men|women|man|woman|boy|girl|guy|kid|child|teen|lady|male|female|shirtless|topless)\\b`, 'i');
-const _hasLooks = (t) => _LOOKS_WORD.test(String(t || ''));
+// Names are not people (as noLooks spares them): "Iron Man Speedrun", "Pac-Man Marathon", "Spider-Man 2" are titles
+// about a game or a character, so a hyphenated name and the few two-word ones are skipped before the word test.
+const _NAMED = /\b(?:iron|mega|pac|ant|spider|bat|he|ray)[\s-]+(?:man|men|woman|women)\b|-(?:man|men|woman|women|boy|girl)\b/gi;
+const _hasLooks = (t) => _LOOKS_WORD.test(String(t || '').replace(_NAMED, ' '));
 function _noLooksTags(tags) {
     return (Array.isArray(tags) ? tags : []).filter((t) => typeof t === 'string' && t.trim() && !_LOOKS_TAG.test(t.trim()));
 }
@@ -130,12 +138,12 @@ function _noLooksWords(text) {
         // Looks named: the person on camera. Only an age ("a child sits nearby"): someone, who may not be the streamer.
         .replace(_LOOKED_AT, (m, art, looks, noun) => (looks ? _cap(m, 'the streamer') : _AGE_NOUN.test(noun) ? _cap(m, /^the$/i.test(art) ? 'the person' : 'someone') : m))
         .replace(_LOOKED_AT_BARE, (m) => _cap(m, 'streamer'))
-        .replace(/\s+(?:is|are)\s+(?:shirtless|topless|bare-chested)\s+and\s+/gi, ' ')
-        .replace(/\b(?:shirtless|topless|bare-chested)\s+and\s+/gi, '')
+        .replace(/\s+(?:is|are)\s+(?:shirtless|topless|bare-chested|half-naked|semi-naked|naked|nude|semi-nude|undressed|unclothed)\s+and\s+/gi, ' ')
+        .replace(/\b(?:shirtless|topless|bare-chested|half-naked|semi-naked|naked|nude|semi-nude|undressed|unclothed)\s+and\s+/gi, '')
         .replace(/\b(one|the other|another),?\s+and\s+(?=\w+ing\b)/gi, '$1 ')
-        .replace(/\s+(?:is|are)\s+(?:shirtless|topless|bare-chested)\b/gi, ' is on camera')
-        .replace(/\s*,\s*(?:shirtless|topless|bare-chested)\s*,/gi, '')
-        .replace(/\b(?:shirtless|topless|bare-chested)\b,?\s*/gi, '');
+        .replace(/\s+(?:is|are)\s+(?:shirtless|topless|bare-chested|half-naked|semi-naked|naked|nude|semi-nude|undressed|unclothed)\b/gi, ' is on camera')
+        .replace(/\s*,\s*(?:shirtless|topless|bare-chested|half-naked|semi-naked|naked|nude|semi-nude|undressed|unclothed)\s*,/gi, '')
+        .replace(/\b(?:shirtless|topless|bare-chested|half-naked|semi-naked|naked|nude|semi-nude|undressed|unclothed)\b,?\s*/gi, '');
 }
 
 // FNV-1a over the rules' source, twice with different offsets: a stable 16-hex-digit version.
@@ -148,7 +156,15 @@ function _hash(text) {
     }
     return a.toString(16).padStart(8, '0') + b.toString(16).padStart(8, '0');
 }
-const RULES_VERSION = _hash([_LOOKS, _PEOPLE, _WORN, _WORN_ANY, _FACE, _WITH_CLOTHES, _GENDER_ADJ, _GROOMING, _LOOKS_TAG, _LOOKS_WORD, _POSE,
+// What a scene shows, not how someone looks: the looks rules take out an adjective ("a naked man … reaching toward
+// their genitals" → "a man … reaching toward their genitals"), so a service asks isExplicit() before it publishes AI text
+// at all. Live's AI auto-clip 483 went public with such a description on 2026-10-23 (Live#344 had its own copy first).
+const _EXPLICIT = /\b(?:genital(?:s|ia)?|penis(?:es)?|vaginas?|vulvas?|sexual(?:ly)?\s+(?:acts?|activity|content|material|explicit|intercourse)|sex\s+acts?|(?:explicit|adult|pornographic|sexual)\s+(?:content|material|footage|scenes?|imagery|videos?|acts?)|porn(?:o|ography|ographic)?|masturbat\w*|intercourse|nudity|erotica?)\b/i;
+function _isExplicit(...texts) {
+    return texts.some((t) => t != null && _EXPLICIT.test(String(t)));
+}
+
+const RULES_VERSION = _hash([_EXPLICIT, _NAMED, _LOOKS, _PEOPLE, _WORN, _LOWER, _WORN_ANY, _FACE, _WITH_CLOTHES, _GENDER_ADJ, _GROOMING, _LOOKS_TAG, _LOOKS_WORD, _POSE,
     _noLooks, _noLooksWords, _noGender, _noGrooming, _noClothing, _HE_SHE, _HER_OBJECT, _PRONOUNS.map(([re, w]) => `${re}${w}`).join(','), _noPronouns].map(String).join('|'));
 
-module.exports = { noLooks: _noLooks, noLooksTags: _noLooksTags, hasLooks: _hasLooks, RULES_VERSION };
+module.exports = { noLooks: _noLooks, noLooksTags: _noLooksTags, hasLooks: _hasLooks, isExplicit: _isExplicit, RULES_VERSION };

@@ -1,0 +1,27 @@
+{
+  "openvibe-sdk/core": {
+    "frozen": ["CONTRACTS_RANGE", "DEFAULT_NETWORK", "OpenVibeError", "SDK_VERSION", "compareVersions", "createClient", "isOpenVibeError", "newIdempotencyKey", "offsetPager", "paginate", "satisfiesRange", "ulid"],
+    "platform": ["contextFromHeaders", "isActingSubjectId", "newEventId", "parseTraceparent", "startSpan"],
+    "leaving": []
+  },
+  "openvibe-sdk/auth": {
+    "frozen": ["buildAuthorizeUrl", "createPkcePair", "createServiceTokenClient", "createState", "decodeUnverified", "exchangeCode", "jwksClient", "jwksStatus", "readCallback", "refreshUserToken", "startAuthorization", "unverifiedClaims", "verifyAppToken", "verifyServiceToken", "verifyUserToken"],
+    "platform": ["TOKEN_VALID_AFTER", "base64url", "createJwksClient", "createNetworkKeys", "createPgRevocationStore", "revocationSchema"],
+    "leaving": ["createCodeVerifier", "pkceChallenge"]
+  },
+  "openvibe-sdk/events": {
+    "frozen": ["appSource", "createAppEvents", "createEventsClient", "parseDelivery", "projectKey", "signDeliveryHeaders", "signDeliveryV2", "verifyDeliveryV2"],
+    "platform": ["createPgInbox", "createPgOutbox", "createServiceOutbox", "inboxSchema", "outboxSchema"],
+    "leaving": ["signDelivery", "verifyDelivery"]
+  },
+  "openvibe-sdk/db": {
+    "frozen": ["DbError", "ISOLATION", "PARSERS", "createDb", "sql"],
+    "platform": [],
+    "leaving": []
+  },
+  "openvibe-sdk/media": {
+    "frozen": ["DEFAULT_PUBLIC_ORIGIN", "createMediaClient", "createObjectsClient", "mediaUrls"],
+    "platform": [],
+    "leaving": []
+  }
+}
