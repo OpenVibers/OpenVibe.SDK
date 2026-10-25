@@ -7,6 +7,7 @@ import * as media from './media';
 import * as community from './community';
 import * as bot from './bot';
 import * as search from './search';
+import * as themes from './themes';
 import * as chat from './chat';
 import * as ai from './ai';
 import * as jobs from './jobs';
@@ -24,6 +25,7 @@ export * as media from './media';
 export * as community from './community';
 export * as bot from './bot';
 export * as search from './search';
+export * as themes from './themes';
 export * as chat from './chat';
 export * as ai from './ai';
 export * as jobs from './jobs';
@@ -33,6 +35,6 @@ export * as geo from './geo';
 
 declare const sdk: typeof core & {
     auth: typeof auth; registry: typeof registry; modules: typeof modules; realtime: typeof realtime;
-    media: typeof media; community: typeof community; bot: typeof bot; search: typeof search; chat: typeof chat; ai: typeof ai; jobs: typeof jobs; tools: typeof tools; projects: typeof projects; geo: typeof geo;
+    media: typeof media; community: typeof community; bot: typeof bot; search: typeof search; themes: typeof themes; chat: typeof chat; ai: typeof ai; jobs: typeof jobs; tools: typeof tools; projects: typeof projects; geo: typeof geo;
 };
 export default sdk;

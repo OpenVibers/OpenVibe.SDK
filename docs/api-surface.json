@@ -253,6 +253,18 @@
         "validateTelemetrySample"
       ]
     },
+    "themes": {
+      "object": [
+        "DISPLAY_OPTIONS",
+        "TOKENS",
+        "applyTheme",
+        "createThemesClient",
+        "followTheme",
+        "onColor",
+        "readTheme",
+        "seasonOn"
+      ]
+    },
     "tips": {
       "object": [
         "createTipsClient"
@@ -725,6 +737,22 @@
     "createTestValkey": "function",
     "pgAvailable": "function",
     "valkeyAvailable": "function"
+  },
+  "openvibe-sdk/themes": {
+    "DISPLAY_OPTIONS": {
+      "object": [
+        "motion",
+        "seasonal",
+        "text"
+      ]
+    },
+    "TOKENS": "array",
+    "applyTheme": "function",
+    "createThemesClient": "function",
+    "followTheme": "function",
+    "onColor": "function",
+    "readTheme": "function",
+    "seasonOn": "function"
   },
   "openvibe-sdk/tips": {
     "createTipsClient": "function"

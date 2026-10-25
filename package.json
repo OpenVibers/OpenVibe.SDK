@@ -87,6 +87,11 @@
       "import": "./esm/search.mjs",
       "default": "./src/search.js"
     },
+    "./themes": {
+      "types": "./types/themes.d.ts",
+      "import": "./esm/themes.mjs",
+      "default": "./src/themes.js"
+    },
     "./limits": {
       "types": "./types/limits.d.ts",
       "browser": null,
