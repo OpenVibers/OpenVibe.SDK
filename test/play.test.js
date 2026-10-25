@@ -19,6 +19,7 @@ const { OpenVibeError } = require('../src/core/errors');
     await play.players.achievements('gem-run', KIM);
     await play.boards.get('gem-run', 'high-score', { period: 'week' });
     await play.titles.list();
+    await play.titles.remove('sandbox-gem-run');
     assert.deepStrictEqual(calls.map((c) => [c.method || 'GET', c.path, c.audience || null, c.auth === false]), [
         ['PUT', '/api/v1/titles/gem-run', 'openvibe.play', false],
         ['POST', '/api/v1/titles/gem-run/scores', 'openvibe.play', false],
@@ -27,6 +28,7 @@ const { OpenVibeError } = require('../src/core/errors');
         ['GET', `/api/v1/titles/gem-run/players/${KIM}/achievements`, 'openvibe.play', false],
         ['GET', '/api/v1/titles/gem-run/boards/high-score', null, true],
         ['GET', '/api/v1/titles', null, true],
+        ['DELETE', '/api/v1/titles/sandbox-gem-run', 'openvibe.play', false],
     ]);
     assert.deepStrictEqual(calls[1].json, { board: 'high-score', ref: 'round-1', entries: [{ player: KIM, name: 'kim', score: 1200 }] });
     assert.deepStrictEqual(calls[3].json, { person: KIM });

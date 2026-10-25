@@ -8,6 +8,8 @@ export interface PlayClient {
         define(title: string, definition: PlayTitleDefinition, opts?: { signal?: AbortSignal }): Promise<any>;
         list(opts?: { signal?: AbortSignal }): Promise<any>;
         get(title: string, opts?: { signal?: AbortSignal }): Promise<any | null>;
+        /** Delete a sandbox title you manage (a production title is kept: 409 play.title_kept). */
+        remove(title: string, opts?: { signal?: AbortSignal }): Promise<any>;
     };
     scores: {
         post(title: string, round: { board: string; ref: string; at?: string; entries: PlayScoreEntry[] }, opts?: { signal?: AbortSignal }): Promise<any>;
