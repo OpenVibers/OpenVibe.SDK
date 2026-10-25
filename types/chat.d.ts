@@ -64,6 +64,11 @@ export interface ChatClient {
         testWebhook(id: string, hookId: number | string, opts?: Opts): Promise<{ ok: boolean; status: number | null; error: string | null }>;
         removeWebhook(id: string, hookId: number | string, opts?: Opts): Promise<void | Json>;
     };
+    support: {
+        list(query?: { limit?: number }, opts?: Opts): Promise<{ conversations: Json[] }>;
+        messages(convId: string, query?: { after?: number }, opts?: Opts): Promise<{ conversation: Json; messages: InboxMessage[] } | null>;
+        send(convId: string, message: string, opts?: Opts): Promise<{ conversation: Json; message: InboxMessage }>;
+    };
     feeds: {
         mine(opts?: Opts): Promise<{ feeds: Json[] }>;
         create(input?: FeedInput, opts?: Opts): Promise<{ feed: Json; key: string }>;
@@ -95,7 +100,7 @@ export interface FeedEvent {
 export interface InboxVisitor {
     readonly token: string | null;
     config(opts?: Opts): Promise<{ inbox: { id: string; name: string; greeting: string; color: string; ai: boolean; people: boolean } }>;
-    visit(opts?: Opts): Promise<{ token: string; verified?: boolean; inbox: Json; conversation: Json | null; messages: InboxMessage[] }>;
+    visit(opts?: Opts): Promise<{ token: string; verified?: boolean; account?: { name: string } | null; inbox: Json; conversation: Json | null; messages: InboxMessage[] }>;
     send(message: string, extra?: { page_url?: string; name?: string }, opts?: Opts): Promise<{ conversation: Json; message: InboxMessage }>;
     messages(query?: { after?: number }, opts?: Opts): Promise<{ conversation: Json | null; messages: InboxMessage[] }>;
     handoff(opts?: Opts): Promise<{ conversation: Json }>;
@@ -107,5 +112,5 @@ export interface FeedPublisher {
     claudeCode(hook: Json, opts?: Opts): Promise<Json>;
 }
 export function createChatClient(client: OpenVibeClient, defaults?: { baseUrl?: string }): ChatClient;
-export function createInboxVisitor(client: OpenVibeClient, options: { inbox: string; token?: string | null; user?: { id: string; name?: string; email?: string; hash: string } | null; baseUrl?: string }): InboxVisitor;
+export function createInboxVisitor(client: OpenVibeClient, options: { inbox: string; token?: string | null; user?: { id: string; name?: string; email?: string; hash: string } | null; account?: string | null; baseUrl?: string }): InboxVisitor;
 export function createFeedPublisher(client: OpenVibeClient, options: { feed: string; key: string; baseUrl?: string }): FeedPublisher;

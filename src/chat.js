@@ -123,6 +123,15 @@ function createChatClient(client, defaults = {}) {
             testWebhook: (id, hookId, o = {}) => call({ method: 'POST', path: `${inbox(id)}/webhooks/${enc(hookId)}/test`, ...once }, o),
             removeWebhook: (id, hookId, o = {}) => call({ method: 'DELETE', path: `${inbox(id)}/webhooks/${enc(hookId)}`, ...once }, o),
         },
+        /** The person's own conversations with sites' chats (they signed in to OpenVibe in the panel). */
+        support: {
+            /** { conversations }: newest first, each with its inbox's name */
+            list: (query = {}, o = {}) => call({ path: '/api/chat/support', query }, o),
+            /** query: after → { conversation, messages } */
+            messages: (convId, query = {}, o = {}) => orNull(call({ path: `/api/chat/support/${enc(convId)}/messages`, query }, o)),
+            /** → { conversation, message }; writing to a resolved one starts a new conversation with that inbox */
+            send: (convId, message, o = {}) => call({ method: 'POST', path: `/api/chat/support/${enc(convId)}/messages`, json: { message }, ...once }, o),
+        },
         /** Feeds, the owner's side (publishing is createFeedPublisher, with the feed's key). */
         feeds: {
             mine: (o = {}) => call({ path: '/api/chat/feeds/mine' }, o),
@@ -148,11 +157,14 @@ function createChatClient(client, defaults = {}) {
  * user (an inbox with verified visitors): { id, name?, email?, hash } where hash is HMAC-SHA256 of id with the inbox's
  * identity secret, in hex, made on your server; Chat then trusts the name and email and gives the person the same
  * token on every device. A wrong hash is just an anonymous visitor.
+ *
+ * account: the visitor's own OpenVibe sign-in (a Network token), when they have one: their conversation becomes
+ * theirs, in their openvibe.chat Messages and on every device.
  */
-function createInboxVisitor(client, { inbox, token = null, user = null, baseUrl } = {}) {
+function createInboxVisitor(client, { inbox, token = null, user = null, account = null, baseUrl } = {}) {
     if (!/^inb_[0-9A-HJKMNP-TV-Z]{26}$/.test(String(inbox || ''))) throw new TypeError('createInboxVisitor: inbox is an inb_ id');
     let current = token || null;
-    const call = (opts, o = {}) => client.json({ service: 'chat', baseUrl, auth: false, credentials: 'omit', ...opts, signal: o.signal });
+    const call = (opts, o = {}) => client.json({ service: 'chat', baseUrl, auth: false, credentials: 'omit', ...opts, headers: { ...(account ? { Authorization: `Bearer ${account}` } : {}), ...(opts.headers || {}) }, signal: o.signal });
     const path = (p = '') => `/api/chat/widget/inbox/${enc(inbox)}${p}`;
     const once = { idempotencyKey: false };
     return {

@@ -106,6 +106,9 @@ run([
         const signed = createInboxVisitor(client, { inbox: INBOX, user: { id: 'cust-42', hash: 'a'.repeat(64) } });
         await signed.visit();
         assert.deepEqual(JSON.parse(String(srv.requests[srv.requests.length - 1].body)).user, { id: 'cust-42', hash: 'a'.repeat(64) }, 'a verified visitor sends who they are');
+        const mine = createInboxVisitor(client, { inbox: INBOX, account: 'net-jwt' });
+        await mine.visit();
+        assert.equal(srv.requests[srv.requests.length - 1].headers.authorization, 'Bearer net-jwt', 'a signed-in visitor sends their own sign-in');
         const f = createFeedPublisher(client, { feed: FEED, key: KEY });
         await f.publish([{ eventId: 'e1', eventType: 'prompt', text: 'x' }]);
         const pubs = srv.requests.filter((r) => r.url.endsWith('/events'));
