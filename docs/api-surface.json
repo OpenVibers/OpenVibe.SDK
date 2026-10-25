@@ -56,7 +56,9 @@
     },
     "chat": {
       "object": [
-        "createChatClient"
+        "createChatClient",
+        "createFeedPublisher",
+        "createInboxVisitor"
       ]
     },
     "commerce": {
@@ -382,7 +384,9 @@
     "createCache": "function"
   },
   "openvibe-sdk/chat": {
-    "createChatClient": "function"
+    "createChatClient": "function",
+    "createFeedPublisher": "function",
+    "createInboxVisitor": "function"
   },
   "openvibe-sdk/commerce": {
     "CommerceError": "class",
