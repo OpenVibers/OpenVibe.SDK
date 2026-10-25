@@ -115,6 +115,10 @@ run([
         const mine = createInboxVisitor(client, { inbox: INBOX, account: 'net-jwt' });
         await mine.visit();
         assert.equal(srv.requests[srv.requests.length - 1].headers.authorization, 'Bearer net-jwt', 'a signed-in visitor sends their own sign-in');
+        await mine.sendPicture(new Blob([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], { type: 'image/png' }), { caption: 'The crack, here' });
+        const pic = srv.requests[srv.requests.length - 1];
+        assert.deepEqual([pic.url, pic.headers['content-type'], pic.headers['x-visitor-token'], decodeURIComponent(pic.headers['x-caption']), pic.headers.authorization, pic.body.length],
+            [`/api/chat/widget/inbox/${INBOX}/picture`, 'image/png', 'T'.repeat(32), 'The crack, here', 'Bearer net-jwt', 4], 'a picture goes as itself, with the token in a header');
         const f = createFeedPublisher(client, { feed: FEED, key: KEY });
         await f.publish([{ eventId: 'e1', eventType: 'prompt', text: 'x' }]);
         const pubs = srv.requests.filter((r) => r.url.endsWith('/events'));

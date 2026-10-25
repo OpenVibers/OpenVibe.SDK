@@ -198,6 +198,15 @@ function createInboxVisitor(client, { inbox, token = null, user = null, account 
         handoff: (o = {}) => call({ method: 'POST', path: path('/handoff'), json: { token: current }, ...once }, o),
         /** Rate a resolved conversation: 1 (good) or -1 (bad), with a line → { conversation } */
         rate: (rating, extra = {}, o = {}) => call({ method: 'POST', path: path('/rating'), json: { token: current, rating, ...extra }, ...once }, o),
+        /**
+         * A picture (a Blob, File or Buffer: JPEG, PNG, GIF, WebP or AVIF), with an optional line → { conversation, message,
+         * picture }. Signed-in visitors only (`account`): it goes to OpenVibe.Pics as them; anyone else gets 403
+         * inbox.sign_in_to_attach.
+         */
+        sendPicture: (picture, { caption = '', contentType } = {}, o = {}) => call({
+            method: 'POST', path: path('/picture'), body: picture, ...once,
+            headers: { 'Content-Type': contentType || (picture && picture.type) || 'application/octet-stream', 'X-Visitor-Token': current, ...(caption ? { 'X-Caption': encodeURIComponent(String(caption)) } : {}) },
+        }, o),
     };
 }
 

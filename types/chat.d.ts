@@ -98,7 +98,7 @@ export interface InboxInput {
 }
 export interface InboxActionInput { name: string; description: string; url: string; params?: { name: string; description?: string }[] | string }
 export interface InboxAction { id: number; name: string; description: string; url: string; params: { name: string; description: string }[]; last_status: number | null; last_error: string | null; last_at: string | null }
-export interface InboxMessage { id: number; author: 'visitor' | 'agent' | 'ai' | 'system'; author_name?: string | null; body: string; created_at: string }
+export interface InboxMessage { id: number; author: 'visitor' | 'agent' | 'ai' | 'system'; author_name?: string | null; body: string; created_at: string; /** a visitor's message written signed in: its Pics links show as pictures */ account?: true }
 export interface FeedInput { title?: string; room?: string | number | null; slot?: number | null; settings?: Record<string, number | string | boolean> }
 export type FeedEventType = 'session.status' | 'prompt' | 'response' | 'thinking' | 'tool.call' | 'file.change' | 'file.save';
 export interface FeedEvent {
@@ -122,6 +122,7 @@ export interface InboxVisitor {
     messages(query?: { after?: number }, opts?: Opts): Promise<{ conversation: Json | null; messages: InboxMessage[] }>;
     handoff(opts?: Opts): Promise<{ conversation: Json }>;
     rate(rating: 1 | -1, extra?: { comment?: string; conversation?: string }, opts?: Opts): Promise<{ conversation: Json }>;
+    sendPicture(picture: Blob | ArrayBuffer | Uint8Array, extra?: { caption?: string; contentType?: string }, opts?: Opts): Promise<{ conversation: Json; message: InboxMessage; picture: { slug: string; direct: string; page: string } }>;
 }
 export interface FeedPublisher {
     hello(input?: { sessionKey?: string; publisher?: Json }, opts?: Opts): Promise<{ sessionKey: string; publisher: Json }>;
