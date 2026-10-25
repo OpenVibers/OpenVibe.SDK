@@ -2,7 +2,8 @@ import type { OpenVibeClient } from './core';
 
 type Opts = { signal?: AbortSignal };
 export type ThemeVariables = Record<string, string>;
-export interface Season { id: string; name: string; theme: string; from: string; to: string }
+/** theme: the dark half; light: its light half (Hayride for Halloween). */
+export interface Season { id: string; name: string; theme: string; light?: string; from: string; to: string }
 export interface Theme {
     id: string; name: string; slug: string; description?: string; mode: 'dark' | 'light'; variables: ThemeVariables;
     preview_colors?: string[] | null; tags?: string[]; is_builtin?: number; downloads?: number;
@@ -10,7 +11,7 @@ export interface Theme {
     season?: { id: string; name: string; from: string; to: string };
     [field: string]: unknown;
 }
-export interface DisplayPrefs { motion?: 'auto' | 'reduced'; text?: '100' | '112' | '125'; seasonal?: 'on' | 'off' }
+export interface DisplayPrefs { motion?: 'auto' | 'reduced'; text?: '100' | '112' | '125'; seasonal?: 'on' | 'off'; scheme?: 'manual' | 'auto' }
 export interface ActiveTheme { theme_id: string | null; custom_variables?: ThemeVariables | null; display?: DisplayPrefs | null; guest?: boolean }
 export interface ThemesClient {
     catalog(query?: { mode?: 'dark' | 'light'; search?: string; sort?: 'downloads' | 'rating'; limit?: number }, opts?: Opts): Promise<{ themes: Theme[] }>;
@@ -28,7 +29,7 @@ export interface ThemeSnapshot {
     id: string | null;
     mode: 'dark' | 'light' | string;
     tokens: Record<string, string>;
-    display: { motion: 'auto' | 'reduced'; text: '100' | '112' | '125'; seasonal: 'on' | 'off'; textScale: number; calm: boolean };
+    display: { motion: 'auto' | 'reduced'; text: '100' | '112' | '125'; seasonal: 'on' | 'off'; scheme: 'manual' | 'auto'; textScale: number; calm: boolean };
     season: { id: string } | null;
     seasonMark: string | null;
 }
@@ -38,5 +39,5 @@ export function readTheme(opts?: { root?: Element; names?: readonly string[] }):
 export function applyTheme(vars: ThemeVariables, opts?: { root?: HTMLElement }): HTMLElement | null;
 export function seasonOn(date: Date | string | number | null | undefined, seasons: Season[]): Season | null;
 export function onColor(hex: string): '#0b0d10' | '#ffffff' | null;
-export const DISPLAY_OPTIONS: Readonly<{ motion: string[]; text: string[]; seasonal: string[] }>;
+export const DISPLAY_OPTIONS: Readonly<{ motion: string[]; text: string[]; seasonal: string[]; scheme: string[] }>;
 export const TOKENS: readonly string[];

@@ -742,6 +742,7 @@
     "DISPLAY_OPTIONS": {
       "object": [
         "motion",
+        "scheme",
         "seasonal",
         "text"
       ]
