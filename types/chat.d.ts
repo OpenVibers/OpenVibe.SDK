@@ -54,6 +54,9 @@ export interface ChatClient {
         messages(id: string, convId: string, query?: { after?: number }, opts?: Opts): Promise<{ conversation: Json; messages: InboxMessage[] }>;
         reply(id: string, convId: string, message: string, opts?: Opts): Promise<{ message: InboxMessage }>;
         setStatus(id: string, convId: string, status: 'open' | 'resolved' | 'bot', opts?: Opts): Promise<{ conversation: Json }>;
+        assign(id: string, convId: string, assigneeId: number | null, opts?: Opts): Promise<{ conversation: Json }>;
+        translateMessage(id: string, convId: string, messageId: number | string, to: string, opts?: Opts): Promise<{ text: string; lang: string; cached: boolean }>;
+        translateDraft(id: string, text: string, to: string, opts?: Opts): Promise<{ text: string; lang: string }>;
         read(id: string, convId: string, opts?: Opts): Promise<Json>;
         identity(id: string, action: 'on' | 'rotate' | 'off', opts?: Opts): Promise<{ identity_secret: string | null }>;
         replies(id: string, opts?: Opts): Promise<{ replies: { id: number; shortcut: string; body: string }[] }>;
@@ -63,6 +66,10 @@ export interface ChatClient {
         addWebhook(id: string, url: string, opts?: Opts): Promise<{ webhook: Json; secret: string | null }>;
         testWebhook(id: string, hookId: number | string, opts?: Opts): Promise<{ ok: boolean; status: number | null; error: string | null }>;
         removeWebhook(id: string, hookId: number | string, opts?: Opts): Promise<void | Json>;
+        actions(id: string, opts?: Opts): Promise<{ actions: InboxAction[] }>;
+        addAction(id: string, input: InboxActionInput, opts?: Opts): Promise<{ action: InboxAction; secret: string }>;
+        testAction(id: string, actionId: number | string, args?: Record<string, string>, opts?: Opts): Promise<{ ok: boolean; status: number | null; error: string | null; result: string | null }>;
+        removeAction(id: string, actionId: number | string, opts?: Opts): Promise<void | Json>;
     };
     support: {
         list(query?: { limit?: number }, opts?: Opts): Promise<{ conversations: Json[] }>;
@@ -80,7 +87,17 @@ export interface ChatClient {
     };
 }
 export type ConversationStatus = 'bot' | 'waiting' | 'open' | 'resolved';
-export interface InboxInput { name?: string; greeting?: string; color?: string; ai_enabled?: boolean; ai_instructions?: string; knowledge_urls?: string[] | string; allowed_origins?: string[] | string }
+export interface InboxInput {
+    name?: string; greeting?: string; color?: string; ai_enabled?: boolean; ai_instructions?: string; knowledge_urls?: string[] | string; allowed_origins?: string[] | string;
+    /** false: a site assistant, only Vibe answers */
+    handoff?: boolean;
+    /** When the inbox's people answer; null: always */
+    hours?: { tz: string; days: number[]; start: string; end: string } | null;
+    /** round_robin: a visitor waiting goes to the next of the people */
+    route?: 'none' | 'round_robin';
+}
+export interface InboxActionInput { name: string; description: string; url: string; params?: { name: string; description?: string }[] | string }
+export interface InboxAction { id: number; name: string; description: string; url: string; params: { name: string; description: string }[]; last_status: number | null; last_error: string | null; last_at: string | null }
 export interface InboxMessage { id: number; author: 'visitor' | 'agent' | 'ai' | 'system'; author_name?: string | null; body: string; created_at: string }
 export interface FeedInput { title?: string; room?: string | number | null; slot?: number | null; settings?: Record<string, number | string | boolean> }
 export type FeedEventType = 'session.status' | 'prompt' | 'response' | 'thinking' | 'tool.call' | 'file.change' | 'file.save';

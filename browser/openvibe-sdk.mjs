@@ -2243,6 +2243,12 @@ function createChatClient(client, defaults = {}) {
             reply: (id, convId, message, o = {}) => call({ method: 'POST', path: `${inbox(id)}/conversations/${enc(convId)}/messages`, json: { message }, ...once }, o),
             /** status: open | resolved | bot (back to Vibe) */
             setStatus: (id, convId, status, o = {}) => call({ method: 'PATCH', path: `${inbox(id)}/conversations/${enc(convId)}`, json: { status }, ...once }, o),
+            /** Hand a conversation to one of the inbox's people (their user id), or null to unassign. */
+            assign: (id, convId, assigneeId, o = {}) => call({ method: 'PATCH', path: `${inbox(id)}/conversations/${enc(convId)}`, json: { assignee_id: assigneeId == null ? null : assigneeId }, ...once }, o),
+            /** A visitor's message in the reader's language (kept, so the next reader pays nothing) → { text, lang, cached } */
+            translateMessage: (id, convId, messageId, to, o = {}) => call({ method: 'POST', path: `${inbox(id)}/conversations/${enc(convId)}/messages/${enc(messageId)}/translate`, json: { to }, ...once }, o),
+            /** A reply draft in the visitor's language → { text, lang } */
+            translateDraft: (id, text, to, o = {}) => call({ method: 'POST', path: `${inbox(id)}/translate`, json: { text, to }, ...once }, o),
             read: (id, convId, o = {}) => call({ method: 'POST', path: `${inbox(id)}/conversations/${enc(convId)}/read`, ...once }, o),
             /** Verified visitors (owner): action on | rotate | off → { identity_secret } (keep it on your server) */
             identity: (id, action, o = {}) => call({ method: 'POST', path: `${inbox(id)}/identity`, json: { action }, ...once }, o),
@@ -2255,6 +2261,16 @@ function createChatClient(client, defaults = {}) {
             addWebhook: (id, url, o = {}) => call({ method: 'POST', path: `${inbox(id)}/webhooks`, json: { url }, ...once }, o),
             testWebhook: (id, hookId, o = {}) => call({ method: 'POST', path: `${inbox(id)}/webhooks/${enc(hookId)}/test`, ...once }, o),
             removeWebhook: (id, hookId, o = {}) => call({ method: 'DELETE', path: `${inbox(id)}/webhooks/${enc(hookId)}`, ...once }, o),
+            /**
+             * Actions (owner): the team's own https endpoints Vibe may ask while it answers (look up an order).
+             * input { name, description, url, params: [{ name, description }] | 'name: what it is' lines } → { action, secret }
+             * (the secret once: each call is signed like an Events delivery, so parseDelivery checks it).
+             */
+            actions: (id, o = {}) => call({ path: `${inbox(id)}/actions` }, o),
+            addAction: (id, input, o = {}) => call({ method: 'POST', path: `${inbox(id)}/actions`, json: input, ...once }, o),
+            /** Call it now with these arguments → { ok, status, error, result } */
+            testAction: (id, actionId, args = {}, o = {}) => call({ method: 'POST', path: `${inbox(id)}/actions/${enc(actionId)}/test`, json: { arguments: args }, ...once }, o),
+            removeAction: (id, actionId, o = {}) => call({ method: 'DELETE', path: `${inbox(id)}/actions/${enc(actionId)}`, ...once }, o),
         },
         /** The person's own conversations with sites' chats (they signed in to OpenVibe in the panel). */
         support: {
