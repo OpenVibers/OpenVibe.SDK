@@ -93,6 +93,8 @@ run([
         assert.equal(v.token, 'T'.repeat(32));
         await v.send('hi', { page_url: 'https://shop.example/' });
         await v.messages({ after: 3 });
+        await v.rate(1, { comment: 'Quick!' });
+        assert.deepEqual(JSON.parse(String(srv.requests[3].body)), { token: 'T'.repeat(32), rating: 1, comment: 'Quick!' });
         const sent = srv.requests.slice(0, 3);
         assert.ok(sent.every((r) => r.headers.authorization === undefined), 'no account token');
         assert.deepEqual(JSON.parse(String(sent[1].body)), { token: 'T'.repeat(32), message: 'hi', page_url: 'https://shop.example/' });

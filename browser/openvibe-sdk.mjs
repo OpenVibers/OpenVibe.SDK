@@ -2284,8 +2284,10 @@ function createInboxVisitor(client, { inbox, token = null, baseUrl } = {}) {
         send: (message, extra = {}, o = {}) => call({ method: 'POST', path: path('/messages'), json: { token: current, message, ...extra }, ...once }, o),
         /** query: after (a message id) → { conversation, messages } */
         messages: (query = {}, o = {}) => call({ path: path('/messages'), query, headers: { 'X-Visitor-Token': current } }, o),
-        /** "Talk to a person" → { conversation } */
+        /** "Talk to a person" → { conversation } (409 when only Vibe answers in this inbox: config().inbox.people false) */
         handoff: (o = {}) => call({ method: 'POST', path: path('/handoff'), json: { token: current }, ...once }, o),
+        /** Rate a resolved conversation: 1 (good) or -1 (bad), with a line → { conversation } */
+        rate: (rating, extra = {}, o = {}) => call({ method: 'POST', path: path('/rating'), json: { token: current, rating, ...extra }, ...once }, o),
     };
 }
 

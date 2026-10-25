@@ -86,11 +86,12 @@ export interface FeedEvent {
 }
 export interface InboxVisitor {
     readonly token: string | null;
-    config(opts?: Opts): Promise<{ inbox: { id: string; name: string; greeting: string; color: string; ai: boolean } }>;
+    config(opts?: Opts): Promise<{ inbox: { id: string; name: string; greeting: string; color: string; ai: boolean; people: boolean } }>;
     visit(opts?: Opts): Promise<{ token: string; inbox: Json; conversation: Json | null; messages: InboxMessage[] }>;
     send(message: string, extra?: { page_url?: string; name?: string }, opts?: Opts): Promise<{ conversation: Json; message: InboxMessage }>;
     messages(query?: { after?: number }, opts?: Opts): Promise<{ conversation: Json | null; messages: InboxMessage[] }>;
     handoff(opts?: Opts): Promise<{ conversation: Json }>;
+    rate(rating: 1 | -1, extra?: { comment?: string; conversation?: string }, opts?: Opts): Promise<{ conversation: Json }>;
 }
 export interface FeedPublisher {
     hello(input?: { sessionKey?: string; publisher?: Json }, opts?: Opts): Promise<{ sessionKey: string; publisher: Json }>;
