@@ -5,6 +5,7 @@
  * with its own principal's token (audience openvibe.play): a first-party service token, or a developer app's token
  * granted play.title.manage / play.result.write / play.player.read. The principal that registers a title is its only
  * writer; another one is told the title does not exist. Leaderboards and titles are public reads (no token).
+ * A developer's sandbox app manages `sandbox-…` titles only (guest players, unlisted, at most 3) and may delete them.
  *
  *   const play = createPlayClient(createClient({ tokenProvider: tokens }));
  *   await play.titles.define('gem-run', {                                  // play.title-definition@1
@@ -44,6 +45,8 @@ function createPlayClient(client, { baseUrl } = {}) {
             list: ({ signal } = {}) => open({ path: '/api/v1/titles', signal }),
             /** Public: one title, or null. */
             get: (title, { signal } = {}) => orNull(open({ path: `/api/v1/titles/${enc(title)}`, signal })),
+            /** Delete a sandbox title you manage, with everything in it (play.title.manage); a production title is kept (409 play.title_kept). */
+            remove: (title, { signal } = {}) => call({ method: 'DELETE', path: `/api/v1/titles/${enc(title)}`, signal, idempotencyKey: false }),
         },
         scores: {
             /** A round's scores to one board (play.result.write); idempotent by ref, up to 100 entries. */
