@@ -6,11 +6,12 @@ export const {
     startSpan, contextFromHeaders, ulid, newEventId, newIdempotencyKey, isActingSubjectId,
     satisfiesRange, compareVersions, CONTRACTS_RANGE, DEFAULT_NETWORK, SDK_VERSION, auth,
     registry, identity, modules, events, realtime, media,
-    community, bot, search, chat, ai, jobs,
-    tools, projects, resources, vip, quest, live,
-    inventory, tips, blog, reviews, wiki, coupons,
-    deals, trade, space, host, news, food,
-    actor, run, video, work, zone, play,
-    download, openre, geo, usage, commerce, telemetry,
+    community, bot, search, themes, chat, ai,
+    jobs, tools, projects, resources, vip, quest,
+    live, inventory, tips, blog, reviews, wiki,
+    coupons, deals, trade, space, host, news,
+    food, actor, run, video, work, zone,
+    play, download, openre, geo, usage, commerce,
+    telemetry,
 } = cjs;
 export default cjs;
