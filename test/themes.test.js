@@ -21,14 +21,14 @@ run([
         await t.catalog({ mode: 'dark' });
         await t.active();
         await t.set('vibe', { custom: { '--accent': '#ff5c8a' } });
-        await t.setDisplay({ motion: 'reduced', text: '125', seasonal: 'off', colour: 'red', 'text-extra': 1 });
+        await t.setDisplay({ motion: 'reduced', text: '125', seasonal: 'off', scheme: 'auto', colour: 'red', 'text-extra': 1 });
         await t.seasons({ date: '2026-10-25' });
         const got = srv.requests.slice(2).map((r) => [r.method, r.url, r.body && String(r.body).length ? JSON.parse(String(r.body)) : null]);
         assert.deepEqual(got, [
             ['GET', '/api/themes?mode=dark', null],
             ['GET', '/api/themes/me/active', null],
             ['PUT', '/api/themes/me', { theme_id: 'vibe', custom_variables: { '--accent': '#ff5c8a' } }],
-            ['PUT', '/api/themes/me/display', { motion: 'reduced', text: '125', seasonal: 'off' }],
+            ['PUT', '/api/themes/me/display', { motion: 'reduced', text: '125', seasonal: 'off', scheme: 'auto' }],
             ['GET', '/api/themes/seasons?date=2026-10-25', null],
         ]);
         assert.equal(srv.requests[0].headers.authorization, 'Bearer user-jwt');

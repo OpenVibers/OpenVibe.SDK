@@ -11,7 +11,7 @@
  *   const theme = await themes.get('nord');                    // null when missing
  *   const mine = await themes.active();                        // { theme_id, custom_variables, display } (guests: theme_id null)
  *   await themes.set('nord');                                  // or set('vibe', { custom: { '--accent': '#ff5c8a' } })
- *   await themes.setDisplay({ motion: 'reduced', text: '112', seasonal: 'off' });
+ *   await themes.setDisplay({ motion: 'reduced', text: '112', seasonal: 'off', scheme: 'auto' });
  *   const { seasons, now } = await themes.seasons();           // what stands in for the default theme when
  *
  * On a page (the theme loader every OpenVibe site runs, openvibe-sdk/frame, paints the theme; this follows it):
@@ -29,7 +29,8 @@
 const { isOpenVibeError } = require('./core/errors');
 
 const enc = encodeURIComponent;
-const DISPLAY_OPTIONS = Object.freeze({ motion: ['auto', 'reduced'], text: ['100', '112', '125'], seasonal: ['on', 'off'] });
+// scheme: 'manual' (the picked theme as it is) or 'auto' (its light or dark half, as the device is set).
+const DISPLAY_OPTIONS = Object.freeze({ motion: ['auto', 'reduced'], text: ['100', '112', '125'], seasonal: ['on', 'off'], scheme: ['manual', 'auto'] });
 /** The tokens every OpenVibe theme sets (the shared names apps style with). */
 const TOKENS = Object.freeze(['--bg-primary', '--bg-secondary', '--bg-tertiary', '--bg-card', '--bg-hover', '--text-primary', '--text-secondary', '--text-muted',
     '--accent', '--accent-light', '--accent-dark', '--accent-strong', '--on-accent', '--on-accent-strong', '--accent-glow', '--border', '--border-light',
@@ -111,7 +112,7 @@ function readTheme({ root, names = TOKENS } = {}) {
         for (const n of names) { const v = cs.getPropertyValue(n).trim(); if (v) tokens[n] = v; }
     }
     const raw = (L && L.display && typeof L.display.get === 'function') ? L.display.get() : {};
-    const display = { motion: 'auto', text: '100', seasonal: 'on', ...cleanDisplay(raw) };
+    const display = { motion: 'auto', text: '100', seasonal: 'on', scheme: 'manual', ...cleanDisplay(raw) };
     let reduced = false;
     try { reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { reduced = false; }
     return {
