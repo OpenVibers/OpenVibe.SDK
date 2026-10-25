@@ -36,5 +36,99 @@ export interface ChatClient {
         unblock(userId: number | string, opts?: Opts): Promise<Json>;
     };
     exportMine(opts?: Opts): Promise<{ username: string; exported_at: string; total: number; truncated: boolean; messages: Json[] }>;
+    vibe: {
+        list(opts?: Opts): Promise<{ chats: Json[]; allowance?: Json }>;
+        start(message: string, opts?: Opts): Promise<{ room: Json; message: Json }>;
+        rename(slug: string, name: string, opts?: Opts): Promise<Json>;
+        remove(slug: string, opts?: Opts): Promise<Json>;
+    };
+    inboxes: {
+        list(opts?: Opts): Promise<{ inboxes: Json[] }>;
+        create(input: InboxInput & { name: string }, opts?: Opts): Promise<{ inbox: Json; embed: { script: string; panel: string } }>;
+        get(id: string, opts?: Opts): Promise<{ inbox: Json; role: 'owner' | 'agent'; members: Json[]; embed: { script: string; panel: string } } | null>;
+        update(id: string, patch: InboxInput, opts?: Opts): Promise<Json>;
+        remove(id: string, opts?: Opts): Promise<Json>;
+        addMember(id: string, username: string, opts?: Opts): Promise<Json>;
+        removeMember(id: string, userId: number | string, opts?: Opts): Promise<Json>;
+        conversations(id: string, query?: { status?: 'active' | ConversationStatus }, opts?: Opts): Promise<{ conversations: Json[] }>;
+        messages(id: string, convId: string, query?: { after?: number }, opts?: Opts): Promise<{ conversation: Json; messages: InboxMessage[] }>;
+        reply(id: string, convId: string, message: string, opts?: Opts): Promise<{ message: InboxMessage }>;
+        setStatus(id: string, convId: string, status: 'open' | 'resolved' | 'bot', opts?: Opts): Promise<{ conversation: Json }>;
+        assign(id: string, convId: string, assigneeId: number | null, opts?: Opts): Promise<{ conversation: Json }>;
+        translateMessage(id: string, convId: string, messageId: number | string, to: string, opts?: Opts): Promise<{ text: string; lang: string; cached: boolean }>;
+        translateDraft(id: string, text: string, to: string, opts?: Opts): Promise<{ text: string; lang: string }>;
+        read(id: string, convId: string, opts?: Opts): Promise<Json>;
+        identity(id: string, action: 'on' | 'rotate' | 'off', opts?: Opts): Promise<{ identity_secret: string | null }>;
+        replies(id: string, opts?: Opts): Promise<{ replies: { id: number; shortcut: string; body: string }[] }>;
+        saveReply(id: string, shortcut: string, body: string, opts?: Opts): Promise<{ replies: { id: number; shortcut: string; body: string }[] }>;
+        deleteReply(id: string, replyId: number | string, opts?: Opts): Promise<{ replies: { id: number; shortcut: string; body: string }[] }>;
+        webhooks(id: string, opts?: Opts): Promise<{ webhooks: Json[] }>;
+        addWebhook(id: string, url: string, opts?: Opts): Promise<{ webhook: Json; secret: string | null }>;
+        testWebhook(id: string, hookId: number | string, opts?: Opts): Promise<{ ok: boolean; status: number | null; error: string | null }>;
+        removeWebhook(id: string, hookId: number | string, opts?: Opts): Promise<void | Json>;
+        actions(id: string, opts?: Opts): Promise<{ actions: InboxAction[] }>;
+        addAction(id: string, input: InboxActionInput, opts?: Opts): Promise<{ action: InboxAction; secret: string }>;
+        testAction(id: string, actionId: number | string, args?: Record<string, string>, opts?: Opts): Promise<{ ok: boolean; status: number | null; error: string | null; result: string | null }>;
+        removeAction(id: string, actionId: number | string, opts?: Opts): Promise<void | Json>;
+    };
+    support: {
+        list(query?: { limit?: number }, opts?: Opts): Promise<{ conversations: Json[] }>;
+        messages(convId: string, query?: { after?: number }, opts?: Opts): Promise<{ conversation: Json; messages: InboxMessage[] } | null>;
+        send(convId: string, message: string, opts?: Opts): Promise<{ conversation: Json; message: InboxMessage }>;
+    };
+    feeds: {
+        mine(opts?: Opts): Promise<{ feeds: Json[] }>;
+        create(input?: FeedInput, opts?: Opts): Promise<{ feed: Json; key: string }>;
+        update(id: string, patch: FeedInput, opts?: Opts): Promise<{ feed: Json }>;
+        rotateKey(id: string, opts?: Opts): Promise<{ key: string }>;
+        remove(id: string, opts?: Opts): Promise<void | Json>;
+        view(id: string, query?: { limit?: number }, opts?: Opts): Promise<{ feed: Json; publisher: Json | null; events: FeedEvent[] } | null>;
+        onLive(where: { slot: number | number[] } | { channel: string }, opts?: Opts): Promise<{ feeds: Json[] }>;
+    };
+}
+export type ConversationStatus = 'bot' | 'waiting' | 'open' | 'resolved';
+export interface InboxInput {
+    name?: string; greeting?: string; color?: string; ai_enabled?: boolean; ai_instructions?: string; knowledge_urls?: string[] | string; allowed_origins?: string[] | string;
+    /** false: a site assistant, only Vibe answers */
+    handoff?: boolean;
+    /** When the inbox's people answer; null: always */
+    hours?: { tz: string; days: number[]; start: string; end: string } | null;
+    /** round_robin: a visitor waiting goes to the next of the people */
+    route?: 'none' | 'round_robin';
+}
+export interface InboxActionInput { name: string; description: string; url: string; params?: { name: string; description?: string }[] | string }
+export interface InboxAction { id: number; name: string; description: string; url: string; params: { name: string; description: string }[]; last_status: number | null; last_error: string | null; last_at: string | null }
+export interface InboxMessage { id: number; author: 'visitor' | 'agent' | 'ai' | 'system'; author_name?: string | null; body: string; created_at: string; /** a visitor's message written signed in: its Pics links show as pictures */ account?: true }
+export interface FeedInput { title?: string; room?: string | number | null; slot?: number | null; settings?: Record<string, number | string | boolean> }
+export type FeedEventType = 'session.status' | 'prompt' | 'response' | 'thinking' | 'tool.call' | 'file.change' | 'file.save';
+export interface FeedEvent {
+    eventType: FeedEventType;
+    eventId?: string;
+    sessionKey?: string;
+    sequence?: number;
+    occurredAt?: string;
+    summary?: string;
+    text?: string;
+    prompt?: { text: string }; response?: { text: string }; thinking?: { text: string };
+    tool?: { name: string; phase?: string; argumentsPreview?: string | null; resultPreview?: string | null };
+    file?: { name?: string; relativePath?: string | null; operation?: string; changeCount?: number; snippet?: string | null };
+    publisher?: Json; metadata?: Json; source?: Json;
+}
+export interface InboxVisitor {
+    readonly token: string | null;
+    config(opts?: Opts): Promise<{ inbox: { id: string; name: string; greeting: string; color: string; ai: boolean; people: boolean } }>;
+    visit(opts?: Opts): Promise<{ token: string; verified?: boolean; account?: { name: string } | null; inbox: Json; conversation: Json | null; messages: InboxMessage[] }>;
+    send(message: string, extra?: { page_url?: string; name?: string }, opts?: Opts): Promise<{ conversation: Json; message: InboxMessage }>;
+    messages(query?: { after?: number }, opts?: Opts): Promise<{ conversation: Json | null; messages: InboxMessage[] }>;
+    handoff(opts?: Opts): Promise<{ conversation: Json }>;
+    rate(rating: 1 | -1, extra?: { comment?: string; conversation?: string }, opts?: Opts): Promise<{ conversation: Json }>;
+    sendPicture(picture: Blob | ArrayBuffer | Uint8Array, extra?: { caption?: string; contentType?: string }, opts?: Opts): Promise<{ conversation: Json; message: InboxMessage; picture: { slug: string; direct: string; page: string } }>;
+}
+export interface FeedPublisher {
+    hello(input?: { sessionKey?: string; publisher?: Json }, opts?: Opts): Promise<{ sessionKey: string; publisher: Json }>;
+    publish(events: FeedEvent | FeedEvent[], opts?: Opts): Promise<{ events: { eventId: string; delivered: boolean }[] }>;
+    claudeCode(hook: Json, opts?: Opts): Promise<Json>;
 }
 export function createChatClient(client: OpenVibeClient, defaults?: { baseUrl?: string }): ChatClient;
+export function createInboxVisitor(client: OpenVibeClient, options: { inbox: string; token?: string | null; user?: { id: string; name?: string; email?: string; hash: string } | null; account?: string | null; baseUrl?: string }): InboxVisitor;
+export function createFeedPublisher(client: OpenVibeClient, options: { feed: string; key: string; baseUrl?: string }): FeedPublisher;
