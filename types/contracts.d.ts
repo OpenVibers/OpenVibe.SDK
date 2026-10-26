@@ -1,4 +1,4 @@
-/* Copied verbatim from openvibe-contracts v0.159.0 generated/typescript/index.d.ts (the SDK does not
+/* Copied verbatim from openvibe-contracts v0.214.0 generated/typescript/index.d.ts (the SDK does not
  * require the package at runtime; it is a devDependency for the tests). test/types.test.js checks
  * these against it. */
 /* eslint-disable */
@@ -2166,7 +2166,7 @@ export interface Capability {
   inputSchema?: string;
   outputSchema?: string;
   permissions: string[];
-  resourceConstraints: ("namespace" | "owner" | "room_member" | "space_member" | "project" | "none")[];
+  resourceConstraints: ("namespace" | "owner" | "room_member" | "space_member" | "inbox_member" | "project" | "none")[];
   quotaClass: string;
   events: string[];
   /**
