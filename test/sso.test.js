@@ -72,6 +72,19 @@ run([
         await sso.handlers.login({ query: { silent: '1', next: '/deals' }, headers: {} }, silent);
         assert.equal(new URL(silent.location).searchParams.get('prompt'), 'none');
         assert.equal(silent.cookies.ov_oauth_next.v, '/deals');
+        // "Switch account" and "use another account" pass through, with the account to continue as (OIDC login_hint).
+        const sw = fakeRes();
+        await sso.handlers.login({ query: { prompt: 'select_account', login_hint: '@alt' }, headers: {} }, sw);
+        assert.deepEqual([new URL(sw.location).searchParams.get('prompt'), new URL(sw.location).searchParams.get('login_hint')], ['select_account', '@alt']);
+        const other = fakeRes();
+        await sso.handlers.login({ query: { prompt: 'login' }, headers: {} }, other);
+        assert.equal(new URL(other.location).searchParams.get('prompt'), 'login');
+        const odd = fakeRes();
+        await sso.handlers.login({ query: { prompt: 'consent', login_hint: '<b>x</b>' }, headers: {} }, odd);
+        assert.deepEqual([new URL(odd.location).searchParams.get('prompt'), new URL(odd.location).searchParams.get('login_hint')], [null, null], 'anything else is dropped');
+        const quiet = fakeRes();
+        await sso.handlers.login({ query: { silent: '1', prompt: 'login' }, headers: {} }, quiet);
+        assert.equal(new URL(quiet.location).searchParams.get('prompt'), 'none', 'silent stays silent');
     }],
 
     ['callback: the state cookie is required and must match; the code is exchanged with the secret and the PKCE verifier', async () => {

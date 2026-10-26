@@ -5,6 +5,11 @@ release may change an API and says so here.
 
 ## 0.65.0 (2026-10-26)
 
+- **`openvibe-sdk/sso`: switch account and use another account** (the owner, 2026-10-26: sign-in "like the Google
+  sign-in does … open to SDK and API"). `GET /auth/login?prompt=select_account` shows OpenVibe.Network's account
+  chooser, `?prompt=login` its sign-in form, and `?login_hint=<username>` names the account the chooser continues as when
+  the browser has it (OpenID Connect; Network's docs/sign-in.md). `?silent=1` stays `prompt=none`; anything else is
+  dropped.
 - **`openvibe-sdk/chat`: Vibe, support inboxes and feeds** (#78; the owner, 2026-10-24: OpenVibe Chat "fully modular
   and SDK and API"). `createChatClient` gains `vibe.*` (a person's chats with Vibe), `inboxes.*` (the team's side of a
   support inbox: conversations, replies, members, verified visitors, saved replies, actions, assign, translate) and
