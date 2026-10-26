@@ -16,7 +16,8 @@
  *   app.get('/private', sso.requireAuth(), handler);     // 401 JSON without a session
  *
  * Routes (mounted at /auth; the redirect URI is <baseUrl>/auth/callback unless `redirectUri` says otherwise):
- *   GET  /login     → Network /oauth/authorize with state and PKCE (S256); ?silent=1: prompt=none; ?next= a same-site
+ *   GET  /login     → Network /oauth/authorize with state and PKCE (S256); ?silent=1: prompt=none; ?prompt=select_account
+ *                     (the chooser) or login (the sign-in form) and ?login_hint=<username> pass through; ?next= a same-site
  *                     path, this site's https origin or the Network's (control characters and backslashes go home)
  *   GET  /callback  → the state is required and compared in constant time; the code is exchanged server-side with the
  *                     client secret and the PKCE verifier; cookies are set; back to `next`
@@ -194,7 +195,7 @@ function createSsoClient(opts = {}) {
     }
 
     /** The authorize URL for a sign-in (pure; exported for tests). → { url, state, verifier } */
-    function authorizeUrl({ silent = false } = {}) {
+    function authorizeUrl({ silent = false, prompt = '', loginHint = '' } = {}) {
         const verifier = crypto.randomBytes(32).toString('base64url');
         const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
         const state = crypto.randomBytes(24).toString('base64url');
@@ -209,6 +210,11 @@ function createSsoClient(opts = {}) {
         // silent: continue as the account openvibe.network already knows (no chooser); with no Network session either it
         // bounces back with error=login_required and the site stays quiet.
         if (silent) u.searchParams.set('prompt', 'none');
+        // "Switch account" (the chooser) and "use another account" (the sign-in form); login_hint names the account the
+        // chooser continues as when this browser has it (Network docs/sign-in.md).
+        else if (prompt === 'select_account' || prompt === 'login') u.searchParams.set('prompt', prompt);
+        const hint = String(loginHint || '').trim();
+        if (hint.length <= 64 && /^@?[A-Za-z0-9_.-]+$/.test(hint)) u.searchParams.set('login_hint', hint);
         return { url: u.toString(), state, verifier };
     }
 
@@ -218,7 +224,7 @@ function createSsoClient(opts = {}) {
             const silent = !!q.silent && q.silent !== '0';
             // Already signed in here? A silent round trip would only hand back the session we have.
             if (silent && await verify(parseCookies(req)[ACCESS_COOKIE])) { clearFlow(res); return res.redirect(next(q.next)); }
-            const { url, state, verifier } = authorizeUrl({ silent });
+            const { url, state, verifier } = authorizeUrl({ silent, prompt: String(q.prompt || ''), loginHint: q.login_hint });
             res.cookie(STATE_COOKIE, state, flowOpts());
             res.cookie(VERIFIER_COOKIE, verifier, flowOpts());
             const target = next(q.next);

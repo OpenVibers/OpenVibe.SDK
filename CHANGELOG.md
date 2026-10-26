@@ -3,6 +3,30 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.65.0 (2026-10-26)
+
+- **`openvibe-sdk/sso`: switch account and use another account** (the owner, 2026-10-26: sign-in "like the Google
+  sign-in does … open to SDK and API"). `GET /auth/login?prompt=select_account` shows OpenVibe.Network's account
+  chooser, `?prompt=login` its sign-in form, and `?login_hint=<username>` names the account the chooser continues as when
+  the browser has it (OpenID Connect; Network's docs/sign-in.md). `?silent=1` stays `prompt=none`; anything else is
+  dropped.
+- **`openvibe-sdk/chat`: Vibe, support inboxes and feeds** (#78; the owner, 2026-10-24: OpenVibe Chat "fully modular
+  and SDK and API"). `createChatClient` gains `vibe.*` (a person's chats with Vibe), `inboxes.*` (the team's side of a
+  support inbox: conversations, replies, members, verified visitors, saved replies, actions, assign, translate) and
+  `feeds.*` (the owner's side of a feed; `view` and `onLive` send no token). `createInboxVisitor(client, { inbox, token,
+  user })` is a visitor's side with no account and no cookies (visit, send, messages, handoff, rate, sendPicture), and
+  `createFeedPublisher(client, { feed, key })` publishes vibe coding events with a feed's key (`claudeCode(hookJson)`).
+- **`openvibe-sdk/themes`** (#80, #81; the owner, 2026-10-25: the theme system in the SDK and API). `createThemesClient`
+  reads and sets the account's theme on Network (catalog with seasons, active, set, setDisplay, seasons, submissions,
+  import), and `followTheme(fn)` keeps a page, canvas or game in step with the theme someone picked on any OpenVibe site
+  (`readTheme()`: id, mode, tokens, display, season). `DISPLAY_OPTIONS.scheme` is `manual | auto` (Shared 4.12's Light /
+  Dark / Auto), and each season says its light half.
+- **`openvibe-sdk/play`: `titles.remove`** (#82) deletes a sandbox title you manage (OpenVibe.Play#42; a developer's
+  sandbox app registers up to 3 `sandbox-` titles since Play#41). A production title is kept (409 `play.title_kept`).
+- `openvibe-contracts` v0.213.0 (#79).
+
+All additions: nothing exported before changes.
+
 ## 0.64.0 (2026-10-25)
 
 - **`parseDelivery` requires a v2 signature by default.** A delivery without `X-OpenVibe-Signature-V2` is refused
