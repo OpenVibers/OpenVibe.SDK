@@ -20,6 +20,8 @@ let contracts = null;
 try { contracts = require('openvibe-contracts'); } catch { /* the fixture case skips */ }
 const loadFixture = (dir, file) => JSON.parse(fs.readFileSync(path.join(FIX, dir, 'valid', file), 'utf8'));
 
+const seenCommands = [];
+
 /** A stub Bot: fixtures for the contract-shaped answers, plus the routes the SDK turns into calls. */
 function server() {
     return stubServer((req, res, body) => {
@@ -63,6 +65,17 @@ function server() {
         if (m === 'GET' && p === '/api/v1/profiles/adeept.adr036') return send(res, 200, { profile: loadFixture('bot.robot-profile', 'adeept-file.json') });
         if (m === 'GET' && p === '/api/v1/kits') return send(res, 200, { kits: [{ id: 'starter' }] });
         if (m === 'GET' && p === '/api/v1/kits/starter') return send(res, 200, { kit: { id: 'starter' } });
+        if (m === 'GET' && p === '/api/v1/machines') return send(res, 200, { machines: [{ id: DEV, name: 'desk-host', online: true, computer: { desk: { named: true, kinds: ['browser'] } } }] });
+        if (m === 'GET' && p === `/api/v1/machines/${DEV}/computer`) return send(res, 200, { machine: { id: DEV } });
+        if (m === 'GET' && p === `/api/v1/machines/${DEV}/desk-turn`) return send(res, 200, { desk: u.searchParams.get('desk'), person_driving: false, last_person_at: null });
+        if (m === 'POST' && p === `/api/v1/machines/${DEV}/commands`) {
+            const input = JSON.parse(body.toString() || '{}');
+            seenCommands.push(input);
+            if (input.kind === 'browser' && input.value.action === 'click') return send(res, 200, { machine_id: DEV, result: 'nack', reason: 'nothing on the page matches #missing' });
+            if (input.kind === 'desk') return send(res, 200, { machine_id: DEV, result: 'ack', data: { running: input.value.action === 'start', desk: input.value.desk, kind: input.value.kind || 'desktop' } });
+            return send(res, 200, { machine_id: DEV, result: 'ack', data: { url: 'https://example.org/', title: 'Example' } });
+        }
+        if (p.startsWith('/api/v1/machines/')) return problem(res, 404, 'bot.device_not_found', 'no such machine of yours');
         if (p.startsWith('/api/v1/profiles/')) return problem(res, 404, 'bot.profile_not_found', 'no such profile');
         if (p.startsWith('/api/v1/kits/')) return problem(res, 404, 'bot.kit_not_found', 'no such kit');
         if (p.startsWith('/api/v1/robots/')) return problem(res, 404, 'bot.robot_not_found', 'no such robot');
@@ -73,6 +86,27 @@ function server() {
 const hdr = (r, k) => r.headers[k.toLowerCase()];
 
 run([
+    ['machines and a desk of your own: start, the browser there, a nack thrown, the person\'s turn, stop', async () => {
+        const srv = await server();
+        try {
+            const bot = createBotClient(createClient({ baseUrls: { bot: srv.url }, token: 'svc' }), { actingSubject: USR });
+            assert.strictEqual((await bot.machines.list()).machines[0].id, DEV);
+            assert.deepStrictEqual(await bot.machines.computer(DEV), { machine: { id: DEV } });
+            assert.strictEqual(await bot.machines.computer('dev_01J8Z4N0A1B2C3D4E5F6G7H8J0'), null, 'an unknown machine is null');
+            const desk = bot.machines.desk(DEV, { kind: 'browser', profile: 'agent' });
+            assert.match(desk.name, /^desk-[a-z0-9]{10}$/);
+            assert.deepStrictEqual(await desk.start(), { running: true, desk: desk.name, kind: 'browser' });
+            assert.deepStrictEqual(seenCommands.at(-1), { kind: 'desk', value: { action: 'start', desk: desk.name, kind: 'browser', profile: 'agent' } });
+            assert.deepStrictEqual(await desk.browser({ action: 'open', url: 'https://example.org/' }), { url: 'https://example.org/', title: 'Example' });
+            assert.deepStrictEqual(seenCommands.at(-1).value, { action: 'open', url: 'https://example.org/', desk: desk.name }, 'on the desk, never the person\'s screen');
+            await assert.rejects(() => desk.browser({ action: 'click', selector: '#missing' }), (e) => e.code === 'bot.desk_nack' && /nothing on the page/.test(e.message));
+            assert.deepStrictEqual(await desk.turn(), { desk: desk.name, person_driving: false, last_person_at: null });
+            await desk.exec({ argv: ['xterm'], detach: true });
+            assert.deepStrictEqual(seenCommands.at(-1), { kind: 'exec', value: { argv: ['xterm'], detach: true, desk: desk.name } });
+            assert.strictEqual((await desk.stop()).running, false);
+            assert.throws(() => bot.machines.desk(DEV, { name: 'private' }), TypeError, 'only a named desk of your own');
+        } finally { await srv.close(); }
+    }],
     ['a service acting for a person sends X-OV-Subject, its token and an Idempotency-Key', async () => {
         const srv = await server();
         const bot = createBotClient(createClient({ baseUrls: { bot: srv.url }, token: 'svc-token' }), { actingSubject: USR });

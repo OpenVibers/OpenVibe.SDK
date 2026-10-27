@@ -81,8 +81,31 @@ export interface PairInput {
     capabilities?: Record<string, unknown>;
     name?: string;
 }
+export interface MachineCommandInput { id?: string; kind: 'exec' | 'fs' | 'screen' | 'input' | 'browser' | 'probe' | 'desk'; value: Record<string, unknown>; ms?: number; }
+export interface MachineCommandResult { machine_id?: string; id?: string; result: 'ack' | 'nack' | 'expired' | 'refused' | string; data?: Record<string, unknown>; code?: string; reason?: string | null; [field: string]: unknown; }
+export interface DeskOptions { name?: string; kind?: 'browser' | 'desktop'; profile?: string; width?: number; height?: number; }
+export interface Desk {
+    readonly name: string;
+    readonly machine: string;
+    start(ms?: number): Promise<Record<string, unknown>>;
+    stop(): Promise<Record<string, unknown>>;
+    status(): Promise<Record<string, unknown>>;
+    browser(value: Record<string, unknown>, ms?: number): Promise<Record<string, unknown>>;
+    screen(value?: Record<string, unknown>, ms?: number): Promise<Record<string, unknown>>;
+    input(value: Record<string, unknown>, ms?: number): Promise<Record<string, unknown>>;
+    exec(value: Record<string, unknown>, ms?: number): Promise<Record<string, unknown>>;
+    turn(): Promise<{ desk: string; person_driving: boolean; last_person_at: string | null }>;
+}
+export interface MachinesApi {
+    list(opts?: CallOptions): Promise<{ machines: Array<Record<string, unknown>> }>;
+    computer(id: string, opts?: CallOptions): Promise<{ machine: Record<string, unknown> } | null>;
+    command(id: string, input: MachineCommandInput, opts?: CallOptions): Promise<MachineCommandResult>;
+    deskTurn(id: string, desk: string, opts?: CallOptions): Promise<{ desk: string; person_driving: boolean; last_person_at: string | null }>;
+    desk(id: string, options?: DeskOptions, opts?: CallOptions): Desk;
+}
 export interface BotClient {
     robots: RobotsApi;
+    machines: MachinesApi;
     devices: DevicesApi;
     profiles: ProfilesApi;
     kits: KitsApi;

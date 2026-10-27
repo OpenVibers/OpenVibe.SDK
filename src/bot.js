@@ -15,17 +15,25 @@
  * and the call is never retried (a code is one-time, so a lost answer cannot be safely repeated).
  * Every other POST carries an Idempotency-Key (the client generates one when retries are on).
  *
+ * Machines (the OpenVibe Node's computer plugin): `machines.list`, `machines.computer`, `machines.command` (bot.command@1's
+ * computer kinds) and `machines.deskTurn`; `machines.desk(id, { name?, kind?, profile? })` is a desk of your own on a
+ * machine (the Desks plan: its own screen or browser, files and sign-ins), with start/stop/status and browser, screen,
+ * input and exec on it. A desk command that the machine does not do throws an OpenVibeError with code `bot.desk_nack`
+ * (the machine's own fault code is `fault`), so a desk reads as plain awaits.
+ *
  * Not wrapped: the operator WebSocket (/control — Realtime frames bot.command@1), device
  * bootstrap (POST /devices/bind, a Network node token) and the internal Run -> Bot job dispatch
  * (bot.job.dispatch is service-to-service and is never delegated to people or apps). The signed
  * `/robots/:id/devices` listing is `robots.devices`; credential rotation and revocation are
  * `devices.rotate` / `devices.revoke`.
  */
-const { isOpenVibeError } = require('./core/errors');
+const { isOpenVibeError, OpenVibeError } = require('./core/errors');
 const { isActingSubjectId } = require('./core/ids');
 const { paginate } = require('./core/paginate');
 
 const enc = encodeURIComponent;
+const DESK_NAME = /^desk-[a-z0-9][a-z0-9-]{0,23}$/;
+const randomDesk = () => `desk-${Math.random().toString(36).slice(2, 12).padEnd(10, '0')}`;
 
 /** The header a service uses to say who it acts for: X-OV-Subject. Bot ignores the other X-OV-* ones. */
 function actingHeaders({ actingSubject } = {}) {
@@ -103,8 +111,64 @@ function createBotClient(client, defaults = {}) {
         },
     };
 
+    // ── Machines (the OpenVibe Node's computer plugin) and desks of your own on them ──
+    const machines = {
+        /** { machines } — the person's machines with their computer capabilities (a service sees the ones opened to it). */
+        list: (o = {}) => call({ path: '/api/v1/machines' }, o),
+        /** { machine } — one machine's computer capabilities, or null. */
+        computer: (id, o = {}) => orNull(call({ path: `/api/v1/machines/${enc(id)}/computer` }, o)),
+        /**
+         * { id?, kind, value, ms? } -> { machine_id, result, data?, reason? } (bot.command@1's computer kinds: exec, fs,
+         * screen, input, browser, probe, desk). A refusal by Bot is an OpenVibeError (bot.computer_off, bot.person_driving …).
+         */
+        command: (id, input, o = {}) => call({ method: 'POST', path: `/api/v1/machines/${enc(id)}/commands`, json: input }, o),
+        /** { desk, person_driving, last_person_at } — whether a person is using that desk now (the person always wins). */
+        deskTurn: (id, desk, o = {}) => call({ path: `/api/v1/machines/${enc(id)}/desk-turn`, query: { desk } }, o),
+        /**
+         * A desk of your own on a machine (the Desks plan): a screen or a browser alone, its own files and sign-ins.
+         *   const desk = bot.machines.desk(machineId, { kind: 'browser', profile: 'agent' });
+         *   await desk.start();
+         *   const page = await desk.browser({ action: 'open', url: 'https://example.org/' });
+         *   await desk.stop();
+         * Each method answers the machine's `data`; a nack throws (code bot.desk_nack, `fault` the machine's own).
+         */
+        desk(id, { name = randomDesk(), kind, profile, width, height } = {}, o = {}) {
+            if (!DESK_NAME.test(name)) throw new TypeError('name is desk-<name>: lower-case letters, digits and dashes, at most 24 after desk-');
+            const ack = (r) => {
+                if (r && r.result === 'ack') return r.data === undefined ? {} : r.data;
+                throw new OpenVibeError({ code: 'bot.desk_nack', status: 409, message: `the machine did not do it: ${(r && (r.reason || r.result)) || 'no answer'}`, detail: r && r.reason });
+            };
+            const on = (cmdKind, value, ms) => machines.command(id, { kind: cmdKind, value: { ...value, desk: name }, ...(ms ? { ms } : {}) }, o).then(ack);
+            const start = {
+                action: 'start', desk: name,
+                ...(kind ? { kind } : {}), ...(profile ? { profile } : {}),
+                ...(Number.isInteger(width) && Number.isInteger(height) ? { width, height } : {}),
+            };
+            return {
+                name,
+                machine: id,
+                /** Start it (a no-op when it runs) -> { running, kind?, width?, height?, profile? }. */
+                start: (ms) => machines.command(id, { kind: 'desk', value: start, ...(ms ? { ms } : {}) }, o).then(ack),
+                /** Stop it and everything on it -> { running: false, stopped, profile_saved? }. */
+                stop: () => machines.command(id, { kind: 'desk', value: { action: 'stop', desk: name } }, o).then(ack),
+                status: () => machines.command(id, { kind: 'desk', value: { action: 'status', desk: name } }, o).then(ack),
+                /** The agent's browser there: { action: open|read|click|fill|press|back|screenshot|close, … }. */
+                browser: (value, ms) => on('browser', value, ms),
+                /** A picture of the desk -> { format, width, height, content_b64 }. */
+                screen: (value = {}, ms) => on('screen', value, ms),
+                /** The desk's mouse and keyboard: { action: click|double_click|right_click|move|scroll|type|key, … }. */
+                input: (value, ms) => on('input', value, ms),
+                /** A program in the desk's session; { detach: true } leaves it running until the desk stops (a whole desk). */
+                exec: (value, ms) => on('exec', value, ms),
+                /** Whether a person is using it now. */
+                turn: () => machines.deskTurn(id, name, o),
+            };
+        },
+    };
+
     return {
         robots,
+        machines,
         devices: {
             /** Rotate a paired device's credential -> { device, credential?, …video } (the credential is shown once). */
             rotate: (id, o = {}) => call({ method: 'POST', path: `/api/v1/devices/${enc(id)}/rotate`, json: {} }, o),
