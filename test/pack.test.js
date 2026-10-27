@@ -12,6 +12,8 @@ const { run } = require('./helpers');
 
 const ROOT = path.join(__dirname, '..');
 const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+// Node refuses to start a .cmd without a shell since the April 2024 fix (EINVAL on Windows).
+const shell = process.platform === 'win32';
 const pkg = require('../package.json');
 
 run([
@@ -19,7 +21,7 @@ run([
         const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'openvibe-sdk-pack-'));
         try {
             const env = { ...process.env, npm_config_cache: path.join(tmp, '.npm-cache'), npm_config_audit: 'false', npm_config_fund: 'false', npm_config_update_notifier: 'false' };
-            const out = execFileSync(npm, ['pack', '--json', '--pack-destination', tmp], { cwd: ROOT, env, encoding: 'utf8' });
+            const out = execFileSync(npm, ['pack', '--json', '--pack-destination', tmp], { cwd: ROOT, env, encoding: 'utf8', shell });
             const info = JSON.parse(out)[0];
             const files = info.files.map((f) => f.path);
             for (const must of ['package.json', 'index.js', 'browser.js', 'LICENSE', 'README.md', 'CHANGELOG.md', 'src/core/client.js', 'src/jobs.js', 'src/tools.js', 'src/core/form.js', 'src/projects.js', 'src/vip.js', 'esm/vip.mjs', 'types/vip.d.ts', 'src/bot.js', 'esm/bot.mjs', 'types/bot.d.ts', 'src/frame.js', 'esm/frame.mjs', 'types/frame.d.ts', 'src/service/index.js', 'esm/service.mjs', 'types/service.d.ts', 'docs/service.md', 'esm/core.mjs', 'esm/jobs.mjs', 'esm/tools.mjs', 'types/tools.d.ts', 'types/core.d.ts', 'types/contracts.d.ts', 'types/bundle.d.ts', 'src/resources.js', 'esm/resources.mjs', 'types/resources.d.ts', 'browser/openvibe-sdk.mjs']) {
@@ -30,7 +32,7 @@ run([
             const app = path.join(tmp, 'app');
             fs.mkdirSync(app);
             fs.writeFileSync(path.join(app, 'package.json'), JSON.stringify({ name: 'sdk-consumer', version: '1.0.0', private: true }));
-            execFileSync(npm, ['install', '--offline', '--no-package-lock', path.join(tmp, info.filename)], { cwd: app, env, stdio: 'pipe' });
+            execFileSync(npm, ['install', '--offline', '--no-package-lock', path.join(tmp, info.filename)], { cwd: app, env, stdio: 'pipe', shell });
 
             const subpaths = Object.keys(pkg.exports).filter((s) => s !== './package.json' && !s.endsWith('.mjs')).map((s) => (s === '.' ? 'openvibe-sdk' : `openvibe-sdk/${s.slice(2)}`));
             const script = `

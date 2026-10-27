@@ -15,3 +15,22 @@ jobs:
   # Secret scan (gitleaks) and dependency audit, shared by every OpenVibers repo.
   security:
     uses: OpenVibers/OpenVibe.Shared/.github/workflows/security.yml@66b76f868ea8228aad7811309eafef3726b036f3
+  # Sites and apps built on the SDK run on every OS a developer uses (owner, 2026-10-27: "the shared SDK and API … work
+  # well across multi-platform"): the whole suite on Windows and macOS too. The PostgreSQL and Valkey tests skip
+  # themselves there (no containers); everything else, the embedded PGlite database included, runs.
+  other-os:
+    name: test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --no-audit --no-fund
+      - run: npm test
+        env:
+          OV_ALLOW_SUITE: '1'

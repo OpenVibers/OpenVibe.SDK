@@ -77,7 +77,7 @@ run([
         }
         assert.deepEqual(problems, []);
         assert.deepEqual(blocked.sort(), ['./account-data', './actor', './blog', './cache', './commerce', './cost', './coupons', './db', './deals', './delivery', './download', './events', './food', './govern', './host', './identity', './inventory', './limits', './live', './news', './node', './notifications', './openre', './placement', './play', './pubsub', './quest', './queue', './resources', './reviews', './run', './runtime', './service', './space', './sso', './storage', './telemetry', './testing', './tips', './trade', './usage', './valkey', './video', './vip', './wiki', './work', './zone']);
-        const rel = [...scanned].map((f) => path.relative(ROOT, f));
+        const rel = [...scanned].map((f) => path.relative(ROOT, f).split(path.sep).join('/'));   // the same names on Windows
         for (const must of ['browser.js', 'src/core/client.js', 'src/auth/browser.js', 'src/realtime.js', 'src/media.js', 'src/community.js', 'src/bot.js', 'src/modules.js', 'src/registry.js', 'src/jobs.js', 'src/tools.js', 'src/core/form.js', 'src/projects.js', 'browser/openvibe-sdk.mjs']) {
             assert.ok(rel.includes(must), `${must} is scanned`);
         }
