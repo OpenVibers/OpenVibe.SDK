@@ -67,12 +67,15 @@ function server() {
         if (m === 'GET' && p === '/api/v1/kits/starter') return send(res, 200, { kit: { id: 'starter' } });
         if (m === 'GET' && p === '/api/v1/machines') return send(res, 200, { machines: [{ id: DEV, name: 'desk-host', online: true, computer: { desk: { named: true, kinds: ['browser'] } } }] });
         if (m === 'GET' && p === `/api/v1/machines/${DEV}/computer`) return send(res, 200, { machine: { id: DEV } });
+        if (m === 'POST' && p === `/api/v1/machines/${DEV}/ai-models`) return send(res, 200, { machine: { id: DEV, ai_models: JSON.parse(body.toString() || '{}').on === true } });
         if (m === 'GET' && p === `/api/v1/machines/${DEV}/desk-turn`) return send(res, 200, { desk: u.searchParams.get('desk'), person_driving: false, last_person_at: null });
         if (m === 'POST' && p === `/api/v1/machines/${DEV}/commands`) {
             const input = JSON.parse(body.toString() || '{}');
             seenCommands.push(input);
             if (input.kind === 'browser' && input.value.action === 'click') return send(res, 200, { machine_id: DEV, result: 'nack', reason: 'nothing on the page matches #missing' });
             if (input.kind === 'desk') return send(res, 200, { machine_id: DEV, result: 'ack', data: { running: input.value.action === 'start', desk: input.value.desk, kind: input.value.kind || 'desktop' } });
+            if (input.kind === 'ai' && input.value.model === 'busy') return send(res, 200, { machine_id: DEV, result: 'nack', reason: 'the model is answering another request on this machine' });
+            if (input.kind === 'ai') return send(res, 200, { machine_id: DEV, result: 'ack', data: { model: input.value.model, message: { role: 'assistant', content: 'A lock one thread holds.' }, usage: { completion_tokens: 6 }, ms: 400 } });
             return send(res, 200, { machine_id: DEV, result: 'ack', data: { url: 'https://example.org/', title: 'Example' } });
         }
         if (p.startsWith('/api/v1/machines/')) return problem(res, 404, 'bot.device_not_found', 'no such machine of yours');
@@ -105,6 +108,19 @@ run([
             assert.deepStrictEqual(seenCommands.at(-1), { kind: 'exec', value: { argv: ['xterm'], detach: true, desk: desk.name } });
             assert.strictEqual((await desk.stop()).running, false);
             assert.throws(() => bot.machines.desk(DEV, { name: 'private' }), TypeError, 'only a named desk of your own');
+        } finally { await srv.close(); }
+    }],
+    ['a machine\'s own models: one reply (kind ai), a nack thrown, the owner\'s switch', async () => {
+        const srv = await server();
+        try {
+            const bot = createBotClient(createClient({ baseUrls: { bot: srv.url }, token: 'svc' }), { actingSubject: USR });
+            const out = await bot.machines.chat(DEV, { model: 'llama3.1:8b', messages: [{ role: 'user', content: 'What is a mutex?' }], max_tokens: 80 });
+            assert.deepStrictEqual(out, { model: 'llama3.1:8b', message: { role: 'assistant', content: 'A lock one thread holds.' }, usage: { completion_tokens: 6 }, ms: 400 });
+            assert.deepStrictEqual(seenCommands.at(-1), { kind: 'ai', value: { model: 'llama3.1:8b', messages: [{ role: 'user', content: 'What is a mutex?' }], max_tokens: 80 }, ms: 120000 });
+            await assert.rejects(() => bot.machines.chat(DEV, { model: 'busy', messages: [{ role: 'user', content: 'x' }] }), (e) => e.code === 'bot.ai_nack' && /another request/.test(e.message));
+            await assert.rejects(() => bot.machines.chat(DEV, { model: '', messages: [] }), TypeError);
+            assert.strictEqual((await bot.machines.aiModels(DEV, true)).machine.ai_models, true);
+            assert.strictEqual((await bot.machines.aiModels(DEV, false)).machine.ai_models, false);
         } finally { await srv.close(); }
     }],
     ['a service acting for a person sends X-OV-Subject, its token and an Idempotency-Key', async () => {

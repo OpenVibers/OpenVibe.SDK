@@ -3,6 +3,17 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.67.0 (2026-10-27)
+
+- **`openvibe-sdk/bot`: a machine's own models** (AI on your own machines; OpenVibe.Node v0.27.0's ai plugin).
+  - `bot.machines.chat(id, { model, messages, max_tokens?, temperature? })` asks one of them for one reply (bot.command@1
+    kind `ai`) and answers `{ model, message, usage?, ms? }`. A machine that does not answer throws an `OpenVibeError`
+    with code `bot.ai_nack`.
+  - `bot.machines.aiModels(id, on)` is the owner's "Let my AI use this computer's models".
+- Types: `Machine` for `machines.list()`, with `computer.ai` (the models and whether a server answers) and
+  `computer.ai_speed` (how fast the last model answered there, Node v0.29.0); `MachineChatInput` and `MachineChatResult`;
+  `MachineCommandInput.kind` takes `ai`.
+
 ## 0.66.0 (2026-10-27)
 
 - **`openvibe-sdk/bot`: machines and desks** (the Desks plan; the roadmap's SDK section). `bot.machines.list()`,
