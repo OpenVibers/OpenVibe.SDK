@@ -1,0 +1,10 @@
+# One line ending on every OS: generated files (esm/, browser/, types/) are compared byte for byte with what the
+# scripts write, and Windows checkouts used to turn them into CRLF (2026-10-27, the first Windows CI run).
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.woff2 binary
+*.wasm binary
+*.tgz binary
