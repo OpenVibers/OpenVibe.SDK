@@ -21,6 +21,11 @@
  * input and exec on it. A desk command that the machine does not do throws an OpenVibeError with code `bot.desk_nack`
  * (the machine's own fault code is `fault`), so a desk reads as plain awaits.
  *
+ * A machine's own models (AI on your own machines, contracts 0.219.0, OpenVibe.Node v0.27.0's ai plugin):
+ * `machines.chat(id, { model, messages, max_tokens?, temperature? })` asks one of them for one reply (kind ai) and answers
+ * `{ model, message: { role, content }, usage?, ms? }`; a machine that does not answer throws `bot.ai_nack`.
+ * `machines.aiModels(id, on)` is the owner's "Let my AI use this computer's models".
+ *
  * Not wrapped: the operator WebSocket (/control — Realtime frames bot.command@1), device
  * bootstrap (POST /devices/bind, a Network node token) and the internal Run -> Bot job dispatch
  * (bot.job.dispatch is service-to-service and is never delegated to people or apps). The signed
@@ -124,6 +129,21 @@ function createBotClient(client, defaults = {}) {
         command: (id, input, o = {}) => call({ method: 'POST', path: `/api/v1/machines/${enc(id)}/commands`, json: input }, o),
         /** { desk, person_driving, last_person_at } — whether a person is using that desk now (the person always wins). */
         deskTurn: (id, desk, o = {}) => call({ path: `/api/v1/machines/${enc(id)}/desk-turn`, query: { desk } }, o),
+        /**
+         * One reply from a model on the machine (kind ai): { model, messages, max_tokens?, temperature? } ->
+         * { model, message: { role, content }, usage?, ms? }. Its models are machines.list()'s computer.ai.models, and
+         * how fast they answer there computer.ai_speed. A machine that does not answer throws (code bot.ai_nack).
+         */
+        async chat(id, { model, messages, max_tokens, temperature } = {}, o = {}) {
+            if (typeof model !== 'string' || !model) throw new TypeError('model is one of the machine\'s models (computer.ai.models)');
+            if (!Array.isArray(messages) || !messages.length) throw new TypeError('messages are [{ role, content }, …]');
+            const value = { model, messages, ...(Number.isInteger(max_tokens) ? { max_tokens } : {}), ...(typeof temperature === 'number' ? { temperature } : {}) };
+            const r = await machines.command(id, { kind: 'ai', value, ms: o.ms || 120000 }, o);
+            if (r && r.result === 'ack') return r.data === undefined ? {} : r.data;
+            throw new OpenVibeError({ code: 'bot.ai_nack', status: 409, message: `the machine's model did not answer: ${(r && (r.reason || r.result)) || 'no answer'}`, detail: r && r.reason });
+        },
+        /** { machine } — the owner's "Let my AI use this computer's models" on or off (OpenVibe.AI, for them only). */
+        aiModels: (id, on, o = {}) => call({ method: 'POST', path: `/api/v1/machines/${enc(id)}/ai-models`, json: { on: on === true } }, o),
         /**
          * A desk of your own on a machine (the Desks plan): a screen or a browser alone, its own files and sign-ins.
          *   const desk = bot.machines.desk(machineId, { kind: 'browser', profile: 'agent' });

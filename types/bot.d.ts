@@ -81,7 +81,18 @@ export interface PairInput {
     capabilities?: Record<string, unknown>;
     name?: string;
 }
-export interface MachineCommandInput { id?: string; kind: 'exec' | 'fs' | 'screen' | 'input' | 'browser' | 'probe' | 'desk'; value: Record<string, unknown>; ms?: number; }
+export interface MachineCommandInput { id?: string; kind: 'exec' | 'fs' | 'screen' | 'input' | 'browser' | 'probe' | 'desk' | 'ai'; value: Record<string, unknown>; ms?: number; }
+/** A machine's own models (OpenVibe.Node's ai plugin): what it offers and how fast its last model answered there. */
+export interface MachineAi { models: string[]; ready: boolean; max_tokens?: number; }
+export interface MachineAiSpeed { model: string; tokens_per_s: number; }
+export interface Machine {
+    id: string; name: string | null; online: boolean;
+    agent_computer?: boolean; ai_models?: boolean; watch_probe?: boolean;
+    computer: ({ ai?: MachineAi | null; ai_speed?: MachineAiSpeed | null; desks_running?: number | null; [field: string]: unknown }) | null;
+    [field: string]: unknown;
+}
+export interface MachineChatInput { model: string; messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>; max_tokens?: number; temperature?: number; }
+export interface MachineChatResult { model: string; message: { role: 'assistant'; content: string }; usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number }; finish_reason?: string; ms?: number; }
 export interface MachineCommandResult { machine_id?: string; id?: string; result: 'ack' | 'nack' | 'expired' | 'refused' | string; data?: Record<string, unknown>; code?: string; reason?: string | null; [field: string]: unknown; }
 export interface DeskOptions { name?: string; kind?: 'browser' | 'desktop'; profile?: string; width?: number; height?: number; }
 export interface Desk {
@@ -97,11 +108,13 @@ export interface Desk {
     turn(): Promise<{ desk: string; person_driving: boolean; last_person_at: string | null }>;
 }
 export interface MachinesApi {
-    list(opts?: CallOptions): Promise<{ machines: Array<Record<string, unknown>> }>;
+    list(opts?: CallOptions): Promise<{ machines: Machine[] }>;
     computer(id: string, opts?: CallOptions): Promise<{ machine: Record<string, unknown> } | null>;
     command(id: string, input: MachineCommandInput, opts?: CallOptions): Promise<MachineCommandResult>;
     deskTurn(id: string, desk: string, opts?: CallOptions): Promise<{ desk: string; person_driving: boolean; last_person_at: string | null }>;
     desk(id: string, options?: DeskOptions, opts?: CallOptions): Desk;
+    chat(id: string, input: MachineChatInput, opts?: CallOptions & { ms?: number }): Promise<MachineChatResult>;
+    aiModels(id: string, on: boolean, opts?: CallOptions): Promise<{ machine: Machine }>;
 }
 export interface BotClient {
     robots: RobotsApi;
