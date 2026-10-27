@@ -3,6 +3,19 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.66.0 (2026-10-27)
+
+- **`openvibe-sdk/bot`: machines and desks** (the Desks plan; the roadmap's SDK section). `bot.machines.list()`,
+  `.computer(id)`, `.command(id, { kind, value })` (bot.command@1's computer kinds) and `.deskTurn(id, desk)`.
+- **`bot.machines.desk(id, { name?, kind?, profile? })`** is a desk of your own on a machine: a browser alone or a whole
+  screen, with its own files and sign-ins (OpenVibe.Node v0.19.0 to v0.26.0).
+  - `start`, `stop` and `status`.
+  - `browser`, `screen`, `input` and `exec` on that desk only, never on the person's own screen. `exec` takes
+    `detach` for an app that keeps running until the desk stops.
+  - `turn()` says whether a person is using the desk now.
+  - Each method answers the machine's `data`. A command the machine does not do throws an `OpenVibeError` with code
+    `bot.desk_nack`.
+
 ## 0.65.0 (2026-10-26)
 
 - **`openvibe-sdk/sso`: switch account and use another account** (the owner, 2026-10-26: sign-in "like the Google
