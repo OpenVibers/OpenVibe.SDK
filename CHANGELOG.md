@@ -3,6 +3,10 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.71.0 (2026-10-28)
+
+- **`openvibe-sdk/bench`** (BENCH-4, plan §4.12): browser-safe Bench client for kinds, tasks, pinned rounds, outside entries, judgements, boards, model summaries, streamed open JSONL datasets and private evaluations. `mcpTools()` lists the live Bench MCP tools through `POST /mcp`. Calls use the `bench` service origin and `openvibe.bench` audience; optional `actingSubject` sends `X-OV-Subject`. HTTP errors remain `OpenVibeError`.
+
 ## 0.70.0 (2026-10-28)
 
 - **`openvibe-sdk/search`: the Search Fabric** (Contracts 0.225.0 `search.fabric.query`; plan 2026-10-28 §4.5). One

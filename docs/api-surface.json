@@ -43,6 +43,11 @@
         "verifyUserToken"
       ]
     },
+    "bench": {
+      "object": [
+        "createBenchClient"
+      ]
+    },
     "blog": {
       "object": [
         "createBlogClient"
@@ -373,6 +378,9 @@
     "readCallback": "function",
     "startAuthorization": "function",
     "unverifiedClaims": "function"
+  },
+  "openvibe-sdk/bench": {
+    "createBenchClient": "function"
   },
   "openvibe-sdk/blog": {
     "createBlogClient": "function"
