@@ -235,6 +235,7 @@
     "search": {
       "object": [
         "createSearchClient",
+        "fabricOf",
         "queryOf"
       ]
     },
@@ -634,6 +635,7 @@
   },
   "openvibe-sdk/search": {
     "createSearchClient": "function",
+    "fabricOf": "function",
     "queryOf": "function"
   },
   "openvibe-sdk/service": {

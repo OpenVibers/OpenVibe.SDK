@@ -3,6 +3,26 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.70.0 (2026-10-28)
+
+- **`openvibe-sdk/search`: the Search Fabric** (Contracts 0.225.0 `search.fabric.query`; plan 2026-10-28 §4.5). One
+  query over several scopes, routed the cheapest way that answers.
+  - **`search.fabric(text, { scopes, freshness, depth, answer, limit, cursor, owner, type, lang, site })`** returns
+    `search.fabric-result@1`:
+    - `results`: each has a scope and a kind (a document in the index, or a web page with its provider, URL and
+      dates);
+    - `groups`, `citations`, and `route.explain` (what each step did and what it cost).
+  - **Scopes:**
+    - `network` and `mine` (the person's own; a service passes `actingSubject`);
+    - `web`: OpenVibe's open index first, then DeepSeek for a signed-in caller or a service, then Wikipedia,
+      cached;
+    - `news`, `images`, `video`, `products`, `people`, `places` and `code`.
+  - `search.query(text, { scopes })` is the same call; without `scopes`, `query()` is the index search as before.
+  - `search.providers()` lists the web ladder's `search.provider-offer@1` items.
+  - Reads use GET, so the client may retry them.
+  - Types: `FabricOptions`, `FabricAnswer`, `FabricResult`, `FabricExplainStep`, `ProviderOffer`; `fabricOf()` builds
+    the query string.
+
 ## 0.69.0 (2026-10-28)
 
 - **`openvibe-sdk/tools`: domain history** (OpenVibe.Tools' `/api/v1/domains`, 2026-10-28). What the WHOIS and RDAP
