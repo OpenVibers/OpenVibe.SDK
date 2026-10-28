@@ -3,6 +3,17 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.69.0 (2026-10-28)
+
+- **`openvibe-sdk/tools`: domain history** (OpenVibe.Tools' `/api/v1/domains`, 2026-10-28). What the WHOIS and RDAP
+  tools saw of a domain over time, public registration facts only (registrar, dates, status, name servers, DNSSEC;
+  never contact details).
+  - `tools.domains.history('example.com')` gives its snapshots and what changed when; it is null when nothing was kept.
+  - `tools.domains.lists({ limit })` gives the most looked up domains and those of them expiring soon (each looked up
+    five times or more).
+  - Both read without a token; a malformed name is refused in the client. Types: `DomainHistory`, `DomainLists`,
+    `DomainFacts`.
+
 ## 0.68.0 (2026-10-28)
 
 - **`openvibe-sdk/food`: food boxes** (OpenVibe.Food's `/boxes`, 2026-10-28). Every meal kit, ready meal and food box
