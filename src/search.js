@@ -8,6 +8,15 @@
  *   const { suggestions } = await search.suggest('japan');
  *   const doc = await search.document('live', 'channel', '327');   // null when missing or not yours to see
  *
+ * The Search Fabric (Contracts 0.225.0, search.fabric.query; also the MCP tool openvibe.search): one query over
+ * several scopes, routed the cheapest way that answers.
+ *   const r = await search.fabric('surf maps', { scopes: ['network', 'web'], freshness: 'month', depth: 'standard' });
+ *   // r: { results (each with scope, kind document|page, url, provider for the web), groups, citations,
+ *   //      route: { explain, cost_usd }, next_cursor } — query(text, { scopes }) is the same call
+ *   const { providers } = await search.providers();   // the web ladder's offers (price, availability, today's use)
+ * Anonymous callers get the index, the open index and cached web answers; a person or a service also reaches the
+ * paid providers within OpenVibe's daily caps; `mine` needs a person (actingSubject for a service).
+ *
  * Who sees what is decided by Search for every hit: anonymous callers get public, published, indexable
  * documents only; a signed-in person (Bearer user JWT, or the ov_token cookie with credentials) also
  * gets restricted documents whose ACL names them; a first-party service with search.query.delegate may
@@ -20,6 +29,17 @@ const { isOpenVibeError } = require('./core/errors');
 const { isActingSubjectId } = require('./core/ids');
 
 const enc = encodeURIComponent;
+const FABRIC_KEYS = ['freshness', 'depth', 'limit', 'cursor', 'owner', 'type', 'lang', 'site'];
+
+/** The query string of GET /api/v1/query (search.fabric-request@1, GET form: scopes comma-separated). */
+function fabricOf(text, o = {}) {
+    const q = { q: String(text == null ? '' : text) };
+    const scopes = Array.isArray(o.scopes) ? o.scopes : o.scopes ? String(o.scopes).split(',') : ['network'];
+    q.scopes = scopes.map((x) => String(x).trim()).filter(Boolean).join(',');
+    for (const k of FABRIC_KEYS) if (o[k] !== undefined && o[k] !== null && o[k] !== '') q[k] = o[k];
+    if (o.answer) q.answer = 'true';
+    return q;
+}
 const FACET_KEY = /^[a-z][a-z0-9_]{0,39}$/;
 
 function queryOf(text, o = {}) {
@@ -60,9 +80,15 @@ function createSearchClient(client, defaults = {}) {
     }
     const orNull = (p) => p.catch((err) => { if (isOpenVibeError(err) && err.status === 404) return null; throw err; });
 
+    /** The Search Fabric: GET, so the core client may retry it safely. */
+    const fabric = (text, o = {}) => call({ path: pathWith('/api/v1/query', fabricOf(text, o)) }, o);
     return {
-        /** { results, next_cursor, facets? } — one page. */
-        query: (text, o = {}) => call({ path: pathWith('/api/v1/search', queryOf(text, o)) }, o),
+        /** { results, next_cursor, facets? } — one page. With `scopes`, the Search Fabric (fabric()). */
+        query: (text, o = {}) => (o.scopes ? fabric(text, o) : call({ path: pathWith('/api/v1/search', queryOf(text, o)) }, o)),
+        /** search.fabric-result@1 — one query over network, mine, web and the vertical scopes. */
+        fabric,
+        /** { providers: search.provider-offer@1[] } — the web ladder's providers. */
+        providers: (o = {}) => call({ path: '/api/v1/query/providers' }, o),
         /** Every result, page after page (cursor), until Search has no more or `max` is reached. */
         async *iterate(text, o = {}) {
             let cursor = o.cursor || null;
@@ -81,4 +107,4 @@ function createSearchClient(client, defaults = {}) {
     };
 }
 
-module.exports = { createSearchClient, queryOf };
+module.exports = { createSearchClient, queryOf, fabricOf };
