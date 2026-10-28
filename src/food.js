@@ -1,12 +1,16 @@
 'use strict';
 /**
  * openvibe-sdk/food — OpenVibe.Food for apps: places to get food near you (food banks, pantries, free meals; from
- * OpenStreetMap), the food list with store prices, meal plans, a person's pantry with "what can I make", and recipe
- * ideas from the network's AI. Routes at https://openvibe.food/api/v1; tokens for audience openvibe.food.
+ * OpenStreetMap), the food list with store prices, food boxes (every meal kit, ready meal and food box side by side,
+ * with their codes and scores), meal plans, a person's pantry with "what can I make", and recipe ideas from the
+ * network's AI. Routes at https://openvibe.food/api/v1; tokens for audience openvibe.food.
  *
  *   const food = createFoodClient(createClient({ tokenProvider }));
  *   const near = await food.places({ kind: 'foodbank', lat: 45.52, lon: -122.68, radius: 10 });   // public
  *   const { foods } = await food.foods.list({ group: 'vegetables', q: 'carrot' });               // public
+ *   const { boxes } = await food.boxes.list({ kind: 'cook', diet: 'vegetarian' });                // public
+ *   const { box, coupons, reviews } = await food.boxes.get('everyplate');                       // public
+ *   const { cost } = await food.boxes.cost('everyplate', { people: 4, meals: 3 });              // public
  *   const plan = await food.plans.create({ people: 2, days: 7, budget: 80, title: 'This week' }); // food.plan.write
  *   await food.pantry.set(['rice', 'black-beans', 'onions']);                                    // food.pantry.write
  *   const { suggestions } = await food.pantry.get();                                             // { can_make, almost }
@@ -16,8 +20,10 @@
  * is deterministic (all six MyPlate groups, a shopping list, the cheapest store per line, a budget as a hard cap); the
  * pantry's suggestions are matches against basic recipes, not dietary advice. Creating a plan or asking for recipe
  * ideas makes a new one each time, so neither is retried on its own; setting the pantry is a PUT and is.
+ * A box's facts were read by a person on the service's own pages, each with its page and day (sources, checked); a
+ * fact nobody checked is null, and a box's cost is worked out only from a stated price per serving or meal.
  * Errors are OpenVibeError: food.plan.invalid, food.pantry.invalid, food.pantry.unknown_item, food.pantry_empty,
- * food.recipes_daily_limit (429), food.ai_off (503), food.plan.not_found, …
+ * food.recipes_daily_limit (429), food.ai_off (503), food.plan.not_found, food.box.not_found, food.box.no_cost, …
  */
 const enc = encodeURIComponent;
 const PLAN_ID_RE = /^pln_[0-9A-HJKMNP-TV-Z]{26}$/;   // Food's own rule
@@ -38,6 +44,14 @@ function createFoodClient(client, { baseUrl } = {}) {
             /** The food list with store prices (public), by MyPlate group and/or a search. */
             list: ({ group, q, signal } = {}) => call({ path: '/api/v1/foods', query: { group, q }, signal }),
             get: (slug, { signal } = {}) => call({ path: `/api/v1/foods/${enc(String(slug))}`, signal }),
+        },
+        boxes: {
+            /** Every food box (public): kind cook|ready|produce|meat|snacks|coffee|baby|pets, a diet, a search. */
+            list: ({ kind, diet, q, signal } = {}) => call({ path: '/api/v1/boxes', query: { kind, diet, q }, signal }),
+            /** One box with its codes on OpenVibe.Coupons and its score on OpenVibe.Reviews (null when there are none). */
+            get: (slug, { signal } = {}) => call({ path: `/api/v1/boxes/${enc(String(slug))}`, signal }),
+            /** What its stated price comes to for people × meals a week over weeks (food.box.no_cost when it states none). */
+            cost: (slug, { people, meals, weeks, signal } = {}) => call({ path: `/api/v1/boxes/${enc(String(slug))}/cost`, query: { people, meals, weeks }, signal }),
         },
         plans: {
             /** A meal plan for 1–14 days (food.plan-create-request@1) → the plan, saved as the caller's. */

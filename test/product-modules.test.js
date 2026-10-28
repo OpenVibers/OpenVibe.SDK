@@ -68,6 +68,9 @@ const ids = { plan: `pln_${ULID}`, task: `tsk_${ULID}`, agent: `agt_${ULID}`, me
         await food.places({ kind: 'foodbank', lat: 45.5, lon: -122.6, radius: 10 });
         await food.foods.list({ group: 'vegetables', q: 'carrot' });
         await food.foods.get('carrots');
+        await food.boxes.list({ kind: 'cook', diet: 'keto' });
+        await food.boxes.get('everyplate');
+        await food.boxes.cost('everyplate', { people: 4, meals: 3 });
         await food.plans.list({ limit: 5 });
         await food.plans.get(ids.plan);
         await food.pantry.get();
@@ -77,6 +80,7 @@ const ids = { plan: `pln_${ULID}`, task: `tsk_${ULID}`, agent: `agt_${ULID}`, me
         await food.recipes.list();
         assert.deepStrictEqual(mark().map((r) => `${r.method} ${r.url}`), [
             'GET /api/v1/places?kind=foodbank&lat=45.5&lon=-122.6&radius=10', 'GET /api/v1/foods?group=vegetables&q=carrot', 'GET /api/v1/foods/carrots',
+            'GET /api/v1/boxes?kind=cook&diet=keto', 'GET /api/v1/boxes/everyplate', 'GET /api/v1/boxes/everyplate/cost?people=4&meals=3',
             'GET /api/v1/plans?limit=5', `GET /api/v1/plans/${ids.plan}`, 'GET /api/v1/pantry', 'PUT /api/v1/pantry', 'PUT /api/v1/pantry',
             'POST /api/v1/plans', 'POST /api/v1/recipes/suggest', 'GET /api/v1/recipes',
         ]);

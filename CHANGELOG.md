@@ -3,6 +3,15 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.68.0 (2026-10-28)
+
+- **`openvibe-sdk/food`: food boxes** (OpenVibe.Food's `/boxes`, 2026-10-28). Every meal kit, ready meal and food box
+  side by side: `food.boxes.list({ kind, diet, q })`, `.get(slug)` (with the box's codes on OpenVibe.Coupons and its
+  score on OpenVibe.Reviews, null when there are none) and `.cost(slug, { people, meals, weeks })` (what its stated price
+  comes to).
+  - Each box's facts were read on the service's own pages, with the page and the day (`sources`, `checked`).
+  - Types: `FoodBox`, `FoodBoxCost`, `BoxKind`.
+
 ## 0.67.0 (2026-10-27)
 
 - **`openvibe-sdk/bot`: a machine's own models** (AI on your own machines; OpenVibe.Node v0.27.0's ai plugin).
