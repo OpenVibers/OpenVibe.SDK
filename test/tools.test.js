@@ -292,6 +292,29 @@ run([
         assert.deepEqual(s.violations, []);
     }],
 
+    ['domains: a domain\'s history and the lists, read without a token; a bad name never leaves the client', async () => {
+        const asked = [];
+        const s = standIn({}, {
+            before: async (req, url) => {
+                if (!url.pathname.startsWith('/api/v1/domains')) return null;
+                asked.push([url.pathname + url.search, req.headers.get('authorization')]);
+                if (url.pathname === '/api/v1/domains/gone.example') return new Response(JSON.stringify({ type: 'about:blank', title: 'Not Found', status: 404 }), { status: 404, headers: { 'Content-Type': 'application/problem+json' } });
+                const body = url.pathname === '/api/v1/domains' ? { ok: true, most_looked_up: [{ domain: 'example.com', lookups: 9, registrar: 'R', expires: null }], expiring_soon: [], min_lookups: 5 }
+                    : { ok: true, domain: 'example.com', snapshots: [{ facts: { registrar: 'R', created: null, updated: null, expires: null, status: [], nameservers: ['a.ns'], dnssec: null }, first_seen: '2026-10-01T00:00:00.000Z', last_seen: '2026-10-02T00:00:00.000Z', seen: 2 }], changes: [], lookups: 2, first_seen: '2026-10-01T00:00:00.000Z' };
+                return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
+            },
+        });
+        const tools = createToolsClient(s.client());
+        const h = await tools.domains.history('Example.COM');
+        assert.deepEqual([h.domain, h.snapshots.length, h.lookups], ['example.com', 1, 2]);
+        assert.equal(await tools.domains.history('gone.example'), null, 'a 404 is null');
+        const l = await tools.domains.lists({ limit: 5 });
+        assert.deepEqual(l.most_looked_up.map((d) => d.domain), ['example.com']);
+        assert.deepEqual(asked.map((a) => a[0]), ['/api/v1/domains/example.com', '/api/v1/domains/gone.example', '/api/v1/domains?limit=5']);
+        assert.ok(asked.every((a) => !a[1]), 'public reads carry no token');
+        await assert.rejects(tools.domains.history('not a domain'), TypeError);
+    }],
+
     ['429 with Retry-After is retried after the delay, with the same Idempotency-Key', async () => {
         let throttled = 0;
         const s = standIn({}, {

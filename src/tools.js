@@ -260,7 +260,23 @@ function createToolsClient(client, { baseUrl, service = 'tools', audience = 'ope
         });
     }
 
-    return { list, get, schema, run, jobs };
+    /**
+     * Domain history (OpenVibe.Tools 2026-10-28): what the WHOIS and RDAP tools saw of a domain over time, public
+     * registration facts only (registrar, dates, status, name servers, DNSSEC; never contact details).
+     *   domains.history('example.com') → { domain, snapshots: [{ facts, first_seen, last_seen, seen }], changes:
+     *                                      [{ at, changes: [{ field, before, after }] }], lookups, first_seen }
+     *   domains.lists({ limit })        → { most_looked_up, expiring_soon, min_lookups } (domains looked up 5+ times)
+     */
+    const domains = {
+        async history(domain, { signal } = {}) {
+            const d = String(domain || '').trim().toLowerCase();
+            if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(d)) throw new TypeError('tools.domains.history: a domain name, like example.com');
+            return orNull(read(`/api/v1/domains/${enc(d)}`, undefined, signal));
+        },
+        async lists({ limit, signal } = {}) { return read('/api/v1/domains', { limit }, signal); },
+    };
+
+    return { list, get, schema, run, jobs, domains };
 }
 
 module.exports = { createToolsClient, ToolRunError, isToolRunError };

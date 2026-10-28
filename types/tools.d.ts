@@ -108,6 +108,11 @@ export interface ToolsClient {
     run(id: string, input?: Record<string, unknown>, opts?: ToolRunOptions): Promise<ToolRunOutcome>;
     /** openvibe-sdk/jobs on the same origin and credentials: the gateway's /api/v1/jobs facade. */
     jobs: JobsClient;
+    /** Domain history: what the WHOIS and RDAP tools saw of a domain over time (public registration facts only). */
+    domains: {
+        history(domain: string, opts?: { signal?: AbortSignal }): Promise<DomainHistory | null>;
+        lists(opts?: { limit?: number; signal?: AbortSignal }): Promise<DomainLists>;
+    };
 }
 
 export interface ToolsClientOptions {
@@ -119,3 +124,24 @@ export interface ToolsClientOptions {
     anonymousReads?: boolean;
 }
 export declare function createToolsClient(client: OpenVibeClient, opts?: ToolsClientOptions): ToolsClient;
+
+/** A domain's public registration facts at one time (RDAP). Never contact details. */
+export interface DomainFacts {
+    registrar: string | null;
+    created: string | null;
+    updated: string | null;
+    expires: string | null;
+    status: string[];
+    nameservers: string[];
+    dnssec: boolean | null;
+}
+export interface DomainHistory {
+    ok: true;
+    domain: string;
+    snapshots: Array<{ facts: DomainFacts; first_seen: string; last_seen: string; seen: number }>;
+    changes: Array<{ at: string; changes: Array<{ field: keyof DomainFacts; before: unknown; after: unknown }> }>;
+    lookups: number;
+    first_seen: string | null;
+}
+export interface DomainListed { domain: string; lookups: number; registrar: string | null; expires: string | null }
+export interface DomainLists { ok: true; most_looked_up: DomainListed[]; expiring_soon: DomainListed[]; min_lookups: number }
