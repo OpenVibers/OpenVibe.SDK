@@ -310,6 +310,12 @@
         "createVipClient"
       ]
     },
+    "vision": {
+      "object": [
+        "DEFAULT_AUDIENCE",
+        "createVisionClient"
+      ]
+    },
     "wiki": {
       "object": [
         "createWikiClient"
@@ -795,6 +801,10 @@
   "openvibe-sdk/vip": {
     "createVipCache": "function",
     "createVipClient": "function"
+  },
+  "openvibe-sdk/vision": {
+    "DEFAULT_AUDIENCE": "string",
+    "createVisionClient": "function"
   },
   "openvibe-sdk/wiki": {
     "createWikiClient": "function"
