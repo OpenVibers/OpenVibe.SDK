@@ -16,6 +16,7 @@ module.exports = {
     bot: require('./src/bot'),
     search: require('./src/search'),
     bench: require('./src/bench'),
+    vision: require('./src/vision'),
     themes: require('./src/themes'),
     chat: require('./src/chat'),
     ai: require('./src/ai'),
