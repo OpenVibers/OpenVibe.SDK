@@ -28,16 +28,22 @@ export interface SsoClientOptions {
     secureCookies?: boolean;
     accessMaxAgeMs?: number;
     fetch?: FetchLike;
-    log?: Pick<Console, 'warn' | 'log'>;
+    log?: Pick<Console, 'warn' | 'log'> & Partial<Pick<Console, 'error'>>;
+    /** The name the sign-in pages show (default OpenVibe.<Site>). */
+    siteName?: string;
+    /** Keep the access token httpOnly (no script can read it; the navbar asks /auth/me). Default false: the shared navbar reads ov_token. */
+    httpOnlyAccess?: boolean;
+    /** A site's own cookie names before it moved to the SDK: read as the session until the SDK writes its own. */
+    legacyCookies?: { access?: Array<string | { name: string; path?: string }>; refresh?: Array<string | { name: string; path?: string }> };
 }
 
 /** The verified session's claims without iat/exp/aud/iss/nbf/jti. */
 export type SsoUser = Omit<UserTokenClaims, 'iat' | 'exp' | 'aud' | 'iss' | 'nbf' | 'jti'> & Record<string, unknown>;
 
 export interface SsoClient {
-    /** GET /login /callback /logout /me, POST /fedcm /refresh; mount at /auth. */
+    /** GET /login /callback /logout /me /health, POST /fedcm /refresh; mount at /auth. */
     router(express: any): any;
-    handlers: { login: Handler; callback: Handler; fedcm: Handler; logout: Handler; me: Handler; refresh: Handler };
+    handlers: { login: Handler; callback: Handler; fedcm: Handler; logout: Handler; me: Handler; refresh: Handler; health: Handler };
     /** Sets req.user and req.token when a valid session is presented. */
     optionalAuth(): (req: Req, res: Res, next: Next) => void;
     /** 401 JSON without a valid session. */
@@ -48,6 +54,8 @@ export interface SsoClient {
     extractToken(req: Req): string | null;
     authorizeUrl(opts?: { silent?: boolean }): { url: string; state: string; verifier: string };
     tokenGrant(body: Record<string, unknown>): Promise<Record<string, any>>;
+    /** Does the Network accept this client? Cached 10 minutes; GET /auth/health answers with it (503 when 'invalid'). */
+    checkClient(opts?: { force?: boolean }): Promise<'ok' | 'invalid' | 'unknown'>;
     redirectUri: string;
     audience: string | string[];
 }
@@ -56,6 +64,8 @@ export declare function createSsoClient(opts: SsoClientOptions): SsoClient;
 /** A same-site path, this site's https origin or the Network's; anything else (control characters, backslashes) is '/'. */
 export declare function sanitizeNext(next: unknown, opts?: { baseUrl?: string; networkUrl?: string }): string;
 export declare function withParam(target: string, key: string, value: string): string;
+/** The self-contained page a sign-in that cannot finish shows (text is escaped). */
+export declare function failurePage(o: { siteName: string; title: string; text: string; retryHref: string; backHref: string }): string;
 /** The payload of a JWT, unverified; null when it does not parse. */
 export declare function decodeJwtPayload(token: string): Record<string, any> | null;
 export declare function fedcmNonceMatches(token: string, nonce: string): boolean;

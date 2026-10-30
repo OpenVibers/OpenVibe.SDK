@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const http = require('node:http');
 const { run } = require('./helpers');
-const { createSsoClient, sanitizeNext, withParam, fedcmNonceMatches } = require('../src/sso');
+const { createSsoClient, sanitizeNext, withParam, fedcmNonceMatches, failurePage } = require('../src/sso');
 
 const keys = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
 const ISS = 'https://openvibe.network';
@@ -26,6 +26,7 @@ const server = http.createServer((req, res) => {
             net.grants.push(body);
             if (body.client_secret !== 'secret') return send(401, { error: 'invalid_client' });
             if (body.grant_type === 'refresh_token' && net.refuseRefresh) return send(400, { error: 'invalid_grant' });
+            if (body.grant_type === 'authorization_code' && (body.code === 'ov_health_check_never_issued' || body.code === 'used')) return send(400, { error: 'invalid_grant' });
             return send(200, { access_token: session(), refresh_token: `rt_${net.grants.length}`, token_type: 'Bearer' });
         }
         return send(404, {});
@@ -40,6 +41,8 @@ function fakeRes() {
     r.status = (s) => { r.statusCode = s; return r; };
     r.json = (b) => { r.body = b; return r; };
     r.send = (b) => { r.body = b; return r; };
+    r.type = (t) => { r.contentType = t; return r; };
+    r.set = (k, v) => { (r.headers = r.headers || {})[k] = v; return r; };
     return r;
 }
 const cookieHeader = (o) => Object.entries(o).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('; ');
@@ -88,12 +91,24 @@ run([
     }],
 
     ['callback: the state cookie is required and must match; the code is exchanged with the secret and the PKCE verifier', async () => {
+        // No state cookie, or another state: never a session; a fresh sign-in of the visitor's own, once (0.73.0).
         const noCookie = fakeRes();
-        await sso.handlers.callback({ query: { code: 'c', state: 's' }, headers: {} }, noCookie);
-        assert.equal(noCookie.statusCode, 400, 'no state cookie');
+        await sso.handlers.callback({ query: { code: 'c', state: 's' }, headers: { cookie: cookieHeader({ ov_oauth_next: '/deals' }) } }, noCookie);
+        assert.equal(noCookie.statusCode, 302, 'no state cookie: start again');
+        assert.equal(noCookie.location, '/auth/login?next=%2Fdeals', 'back to where the visitor was going');
+        assert.equal(noCookie.cookies.ov_oauth_retry.v, '1');
+        assert.ok(!noCookie.cookies.ov_token, 'no session without a matching state');
         const mismatch = fakeRes();
-        await sso.handlers.callback({ query: { code: 'c', state: 's' }, headers: { cookie: cookieHeader({ ov_oauth_state: 't', ov_oauth_verifier: 'v' }) } }, mismatch);
-        assert.equal(mismatch.statusCode, 400, 'another state');
+        await sso.handlers.callback({ query: { code: 'c', state: 's' }, headers: { cookie: cookieHeader({ ov_oauth_state: 't', ov_oauth_verifier: 'v', ov_oauth_retry: '1' }) } }, mismatch);
+        assert.equal(mismatch.statusCode, 400, 'the second time: the page, not another loop');
+        assert.equal(mismatch.contentType, 'html');
+        assert.match(mismatch.body, /<h1>Sign-in didn&#39;t finish<\/h1>/);
+        assert.match(mismatch.body, /<a class="go" href="\/auth\/login">Try again<\/a>/);
+        assert.ok(!mismatch.cookies.ov_token && mismatch.cleared.includes('ov_oauth_retry'), 'no session; the retry mark is spent');
+        // A code the Network no longer accepts (used twice, too old): the same, once.
+        const used = fakeRes();
+        await sso.handlers.callback({ query: { code: 'used', state: 's' }, headers: { cookie: cookieHeader({ ov_oauth_state: 's', ov_oauth_verifier: 'v' }) } }, used);
+        assert.equal(used.statusCode, 302); assert.equal(used.location, '/auth/login'); assert.ok(!used.cookies.ov_token);
         const ok = fakeRes();
         await sso.handlers.callback({ query: { code: 'c1', state: 's' }, headers: { cookie: cookieHeader({ ov_oauth_state: 's', ov_oauth_verifier: 'ver', ov_oauth_next: '/deals' }) } }, ok);
         assert.equal(ok.location, '/deals');
@@ -105,6 +120,57 @@ run([
         const quiet = fakeRes();
         await sso.handlers.callback({ query: { error: 'login_required' }, headers: { cookie: cookieHeader({ ov_oauth_silent: '1', ov_oauth_next: '/x' }) } }, quiet);
         assert.equal(quiet.location, '/x?sso=none', 'a silent sign-in with no Network session goes back quietly');
+    }],
+
+    ['a client the Network refuses: the page says it is our problem, logs what to check, and /auth/health reports it', async () => {
+        const errors = [];
+        const bad = createSsoClient({ site: 'cam', baseUrl: 'https://openvibe.cam', clientId: 'cam', clientSecret: '...', networkUrl: ISS, networkInternalUrl: base, issuer: ISS, log: { warn() {}, error: (m) => errors.push(m) } });
+        const res = fakeRes();
+        await bad.handlers.callback({ query: { code: 'c', state: 's' }, headers: { cookie: cookieHeader({ ov_oauth_state: 's', ov_oauth_verifier: 'v' }) } }, res);
+        assert.equal(res.statusCode, 500, 'no retry loop for a configuration error');
+        assert.match(res.body, /Sign-in isn&#39;t working on OpenVibe\.Cam right now/);
+        assert.match(res.body, /not with your account/);
+        assert.ok(errors.some((m) => /refuses this site's OAuth client/.test(m) && /OV_OAUTH_CLIENT_SECRET/.test(m)), 'the log names what to check');
+        const h = fakeRes();
+        await bad.handlers.health({}, h);
+        assert.deepEqual([h.statusCode, h.body], [503, { ok: false, client: 'invalid' }]);
+        assert.equal(await bad.checkClient({ force: true }), 'invalid', 'a forced check asks the Network again');
+        const good = fakeRes();
+        await sso.handlers.health({}, good);
+        assert.deepEqual([good.statusCode, good.body.client], [200, 'ok']);
+        assert.equal(await sso.checkClient({ force: true }), 'ok', 'invalid_grant for a code that cannot exist: the client is fine');
+        assert.ok(net.grants.some((g) => g.code === 'ov_health_check_never_issued'), 'the check presents the never-issued code');
+        // The Network does not answer: the page, 502, no retry.
+        const down = createSsoClient({ site: 'cam', baseUrl: 'https://openvibe.cam', clientId: 'cam', clientSecret: 'secret', networkUrl: 'http://127.0.0.1:9', networkInternalUrl: 'http://127.0.0.1:9', issuer: ISS, log: { warn() {}, error() {} } });
+        const d = fakeRes();
+        await down.handlers.callback({ query: { code: 'c', state: 's' }, headers: { cookie: cookieHeader({ ov_oauth_state: 's', ov_oauth_verifier: 'v' }) } }, d);
+        assert.equal(d.statusCode, 502); assert.match(d.body, /OpenVibe\.Network didn&#39;t answer/);
+        assert.equal(await down.checkClient({ force: true }), 'unknown', 'unreachable is unknown, not invalid');
+        // The page escapes what it is given and needs nothing from outside.
+        const page = failurePage({ siteName: '<b>X</b>', title: 'T"', text: "a'b", retryHref: '/auth/login?next=%2F%22x', backHref: '/' });
+        assert.ok(!page.includes('<b>X</b>') && page.includes('&lt;b&gt;X&lt;/b&gt;') && page.includes('T&quot;') && page.includes('a&#39;b'));
+        assert.ok(!/<script|https?:\/\//.test(page), 'no script and no outside request');
+    }],
+
+    ['legacy cookies: a site moving here keeps its sessions, then writes the SDK names and clears the old ones', async () => {
+        const moved = createSsoClient({ site: 'cam', baseUrl: 'https://openvibe.cam', clientId: 'cam', clientSecret: 'secret', networkUrl: ISS, networkInternalUrl: base, issuer: ISS, audience: ['openvibe.network', 'openvibe.live'], legacyCookies: { access: ['cam_at'], refresh: [{ name: 'cam_rt', path: '/auth' }, 'bad name;'] }, log: { warn() {}, error() {} } });
+        const me = fakeRes();
+        await moved.handlers.me({ headers: { cookie: cookieHeader({ cam_at: session() }) } }, me);
+        assert.equal(me.body.user.username, 'ana', 'the old access cookie is the session');
+        const r = fakeRes();
+        await moved.handlers.refresh({ headers: { cookie: cookieHeader({ cam_rt: 'old-rt' }) } }, r);
+        assert.ok(r.body.token && r.cookies.ov_token && r.cookies.ov_refresh, 'the old refresh cookie refreshes; the SDK names are written');
+        assert.equal(net.grants.at(-1).refresh_token, 'old-rt');
+        assert.ok(r.cleared.includes('cam_at') && r.cleared.includes('cam_rt') && !r.cleared.includes('bad name;'), 'the old cookies are cleared; a bad name is ignored');
+        const out = fakeRes();
+        await moved.handlers.logout({ headers: { cookie: cookieHeader({ cam_rt: 'x' }) }, query: {} }, out);
+        assert.ok(out.cleared.includes('cam_at') && out.cleared.includes('ov_token'), 'logout clears both');
+        assert.ok(net.revoked.includes('x'), 'logout revokes the old refresh token too');
+        net.revoked.splice(0);
+        const strict = createSsoClient({ site: 'cam', baseUrl: 'https://openvibe.cam', clientId: 'cam', clientSecret: 'secret', networkUrl: ISS, networkInternalUrl: base, issuer: ISS, httpOnlyAccess: true, log: { warn() {}, error() {} } });
+        const s2 = fakeRes();
+        await strict.handlers.refresh({ headers: { cookie: cookieHeader({ ov_refresh: 'r' }) } }, s2);
+        assert.equal(s2.cookies.ov_token.o.httpOnly, true, 'httpOnlyAccess keeps the token from scripts');
     }],
 
     ['me and the middleware: a session verifies offline; a FedCM assertion, a service token, an expired token do not', async () => {

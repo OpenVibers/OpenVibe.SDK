@@ -722,6 +722,7 @@
     "claimsToUser": "function",
     "createSsoClient": "function",
     "decodeJwtPayload": "function",
+    "failurePage": "function",
     "fedcmNonceMatches": "function",
     "parseCookies": "function",
     "sanitizeNext": "function",
