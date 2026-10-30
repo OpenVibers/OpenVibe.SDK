@@ -590,19 +590,26 @@
     "createOpenReClient": "function"
   },
   "openvibe-sdk/placement": {
+    "DEFAULT_TRUST": "array",
     "TRUST_CLASSES": "array",
     "TRUST_ORDER": "array",
     "canonical": "function",
     "createPlanHolder": "function",
+    "escalate": "function",
     "excluded": "function",
     "forecast": "function",
+    "learn": "function",
+    "lineFor": "function",
     "marginalCost": "function",
+    "optionKey": "function",
     "ownedLoadCost": "function",
     "pickTwo": "function",
+    "place": "function",
     "plan": "function",
     "priceOf": "function",
     "rendezvous": "function",
     "signPlan": "function",
+    "successOf": "function",
     "verifyPlan": "function"
   },
   "openvibe-sdk/play": {

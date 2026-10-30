@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.76.0 (2026-10-30)
+
+- **`openvibe-sdk/placement`: placement v1 — quality, the person's rules, learning and a reason (agent plan A1).**
+  - `place(requirements, offers, ctx)` is `plan()` with the plan's road: the person's rules and ownership, a quality
+    floor (default 0.5) with a fallback, the success estimate, cost per success, escalation and one plain sentence
+    saying why. It returns `{ result, line, ranked, rejected, fallback }`; `result` is exactly what `plan()` returns
+    for the offers left in, validated as today.
+  - `learn(outcomes, {person, key, kind, ok, at})` and `successOf(outcomes, {person, key, kind, prior, now})` keep
+    and read plain counts with a 14-day half-life, a Beta mean, Bench priors, the global weight `min(1, 20/nG)` over
+    **everyone else's** counts (the person's rows are not counted twice) and the dotted-kind fallback.
+    `escalate(previous, failure, requirements, offers, ctx)` handles quality, busy, offline, refused, budget and
+    timeout, and asks the person after two escalations. It learns the failed try exactly once and returns the new
+    counts as `outcomes`; the caller persists that set and must not record the same failure again.
+    `optionKey(offer)` and `lineFor(facts)` are exported too.
+  - On the person's own free machine the line claims only what the step asked for: `harness:tools` (the harness's
+    own tools, including the signed-in CLI) says "your sign-in", and `harness:host-access` (the person's machine and
+    its files) says "your files". With neither it says "your own machine".
+  - `plan()` takes an optional `success: { [offer_id]: p }`: when present the cost part of the score is
+    `estimated_cost_usd / p`, while `estimated_cost_usd` in the result stays the raw cost. When absent, scoring is
+    unchanged.
+  - **Behaviour fix: `user-owned` is never a default.** When `requirements.trust` is absent, `plan()` now uses
+    `DEFAULT_TRUST` (`first-party`, `partner`, `community`, `external`). The contract
+    (`platform.workload-requirements@1`) says exactly that: "when absent, first-party, partner, community and
+    external. user-owned is never a default: a user-owned offer is eligible only when this list names it". A
+    stranger's machine must never be a default. `TRUST_ORDER` keeps all five classes as the preference order;
+    `DEFAULT_TRUST` is the four-class default. `place()` also requires a user-owned offer's `owner` to be the person
+    of the step.
+  - **Streaming machines.** A step that asks for a GPU or 2 or more cores excludes an offer whose
+    `health.streaming` is `true`, with the reason "it is streaming". The field is not in
+    `platform.resource-offer@1` yet (Node reports `screen.state` in its own status, Bot's offer does not carry it),
+    so this release fixes the name the Node can start sending; a top-level `offer.streaming` is tolerated too.
+  - README and [docs/placement.md](docs/placement.md): the API, the rules, the estimate, escalation and the line
+    templates.
+
+All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
+release may change an API and says so here.
+
 ## 0.75.0 (2026-10-30)
 
 - **`openvibe-sdk/redact`: one secret scrubber for the Node and AI (Memory M2).**
