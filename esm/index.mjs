@@ -7,11 +7,11 @@ export const {
     satisfiesRange, compareVersions, CONTRACTS_RANGE, DEFAULT_NETWORK, SDK_VERSION, auth,
     registry, identity, modules, events, realtime, media,
     community, bot, search, bench, vision, themes,
-    chat, ai, jobs, tools, projects, resources,
-    vip, quest, live, inventory, tips, blog,
-    reviews, wiki, coupons, deals, trade, space,
-    host, news, food, actor, run, video,
-    work, zone, play, download, openre, geo,
-    usage, commerce, telemetry,
+    redact, chat, ai, jobs, tools, projects,
+    resources, vip, quest, live, inventory, tips,
+    blog, reviews, wiki, coupons, deals, trade,
+    space, host, news, food, actor, run,
+    video, work, zone, play, download, openre,
+    geo, usage, commerce, telemetry,
 } = cjs;
 export default cjs;
