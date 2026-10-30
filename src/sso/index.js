@@ -25,6 +25,9 @@
  *   GET  /logout    → cookies cleared, the refresh token revoked (best effort), hint=guest
  *   GET  /me        → the verified session's profile
  *   POST /refresh   → rotate the tokens with the refresh token
+ * Moving a site from its own sign-in code (0.73.0): legacyCookies: { access: ['cam_at'], refresh: [{ name: 'cam_rt',
+ * path: '/auth' }] } reads the old cookies as the session until the next sign-in or refresh writes ov_token/ov_refresh
+ * and clears them, so nobody is signed out by the move; logout clears both.
  *   GET  /health    → { ok, client: 'ok' | 'invalid' | 'unknown' }: does the Network accept this site's OAuth client?
  *                     (a token request with a code that cannot exist: invalid_grant means the client is fine,
  *                     invalid_client means its id or secret is wrong; cached 10 minutes; 503 only for 'invalid')
@@ -164,6 +167,12 @@ function createSsoClient(opts = {}) {
     if (!baseUrl || !opts.clientId) throw new TypeError('createSsoClient: baseUrl and clientId are required');
     const next = (value) => sanitizeNext(value, { baseUrl, networkUrl });
     const siteName = String(opts.siteName || `OpenVibe.${site.charAt(0).toUpperCase()}${site.slice(1)}`);
+    // A site's own cookie names before it moved here: read as the session, cleared when the SDK writes its own.
+    const legacyList = (l) => (Array.isArray(l) ? l : []).map((x) => (typeof x === 'string' ? { name: x, path: '/' } : { name: String(x.name), path: x.path || '/' })).filter((x) => /^[A-Za-z0-9_-]{1,64}$/.test(x.name));
+    const legacy = { access: legacyList(opts.legacyCookies && opts.legacyCookies.access), refresh: legacyList(opts.legacyCookies && opts.legacyCookies.refresh) };
+    const readCookie = (req, name, old) => { const c = parseCookies(req); if (c[name]) return c[name]; for (const l of old) if (c[l.name]) return c[l.name]; return null; };
+    const readAccess = (req) => readCookie(req, ACCESS_COOKIE, legacy.access);
+    const readRefresh = (req) => readCookie(req, REFRESH_COOKIE, legacy.refresh);
 
     /** The verified claims of a session token, or null. Never throws. */
     async function verify(token) {
@@ -180,7 +189,7 @@ function createSsoClient(opts = {}) {
     function extractToken(req) {
         const h = String((req.headers && req.headers.authorization) || '');
         if (h.startsWith('Bearer ')) return h.slice(7).trim() || null;
-        return parseCookies(req)[ACCESS_COOKIE] || null;
+        return readAccess(req);
     }
 
     const cookie = (maxAge, { httpOnly = true, path = '/' } = {}) => ({ sameSite: 'lax', secure, httpOnly, path, ...(maxAge ? { maxAge } : {}) });
@@ -189,12 +198,15 @@ function createSsoClient(opts = {}) {
     const flowOpts = () => cookie(10 * 60e3, { path: '/auth' });
     const hintOpts = () => cookie(365 * 24 * 3600e3, { httpOnly: false });
 
+    const clearLegacy = (res) => { for (const l of [...legacy.access, ...legacy.refresh]) res.clearCookie(l.name, { path: l.path }); };
     function setSession(res, accessToken, refreshToken) {
+        clearLegacy(res);
         res.cookie(ACCESS_COOKIE, accessToken, accessOpts());
         if (refreshToken) res.cookie(REFRESH_COOKIE, refreshToken, refreshOpts());
         res.cookie(HINT_COOKIE, 'account', hintOpts());
     }
     function clearSession(res) {
+        clearLegacy(res);
         res.clearCookie(ACCESS_COOKIE, { ...accessOpts(), maxAge: undefined });
         res.clearCookie(REFRESH_COOKIE, { ...refreshOpts(), maxAge: undefined });
     }
@@ -271,7 +283,7 @@ function createSsoClient(opts = {}) {
             const q = req.query || {};
             const silent = !!q.silent && q.silent !== '0';
             // Already signed in here? A silent round trip would only hand back the session we have.
-            if (silent && await verify(parseCookies(req)[ACCESS_COOKIE])) { clearFlow(res); return res.redirect(next(q.next)); }
+            if (silent && await verify(readAccess(req))) { clearFlow(res); return res.redirect(next(q.next)); }
             const { url, state, verifier } = authorizeUrl({ silent, prompt: String(q.prompt || ''), loginHint: q.login_hint });
             res.cookie(STATE_COOKIE, state, flowOpts());
             res.cookie(VERIFIER_COOKIE, verifier, flowOpts());
@@ -337,7 +349,7 @@ function createSsoClient(opts = {}) {
 
         async logout(req, res) {
             // Best-effort revocation: the Network's rotating refresh tokens invalidate themselves anyway.
-            const refresh = parseCookies(req)[REFRESH_COOKIE];
+            const refresh = readRefresh(req);
             if (refresh) {
                 try {
                     await fetchImpl(`${networkInternalUrl}/oauth/revoke`, {
@@ -361,7 +373,7 @@ function createSsoClient(opts = {}) {
         },
 
         async refresh(req, res) {
-            const refresh = parseCookies(req)[REFRESH_COOKIE];
+            const refresh = readRefresh(req);
             if (!refresh) return res.status(401).json({ error: 'No refresh token' });
             try {
                 const data = await tokenGrant({ grant_type: 'refresh_token', refresh_token: refresh });

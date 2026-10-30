@@ -152,6 +152,23 @@ run([
         assert.ok(!/<script|https?:\/\//.test(page), 'no script and no outside request');
     }],
 
+    ['legacy cookies: a site moving here keeps its sessions, then writes the SDK names and clears the old ones', async () => {
+        const moved = createSsoClient({ site: 'cam', baseUrl: 'https://openvibe.cam', clientId: 'cam', clientSecret: 'secret', networkUrl: ISS, networkInternalUrl: base, issuer: ISS, audience: ['openvibe.network', 'openvibe.live'], legacyCookies: { access: ['cam_at'], refresh: [{ name: 'cam_rt', path: '/auth' }, 'bad name;'] }, log: { warn() {}, error() {} } });
+        const me = fakeRes();
+        await moved.handlers.me({ headers: { cookie: cookieHeader({ cam_at: session() }) } }, me);
+        assert.equal(me.body.user.username, 'ana', 'the old access cookie is the session');
+        const r = fakeRes();
+        await moved.handlers.refresh({ headers: { cookie: cookieHeader({ cam_rt: 'old-rt' }) } }, r);
+        assert.ok(r.body.token && r.cookies.ov_token && r.cookies.ov_refresh, 'the old refresh cookie refreshes; the SDK names are written');
+        assert.equal(net.grants.at(-1).refresh_token, 'old-rt');
+        assert.ok(r.cleared.includes('cam_at') && r.cleared.includes('cam_rt') && !r.cleared.includes('bad name;'), 'the old cookies are cleared; a bad name is ignored');
+        const out = fakeRes();
+        await moved.handlers.logout({ headers: { cookie: cookieHeader({ cam_rt: 'x' }) }, query: {} }, out);
+        assert.ok(out.cleared.includes('cam_at') && out.cleared.includes('ov_token'), 'logout clears both');
+        assert.ok(net.revoked.includes('x'), 'logout revokes the old refresh token too');
+        net.revoked.splice(0);
+    }],
+
     ['me and the middleware: a session verifies offline; a FedCM assertion, a service token, an expired token do not', async () => {
         const me = fakeRes();
         await sso.handlers.me({ headers: { cookie: cookieHeader({ ov_token: session() }) } }, me);

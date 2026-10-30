@@ -17,6 +17,9 @@ release may change an API and says so here.
   - Why: OpenVibe.Cam ran for a day on the placeholder secret from its `.env.example`. Every sign-in ended on "The
     Network refused the sign-in code", and nothing checked.
   - `siteName` option for the pages.
+  - `legacyCookies: { access, refresh }` moves a site off its own sign-in code without signing anyone out. Its old
+    cookies are read as the session until the next sign-in or refresh writes `ov_token`/`ov_refresh` and clears them;
+    logout clears both.
 
 ## 0.72.0 (2026-10-29)
 

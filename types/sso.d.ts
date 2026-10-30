@@ -31,6 +31,8 @@ export interface SsoClientOptions {
     log?: Pick<Console, 'warn' | 'log'> & Partial<Pick<Console, 'error'>>;
     /** The name the sign-in pages show (default OpenVibe.<Site>). */
     siteName?: string;
+    /** A site's own cookie names before it moved to the SDK: read as the session until the SDK writes its own. */
+    legacyCookies?: { access?: Array<string | { name: string; path?: string }>; refresh?: Array<string | { name: string; path?: string }> };
 }
 
 /** The verified session's claims without iat/exp/aud/iss/nbf/jti. */
