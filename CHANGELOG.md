@@ -3,6 +3,22 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.74.0 (2026-10-30)
+
+- **`openvibe-sdk/app-signin`: "Sign in with OpenVibe" for developer apps, in one call.**
+  - `createAppSignIn({ clientId, clientSecret, redirectUri, networkUrl, audience, scope, session })` gives a router
+    with `/login`, `/callback`, `/logout`, `/me` and `/health`, built on the SDK's own auth helpers
+    (authorization code + PKCE, the state check): nothing here re-implements OAuth.
+  - The same recovery as `openvibe-sdk/sso` 0.73.0: a lost or expired flow and a code the Network no longer accepts
+    start the sign-in once more by themselves; the second failure shows the same plain page (`failurePage`, now
+    exported by `openvibe-sdk/sso`), with "Try again" and the way back. Neither ever sets a session.
+  - The same client check: `GET /health` and `checkClient()` answer whether the Network accepts the app's
+    credentials (a code that is never issued; cached 10 minutes; 503 only when they are refused).
+  - The app token is verified offline against the Network's JWKS and only trusted when it was minted for THIS app
+    (`sub = app:<clientId>`), before `on_behalf_of` names the person.
+  - The session: your own store (`session: { get, set, clear }`) or, by default, an in-memory store with an opaque
+    httpOnly cookie. The secret, the PKCE verifier and the token never reach the browser and never appear in a log.
+
 ## 0.73.0 (2026-10-30)
 
 - **`openvibe-sdk/sso`: a sign-in that recovers, explains itself and can be checked.**
