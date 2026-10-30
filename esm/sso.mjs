@@ -3,6 +3,6 @@ import cjs from '../src/sso/index.js';
 
 export const {
     createSsoClient, sanitizeNext, withParam, decodeJwtPayload, fedcmNonceMatches, claimsToUser,
-    parseCookies, COOKIES,
+    parseCookies, failurePage, COOKIES,
 } = cjs;
 export default cjs;

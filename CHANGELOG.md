@@ -3,7 +3,22 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
-## 0.72.0 (unreleased)
+## 0.73.0 (2026-10-30)
+
+- **`openvibe-sdk/sso`: a sign-in that recovers, explains itself and can be checked.**
+  - A lost or expired flow (no or another state cookie) and a code the Network no longer accepts (`invalid_grant`) start
+    the sign-in once more by themselves. A two-minute `ov_oauth_retry` cookie keeps it from looping, and neither ever
+    sets a session.
+  - A second failure, a client the Network refuses (`invalid_client`) and a Network that does not answer show a small,
+    self-contained page in plain words, with "Try again" and "Back to <site>", in place of a bare line of text.
+  - A refused client is logged as a configuration error that names `OV_OAUTH_CLIENT_ID` / `OV_OAUTH_CLIENT_SECRET`.
+  - `GET /auth/health` and `checkClient()`: a token request with a code that is never issued. `invalid_grant` means the
+    client is fine; `invalid_client` that its id or secret is wrong (503). The answer is cached 10 minutes.
+  - Why: OpenVibe.Cam ran for a day on the placeholder secret from its `.env.example`. Every sign-in ended on "The
+    Network refused the sign-in code", and nothing checked.
+  - `siteName` option for the pages.
+
+## 0.72.0 (2026-10-29)
 
 - **`openvibe-sdk/vision`** (VIS-5, plan §5.8b): typed browser and server calls for Vision's image tools, private search, face privacy and consent APIs, and MCP discovery. The service enforces token grants and consent; the client preserves problem errors and binary blur results.
 

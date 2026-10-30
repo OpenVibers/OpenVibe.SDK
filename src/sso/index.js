@@ -25,6 +25,15 @@
  *   GET  /logout    → cookies cleared, the refresh token revoked (best effort), hint=guest
  *   GET  /me        → the verified session's profile
  *   POST /refresh   → rotate the tokens with the refresh token
+ *   GET  /health    → { ok, client: 'ok' | 'invalid' | 'unknown' }: does the Network accept this site's OAuth client?
+ *                     (a token request with a code that cannot exist: invalid_grant means the client is fine,
+ *                     invalid_client means its id or secret is wrong; cached 10 minutes; 503 only for 'invalid')
+ *
+ * When a sign-in cannot finish (0.73.0): a lost or expired flow (the state cookie is gone or does not match) and a code
+ * the Network no longer accepts (invalid_grant: used twice, or too old) start the sign-in once more by themselves, with
+ * a two-minute ov_oauth_retry cookie so it never loops; neither sets a session. A second failure, a client the Network
+ * refuses (invalid_client: a configuration error, logged as one with what to check) and a Network that does not answer
+ * show a small page in plain words with "Try again" and "Back to <site>", never a bare line of text.
  * Cookies (host-only): ov_token (the access JWT, SameSite=Lax, readable by the shared navbar), ov_refresh (httpOnly,
  * Path=/auth), ov_sso_hint ('account' / 'guest'), and the short-lived flow cookies on /auth.
  *
@@ -43,6 +52,9 @@ const NEXT_COOKIE = 'ov_oauth_next';
 const SILENT_COOKIE = 'ov_oauth_silent';
 const VERIFIER_COOKIE = 'ov_oauth_verifier';
 const FLOW_COOKIES = [STATE_COOKIE, NEXT_COOKIE, SILENT_COOKIE, VERIFIER_COOKIE];
+const RETRY_COOKIE = 'ov_oauth_retry';
+// A code no sign-in can ever have: the health check presents it and reads which way the Network refuses it.
+const HEALTH_CODE = 'ov_health_check_never_issued';
 
 const trim = (u) => String(u || '').replace(/\/+$/, '');
 
@@ -117,6 +129,24 @@ function sameString(a, b) {
     return x.length === y.length && x.length > 0 && crypto.timingSafeEqual(x, y);
 }
 
+const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+
+/**
+ * The page a sign-in that cannot finish shows: what happened in plain words, "Try again" (a fresh sign-in back to where
+ * the person was going) and the way back. Self-contained (no script, no font, no request): the theme's colours when the
+ * site's page variables are not there, light or dark as the device is.
+ */
+function failurePage({ siteName, title, text, retryHref, backHref }) {
+    return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><meta name="color-scheme" content="light dark"><title>${escapeHtml(title)} · ${escapeHtml(siteName)}</title>`
+        + '<style>:root{--b:#0a0f1c;--c:#131c2e;--t:#e6edf7;--m:#96a7c2;--a:#3b82f6;--l:#1f2d47}@media (prefers-color-scheme:light){:root{--b:#f6f7fb;--c:#fff;--t:#0f172a;--m:#475569;--a:#1d4ed8;--l:#e3e7ef}}'
+        + 'body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--b);color:var(--t);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}'
+        + 'main{box-sizing:border-box;width:min(440px,calc(100vw - 32px));padding:28px 24px;border:1px solid var(--l);border-radius:18px;background:var(--c)}'
+        + 'h1{margin:0 0 8px;font-size:1.3rem}p{margin:0 0 20px;color:var(--m)}nav{display:flex;flex-wrap:wrap;gap:10px}'
+        + 'a{display:inline-flex;align-items:center;min-height:44px;padding:0 18px;border-radius:999px;font-weight:650;text-decoration:none}'
+        + 'a.go{background:var(--a);color:#fff}a.back{color:var(--t);border:1px solid var(--l)}a:focus-visible{outline:3px solid var(--a);outline-offset:2px}</style></head>'
+        + `<body><main><h1>${escapeHtml(title)}</h1><p>${escapeHtml(text)}</p><nav><a class="go" href="${escapeHtml(retryHref)}">Try again</a><a class="back" href="${escapeHtml(backHref)}">Back to ${escapeHtml(siteName)}</a></nav></main></body></html>`;
+}
+
 function createSsoClient(opts = {}) {
     const site = String(opts.site || 'site');
     const baseUrl = trim(opts.baseUrl);
@@ -133,6 +163,7 @@ function createSsoClient(opts = {}) {
     const accessMaxAgeMs = opts.accessMaxAgeMs || 24 * 3600e3;
     if (!baseUrl || !opts.clientId) throw new TypeError('createSsoClient: baseUrl and clientId are required');
     const next = (value) => sanitizeNext(value, { baseUrl, networkUrl });
+    const siteName = String(opts.siteName || `OpenVibe.${site.charAt(0).toUpperCase()}${site.slice(1)}`);
 
     /** The verified claims of a session token, or null. Never throws. */
     async function verify(token) {
@@ -168,6 +199,23 @@ function createSsoClient(opts = {}) {
         res.clearCookie(REFRESH_COOKIE, { ...refreshOpts(), maxAge: undefined });
     }
     const clearFlow = (res) => { for (const c of FLOW_COOKIES) res.clearCookie(c, { path: '/auth' }); };
+    const retryOpts = () => cookie(2 * 60e3, { path: '/auth' });
+    const loginHref = (target) => `/auth/login${target && target !== '/' ? `?next=${encodeURIComponent(target)}` : ''}`;
+    /** A sign-in that can recover starts once more by itself; the second time it shows the page. Never sets a session. */
+    function retryOrExplain(req, res, target, page) {
+        if (parseCookies(req)[RETRY_COOKIE] !== '1') {
+            res.cookie(RETRY_COOKIE, '1', retryOpts());
+            return res.redirect(loginHref(target));
+        }
+        res.clearCookie(RETRY_COOKIE, { path: '/auth' });
+        return explain(res, 400, target, page);
+    }
+    function explain(res, status, target, { title, text }) {
+        if (typeof res.type === 'function') res.type('html');
+        if (typeof res.set === 'function') res.set('Cache-Control', 'no-store');
+        return res.status(status).send(failurePage({ siteName, title, text, retryHref: loginHref(target), backHref: target || '/' }));
+    }
+    const SIGN_IN_AGAIN = { title: 'Sign-in didn\'t finish', text: 'It took too long, or it started in another tab or app. Start it again and it will go through; your account is fine.' };
 
     /** A token grant at the Network: the internal URL first, the public one if it cannot be reached. */
     async function tokenGrant(body) {
@@ -244,20 +292,28 @@ function createSsoClient(opts = {}) {
                 if (silent || q.error === 'login_required') return res.redirect(withParam(target, 'sso', 'none'));
                 return res.redirect(withParam('/', 'auth_error', String(q.error)));
             }
-            if (!q.code) return res.status(400).send('Missing authorization code');
+            if (!q.code) return explain(res, 400, target, SIGN_IN_AGAIN);
             const expected = c[STATE_COOKIE], verifier = c[VERIFIER_COOKIE];
             clearFlow(res);
             // The state cookie is required, not only compared when present: skipping the check without it would let a
-            // crafted link sign a visitor into someone else's account.
-            if (!sameString(q.state, expected) || !verifier) return res.status(400).send('OAuth state mismatch. Please try signing in again.');
+            // crafted link sign a visitor into someone else's account. A mismatch never sets a session; it starts a fresh
+            // sign-in of the visitor's own (once), which is what a lost or expired flow cookie needs.
+            if (!sameString(q.state, expected) || !verifier) return retryOrExplain(req, res, target, SIGN_IN_AGAIN);
             try {
                 const data = await tokenGrant({ grant_type: 'authorization_code', redirect_uri: redirectUri, code: String(q.code), code_verifier: verifier });
                 setSession(res, data.access_token, data.refresh_token);
+                res.clearCookie(RETRY_COOKIE, { path: '/auth' });
+                health = { client: 'ok', at: Date.now() };
                 return res.redirect(target);
             } catch (err) {
-                log.error(`[${site} auth] code exchange failed: ${err.message}`);
-                if (err.status && err.status < 500) return res.redirect(withParam('/', 'auth_error', String(err.error || 'invalid_grant')));
-                return res.status(502).send('Sign-in failed: OpenVibe.Network could not be reached. Please try again.');
+                if (err.status === 401 || err.error === 'invalid_client' || err.error === 'unauthorized_client') {
+                    health = { client: 'invalid', at: Date.now() };
+                    log.error(`[${site} auth] the Network refuses this site's OAuth client (${err.error || err.status}): check its client id and secret (OV_OAUTH_CLIENT_ID / OV_OAUTH_CLIENT_SECRET) against the Network's registration`);
+                    return explain(res, 500, target, { title: `Sign-in isn't working on ${siteName} right now`, text: 'This is a problem on our side, not with your account, and it has been logged. Please try again a little later.' });
+                }
+                log.warn(`[${site} auth] code exchange failed: ${err.message}`);
+                if (err.status && err.status < 500) return retryOrExplain(req, res, target, SIGN_IN_AGAIN);
+                return explain(res, 502, target, { title: 'OpenVibe.Network didn\'t answer', text: 'Your account is fine: the sign-in service did not reply in time. Try again in a moment.' });
             }
         },
 
@@ -319,6 +375,29 @@ function createSsoClient(opts = {}) {
         },
     };
 
+    let health = null;   // { client, at }: the last check, or the last sign-in's verdict
+    /**
+     * Does the Network accept this site's OAuth client? A token request with a code no sign-in ever has: invalid_grant
+     * means the id and secret are right, invalid_client that they are not. Cached 10 minutes. → 'ok' | 'invalid' | 'unknown'
+     */
+    async function checkClient({ force = false } = {}) {
+        if (!force && health && Date.now() - health.at < 10 * 60e3) return health.client;
+        try {
+            await tokenGrant({ grant_type: 'authorization_code', redirect_uri: redirectUri, code: HEALTH_CODE, code_verifier: HEALTH_CODE });
+            health = { client: 'ok', at: Date.now() };   // a stub that accepts anything: the client is not refused
+        } catch (err) {
+            const invalid = err.status === 401 || err.error === 'invalid_client' || err.error === 'unauthorized_client';
+            health = { client: invalid ? 'invalid' : (err.status && err.status < 500 ? 'ok' : 'unknown'), at: Date.now() };
+            if (invalid) log.error(`[${site} auth] the Network refuses this site's OAuth client: check OV_OAUTH_CLIENT_ID / OV_OAUTH_CLIENT_SECRET`);
+        }
+        return health.client;
+    }
+    handlers.health = async (req, res) => {
+        const client = await checkClient();
+        if (typeof res.set === 'function') res.set('Cache-Control', 'no-store');
+        return res.status(client === 'invalid' ? 503 : 200).json({ ok: client !== 'invalid', client });
+    };
+
     /** The /auth router. Pass your express module (the SDK does not depend on it). */
     function router(express) {
         if (!express || typeof express.Router !== 'function') throw new TypeError('sso.router(express): pass the express module');
@@ -332,6 +411,7 @@ function createSsoClient(opts = {}) {
         r.get('/logout', wrap(handlers.logout));
         r.get('/me', wrap(handlers.me));
         r.post('/refresh', wrap(handlers.refresh));
+        r.get('/health', wrap(handlers.health));
         return r;
     }
 
@@ -350,10 +430,10 @@ function createSsoClient(opts = {}) {
         return (req, res, nextFn) => opt(req, res, () => (req.user ? nextFn() : res.status(401).json({ error: 'Sign in required' })));
     }
 
-    return { router, handlers, optionalAuth, requireAuth, verify, extractToken, authorizeUrl, tokenGrant, redirectUri, audience };
+    return { router, handlers, optionalAuth, requireAuth, verify, extractToken, authorizeUrl, tokenGrant, checkClient, redirectUri, audience };
 }
 
 module.exports = {
-    createSsoClient, sanitizeNext, withParam, decodeJwtPayload, fedcmNonceMatches, claimsToUser, parseCookies,
+    createSsoClient, sanitizeNext, withParam, decodeJwtPayload, fedcmNonceMatches, claimsToUser, parseCookies, failurePage,
     COOKIES: Object.freeze({ access: ACCESS_COOKIE, refresh: REFRESH_COOKIE, hint: HINT_COOKIE }),
 };
