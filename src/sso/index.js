@@ -193,7 +193,9 @@ function createSsoClient(opts = {}) {
     }
 
     const cookie = (maxAge, { httpOnly = true, path = '/' } = {}) => ({ sameSite: 'lax', secure, httpOnly, path, ...(maxAge ? { maxAge } : {}) });
-    const accessOpts = () => cookie(accessMaxAgeMs, { httpOnly: false });            // the shared navbar reads it
+    // The shared navbar reads ov_token unless the site asks otherwise (httpOnlyAccess: its navbar asks /auth/me instead,
+    // as the sites that kept their own sign-in code did, so no script can read the token).
+    const accessOpts = () => cookie(accessMaxAgeMs, { httpOnly: !!opts.httpOnlyAccess });
     const refreshOpts = () => cookie(30 * 24 * 3600e3, { path: '/auth' });
     const flowOpts = () => cookie(10 * 60e3, { path: '/auth' });
     const hintOpts = () => cookie(365 * 24 * 3600e3, { httpOnly: false });

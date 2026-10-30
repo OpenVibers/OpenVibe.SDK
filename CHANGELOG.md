@@ -19,7 +19,8 @@ release may change an API and says so here.
   - `siteName` option for the pages.
   - `legacyCookies: { access, refresh }` moves a site off its own sign-in code without signing anyone out. Its old
     cookies are read as the session until the next sign-in or refresh writes `ov_token`/`ov_refresh` and clears them;
-    logout clears both.
+    logout clears both. `httpOnlyAccess: true` keeps the access token httpOnly, as those sites did (their navbar asks
+    `/auth/me`).
 
 ## 0.72.0 (2026-10-29)
 

@@ -167,6 +167,10 @@ run([
         assert.ok(out.cleared.includes('cam_at') && out.cleared.includes('ov_token'), 'logout clears both');
         assert.ok(net.revoked.includes('x'), 'logout revokes the old refresh token too');
         net.revoked.splice(0);
+        const strict = createSsoClient({ site: 'cam', baseUrl: 'https://openvibe.cam', clientId: 'cam', clientSecret: 'secret', networkUrl: ISS, networkInternalUrl: base, issuer: ISS, httpOnlyAccess: true, log: { warn() {}, error() {} } });
+        const s2 = fakeRes();
+        await strict.handlers.refresh({ headers: { cookie: cookieHeader({ ov_refresh: 'r' }) } }, s2);
+        assert.equal(s2.cookies.ov_token.o.httpOnly, true, 'httpOnlyAccess keeps the token from scripts');
     }],
 
     ['me and the middleware: a session verifies offline; a FedCM assertion, a service token, an expired token do not', async () => {

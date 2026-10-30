@@ -31,6 +31,8 @@ export interface SsoClientOptions {
     log?: Pick<Console, 'warn' | 'log'> & Partial<Pick<Console, 'error'>>;
     /** The name the sign-in pages show (default OpenVibe.<Site>). */
     siteName?: string;
+    /** Keep the access token httpOnly (no script can read it; the navbar asks /auth/me). Default false: the shared navbar reads ov_token. */
+    httpOnlyAccess?: boolean;
     /** A site's own cookie names before it moved to the SDK: read as the session until the SDK writes its own. */
     legacyCookies?: { access?: Array<string | { name: string; path?: string }>; refresh?: Array<string | { name: string; path?: string }> };
 }
