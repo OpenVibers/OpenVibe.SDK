@@ -348,6 +348,10 @@
     "TERMINAL": "object",
     "createAiClient": "function"
   },
+  "openvibe-sdk/app-signin": {
+    "createAppSignIn": "function",
+    "normalizeScope": "function"
+  },
   "openvibe-sdk/auth": {
     "TOKEN_VALID_AFTER": "string",
     "base64url": "function",
