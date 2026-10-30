@@ -262,7 +262,8 @@ function kindChain(kind) {
 
 /**
  * successOf(outcomes, { person, key, kind, prior, now }) → p in [0, 1].
- * Beta mean: (k·prior + okP + w·okG) / (k + nP + w·nG), with w = min(1, 20 / nG). Counts decay at read time.
+ * Beta mean: (k·prior + okP + w·okG) / (k + nP + w·nG), with w = min(1, 20 / nG). okG/nG are everyone else's
+ * counts (the person's own rows are not counted twice). Counts decay at read time.
  * The kind falls back by dotted prefix, then to the key's counts over every kind.
  */
 function successOf(outcomes, { person, key, kind, prior, now } = {}) {
@@ -279,8 +280,8 @@ function successOf(outcomes, { person, key, kind, prior, now } = {}) {
     for (const r of rows) {
         const ok = decayCount(r.ok_w, r.updated_at, now);
         const n = decayCount(r.n_w, r.updated_at, now);
-        okG += ok; nG += n;
         if (rowPerson(r) === person) { okP += ok; nP += n; }
+        else { okG += ok; nG += n; }
     }
     const hasPrior = prior != null && Number.isFinite(Number(prior));
     const k = hasPrior ? 4 : 2;
@@ -307,6 +308,11 @@ function neededResource(req) {
     if (Number(r.cpu) >= 2) return `${Number(r.cpu)} cores`;
     return null;
 }
+
+// platform.resource-offer@1 / Codes' harness capabilities: host-access is the person's machine and its files;
+// tools are the harness's own tools (the CLI that holds the person's provider sign-in).
+const CAP_HOST_ACCESS = 'harness:host-access';
+const CAP_TOOLS = 'harness:tools';
 
 /** The rules as requirements; each is a hard filter, never weighed. */
 function applyRules(req, rules = {}) {
@@ -388,7 +394,13 @@ function lineFor(f = {}) {
     if (f.failure) return `Moved to ${name}: ${safeName(f.previousName)} ${failureText(f.failure.reason, f.failure.count || 1)}.`;
     if (f.staying && f.gain != null) return `Staying on ${name}: the best alternative is only ${pct(f.gain)}% better.`;
     if (f.streaming) return `On ${name}: ${safeName(f.streaming)} is streaming, and this needs ${f.gpu ? 'a GPU' : `${Number(f.cores)} cores`}.`;
-    if (f.owned && f.free) return `On ${name}: it has your ${f.provider ? `${safeName(f.provider)} ` : ''}sign-in and your files, and it's free.`;
+    if (f.owned && f.free) {
+        const provider = f.provider ? `${safeName(f.provider)} ` : '';
+        if (f.signIn && f.files) return `On ${name}: it has your ${provider}sign-in and your files, and it's free.`;
+        if (f.signIn) return `On ${name}: it has your ${provider}sign-in, and it's free.`;
+        if (f.files) return `On ${name}: it has your files, and it's free.`;
+        return `On ${name}: your own machine, and it's free.`;
+    }
     if (f.cheapest) return `On ${name}: the cheapest that meets the bar (${money(f.costUsd)} a try, ${pct(f.success)}% expected).`;
     return `On ${name}: it meets the bar (${money(f.costUsd)} a try, ${pct(f.success)}% expected).`;
 }
@@ -451,6 +463,7 @@ function place(requirements, offers, ctx = {}) {
     for (const r of ranked) delete r.score;
 
     const picked = result.selected ? above.find((c) => c.offer.offer_id === result.selected) : null;
+    const asked = new Set(requirements.capabilities || []);
     let line;
     if (!picked) {
         const fb = fallback && offers.find((o) => o.offer_id === fallback.id);
@@ -477,6 +490,8 @@ function place(requirements, offers, ctx = {}) {
             name: displayName(picked.offer, ctx.names),
             owned: ownedBy(picked.offer, person),
             free: cand.estimated_cost_usd === 0,
+            signIn: asked.has(CAP_TOOLS),
+            files: asked.has(CAP_HOST_ACCESS),
             provider: picked.offer.provider || (picked.offer.detail && picked.offer.detail.provider),
             streaming: streamingOffer ? displayName(streamingOffer, ctx.names) : null,
             cores: req.resources && req.resources.cpu,
@@ -502,7 +517,8 @@ function place(requirements, offers, ctx = {}) {
 
 /**
  * escalate(previous, failure, requirements, offers, ctx) → the next place() answer, or, after two escalations,
- * { result: { selected: null }, line: 'Ask the person: …' }. The failed try is recorded in ctx.outcomes.
+ * { result: { selected: null }, line: 'Ask the person: …' }. The failed try is learned here exactly once and
+ * returned as `outcomes`: the caller persists that set and must not record the same failure again.
  */
 function escalate(previous, failure, requirements, offers, ctx = {}) {
     const prev = previous || {};

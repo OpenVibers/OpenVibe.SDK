@@ -87,6 +87,8 @@ export type LineFacts = {
     name?: string;
     owned?: boolean;
     free?: boolean;
+    signIn?: boolean;
+    files?: boolean;
     provider?: string;
     streaming?: string | null;
     cores?: number;
@@ -106,7 +108,7 @@ export type LineFacts = {
 export declare function optionKey(offer: Offer): string;
 /** Add one try to the plain outcome counts, decayed to `at`; returns new data and never mutates the input. */
 export declare function learn(outcomes: Outcome[], entry: { person: string; key: string; kind: string; ok: boolean; at: number | string }): Outcome[];
-/** The Beta-mean success estimate for (person, key, kind), with decay, a Bench prior and the global counts. */
+/** The Beta-mean success estimate for (person, key, kind), with decay, a Bench prior and everyone else's counts. */
 export declare function successOf(outcomes: Outcome[], opts: { person?: string; key: string; kind?: string; prior?: number; now?: number | string }): number;
 /** The one-sentence explanation from fixed templates. */
 export declare function lineFor(facts: LineFacts): string;

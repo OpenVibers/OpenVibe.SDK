@@ -102,12 +102,12 @@ month ago counts for a quarter. The estimate is a Beta mean
 p = (k·prior + okP + w·okG) / (k + nP + w·nG)
 ```
 
-where `okP`/`nP` are this person's decayed successes and tries, `okG`/`nG` are everyone's, `w = min(1, 20 / nG)`, the
-prior is Bench's score for this key on this kind (0.7 when Bench has none), and `k` is 4 with a Bench prior and 2
-without one. With no counts for `code.fix` the kind falls back to `code`, then to the key's counts over every kind.
-A successful outcome means the step finished and its checks passed (Codes' proof, Run's exit 0, Actor's grounded
-check); a failure, a timeout or a result the person rejected is `ok: false`; a step the person cancelled is not
-counted.
+where `okP`/`nP` are this person's decayed successes and tries, `okG`/`nG` are **everyone else's** for the same pair
+(the person's own rows are not counted twice), `w = min(1, 20 / nG)`, the prior is Bench's score for this key on this
+kind (0.7 when Bench has none), and `k` is 4 with a Bench prior and 2 without one. With no counts for `code.fix` the
+kind falls back to `code`, then to the key's counts over every kind. A successful outcome means the step finished and
+its checks passed (Codes' proof, Run's exit 0, Actor's grounded check); a failure, a timeout or a result the person
+rejected is `ok: false`; a step the person cancelled is not counted.
 
 `place()` takes the outcomes and passes the per-offer estimate to `plan()`. When the success map is present the cost
 part of the score is `estimated_cost_usd / p` (cost per success); `estimated_cost_usd` in the result stays the raw
@@ -127,8 +127,11 @@ escalate(previous, failure, requirements, offers, ctx); // → the next place() 
 - `timeout` — exclude it and prefer `lowest-latency`.
 
 The failed option is `failure.option_id` (or `failure.id`), else `previous.result.selected`. At most two escalations
-per step; the third failure returns `{ result: { selected: null } }` and a line asking the person. The failed try is
-recorded with `learn()` and returned as `outcomes`.
+per step; the third failure returns `{ result: { selected: null } }` and a line asking the person.
+
+**The failed try is already learned here, exactly once.** `escalate()` calls `learn()` and returns the new count set as
+`outcomes`. The caller persists that returned set as-is and must not record the same failure again: doing both would
+count one failure twice. Carry the returned `outcomes` into the next `escalate()` and into whatever stores the counts.
 
 ## The line
 
@@ -136,9 +139,16 @@ One sentence from fixed templates, built from the two factors that decided the p
 else the offer's provider and model, else its id. Money is in dollars to 3 significant figures; a percentage is a
 whole number. The line never names another person, a key or a path.
 
+For the person's own free machine the line claims only what the step asked for: `harness:tools` (the harness's own
+tools, including the signed-in CLI) makes it say "your sign-in", and `harness:host-access` (the person's machine and
+its files) makes it say "your files". With neither it says only "your own machine".
+
 | Situation | Template |
 |---|---|
-| the person's own free machine | `On your desktop: it has your Claude sign-in and your files, and it's free.` |
+| own free machine, sign-in and files asked for | `On your desktop: it has your Claude sign-in and your files, and it's free.` |
+| own free machine, sign-in asked for | `On your desktop: it has your Claude sign-in, and it's free.` |
+| own free machine, files asked for | `On your desktop: it has your files, and it's free.` |
+| own free machine, neither asked for | `On your desktop: your own machine, and it's free.` |
 | another machine is streaming | `On the cloud pool: your desktop is streaming, and this needs 4 cores.` |
 | the cheapest that meets the bar | `On DeepSeek V4 Flash: the cheapest that meets the bar ($0.003 a try, 91% expected).` |
 | hysteresis keeps the current one | `Staying on your laptop: the best alternative is only 6% better.` |

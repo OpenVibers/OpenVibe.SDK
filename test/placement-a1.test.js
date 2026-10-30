@@ -69,7 +69,7 @@ run([
             { id: 'cloud', why: 'your rule: never send my repo to the cloud' },
             { id: 'theirs', why: "another person's machine" },
         ]);
-        assert.equal(r.line, 'On your desktop: it has your Claude sign-in and your files, and it\'s free.');
+        assert.equal(r.line, 'On your desktop: your own machine, and it\'s free.');
     }],
 
     ['rule onlyFree: max_cost_usd 0, so paid offers are excluded and free allowances still qualify', async () => {
@@ -120,41 +120,45 @@ run([
         assert.equal(fast.result.objective, 'lowest-latency');
     }],
 
-    ['successOf: the Beta mean, hand-computed (no counts, a Bench prior, personal vs global)', async () => {
+    ['successOf: the Beta mean, hand-computed (no counts, a Bench prior, personal vs everyone else)', async () => {
         // No counts and no Bench prior: (2·0.7 + 0) / (2 + 0) = 0.7.
         close(successOf([], { person: P, key: 'k', kind: 'code.fix', now: T }), 0.7, 'no counts');
         // A Bench prior 0.8: (4·0.8) / 4 = 0.8.
         close(successOf([], { person: P, key: 'k', kind: 'code.fix', prior: 0.8, now: T }), 0.8, 'prior only');
-        // This person 9/10 (okP=9, nP=10), everyone 10/20 (okG=10, nG=20, w=1):
-        // (2·0.7 + 9 + 1·10) / (2 + 10 + 1·20) = 20.4 / 32 = 0.6375.
+        // This person 9/10; everyone else 6/30 (nG > 20, so w = 2/3 and the personal record gets its due):
+        // (2·0.7 + 9 + (2/3)·6) / (2 + 10 + (2/3)·30) = 14.4 / 32 = 0.45.
         const counts = [
             { person: P, key: 'k', kind: 'code.fix', ok_w: 9, n_w: 10, updated_at: ISO(T) },
-            { person: Q, key: 'k', kind: 'code.fix', ok_w: 1, n_w: 10, updated_at: ISO(T) },
+            { person: Q, key: 'k', kind: 'code.fix', ok_w: 6, n_w: 30, updated_at: ISO(T) },
         ];
-        close(successOf(counts, { person: P, key: 'k', kind: 'code.fix', now: T }), 0.6375, 'personal counts');
-        // Without this person's rows: (2·0.7 + 10) / (2 + 20) = 11.4 / 22 = 0.51818…, so the personal record wins.
-        close(successOf(counts, { person: `usr_${'C'.repeat(26)}`, key: 'k', kind: 'code.fix', now: T }), 11.4 / 22, 'global only');
+        close(successOf(counts, { person: P, key: 'k', kind: 'code.fix', now: T }), 0.45, 'personal counts');
+        // For someone with no rows of their own, everyone else is the whole pool: 15/40, w = 1/2.
+        // (2·0.7 + 15·(1/2)) / (2 + 40·(1/2)) = 8.9 / 22 = 0.40454…, so the personal record wins.
+        close(successOf(counts, { person: `usr_${'C'.repeat(26)}`, key: 'k', kind: 'code.fix', now: T }), 8.9 / 22, 'global only');
+        // The person's own 10 failures are the only rows: global is empty, so the person-only Beta mean is
+        // (2·0.7 + 0) / (2 + 10) = 1.4 / 12 = 0.11666….
+        const onlyMine = [{ person: P, key: 'k', kind: 'code.fix', ok_w: 0, n_w: 10, updated_at: ISO(T) }];
+        close(successOf(onlyMine, { person: P, key: 'k', kind: 'code.fix', now: T }), 1.4 / 12, 'my failures only');
     }],
 
     ['successOf: decay at 14 and 28 days', async () => {
-        // 4/8 written 28 days ago. At 14 days ago it has decayed by half: 2/4, w=1.
-        // (2·0.7 + 2 + 2) / (2 + 4 + 4) = 5.4 / 10 = 0.54.
+        // 4/8 written 28 days ago. At 14 days ago it has decayed by half: 2/4. Global is empty (the person's own
+        // rows are not counted twice), so P = (2·0.7 + 2) / (2 + 4) = 3.4 / 6 = 0.56666….
         const old = [{ person: P, key: 'k', kind: 'code.fix', ok_w: 4, n_w: 8, updated_at: ISO(T - 28 * DAY) }];
-        close(successOf(old, { person: P, key: 'k', kind: 'code.fix', now: T - 14 * DAY }), 0.54, '14 days');
-        // At now it has decayed by a quarter: 1/2.
-        // (2·0.7 + 1 + 1) / (2 + 2 + 2) = 3.4 / 6 = 0.56666….
-        close(successOf(old, { person: P, key: 'k', kind: 'code.fix', now: T }), 3.4 / 6, '28 days');
+        close(successOf(old, { person: P, key: 'k', kind: 'code.fix', now: T - 14 * DAY }), 3.4 / 6, '14 days');
+        // At now it has decayed by a quarter: 1/2. P = (2·0.7 + 1) / (2 + 2) = 2.4 / 4 = 0.6.
+        close(successOf(old, { person: P, key: 'k', kind: 'code.fix', now: T }), 0.6, '28 days');
     }],
 
     ['successOf: the kind falls back by dotted prefix, then to every kind', async () => {
-        // No code.fix counts, so the code counts 6/8 are used. w=1:
-        // (2·0.7 + 6 + 6) / (2 + 8 + 8) = 13.4 / 18 = 0.74444….
+        // No code.fix counts, so the code counts 6/8 are used. Global is empty:
+        // (2·0.7 + 6) / (2 + 8) = 7.4 / 10 = 0.74.
         const parent = [{ person: P, key: 'k', kind: 'code', ok_w: 6, n_w: 8, updated_at: ISO(T) }];
-        close(successOf(parent, { person: P, key: 'k', kind: 'code.fix', now: T }), 13.4 / 18, 'code prefix');
-        close(successOf(parent, { person: P, key: 'k', kind: 'code.fix.tests', now: T }), 13.4 / 18, 'two levels up');
+        close(successOf(parent, { person: P, key: 'k', kind: 'code.fix', now: T }), 0.74, 'code prefix');
+        close(successOf(parent, { person: P, key: 'k', kind: 'code.fix.tests', now: T }), 0.74, 'two levels up');
         // No code.fix and no code: the key's counts over every kind are used.
         const other = [{ person: P, key: 'k', kind: 'other.kind', ok_w: 6, n_w: 8, updated_at: ISO(T) }];
-        close(successOf(other, { person: P, key: 'k', kind: 'code.fix', now: T }), 13.4 / 18, 'all kinds');
+        close(successOf(other, { person: P, key: 'k', kind: 'code.fix', now: T }), 0.74, 'all kinds');
     }],
 
     ['learn: decays to the write time, adds the try, and never mutates its input', async () => {
@@ -200,10 +204,21 @@ run([
         assert.equal(none.line, 'Nothing meets the bar for code.fix; the best is MiniMax M2 at 40%. Ask before going ahead?');
     }],
 
-    ['the line: owned and free', async () => {
-        const own = offer('desk', { trust: 'user-owned', owner: P, provider: 'Claude', region: 'home', pricing: { model: 'free-allowance', marginal_usd_per_unit: 0 } });
-        const r = place(req({ trust: ['user-owned'] }), [own], ctx({ person: P, floor: 0.5, priors: { desk: 0.9 }, names: { desk: 'your desktop' } }));
-        assert.equal(r.line, 'On your desktop: it has your Claude sign-in and your files, and it\'s free.');
+    ['the line: owned and free claims only the sign-in or files the step asked for', async () => {
+        const own = (caps) => offer('desk', {
+            trust: 'user-owned', owner: P, provider: 'Claude', region: 'home',
+            capabilities: ['worker:browser', ...caps], pricing: { model: 'free-allowance', marginal_usd_per_unit: 0 },
+        });
+        const run = (caps) => place(
+            req({ trust: ['user-owned'], capabilities: ['worker:browser', ...caps] }),
+            [own(caps)],
+            ctx({ person: P, floor: 0.5, priors: { desk: 0.9 }, names: { desk: 'your desktop' } }),
+        );
+        assert.equal(run(['harness:tools', 'harness:host-access']).line,
+            'On your desktop: it has your Claude sign-in and your files, and it\'s free.');
+        assert.equal(run(['harness:tools']).line, 'On your desktop: it has your Claude sign-in, and it\'s free.');
+        assert.equal(run(['harness:host-access']).line, 'On your desktop: it has your files, and it\'s free.');
+        assert.equal(run([]).line, 'On your desktop: your own machine, and it\'s free.');
     }],
 
     ['the line: a streaming machine, and the step needs 4 cores', async () => {
@@ -251,6 +266,25 @@ run([
         const three = escalate(two, { reason: 'quality' }, r, offers, { ...c, outcomes: two.outcomes });
         assert.deepEqual(three.result, { selected: null });
         assert.match(three.line, /^Ask the person: three tries failed/);
+    }],
+
+    ['escalate learns the failed try exactly once, and returns the set the caller persists', async () => {
+        const a = offer('a');
+        const b = offer('b', { pricing: { model: 'per-operation', marginal_usd_per_unit: 0.02 } });
+        const c = ctx({
+            person: P, step: { kind: 'code.fix' }, floor: 0.5,
+            outcomes: [{ person: P, key: 'a', kind: 'code.fix', ok_w: 1, n_w: 2, updated_at: ISO(T) }],
+        });
+        const base = place(req(), [a, b], c);
+        assert.equal(base.result.selected, 'a');
+        const esc = escalate(base, { reason: 'busy' }, req(), [a, b], c);
+        // One failure adds exactly one try: a's decayed 1/2 becomes 1/3, and no second row appears.
+        assert.equal(esc.outcomes.length, 1);
+        assert.equal(esc.outcomes.filter((r) => r.key === 'a').length, 1);
+        assert.deepEqual(
+            { ok_w: esc.outcomes[0].ok_w, n_w: esc.outcomes[0].n_w },
+            { ok_w: 1, n_w: 3 },
+        );
     }],
 
     ['escalation: each reason, and the stop after 2', async () => {

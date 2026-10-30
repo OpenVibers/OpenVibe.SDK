@@ -8,10 +8,15 @@
     saying why. It returns `{ result, line, ranked, rejected, fallback }`; `result` is exactly what `plan()` returns
     for the offers left in, validated as today.
   - `learn(outcomes, {person, key, kind, ok, at})` and `successOf(outcomes, {person, key, kind, prior, now})` keep
-    and read plain counts with a 14-day half-life, a Beta mean, Bench priors, the global weight `min(1, 20/nG)` and
-    the dotted-kind fallback. `escalate(previous, failure, requirements, offers, ctx)` handles quality, busy, offline,
-    refused, budget and timeout, and asks the person after two escalations. `optionKey(offer)` and `lineFor(facts)`
-    are exported too.
+    and read plain counts with a 14-day half-life, a Beta mean, Bench priors, the global weight `min(1, 20/nG)` over
+    **everyone else's** counts (the person's rows are not counted twice) and the dotted-kind fallback.
+    `escalate(previous, failure, requirements, offers, ctx)` handles quality, busy, offline, refused, budget and
+    timeout, and asks the person after two escalations. It learns the failed try exactly once and returns the new
+    counts as `outcomes`; the caller persists that set and must not record the same failure again.
+    `optionKey(offer)` and `lineFor(facts)` are exported too.
+  - On the person's own free machine the line claims only what the step asked for: `harness:tools` (the harness's
+    own tools, including the signed-in CLI) says "your sign-in", and `harness:host-access` (the person's machine and
+    its files) says "your files". With neither it says "your own machine".
   - `plan()` takes an optional `success: { [offer_id]: p }`: when present the cost part of the score is
     `estimated_cost_usd / p`, while `estimated_cost_usd` in the result stays the raw cost. When absent, scoring is
     unchanged.
@@ -26,7 +31,7 @@
     `health.streaming` is `true`, with the reason "it is streaming". The field is not in
     `platform.resource-offer@1` yet (Node reports `screen.state` in its own status, Bot's offer does not carry it),
     so this release fixes the name the Node can start sending; a top-level `offer.streaming` is tolerated too.
-  - README and [docs/placement.md](docs/placement.md): the API, the rules, the estimate, escalation and the six line
+  - README and [docs/placement.md](docs/placement.md): the API, the rules, the estimate, escalation and the line
     templates.
 
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
