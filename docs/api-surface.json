@@ -210,6 +210,12 @@
         "subscribe"
       ]
     },
+    "redact": {
+      "object": [
+        "onlySecret",
+        "redact"
+      ]
+    },
     "registry": {
       "object": [
         "createRegistryClient"
@@ -622,6 +628,10 @@
     "createRealtimeClient": "function",
     "parseSSE": "function",
     "subscribe": "function"
+  },
+  "openvibe-sdk/redact": {
+    "onlySecret": "function",
+    "redact": "function"
   },
   "openvibe-sdk/registry": {
     "createRegistryClient": "function"

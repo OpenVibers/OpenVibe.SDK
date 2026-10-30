@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.75.0 (2026-10-30)
+
+- **`openvibe-sdk/redact`: one secret scrubber for the Node and AI (Memory M2).**
+  - `redact(text)` → `{ text, count }` ports OpenVibe.Node's `internal/memory/redact.go` (Node #87): the same shapes,
+    the whole-text pass with a sentinel before the per-item pass, the unterminated private key block, Luhn card
+    numbers, and the deliberately wide environment-assignment rule. `onlySecret(text)` says an item was nothing but a
+    secret, so AI refuses it.
+  - `test/redact-corpus.json` holds every case of Node's `TestRedactEveryShape`, the split and unterminated key
+    blocks, the `.env` block and the harmless texts that must not change. Node copies the file and runs the same
+    cases against its Go scrubber, so the two ends share one list and one corpus.
+  - Pure functions, no dependencies: exported for Node and the browser, with ESM and TypeScript entries.
+
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 

@@ -70,6 +70,7 @@ const ENTRIES = {
     'host.mjs': '../src/host.js',
     'news.mjs': '../src/news.js',
     'no-looks.mjs': '../src/no-looks.js',
+    'redact.mjs': '../src/redact.js',
     'vision.mjs': '../src/vision.js',
     'front-page.mjs': '../src/front-page.js',
     'food.mjs': '../src/food.js',

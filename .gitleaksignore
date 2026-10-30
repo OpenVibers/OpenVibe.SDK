@@ -1,0 +1,13 @@
+# The shared redaction corpus holds fake secrets on purpose: every case proves that a shape is removed before an item
+# is stored. The values are obviously fake (FAKE, EXAMPLE, repeated letters) and exist only to be redacted. Each line
+# is the finding's fingerprint (file:rule:line), and only this fixture path is listed.
+test/redact-corpus.json:jwt:406
+test/redact-corpus.json:jwt:408
+test/redact-corpus.json:stripe-access-token:439
+test/redact-corpus.json:stripe-access-token:441
+test/redact-corpus.json:stripe-access-token:496
+test/redact-corpus.json:stripe-access-token:499
+test/redact-corpus.json:private-key:5
+test/redact-corpus.json:private-key:29
+test/redact-corpus.json:private-key:41
+test/redact-corpus.json:private-key:473
