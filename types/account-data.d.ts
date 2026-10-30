@@ -36,6 +36,7 @@ export interface AccountData {
 export function createAccountData(opts: {
     db: any;
     service: string;
+    /** The service's tables; telemetry_samples is covered by the SDK unless it is listed here. */
     tables: AccountDataTable[];
     extraExport?: (db: any, subject: string) => Promise<ExportFile[] | void>;
     extraErase?: (tx: any, subjects: string[], counts: EraseCounts & { add(o: Record<string, number>, kind: string, n: number): void }) => Promise<void>;
@@ -44,6 +45,16 @@ export function createAccountData(opts: {
     log?: { log(msg: string): void; warn(msg: string): void };
 }): AccountData;
 export function createNetworkSender(opts: { networkInternalUrl: string; clientId: string; clientSecret: string; fetch?: typeof fetch; timeoutMs?: number }): NetworkSend;
+export interface UncoveredOptions {
+    /** The service's table map, as entries or bare table names. */
+    tables?: (string | Pick<AccountDataTable, 'table'>)[];
+    /** Tables whose person column is a task's key; their rows go with the task, not the account. */
+    taskKeyed?: string[];
+    /** Tables left out on purpose, each with the reason. */
+    exempt?: Record<string, string>;
+}
+/** The tables with a person column (subject, owner, created_by, user_id, person) that nothing covers, sorted. */
+export function uncovered(db: any, opts?: UncoveredOptions): Promise<string[]>;
 export interface Subscriptions { topics: string[]; endpoint: string; done: Promise<boolean>; stop(): void }
 /** Create any missing Events subscription for `topics` (default TOPICS) at boot; null when a setting is missing. */
 export function startSubscriptions(opts: {

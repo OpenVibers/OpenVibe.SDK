@@ -338,7 +338,8 @@
     "TOPICS": "array",
     "createAccountData": "function",
     "createNetworkSender": "function",
-    "startSubscriptions": "function"
+    "startSubscriptions": "function",
+    "uncovered": "function"
   },
   "openvibe-sdk/actor": {
     "createActorClient": "function"
