@@ -382,7 +382,7 @@ function failureText(reason, count = 1) {
 function lineFor(f = {}) {
     const name = safeName(f.name);
     if (!f.selected) {
-        if (f.fallback) return `Nothing meets the bar for ${f.step || 'this'}; the best is ${safeName(f.fallback.name)} at ${pct(f.fallback.success)}%. Ask before going ahead?`;
+        if (f.fallback) return `Nothing meets the bar for ${safeName(f.step || 'this')}; the best is ${safeName(f.fallback.name)} at ${pct(f.fallback.success)}%. Ask before going ahead?`;
         return 'Ask the person: nothing can run this.';
     }
     if (f.failure) return `Moved to ${name}: ${safeName(f.previousName)} ${failureText(f.failure.reason, f.failure.count || 1)}.`;
