@@ -3,7 +3,7 @@
   "stage": "alpha",
   "code": true,
   "wave": "W2",
-  "version": "0.73.0",
+  "version": "0.74.0",
   "plan": "OpenVibe End-to-End Realignment & Implementation Plan, revision 3 (20 Sep 2026), §3.2; roadmap §30",
   "deployed": false,
   "deployment": "none: a package released as git tags; services and apps pin a tag",
@@ -30,7 +30,8 @@
     "usage: createUsageReporter (openvibe-sdk/usage), the shared platform.usage-sample@1 reporter — validated readings queued idempotency-keyed in an outbox and relayed to Billing with retry, never dropped, refused readings kept",
     "the HTTP telemetry kit (openvibe-sdk/service): the platform.telemetry-sample@1 middleware aggregated per route|method|status_class per flush, with active-requests, p95 and event-loop-lag gauges, lifted from Network's server/telemetry.js and server/observability.js",
     "the telemetry sink (openvibe-sdk/telemetry): telemetrySchema() DDL, createPgTelemetrySink() and pruneTelemetry(), a per-service PostgreSQL table every service stores platform.telemetry-sample@1 into",
+    "account-data (openvibe-sdk/account-data, ADR-033): telemetry_samples covered once by the SDK (exported as telemetry.json, anonymized on deletion), and uncovered() listing every table with a person column that no table map, task-keyed list or reasoned exemption covers",
     "resources (openvibe-sdk/resources): the ADR-048 resource index fan-out and the idempotent control client"
   ],
-  "updated": "2026-10-28"
+  "updated": "2026-10-30"
 }

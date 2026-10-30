@@ -3,6 +3,18 @@
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
+## 0.74.0 (2026-10-30)
+
+- **`openvibe-sdk/account-data`: telemetry leaves with the person, and a guard finds a table nobody covers (ADR-033).**
+  - `createAccountData` handles `telemetry_samples` by itself when the table exists: the person's samples are exported
+    as `telemetry.json` (`at`, `service`, `operation`, `resource`, `status`, `latency_ms`), and a deletion anonymizes
+    them (`subject` set to NULL, the sample kept) instead of removing them. A service that lists the table itself
+    keeps its own entry.
+  - `uncovered(db, {tables, taskKeyed, exempt})` lists every table in the current schema with a person-shaped column
+    (`subject`, `owner`, `created_by`, `user_id`, `person`) that the table map, the telemetry handling, a task-keyed
+    list or a reasoned exemption does not cover. A service's test asserts the list is empty, so a new table fails CI
+    until it is covered or exempted with a reason.
+
 ## 0.73.0 (2026-10-30)
 
 - **`openvibe-sdk/sso`: a sign-in that recovers, explains itself and can be checked.**
