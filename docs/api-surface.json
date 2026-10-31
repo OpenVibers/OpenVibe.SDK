@@ -420,6 +420,15 @@
     "actingHeaders": "function",
     "createCommunityClient": "function"
   },
+  "openvibe-sdk/consent": {
+    "DEFAULT_TIMEOUT_MS": "number",
+    "DEFAULT_TTL_MS": "number",
+    "FEATURES": "array",
+    "KINDS": "array",
+    "MAX_SUBJECTS": "number",
+    "PURPOSES": "array",
+    "createConsent": "function"
+  },
   "openvibe-sdk/core": {
     "CONTRACTS_RANGE": "string",
     "DEFAULT_NETWORK": "string",

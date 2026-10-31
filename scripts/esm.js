@@ -72,6 +72,7 @@ const ENTRIES = {
     'explicit.mjs': '../src/explicit.js',
     'no-looks.mjs': '../src/no-looks.js',
     'redact.mjs': '../src/redact.js',
+    'consent.mjs': '../src/consent.js',
     'vision.mjs': '../src/vision.js',
     'front-page.mjs': '../src/front-page.js',
     'food.mjs': '../src/food.js',

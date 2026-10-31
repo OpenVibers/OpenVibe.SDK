@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.78.0 (2026-10-31)
+
+- **`openvibe-sdk/consent`:** the client for the L24 consent registry. Nothing a person makes is off-limits to AI or
+  data use by design; each use is off until that person turns it on in OpenVibe.Network. A service asks this check
+  before it uses a person's content or likeness.
+  - `createConsent({ networkUrl, token, ttlMs = 60_000, fetch, log })`: `token` returns a service token holding
+    `network.consent.read`. `allowed(subject, purpose, { kind, client, feature })` → a boolean;
+    `filter(subjects, purpose, opts)` → the allowed subset, in input order, in batches of 500;
+    `onChange(event)` drops a subject's answers for a purpose on `network.consent.changed` (wire the payload or the
+    envelope); `mock(map)` answers from `{ subject: ['purpose'] }` without the network.
+  - **Fails closed:** a network error, the 2 s timeout, a non-200, a malformed answer or a token that cannot be
+    minted is false for everyone asked. A failure is never cached as a yes; it logs at most once a minute.
+  - An answer is cached for `ttlMs` (60 s), per subject, purpose, kind, client and feature; an answer in flight when
+    a change arrives is not stored, so a revocation cannot be overwritten.
+  - Server-side (`browser: null`): the token is a service token. Types are in `types/consent.d.ts`, the dataset-build
+    example in `docs/consent.md`.
+
 ## 0.77.0 (2026-10-31)
 
 - **AI text may describe people** (the owner, 2026-10-31: "there should be no reason it can't describe people … remove
