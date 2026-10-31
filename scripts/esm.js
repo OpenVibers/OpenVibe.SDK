@@ -28,6 +28,7 @@ const ENTRIES = {
     'bot.mjs': '../src/bot.js',
     'search.mjs': '../src/search.js',
     'bench.mjs': '../src/bench.js',
+    'meme.mjs': '../src/meme.js',
     'themes.mjs': '../src/themes.js',
     'limits.mjs': '../src/limits.js',
     'account-data.mjs': '../src/account-data.js',
