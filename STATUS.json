@@ -3,8 +3,8 @@
   "stage": "alpha",
   "code": true,
   "wave": "W2",
-  "version": "0.78.0",
-  "plan": "OpenVibe End-to-End Realignment & Implementation Plan, revision 3 (20 Sep 2026), \u00a73.2; roadmap \u00a730",
+  "version": "0.79.0",
+  "plan": "OpenVibe End-to-End Realignment & Implementation Plan, revision 3 (20 Sep 2026), §3.2; roadmap §30",
   "deployed": false,
   "deployment": "none: a package released as git tags; services and apps pin a tag",
   "contracts": "openvibe-contracts v0.222.0 (devDependency; runtime contracts range >=0.5.0 <1.0.0)",
@@ -28,13 +28,14 @@
     "valkey, cache, queue, pubsub and a shared limits store on Valkey 9, each with an in-process twin for tests",
     "commerce (openvibe-sdk/commerce): the shared Billing client for Tips and VIP, with intentKey and receipt",
     "events: the PostgreSQL outbox (lease-claimed, several relays per table) and inbox (handler in its transaction)",
-    "usage: createUsageReporter (openvibe-sdk/usage), the shared platform.usage-sample@1 reporter \u2014 validated readings queued idempotency-keyed in an outbox and relayed to Billing with retry, never dropped, refused readings kept",
+    "usage: createUsageReporter (openvibe-sdk/usage), the shared platform.usage-sample@1 reporter — validated readings queued idempotency-keyed in an outbox and relayed to Billing with retry, never dropped, refused readings kept",
     "the HTTP telemetry kit (openvibe-sdk/service): the platform.telemetry-sample@1 middleware aggregated per route|method|status_class per flush, with active-requests, p95 and event-loop-lag gauges, lifted from Network's server/telemetry.js and server/observability.js",
     "the telemetry sink (openvibe-sdk/telemetry): telemetrySchema() DDL, createPgTelemetrySink() and pruneTelemetry(), a per-service PostgreSQL table every service stores platform.telemetry-sample@1 into",
     "account-data (openvibe-sdk/account-data, ADR-033): telemetry_samples covered once by the SDK (exported as telemetry.json, anonymized on deletion), and uncovered() listing every table with a person column that no table map, task-keyed list or reasoned exemption covers",
     "resources (openvibe-sdk/resources): the ADR-048 resource index fan-out and the idempotent control client",
     "placement v1 (openvibe-sdk/placement): place() with the person's rules and ownership, the quality bar, cost per success, learn/successOf, escalate and the one-line reason; plan() takes the optional success map and never defaults to user-owned",
-    "consent (openvibe-sdk/consent): the L24 check before any use of a person's content or likeness for AI or data; allowed() and filter() (batches of 500), onChange() drops a subject's answers on network.consent.changed, mock() for tests; fails closed, caches 60 s, server-side"
+    "consent (openvibe-sdk/consent): the L24 check before any use of a person's content or likeness for AI or data; allowed() and filter() (batches of 500), onChange() drops a subject's answers on network.consent.changed, mock() for tests; fails closed, caches 60 s, server-side",
+    "openvibe-sdk/machines: the network's machines hub (list, get, catalogue, pair, rename, roles, revoke) against OpenVibe.Network, for a person and for the apps they consented to"
   ],
   "updated": "2026-10-31"
 }
