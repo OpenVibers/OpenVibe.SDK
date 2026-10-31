@@ -1,4 +1,4 @@
-/** openvibe-sdk/machines: the network's machines hub (plan L34; Contracts 0.257.0). */
+/** openvibe-sdk/machines: the network's machines hub (plan L34; Contracts 0.258.0). */
 
 /** One machine as the hub shows it (network.machine@1). */
 export interface Machine {

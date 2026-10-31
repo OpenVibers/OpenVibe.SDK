@@ -2,7 +2,7 @@
 
 ## 0.79.0 (2026-10-31)
 
-- **`openvibe-sdk/machines`: the network's machines hub** (plan L34, step M2; Contracts 0.257.0). A person's machines
+- **`openvibe-sdk/machines`: the network's machines hub** (plan L34, step M2; Contracts 0.258.0). A person's machines
   are the network's: Bot stays the registry underneath, and OpenVibe.Network fronts it on openvibe.network/machines for
   the person and for the apps the person consented to.
   - `createMachines({ networkUrl, token, fetch, timeoutMs })`: `token` returns the caller's own bearer token — the

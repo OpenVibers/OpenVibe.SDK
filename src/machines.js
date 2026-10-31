@@ -1,6 +1,6 @@
 'use strict';
 /**
- * openvibe-sdk/machines — the network's machines hub (plan L34, step M2; Contracts 0.257.0).
+ * openvibe-sdk/machines — the network's machines hub (plan L34, step M2; Contracts 0.258.0).
  *
  * A person's machines are the network's: Bot stays the registry underneath, and OpenVibe.Network fronts it on
  * openvibe.network/machines for the person and for the apps the person consented to. This module is the hub's API:
