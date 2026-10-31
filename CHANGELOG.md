@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.77.0 (2026-10-31)
+
+- **AI text may describe people** (the owner, 2026-10-31: "there should be no reason it can't describe people … remove
+  all that crap"). `openvibe-sdk/no-looks` is deprecated. `noLooks`, `noLooksTags` and `hasLooks` return what they are
+  given, and `RULES_VERSION` is `'off'`, so a service that still calls them keeps working until its next release
+  removes the calls.
+- **`openvibe-sdk/explicit`:** `isExplicit(...texts)`, the rule that stays. AI text that says a scene shows sexual
+  content is not published. `no-looks` re-exports it.
+
 ## 0.76.0 (2026-10-30)
 
 - **`openvibe-sdk/placement`: placement v1 — quality, the person's rules, learning and a reason (agent plan A1).**

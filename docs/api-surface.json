@@ -501,6 +501,9 @@
     "verifyDelivery": "function",
     "verifyDeliveryV2": "function"
   },
+  "openvibe-sdk/explicit": {
+    "isExplicit": "function"
+  },
   "openvibe-sdk/food": {
     "createFoodClient": "function"
   },
