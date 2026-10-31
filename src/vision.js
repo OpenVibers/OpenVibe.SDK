@@ -14,7 +14,7 @@
  * capability its route names (vision.image.ask, vision.text.read, vision.model.compare, vision.alt.write,
  * vision.media.find, vision.receipt.read, vision.product.match, vision.camera.watch, vision.video.moments,
  * vision.face.cast.match). Face matching is refused without an active consent record for that person, and the refusal
- * is the same whether or not the person exists. Public AI text has passed noLooks: a look-naming answer is replaced.
+ * is the same whether or not the person exists.
  *
  * The MCP endpoint is POST /mcp (Streamable HTTP, protocol 2025-06-18); clients that need a token discover it from
  * /.well-known/oauth-protected-resource, as RFC 9728 says.
