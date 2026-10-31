@@ -87,6 +87,26 @@ function createVisionClient(client, { baseUrl, audience = DEFAULT_AUDIENCE } = {
         cluster: (region) => call({ method: 'POST', path: '/api/v1/faces/library/cluster', json: { region } }),
         groups: () => call({ path: '/api/v1/faces/library/groups' }),
         correct: (action, ids) => call({ method: 'POST', path: '/api/v1/faces/library/correct', json: { action, ids } }),
+        /**
+         * F1 familiar faces: the camera owner's own library. A named person may stay pending_consent in a strict
+         * region until Network's registry says yes (or they accept the private link); only that library is matched.
+         */
+        familiar: {
+            list: () => call({ path: '/api/v1/faces/libraries' }),
+            create: (body) => call({ method: 'POST', path: '/api/v1/faces/libraries', json: body }),
+            get: (libraryId) => call({ path: `/api/v1/faces/libraries/${encodeURIComponent(libraryId)}` }),
+            update: (libraryId, body) => call({ method: 'PATCH', path: `/api/v1/faces/libraries/${encodeURIComponent(libraryId)}`, json: body }),
+            remove: (libraryId) => call({ method: 'DELETE', path: `/api/v1/faces/libraries/${encodeURIComponent(libraryId)}` }),
+            enroll: (libraryId, image, fields = {}, opts) => one(`/api/v1/faces/libraries/${encodeURIComponent(libraryId)}/enroll`, image, fields, opts),
+            match: (libraryId, image, opts) => one(`/api/v1/faces/libraries/${encodeURIComponent(libraryId)}/match`, image, {}, opts),
+            people: (libraryId) => call({ path: `/api/v1/faces/libraries/${encodeURIComponent(libraryId)}/people` }),
+            patchPerson: (libraryId, personId, body) => call({ method: 'PATCH', path: `/api/v1/faces/libraries/${encodeURIComponent(libraryId)}/people/${encodeURIComponent(personId)}`, json: body }),
+            removePerson: (libraryId, personId) => call({ method: 'DELETE', path: `/api/v1/faces/libraries/${encodeURIComponent(libraryId)}/people/${encodeURIComponent(personId)}` }),
+            requestConsent: (libraryId, personId) => call({ method: 'POST', path: `/api/v1/faces/libraries/${encodeURIComponent(libraryId)}/people/${encodeURIComponent(personId)}/request` }),
+            checkConsent: (libraryId) => call({ method: 'POST', path: `/api/v1/faces/libraries/${encodeURIComponent(libraryId)}/consent-check` }),
+            acceptConsent: (token, body) => call({ method: 'POST', path: `/api/v1/faces/consent-requests/${encodeURIComponent(token)}/accept`, json: body }),
+            denyConsent: (token) => call({ method: 'POST', path: `/api/v1/faces/consent-requests/${encodeURIComponent(token)}/deny` }),
+        },
     };
 
     return {
