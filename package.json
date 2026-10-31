@@ -1,492 +1,498 @@
 {
-  "name": "openvibe-sdk",
-  "version": "0.78.0",
-  "description": "Supported browser and server clients for the OpenVibe platform: auth (incl. developer apps), registry discovery, identity, user modules, events, realtime, media, community, Bot robots, search, chat, AI runs, Tools (registry, run API and jobs), VIP memberships and developer projects, the async PostgreSQL data layer (db) and the Valkey cache, limits store, queue and pub/sub, with deadlines, safe retries, problem errors and trace propagation.",
-  "main": "index.js",
-  "types": "types/index.d.ts",
-  "browser": "browser.js",
-  "exports": {
-    ".": {
-      "types": "./types/index.d.ts",
-      "browser": "./browser.js",
-      "import": "./esm/index.mjs",
-      "default": "./index.js"
-    },
-    "./core": {
-      "types": "./types/core.d.ts",
-      "import": "./esm/core.mjs",
-      "default": "./src/core/index.js"
-    },
-    "./auth": {
-      "types": "./types/auth.d.ts",
-      "browser": "./src/auth/browser.js",
-      "import": "./esm/auth.mjs",
-      "default": "./src/auth/index.js"
-    },
-    "./auth/browser": {
-      "types": "./types/auth-browser.d.ts",
-      "import": "./esm/auth-browser.mjs",
-      "default": "./src/auth/browser.js"
-    },
-    "./registry": {
-      "types": "./types/registry.d.ts",
-      "import": "./esm/registry.mjs",
-      "default": "./src/registry.js"
-    },
-    "./identity": {
-      "types": "./types/identity.d.ts",
-      "browser": null,
-      "import": "./esm/identity.mjs",
-      "default": "./src/identity.js"
-    },
-    "./notifications": {
-      "types": "./types/notifications.d.ts",
-      "browser": null,
-      "import": "./esm/notifications.mjs",
-      "default": "./src/notifications.js"
-    },
-    "./modules": {
-      "types": "./types/modules.d.ts",
-      "import": "./esm/modules.mjs",
-      "default": "./src/modules.js"
-    },
-    "./events": {
-      "types": "./types/events.d.ts",
-      "browser": null,
-      "import": "./esm/events.mjs",
-      "default": "./src/events.js"
-    },
-    "./sso": {
-      "types": "./types/sso.d.ts",
-      "browser": null,
-      "import": "./esm/sso.mjs",
-      "default": "./src/sso/index.js"
-    },
-    "./realtime": {
-      "types": "./types/realtime.d.ts",
-      "import": "./esm/realtime.mjs",
-      "default": "./src/realtime.js"
-    },
-    "./media": {
-      "types": "./types/media.d.ts",
-      "import": "./esm/media.mjs",
-      "default": "./src/media.js"
-    },
-    "./community": {
-      "types": "./types/community.d.ts",
-      "import": "./esm/community.mjs",
-      "default": "./src/community.js"
-    },
-    "./bot": {
-      "types": "./types/bot.d.ts",
-      "import": "./esm/bot.mjs",
-      "default": "./src/bot.js"
-    },
-    "./search": {
-      "types": "./types/search.d.ts",
-      "import": "./esm/search.mjs",
-      "default": "./src/search.js"
-    },
-    "./bench": {
-      "types": "./types/bench.d.ts",
-      "import": "./esm/bench.mjs",
-      "default": "./src/bench.js"
-    },
-    "./themes": {
-      "types": "./types/themes.d.ts",
-      "import": "./esm/themes.mjs",
-      "default": "./src/themes.js"
-    },
-    "./limits": {
-      "types": "./types/limits.d.ts",
-      "browser": null,
-      "import": "./esm/limits.mjs",
-      "default": "./src/limits.js"
-    },
-    "./account-data": {
-      "types": "./types/account-data.d.ts",
-      "browser": null,
-      "import": "./esm/account-data.mjs",
-      "default": "./src/account-data.js"
-    },
-    "./govern": {
-      "types": "./types/govern.d.ts",
-      "browser": null,
-      "import": "./esm/govern.mjs",
-      "default": "./src/govern.js"
-    },
-    "./placement": {
-      "types": "./types/placement.d.ts",
-      "browser": null,
-      "import": "./esm/placement.mjs",
-      "default": "./src/placement.js"
-    },
-    "./usage": {
-      "types": "./types/usage.d.ts",
-      "browser": null,
-      "import": "./esm/usage.mjs",
-      "default": "./src/usage.js"
-    },
-    "./resources": {
-      "types": "./types/resources.d.ts",
-      "browser": null,
-      "import": "./esm/resources.mjs",
-      "default": "./src/resources.js"
-    },
-    "./telemetry": {
-      "types": "./types/telemetry.d.ts",
-      "browser": null,
-      "import": "./esm/telemetry.mjs",
-      "default": "./src/telemetry.js"
-    },
-    "./cost": {
-      "types": "./types/cost.d.ts",
-      "browser": null,
-      "import": "./esm/cost.mjs",
-      "default": "./src/cost.js"
-    },
-    "./runtime": {
-      "types": "./types/runtime.d.ts",
-      "browser": null,
-      "import": "./esm/runtime.mjs",
-      "default": "./src/runtime.js"
-    },
-    "./storage": {
-      "types": "./types/storage.d.ts",
-      "browser": null,
-      "import": "./esm/storage.mjs",
-      "default": "./src/storage.js"
-    },
-    "./commerce": {
-      "types": "./types/commerce.d.ts",
-      "browser": null,
-      "import": "./esm/commerce.mjs",
-      "default": "./src/commerce.js"
-    },
-    "./delivery": {
-      "types": "./types/delivery.d.ts",
-      "browser": null,
-      "import": "./esm/delivery.mjs",
-      "default": "./src/delivery.js"
-    },
-    "./node": {
-      "types": "./types/node.d.ts",
-      "browser": null,
-      "import": "./esm/node.mjs",
-      "default": "./src/node.js"
-    },
-    "./db": {
-      "types": "./types/db.d.ts",
-      "browser": null,
-      "import": "./esm/db.mjs",
-      "default": "./src/db/index.js"
-    },
-    "./valkey": {
-      "types": "./types/valkey.d.ts",
-      "browser": null,
-      "import": "./esm/valkey.mjs",
-      "default": "./src/valkey.js"
-    },
-    "./cache": {
-      "types": "./types/cache.d.ts",
-      "browser": null,
-      "import": "./esm/cache.mjs",
-      "default": "./src/cache.js"
-    },
-    "./queue": {
-      "types": "./types/queue.d.ts",
-      "browser": null,
-      "import": "./esm/queue.mjs",
-      "default": "./src/queue.js"
-    },
-    "./pubsub": {
-      "types": "./types/pubsub.d.ts",
-      "browser": null,
-      "import": "./esm/pubsub.mjs",
-      "default": "./src/pubsub.js"
-    },
-    "./chat": {
-      "types": "./types/chat.d.ts",
-      "import": "./esm/chat.mjs",
-      "default": "./src/chat.js"
-    },
-    "./ai": {
-      "types": "./types/ai.d.ts",
-      "import": "./esm/ai.mjs",
-      "default": "./src/ai.js"
-    },
-    "./jobs": {
-      "types": "./types/jobs.d.ts",
-      "import": "./esm/jobs.mjs",
-      "default": "./src/jobs.js"
-    },
-    "./tools": {
-      "types": "./types/tools.d.ts",
-      "import": "./esm/tools.mjs",
-      "default": "./src/tools.js"
-    },
-    "./projects": {
-      "types": "./types/projects.d.ts",
-      "import": "./esm/projects.mjs",
-      "default": "./src/projects.js"
-    },
-    "./frame": {
-      "types": "./types/frame.d.ts",
-      "import": "./esm/frame.mjs",
-      "default": "./src/frame.js"
-    },
-    "./geo": {
-      "types": "./types/geo.d.ts",
-      "import": "./esm/geo.mjs",
-      "default": "./src/geo.js"
-    },
-    "./openre": {
-      "types": "./types/openre.d.ts",
-      "browser": null,
-      "import": "./esm/openre.mjs",
-      "default": "./src/openre.js"
-    },
-    "./play": {
-      "types": "./types/play.d.ts",
-      "browser": null,
-      "import": "./esm/play.mjs",
-      "default": "./src/play.js"
-    },
-    "./download": {
-      "types": "./types/download.d.ts",
-      "browser": null,
-      "import": "./esm/download.mjs",
-      "default": "./src/download.js"
-    },
-    "./quest": {
-      "types": "./types/quest.d.ts",
-      "browser": null,
-      "import": "./esm/quest.mjs",
-      "default": "./src/quest.js"
-    },
-    "./live": {
-      "types": "./types/live.d.ts",
-      "browser": null,
-      "import": "./esm/live.mjs",
-      "default": "./src/live.js"
-    },
-    "./inventory": {
-      "types": "./types/inventory.d.ts",
-      "browser": null,
-      "import": "./esm/inventory.mjs",
-      "default": "./src/inventory.js"
-    },
-    "./tips": {
-      "types": "./types/tips.d.ts",
-      "browser": null,
-      "import": "./esm/tips.mjs",
-      "default": "./src/tips.js"
-    },
-    "./blog": {
-      "types": "./types/blog.d.ts",
-      "browser": null,
-      "import": "./esm/blog.mjs",
-      "default": "./src/blog.js"
-    },
-    "./food": {
-      "types": "./types/food.d.ts",
-      "browser": null,
-      "import": "./esm/food.mjs",
-      "default": "./src/food.js"
-    },
-    "./actor": {
-      "types": "./types/actor.d.ts",
-      "browser": null,
-      "import": "./esm/actor.mjs",
-      "default": "./src/actor.js"
-    },
-    "./run": {
-      "types": "./types/run.d.ts",
-      "browser": null,
-      "import": "./esm/run.mjs",
-      "default": "./src/run.js"
-    },
-    "./video": {
-      "types": "./types/video.d.ts",
-      "browser": null,
-      "import": "./esm/video.mjs",
-      "default": "./src/video.js"
-    },
-    "./work": {
-      "types": "./types/work.d.ts",
-      "browser": null,
-      "import": "./esm/work.mjs",
-      "default": "./src/work.js"
-    },
-    "./zone": {
-      "types": "./types/zone.d.ts",
-      "browser": null,
-      "import": "./esm/zone.mjs",
-      "default": "./src/zone.js"
-    },
-    "./reviews": {
-      "types": "./types/reviews.d.ts",
-      "browser": null,
-      "import": "./esm/reviews.mjs",
-      "default": "./src/reviews.js"
-    },
-    "./wiki": {
-      "types": "./types/wiki.d.ts",
-      "browser": null,
-      "import": "./esm/wiki.mjs",
-      "default": "./src/wiki.js"
-    },
-    "./coupons": {
-      "types": "./types/coupons.d.ts",
-      "browser": null,
-      "import": "./esm/coupons.mjs",
-      "default": "./src/coupons.js"
-    },
-    "./deals": {
-      "types": "./types/deals.d.ts",
-      "browser": null,
-      "import": "./esm/deals.mjs",
-      "default": "./src/deals.js"
-    },
-    "./trade": {
-      "types": "./types/trade.d.ts",
-      "browser": null,
-      "import": "./esm/trade.mjs",
-      "default": "./src/trade.js"
-    },
-    "./space": {
-      "types": "./types/space.d.ts",
-      "browser": null,
-      "import": "./esm/space.mjs",
-      "default": "./src/space.js"
-    },
-    "./host": {
-      "types": "./types/host.d.ts",
-      "browser": null,
-      "import": "./esm/host.mjs",
-      "default": "./src/host.js"
-    },
-    "./news": {
-      "types": "./types/news.d.ts",
-      "browser": null,
-      "import": "./esm/news.mjs",
-      "default": "./src/news.js"
-    },
-    "./explicit": {
-      "types": "./types/explicit.d.ts",
-      "import": "./esm/explicit.mjs",
-      "default": "./src/explicit.js"
-    },
-    "./no-looks": {
-      "types": "./types/no-looks.d.ts",
-      "import": "./esm/no-looks.mjs",
-      "default": "./src/no-looks.js"
-    },
-    "./redact": {
-      "types": "./types/redact.d.ts",
-      "import": "./esm/redact.mjs",
-      "default": "./src/redact.js"
-    },
-    "./consent": {
-      "types": "./types/consent.d.ts",
-      "browser": null,
-      "import": "./esm/consent.mjs",
-      "default": "./src/consent.js"
-    },
-    "./vision": {
-      "types": "./types/vision.d.ts",
-      "import": "./esm/vision.mjs",
-      "default": "./src/vision.js"
-    },
-    "./front-page": {
-      "types": "./types/front-page.d.ts",
-      "import": "./esm/front-page.mjs",
-      "default": "./src/front-page.js"
-    },
-    "./vip": {
-      "types": "./types/vip.d.ts",
-      "browser": null,
-      "import": "./esm/vip.mjs",
-      "default": "./src/vip.js"
-    },
-    "./service": {
-      "types": "./types/service.d.ts",
-      "browser": null,
-      "import": "./esm/service.mjs",
-      "default": "./src/service/index.js"
-    },
-    "./testing": {
-      "types": "./types/testing.d.ts",
-      "browser": null,
-      "import": "./esm/testing.mjs",
-      "default": "./src/testing/index.js"
-    },
-    "./browser/openvibe-sdk.mjs": {
-      "types": "./types/bundle.d.ts",
-      "default": "./browser/openvibe-sdk.mjs"
-    },
-    "./package.json": "./package.json"
-  },
-  "bin": {
-    "openvibe-download": "bin/openvibe-download.js"
-  },
-  "files": [
-    "bin/",
-    "index.js",
-    "browser.js",
-    "src/",
-    "esm/",
-    "browser/",
-    "types/",
-    "README.md",
-    "CHANGELOG.md",
-    "LICENSE",
-    "docs/"
-  ],
-  "scripts": {
-    "test": "node test/run.js",
-    "esm": "node scripts/esm.js",
-    "browser-bundle": "node scripts/browser-bundle.js",
-    "surface": "node scripts/surface.js"
-  },
-  "engines": {
-    "node": ">=20"
-  },
-  "sideEffects": false,
-  "keywords": [
-    "openvibe",
-    "sdk",
-    "oauth",
-    "pkce",
-    "events",
-    "sse",
-    "media",
-    "jobs",
-    "tools",
-    "developer-apps"
-  ],
-  "repository": "github:OpenVibers/OpenVibe.SDK",
-  "license": "MIT",
-  "devDependencies": {
-    "@electric-sql/pglite": "^0.5.8",
-    "iovalkey": "^0.4.0",
-    "openvibe-contracts": "https://codeload.github.com/OpenVibers/OpenVibe.Contracts/tar.gz/refs/tags/v0.225.0",
-    "pg": "^8.23.0"
-  },
-  "peerDependencies": {
-    "@electric-sql/pglite": "^0.5.8",
-    "iovalkey": "^0.4.0",
-    "pg": "^8.23.0"
-  },
-  "peerDependenciesMeta": {
-    "pg": {
-      "optional": true
-    },
-    "@electric-sql/pglite": {
-      "optional": true
-    },
-    "iovalkey": {
-      "optional": true
+    "name": "openvibe-sdk",
+    "version": "0.79.0",
+    "description": "Supported browser and server clients for the OpenVibe platform: auth (incl. developer apps), registry discovery, identity, user modules, events, realtime, media, community, Bot robots, search, chat, AI runs, Tools (registry, run API and jobs), VIP memberships and developer projects, the async PostgreSQL data layer (db) and the Valkey cache, limits store, queue and pub/sub, with deadlines, safe retries, problem errors and trace propagation.",
+    "main": "index.js",
+    "types": "types/index.d.ts",
+    "browser": "browser.js",
+    "exports": {
+        ".": {
+            "types": "./types/index.d.ts",
+            "browser": "./browser.js",
+            "import": "./esm/index.mjs",
+            "default": "./index.js"
+        },
+        "./core": {
+            "types": "./types/core.d.ts",
+            "import": "./esm/core.mjs",
+            "default": "./src/core/index.js"
+        },
+        "./auth": {
+            "types": "./types/auth.d.ts",
+            "browser": "./src/auth/browser.js",
+            "import": "./esm/auth.mjs",
+            "default": "./src/auth/index.js"
+        },
+        "./auth/browser": {
+            "types": "./types/auth-browser.d.ts",
+            "import": "./esm/auth-browser.mjs",
+            "default": "./src/auth/browser.js"
+        },
+        "./registry": {
+            "types": "./types/registry.d.ts",
+            "import": "./esm/registry.mjs",
+            "default": "./src/registry.js"
+        },
+        "./identity": {
+            "types": "./types/identity.d.ts",
+            "browser": null,
+            "import": "./esm/identity.mjs",
+            "default": "./src/identity.js"
+        },
+        "./notifications": {
+            "types": "./types/notifications.d.ts",
+            "browser": null,
+            "import": "./esm/notifications.mjs",
+            "default": "./src/notifications.js"
+        },
+        "./modules": {
+            "types": "./types/modules.d.ts",
+            "import": "./esm/modules.mjs",
+            "default": "./src/modules.js"
+        },
+        "./events": {
+            "types": "./types/events.d.ts",
+            "browser": null,
+            "import": "./esm/events.mjs",
+            "default": "./src/events.js"
+        },
+        "./sso": {
+            "types": "./types/sso.d.ts",
+            "browser": null,
+            "import": "./esm/sso.mjs",
+            "default": "./src/sso/index.js"
+        },
+        "./realtime": {
+            "types": "./types/realtime.d.ts",
+            "import": "./esm/realtime.mjs",
+            "default": "./src/realtime.js"
+        },
+        "./media": {
+            "types": "./types/media.d.ts",
+            "import": "./esm/media.mjs",
+            "default": "./src/media.js"
+        },
+        "./community": {
+            "types": "./types/community.d.ts",
+            "import": "./esm/community.mjs",
+            "default": "./src/community.js"
+        },
+        "./bot": {
+            "types": "./types/bot.d.ts",
+            "import": "./esm/bot.mjs",
+            "default": "./src/bot.js"
+        },
+        "./search": {
+            "types": "./types/search.d.ts",
+            "import": "./esm/search.mjs",
+            "default": "./src/search.js"
+        },
+        "./bench": {
+            "types": "./types/bench.d.ts",
+            "import": "./esm/bench.mjs",
+            "default": "./src/bench.js"
+        },
+        "./meme": {
+            "types": "./types/meme.d.ts",
+            "browser": "./src/meme.js",
+            "import": "./esm/meme.mjs",
+            "default": "./src/meme.js"
+        },
+        "./themes": {
+            "types": "./types/themes.d.ts",
+            "import": "./esm/themes.mjs",
+            "default": "./src/themes.js"
+        },
+        "./limits": {
+            "types": "./types/limits.d.ts",
+            "browser": null,
+            "import": "./esm/limits.mjs",
+            "default": "./src/limits.js"
+        },
+        "./account-data": {
+            "types": "./types/account-data.d.ts",
+            "browser": null,
+            "import": "./esm/account-data.mjs",
+            "default": "./src/account-data.js"
+        },
+        "./govern": {
+            "types": "./types/govern.d.ts",
+            "browser": null,
+            "import": "./esm/govern.mjs",
+            "default": "./src/govern.js"
+        },
+        "./placement": {
+            "types": "./types/placement.d.ts",
+            "browser": null,
+            "import": "./esm/placement.mjs",
+            "default": "./src/placement.js"
+        },
+        "./usage": {
+            "types": "./types/usage.d.ts",
+            "browser": null,
+            "import": "./esm/usage.mjs",
+            "default": "./src/usage.js"
+        },
+        "./resources": {
+            "types": "./types/resources.d.ts",
+            "browser": null,
+            "import": "./esm/resources.mjs",
+            "default": "./src/resources.js"
+        },
+        "./telemetry": {
+            "types": "./types/telemetry.d.ts",
+            "browser": null,
+            "import": "./esm/telemetry.mjs",
+            "default": "./src/telemetry.js"
+        },
+        "./cost": {
+            "types": "./types/cost.d.ts",
+            "browser": null,
+            "import": "./esm/cost.mjs",
+            "default": "./src/cost.js"
+        },
+        "./runtime": {
+            "types": "./types/runtime.d.ts",
+            "browser": null,
+            "import": "./esm/runtime.mjs",
+            "default": "./src/runtime.js"
+        },
+        "./storage": {
+            "types": "./types/storage.d.ts",
+            "browser": null,
+            "import": "./esm/storage.mjs",
+            "default": "./src/storage.js"
+        },
+        "./commerce": {
+            "types": "./types/commerce.d.ts",
+            "browser": null,
+            "import": "./esm/commerce.mjs",
+            "default": "./src/commerce.js"
+        },
+        "./delivery": {
+            "types": "./types/delivery.d.ts",
+            "browser": null,
+            "import": "./esm/delivery.mjs",
+            "default": "./src/delivery.js"
+        },
+        "./node": {
+            "types": "./types/node.d.ts",
+            "browser": null,
+            "import": "./esm/node.mjs",
+            "default": "./src/node.js"
+        },
+        "./db": {
+            "types": "./types/db.d.ts",
+            "browser": null,
+            "import": "./esm/db.mjs",
+            "default": "./src/db/index.js"
+        },
+        "./valkey": {
+            "types": "./types/valkey.d.ts",
+            "browser": null,
+            "import": "./esm/valkey.mjs",
+            "default": "./src/valkey.js"
+        },
+        "./cache": {
+            "types": "./types/cache.d.ts",
+            "browser": null,
+            "import": "./esm/cache.mjs",
+            "default": "./src/cache.js"
+        },
+        "./queue": {
+            "types": "./types/queue.d.ts",
+            "browser": null,
+            "import": "./esm/queue.mjs",
+            "default": "./src/queue.js"
+        },
+        "./pubsub": {
+            "types": "./types/pubsub.d.ts",
+            "browser": null,
+            "import": "./esm/pubsub.mjs",
+            "default": "./src/pubsub.js"
+        },
+        "./chat": {
+            "types": "./types/chat.d.ts",
+            "import": "./esm/chat.mjs",
+            "default": "./src/chat.js"
+        },
+        "./ai": {
+            "types": "./types/ai.d.ts",
+            "import": "./esm/ai.mjs",
+            "default": "./src/ai.js"
+        },
+        "./jobs": {
+            "types": "./types/jobs.d.ts",
+            "import": "./esm/jobs.mjs",
+            "default": "./src/jobs.js"
+        },
+        "./tools": {
+            "types": "./types/tools.d.ts",
+            "import": "./esm/tools.mjs",
+            "default": "./src/tools.js"
+        },
+        "./projects": {
+            "types": "./types/projects.d.ts",
+            "import": "./esm/projects.mjs",
+            "default": "./src/projects.js"
+        },
+        "./frame": {
+            "types": "./types/frame.d.ts",
+            "import": "./esm/frame.mjs",
+            "default": "./src/frame.js"
+        },
+        "./geo": {
+            "types": "./types/geo.d.ts",
+            "import": "./esm/geo.mjs",
+            "default": "./src/geo.js"
+        },
+        "./openre": {
+            "types": "./types/openre.d.ts",
+            "browser": null,
+            "import": "./esm/openre.mjs",
+            "default": "./src/openre.js"
+        },
+        "./play": {
+            "types": "./types/play.d.ts",
+            "browser": null,
+            "import": "./esm/play.mjs",
+            "default": "./src/play.js"
+        },
+        "./download": {
+            "types": "./types/download.d.ts",
+            "browser": null,
+            "import": "./esm/download.mjs",
+            "default": "./src/download.js"
+        },
+        "./quest": {
+            "types": "./types/quest.d.ts",
+            "browser": null,
+            "import": "./esm/quest.mjs",
+            "default": "./src/quest.js"
+        },
+        "./live": {
+            "types": "./types/live.d.ts",
+            "browser": null,
+            "import": "./esm/live.mjs",
+            "default": "./src/live.js"
+        },
+        "./inventory": {
+            "types": "./types/inventory.d.ts",
+            "browser": null,
+            "import": "./esm/inventory.mjs",
+            "default": "./src/inventory.js"
+        },
+        "./tips": {
+            "types": "./types/tips.d.ts",
+            "browser": null,
+            "import": "./esm/tips.mjs",
+            "default": "./src/tips.js"
+        },
+        "./blog": {
+            "types": "./types/blog.d.ts",
+            "browser": null,
+            "import": "./esm/blog.mjs",
+            "default": "./src/blog.js"
+        },
+        "./food": {
+            "types": "./types/food.d.ts",
+            "browser": null,
+            "import": "./esm/food.mjs",
+            "default": "./src/food.js"
+        },
+        "./actor": {
+            "types": "./types/actor.d.ts",
+            "browser": null,
+            "import": "./esm/actor.mjs",
+            "default": "./src/actor.js"
+        },
+        "./run": {
+            "types": "./types/run.d.ts",
+            "browser": null,
+            "import": "./esm/run.mjs",
+            "default": "./src/run.js"
+        },
+        "./video": {
+            "types": "./types/video.d.ts",
+            "browser": null,
+            "import": "./esm/video.mjs",
+            "default": "./src/video.js"
+        },
+        "./work": {
+            "types": "./types/work.d.ts",
+            "browser": null,
+            "import": "./esm/work.mjs",
+            "default": "./src/work.js"
+        },
+        "./zone": {
+            "types": "./types/zone.d.ts",
+            "browser": null,
+            "import": "./esm/zone.mjs",
+            "default": "./src/zone.js"
+        },
+        "./reviews": {
+            "types": "./types/reviews.d.ts",
+            "browser": null,
+            "import": "./esm/reviews.mjs",
+            "default": "./src/reviews.js"
+        },
+        "./wiki": {
+            "types": "./types/wiki.d.ts",
+            "browser": null,
+            "import": "./esm/wiki.mjs",
+            "default": "./src/wiki.js"
+        },
+        "./coupons": {
+            "types": "./types/coupons.d.ts",
+            "browser": null,
+            "import": "./esm/coupons.mjs",
+            "default": "./src/coupons.js"
+        },
+        "./deals": {
+            "types": "./types/deals.d.ts",
+            "browser": null,
+            "import": "./esm/deals.mjs",
+            "default": "./src/deals.js"
+        },
+        "./trade": {
+            "types": "./types/trade.d.ts",
+            "browser": null,
+            "import": "./esm/trade.mjs",
+            "default": "./src/trade.js"
+        },
+        "./space": {
+            "types": "./types/space.d.ts",
+            "browser": null,
+            "import": "./esm/space.mjs",
+            "default": "./src/space.js"
+        },
+        "./host": {
+            "types": "./types/host.d.ts",
+            "browser": null,
+            "import": "./esm/host.mjs",
+            "default": "./src/host.js"
+        },
+        "./news": {
+            "types": "./types/news.d.ts",
+            "browser": null,
+            "import": "./esm/news.mjs",
+            "default": "./src/news.js"
+        },
+        "./explicit": {
+            "types": "./types/explicit.d.ts",
+            "import": "./esm/explicit.mjs",
+            "default": "./src/explicit.js"
+        },
+        "./no-looks": {
+            "types": "./types/no-looks.d.ts",
+            "import": "./esm/no-looks.mjs",
+            "default": "./src/no-looks.js"
+        },
+        "./redact": {
+            "types": "./types/redact.d.ts",
+            "import": "./esm/redact.mjs",
+            "default": "./src/redact.js"
+        },
+        "./consent": {
+            "types": "./types/consent.d.ts",
+            "browser": null,
+            "import": "./esm/consent.mjs",
+            "default": "./src/consent.js"
+        },
+        "./vision": {
+            "types": "./types/vision.d.ts",
+            "import": "./esm/vision.mjs",
+            "default": "./src/vision.js"
+        },
+        "./front-page": {
+            "types": "./types/front-page.d.ts",
+            "import": "./esm/front-page.mjs",
+            "default": "./src/front-page.js"
+        },
+        "./vip": {
+            "types": "./types/vip.d.ts",
+            "browser": null,
+            "import": "./esm/vip.mjs",
+            "default": "./src/vip.js"
+        },
+        "./service": {
+            "types": "./types/service.d.ts",
+            "browser": null,
+            "import": "./esm/service.mjs",
+            "default": "./src/service/index.js"
+        },
+        "./testing": {
+            "types": "./types/testing.d.ts",
+            "browser": null,
+            "import": "./esm/testing.mjs",
+            "default": "./src/testing/index.js"
+        },
+        "./browser/openvibe-sdk.mjs": {
+            "types": "./types/bundle.d.ts",
+            "default": "./browser/openvibe-sdk.mjs"
+        },
+        "./package.json": "./package.json"
+    },
+    "bin": {
+        "openvibe-download": "bin/openvibe-download.js"
+    },
+    "files": [
+        "bin/",
+        "index.js",
+        "browser.js",
+        "src/",
+        "esm/",
+        "browser/",
+        "types/",
+        "README.md",
+        "CHANGELOG.md",
+        "LICENSE",
+        "docs/"
+    ],
+    "scripts": {
+        "test": "node test/run.js",
+        "esm": "node scripts/esm.js",
+        "browser-bundle": "node scripts/browser-bundle.js",
+        "surface": "node scripts/surface.js"
+    },
+    "engines": {
+        "node": ">=20"
+    },
+    "sideEffects": false,
+    "keywords": [
+        "openvibe",
+        "sdk",
+        "oauth",
+        "pkce",
+        "events",
+        "sse",
+        "media",
+        "jobs",
+        "tools",
+        "developer-apps"
+    ],
+    "repository": "github:OpenVibers/OpenVibe.SDK",
+    "license": "MIT",
+    "devDependencies": {
+        "@electric-sql/pglite": "^0.5.8",
+        "iovalkey": "^0.4.0",
+        "openvibe-contracts": "https://codeload.github.com/OpenVibers/OpenVibe.Contracts/tar.gz/refs/tags/v0.225.0",
+        "pg": "^8.23.0"
+    },
+    "peerDependencies": {
+        "@electric-sql/pglite": "^0.5.8",
+        "iovalkey": "^0.4.0",
+        "pg": "^8.23.0"
+    },
+    "peerDependenciesMeta": {
+        "pg": {
+            "optional": true
+        },
+        "@electric-sql/pglite": {
+            "optional": true
+        },
+        "iovalkey": {
+            "optional": true
+        }
     }
-  }
 }
