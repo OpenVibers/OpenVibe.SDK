@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.80.0 (2026-11-01)
+
+- **`openvibe-sdk/explicit`: nudity is art.** The owner, 2026-10-31: "naked and nude is fine… stop being against art on
+  my platform." `isExplicit()` now gates what OpenVibe.Live's own rule gates (Live#469), word for word.
+  - **Still gated:** sex acts and pornography (sexual acts or activity, having sex, porn, masturbation, intercourse,
+    oral sex, penetration, pornographic or sexually explicit content), and any text that puts a child and nudity
+    together.
+  - **No longer gated:** nudity and body words on their own. A nude figure-drawing class publishes; "a child is shown
+    naked" never does.
+
 ## 0.79.0 (2026-10-31)
 
 - **`openvibe-sdk/machines`: the network's machines hub** (plan L34, step M2; Contracts 0.258.0). A person's machines
