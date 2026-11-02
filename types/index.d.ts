@@ -26,6 +26,7 @@ export * as inventory from './inventory';
 export * as tips from './tips';
 export * as blog from './blog';
 export * as reviews from './reviews';
+export * as meme from './meme';
 export * as wiki from './wiki';
 export * as coupons from './coupons';
 export * as deals from './deals';

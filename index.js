@@ -19,6 +19,7 @@ module.exports = {
     bot: require('./src/bot'),
     search: require('./src/search'),
     bench: require('./src/bench'),
+    meme: require('./src/meme'),
     vision: require('./src/vision'),
     themes: require('./src/themes'),
     redact: require('./src/redact'),
