@@ -22,6 +22,7 @@ const ENTRIES = {
     'modules.mjs': '../src/modules.js',
     'events.mjs': '../src/events.js',
     'sso.mjs': '../src/sso/index.js',
+    'app-signin.mjs': '../src/app-signin/index.js',
     'realtime.mjs': '../src/realtime.js',
     'media.mjs': '../src/media.js',
     'community.mjs': '../src/community.js',
