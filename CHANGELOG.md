@@ -1,16 +1,38 @@
 # Changelog
 
+## Unreleased
+
+- **`openvibe-sdk/live`: the rest of the Go live screen.** `live.slots.history(id)` (the slot's past streams),
+  `live.slots.quality(id, { resolution, fps, bitrate })` and `live.slots.titleIdeas(id, { weekday, hour, title })` (the
+  card's ✨ Suggest: three titles for the next stream). With these, an app does everything Live's Go live page does
+  (https://openvibe.live/docs/streams-api).
+
+## 0.80.0 (2026-11-01)
+
+- **`openvibe-sdk/explicit`: nudity is art.** The owner, 2026-10-31: "naked and nude is fine… stop being against art on
+  my platform." `isExplicit()` now gates what OpenVibe.Live's own rule gates (Live#469), word for word.
+  - **Still gated:** sex acts and pornography (sexual acts or activity, having sex, porn, masturbation, intercourse,
+    oral sex, penetration, pornographic or sexually explicit content), and any text that puts a child and nudity
+    together.
+  - **No longer gated:** nudity and body words on their own. A nude figure-drawing class publishes; "a child is shown
+    naked" never does.
+
 ## 0.79.0 (2026-10-31)
 
-- **`openvibe-sdk/meme`:** the client for OpenVibe.Meme's encyclopedia, trends, analyser, deep dives and generator.
-  - `createMemeClient(client, { baseUrl? })` (both browser and server; audience `openvibe.meme`, service id `meme`).
-  - `search({ scope, q, status, label, kind, sort, window, channel, limit, cursor })`, `entry(slug)`, `revisions(slug)`,
-    `trends({ window: 'day'|'week', limit })`, `analyze({ url | media_id })`, `research(topic)` (202, poll
-    `researchGet(id)`), `saveResearch(id)` and `generate({ template | template_slug | topic, lines? })`.
-  - `analyze` refuses locally unless exactly one of `url`/`media_id` is given, and `generate` refuses with neither a
-    template nor a topic; no request is sent for either. Types are in `types/meme.d.ts`; the browser bundle includes
-    the client. The `meme` namespace is on `openvibe-sdk` and in the browser bundle, and `openvibe-sdk/meme`
-    (`createMemeClient`) is in docs/api-surface.json.
+- **`openvibe-sdk/machines`: the network's machines hub** (plan L34, step M2; Contracts 0.258.0). A person's machines
+  are the network's: Bot stays the registry underneath, and OpenVibe.Network fronts it on openvibe.network/machines for
+  the person and for the apps the person consented to.
+  - `createMachines({ networkUrl, token, fetch, timeoutMs })`: `token` returns the caller's own bearer token — the
+    person's session token, or an app's token holding `network.machines.read` or `network.machines.manage` with the
+    person's consent.
+  - `list()` → `{ machines }`, `get(id)` → `{ machine }`, `catalogue()` → `{ roles }` (what a machine may do for the
+    network), `pair()` → `{ pairing }` (a one-time code and the command to run), `rename(id, name)` → `{ machine }`,
+    `roles(id, roles)` → `{ machine }` (the whole set, not a change), `revoke(id)` → `{ machine }`.
+  - A refusal throws a `MachinesError` with the hub's own `status` and `code` (`capability.denied`,
+    `capability.owner_denied`, `registry.unknown_role`, a 404 for a machine that is not the caller's). A hub that does
+    not answer is a `machines.timeout`, never a hang.
+  - The machines' own capabilities stay where they are: `openvibe-sdk/bot`'s `machines.desk()` and `machines.chat()`
+    talk to Bot itself and are unchanged.
 
 ## 0.78.0 (2026-10-31)
 

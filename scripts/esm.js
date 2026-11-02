@@ -26,6 +26,7 @@ const ENTRIES = {
     'media.mjs': '../src/media.js',
     'community.mjs': '../src/community.js',
     'bot.mjs': '../src/bot.js',
+    'machines.mjs': '../src/machines.js',
     'search.mjs': '../src/search.js',
     'bench.mjs': '../src/bench.js',
     'meme.mjs': '../src/meme.js',

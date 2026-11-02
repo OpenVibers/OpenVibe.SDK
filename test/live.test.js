@@ -58,6 +58,9 @@ const { createLiveClient } = require('../src/live');
         await live.slots.create({ title: 'Robot cam', streaming_method: 'whip' });
         await live.slots.update(5, { browser_mode: 'screen' });
         await live.slots.regenerateKey(5);
+        await live.slots.history(5);
+        await live.slots.quality(5, { resolution: '1080', fps: '30', bitrate: 4500 });
+        await live.slots.titleIdeas(5, { weekday: 'Sunday', hour: 21, title: 'Night walk' });
         const went = await live.goLive(5, { title: 'Live now' });
         await live.streams.endpoint(77);
         await live.streams.update(77, { title: 'Still live' });
@@ -67,10 +70,13 @@ const { createLiveClient } = require('../src/live');
         assert.deepStrictEqual(went, { stream: { id: 77 }, endpoint: { whipUrlBase: 'x' } });
         assert.deepStrictEqual(seen.map((s) => `${s.method} ${s.url}`), [
             'GET /api/streams/managed', 'POST /api/streams/managed', 'PUT /api/streams/managed/5', 'POST /api/streams/managed/5/regenerate-key',
+            'GET /api/streams/managed/5/history', 'PUT /api/streams/broadcast-settings', 'POST /api/streams/managed/5/title-ideas',
             'POST /api/streams', 'GET /api/streams/77/endpoint', 'PUT /api/streams/77', 'POST /api/streams/77/heartbeat', 'DELETE /api/streams/77',
             'DELETE /api/streams/managed/5',
         ]);
-        assert.deepStrictEqual(JSON.parse(seen[4].body), { title: 'Live now', managed_stream_id: 5 });
+        assert.deepStrictEqual(JSON.parse(seen[5].body), { managed_stream_id: 5, settings: { resolution: '1080', fps: '30', bitrate: 4500 } });
+        assert.deepStrictEqual(JSON.parse(seen[6].body), { weekday: 'Sunday', hour: 21, title: 'Night walk' });
+        assert.deepStrictEqual(JSON.parse(seen[7].body), { title: 'Live now', managed_stream_id: 5 });
         assert.ok(seen.filter((s) => s.method !== 'GET').every((s) => !s.idem), 'writes carry no idempotency key and are never retried');
 
         // WHIP: the offer, the answer, the Location; the key as bearer only when given; never the client's token.

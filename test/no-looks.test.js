@@ -17,12 +17,17 @@ assert.strictEqual(RULES_VERSION, 'off');
 
 // isExplicit: what a scene shows (Live's clip 483 on 2026-10-23, word for word), from either module.
 assert.strictEqual(isExplicit, explicit.isExplicit, 'one function, re-exported');
+// The owner, 2026-10-31: nudity is art; sex acts and porn stay gated, and a child with nudity always is.
 for (const t of [
-    'A naked man lying on their back with legs spread, reaching toward their genitals',
     'The video shows the streamer engaging in explicit adult content, with close-up footage of sexual acts on a couch',
-    'Pornographic footage plays on the second monitor', 'The scene contains nudity', 'masturbating on camera',
+    'Pornographic footage plays on the second monitor', 'masturbating on camera', 'They are having sex on stream',
+    'A child is shown naked', 'Teens undressing in a locker room',
 ]) assert.ok(isExplicit(t), `explicit: ${t}`);
-for (const t of ['A player in Fortnite is sprinting along a pink-purple sunset map', 'They read the news from Essex', 'A sextant and a map', 'A shirtless man sits', '', null, undefined]) {
+for (const t of [
+    'A player in Fortnite is sprinting along a pink-purple sunset map', 'They read the news from Essex', 'A sextant and a map',
+    'A shirtless man sits', 'A nude figure drawing class, the model posing by the window', 'The scene contains nudity',
+    'A naked man lying on his back in the sun', 'Kids in swimsuits at the beach', '', null, undefined,
+]) {
     assert.ok(!isExplicit(t), `not explicit: ${t}`);
 }
 assert.ok(isExplicit('a fine title', null, 'the frame shows sexual activity'), 'any of several texts');
