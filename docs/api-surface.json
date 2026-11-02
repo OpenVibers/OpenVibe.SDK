@@ -591,6 +591,9 @@
     "createObjectsClient": "function",
     "mediaUrls": "function"
   },
+  "openvibe-sdk/meme": {
+    "createMemeClient": "function"
+  },
   "openvibe-sdk/modules": {
     "createModulesClient": "function"
   },

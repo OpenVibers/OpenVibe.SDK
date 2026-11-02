@@ -72,6 +72,12 @@
       "import": "./esm/media.mjs",
       "default": "./src/media.js"
     },
+    "./meme": {
+      "types": "./types/meme.d.ts",
+      "browser": "./src/meme.js",
+      "import": "./esm/meme.mjs",
+      "default": "./src/meme.js"
+    },
     "./community": {
       "types": "./types/community.d.ts",
       "import": "./esm/community.mjs",
