@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **`openvibe-sdk/meme`:** the client for OpenVibe.Meme's encyclopedia, trends, analyser, deep dives and generator.
+  - `createMemeClient(client, { baseUrl? })` (both browser and server; audience `openvibe.meme`, service id `meme`).
+  - `search({ scope, q, status, label, kind, sort, window, channel, limit, cursor })`, `entry(slug)`, `revisions(slug)`,
+    `trends({ window: 'day'|'week', limit })`, `analyze({ url | media_id })`, `research(topic)` (202, poll
+    `researchGet(id)`), `saveResearch(id)` and `generate({ template | template_slug | topic, lines? })`.
+  - `analyze` refuses locally unless exactly one of `url`/`media_id` is given, and `generate` refuses with neither a
+    template nor a topic; no request is sent for either. Types are in `types/meme.d.ts`; the browser bundle includes
+    the client. The `meme` namespace is on `openvibe-sdk` and in the browser bundle, and `openvibe-sdk/meme`
+    (`createMemeClient`) is in docs/api-surface.json.
 - **`openvibe-sdk/live`: the rest of the Go live screen.** `live.slots.history(id)` (the slot's past streams),
   `live.slots.quality(id, { resolution, fps, bitrate })` and `live.slots.titleIdeas(id, { weekday, hour, title })` (the
   card's ✨ Suggest: three titles for the next stream). With these, an app does everything Live's Go live page does
