@@ -29,6 +29,12 @@ export interface LiveClient {
         regenerateKey(slotId: number | string, opts?: Opts): Promise<LiveJson>;
         /** A slot's settings and where to publish to it (owner): stream_key, whip_url_base, rtmp_url, or OpenRestream's whip_url. */
         profile(slotId: number | string, opts?: Opts): Promise<LiveJson>;
+        /** The slot's past streams, newest first. */
+        history(slotId: number | string, opts?: Opts): Promise<{ sessions: LiveJson[] }>;
+        /** The slot's quality: resolution, fps and bitrate (kbps), and the browser settings beside them. */
+        quality(slotId: number | string, settings: { resolution?: string; fps?: string; bitrate?: number; [k: string]: unknown }, opts?: Opts): Promise<LiveJson>;
+        /** Three title ideas for the next stream (the Go live card's Suggest). */
+        titleIdeas(slotId: number | string, input?: { weekday?: string; hour?: number; title?: string }, opts?: Opts): Promise<{ titles: string[] }>;
     };
     /** Go live from a slot → { stream, endpoint }. */
     goLive(slotId: number | string, opts?: GoLiveOptions, extra?: Opts): Promise<{ stream: LiveJson; endpoint: LiveJson }>;

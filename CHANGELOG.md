@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **`openvibe-sdk/live`: the rest of the Go live screen.** `live.slots.history(id)` (the slot's past streams),
+  `live.slots.quality(id, { resolution, fps, bitrate })` and `live.slots.titleIdeas(id, { weekday, hour, title })` (the
+  card's ✨ Suggest: three titles for the next stream). With these, an app does everything Live's Go live page does
+  (https://openvibe.live/docs/streams-api).
+
 ## 0.80.0 (2026-11-01)
 
 - **`openvibe-sdk/explicit`: nudity is art.** The owner, 2026-10-31: "naked and nude is fine… stop being against art on
