@@ -100,6 +100,63 @@ export interface VisionFaceLibraryGroup {
     created_at: string;
 }
 
+export interface VisionFamiliarLibrary {
+    id: string;
+    camera_ids: string[];
+    region: string;
+    region_mode: 'strict' | 'open';
+    threshold: number;
+    created_at: string;
+    updated_at: string;
+    people_count?: number;
+}
+
+export interface VisionFamiliarPerson {
+    id: string;
+    library_id: string;
+    name: string;
+    subject: string | null;
+    status: 'active' | 'pending_consent' | 'denied';
+    consent_basis: 'network' | 'request' | null;
+    muted: boolean;
+    has_template: boolean;
+    created_at: string;
+    updated_at: string;
+    last_matched_at: string | null;
+}
+
+export interface VisionFamiliarConsentRequest {
+    token: string;
+    url: string;
+    expires_at: string;
+    sent: boolean;
+    text_version: string;
+}
+
+export interface VisionFamiliarEnrolResult {
+    person: VisionFamiliarPerson;
+    consent_request: VisionFamiliarConsentRequest | null;
+    enrolled: boolean;
+}
+
+export interface VisionFamiliarMatch {
+    library_id: string;
+    match: boolean;
+    label: string;
+    name: string | null;
+    person_id: string | null;
+    muted: boolean;
+    score: number | null;
+    threshold: number;
+}
+
+export interface VisionFamiliarAcceptResult {
+    accepted: true;
+    library_id: string;
+    person: VisionFamiliarPerson;
+    text_version: string;
+}
+
 export interface VisionUiCheckFinding {
     kind: 'overflow' | 'cut_off' | 'contrast' | 'overlap' | 'layering';
     severity: 'high' | 'medium' | 'low';
@@ -189,6 +246,23 @@ export interface VisionClient {
         cluster(region: string): Promise<VisionFaceLibraryGroup[]>;
         groups(): Promise<VisionFaceLibraryGroup[]>;
         correct(action: 'exclude' | 'merge' | 'split', ids: string[]): Promise<{ action: 'exclude' | 'merge' | 'split'; updated: number }>;
+        /** F1: a camera owner's own library. Only this library is ever matched; strict regions need consent first. */
+        familiar: {
+            list(): Promise<{ count: number; libraries: VisionFamiliarLibrary[] }>;
+            create(body: { camera_ids: string[]; region?: string; threshold?: number }): Promise<VisionFamiliarLibrary>;
+            get(libraryId: string): Promise<VisionFamiliarLibrary & { people: VisionFamiliarPerson[] }>;
+            update(libraryId: string, body: { camera_ids?: string[]; region?: string; threshold?: number }): Promise<VisionFamiliarLibrary & { people: VisionFamiliarPerson[] }>;
+            remove(libraryId: string): Promise<{ deleted: true; id: string; people: number; crops: number; templates: number; requests: number }>;
+            enroll(libraryId: string, image: VisionImage, fields: { name: string; subject?: string }, opts?: { filename?: string; contentType?: string }): Promise<VisionFamiliarEnrolResult>;
+            match(libraryId: string, image: VisionImage, opts?: { filename?: string; contentType?: string }): Promise<VisionFamiliarMatch>;
+            people(libraryId: string): Promise<{ library: VisionFamiliarLibrary; people: VisionFamiliarPerson[] }>;
+            patchPerson(libraryId: string, personId: string, body: { name?: string; muted?: boolean }): Promise<VisionFamiliarPerson>;
+            removePerson(libraryId: string, personId: string): Promise<{ deleted: true; id: string; name: string; templates: number; crops: number; requests: number }>;
+            requestConsent(libraryId: string, personId: string): Promise<VisionFamiliarConsentRequest>;
+            checkConsent(libraryId: string): Promise<{ checked: number; activated: VisionFamiliarPerson[] }>;
+            acceptConsent(token: string, body: { signed_name: string; text_version: string }): Promise<VisionFamiliarAcceptResult>;
+            denyConsent(token: string): Promise<{ denied: true; library_id: string }>;
+        };
     };
 }
 

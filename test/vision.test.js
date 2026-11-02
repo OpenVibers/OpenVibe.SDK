@@ -93,6 +93,37 @@ run([
         await srv.close();
     }],
 
+    ['familiar faces: libraries, a crop enrolment and a library-scoped match use their own routes', async () => {
+        const person = { id: 'flp_01J8Z3Q4R5S6T7V8W9X0Y1Z2A4', library_id: 'flb_01J8Z3Q4R5S6T7V8W9X0Y1Z2A4', name: 'Sam', subject: null, status: 'pending_consent', consent_basis: null, muted: false, has_template: false, created_at: '2026-10-31T10:00:00.000Z', updated_at: '2026-10-31T10:00:00.000Z', last_matched_at: null };
+        const library = { id: person.library_id, camera_ids: ['cam_01J8Z3Q4R5S6T7V8W9X0Y1Z2A4'], region: 'US-IL', region_mode: 'strict', threshold: 0.363, created_at: '2026-10-31T10:00:00.000Z', updated_at: '2026-10-31T10:00:00.000Z' };
+        const srv = await stubServer((req, res) => {
+            if (req.url === '/api/v1/faces/libraries' && req.method === 'GET') return send(res, 200, { count: 1, libraries: [library] });
+            if (req.url === '/api/v1/faces/libraries' && req.method === 'POST') return send(res, 201, library);
+            if (req.url.endsWith('/enroll')) return send(res, 200, { person, consent_request: { token: 'tok', url: 'https://openvibe.vision/people/privacy?face_request=tok', expires_at: '2026-11-14T10:00:00.000Z', sent: false, text_version: 'face-library-2026-10-28' }, enrolled: false });
+            if (req.url.endsWith('/match')) return send(res, 200, { library_id: library.id, match: false, label: 'unknown person', name: null, person_id: null, muted: false, score: 0.1, threshold: 0.363 });
+            if (req.url.endsWith('/consent-check')) return send(res, 200, { checked: 1, activated: [] });
+            return send(res, 200, { people: [person] });
+        });
+        const vision = createVisionClient(createClient({ baseUrls: { vision: srv.url }, token: 'user-token' }));
+        const listed = await vision.face.familiar.list();
+        assert.equal(listed.libraries[0].region_mode, 'strict');
+        const made = await vision.face.familiar.create({ camera_ids: library.camera_ids, region: 'US-IL' });
+        assert.equal(made.id, library.id);
+        assert.deepEqual(JSON.parse(srv.requests[1].body), { camera_ids: library.camera_ids, region: 'US-IL' });
+        const enrolled = await vision.face.familiar.enroll(library.id, Buffer.from('crop'), { name: 'Sam' });
+        assert.equal(enrolled.person.status, 'pending_consent');
+        const form = srv.requests[2].body.toString('latin1');
+        assert.match(form, /name="name"\r\n\r\nSam/);
+        assert.match(form, /name="image"; filename="image"/);
+        const matched = await vision.face.familiar.match(library.id, Buffer.from('crop'));
+        assert.equal(matched.label, 'unknown person');
+        assert.match(srv.requests[3].body.toString('latin1'), /name="image"/);
+        const checked = await vision.face.familiar.checkConsent(library.id);
+        assert.equal(checked.checked, 1);
+        assert.equal(srv.requests[4].url, `/api/v1/faces/libraries/${library.id}/consent-check`);
+        await srv.close();
+    }],
+
     ['a refusal is the service\'s problem details, not a silent empty answer', async () => {
         const srv = await stubServer((req, res) => problem(res, 403, 'faces.consent_required', 'Enable verify consent first.'));
         const vision = createVisionClient(createClient({ baseUrls: { vision: srv.url }, token: 'user-token', retries: 0 }));
