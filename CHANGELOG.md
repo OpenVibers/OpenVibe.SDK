@@ -1,17 +1,38 @@
 # Changelog
 
+## Unreleased
+
+- **`openvibe-sdk/live`: the rest of the Go live screen.** `live.slots.history(id)` (the slot's past streams),
+  `live.slots.quality(id, { resolution, fps, bitrate })` and `live.slots.titleIdeas(id, { weekday, hour, title })` (the
+  card's ✨ Suggest: three titles for the next stream). With these, an app does everything Live's Go live page does
+  (https://openvibe.live/docs/streams-api).
+
+## 0.80.0 (2026-11-01)
+
+- **`openvibe-sdk/explicit`: nudity is art.** The owner, 2026-10-31: "naked and nude is fine… stop being against art on
+  my platform." `isExplicit()` now gates what OpenVibe.Live's own rule gates (Live#469), word for word.
+  - **Still gated:** sex acts and pornography (sexual acts or activity, having sex, porn, masturbation, intercourse,
+    oral sex, penetration, pornographic or sexually explicit content), and any text that puts a child and nudity
+    together.
+  - **No longer gated:** nudity and body words on their own. A nude figure-drawing class publishes; "a child is shown
+    naked" never does.
+
 ## 0.79.0 (2026-10-31)
 
-- **`openvibe-sdk/vision` — familiar faces (`face.familiar`), F1 of the L24 plan.** The camera owner's own Vision
-  library, reached with the owner's token:
-  - `list`, `create({ camera_ids, region, threshold })`, `get`, `update` and `remove` the library. The region picks
-    strict mode (Illinois, Texas, Washington, the EU, the UK; an unknown region too) or open mode.
-  - `enroll(libraryId, image, { name, subject })` names the crop the camera saw; in strict mode it answers a
-    `pending_consent` person with no template and a private `consent_request.url` until the person accepts.
-  - `match(libraryId, image)` matches only that library: a top match over its threshold, or `unknown person`.
-  - `people`, `patchPerson` (rename or mute), `removePerson`, `requestConsent`, `checkConsent`, `acceptConsent` and
-    `denyConsent`.
-  - The types in `types/vision.d.ts` say what the JSON says; no template, crop or other library is ever in an answer.
+- **`openvibe-sdk/machines`: the network's machines hub** (plan L34, step M2; Contracts 0.258.0). A person's machines
+  are the network's: Bot stays the registry underneath, and OpenVibe.Network fronts it on openvibe.network/machines for
+  the person and for the apps the person consented to.
+  - `createMachines({ networkUrl, token, fetch, timeoutMs })`: `token` returns the caller's own bearer token — the
+    person's session token, or an app's token holding `network.machines.read` or `network.machines.manage` with the
+    person's consent.
+  - `list()` → `{ machines }`, `get(id)` → `{ machine }`, `catalogue()` → `{ roles }` (what a machine may do for the
+    network), `pair()` → `{ pairing }` (a one-time code and the command to run), `rename(id, name)` → `{ machine }`,
+    `roles(id, roles)` → `{ machine }` (the whole set, not a change), `revoke(id)` → `{ machine }`.
+  - A refusal throws a `MachinesError` with the hub's own `status` and `code` (`capability.denied`,
+    `capability.owner_denied`, `registry.unknown_role`, a 404 for a machine that is not the caller's). A hub that does
+    not answer is a `machines.timeout`, never a hang.
+  - The machines' own capabilities stay where they are: `openvibe-sdk/bot`'s `machines.desk()` and `machines.chat()`
+    talk to Bot itself and are unchanged.
 
 ## 0.78.0 (2026-10-31)
 

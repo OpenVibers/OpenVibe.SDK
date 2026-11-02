@@ -571,6 +571,11 @@
   "openvibe-sdk/live": {
     "createLiveClient": "function"
   },
+  "openvibe-sdk/machines": {
+    "DEFAULT_TIMEOUT_MS": "number",
+    "MachinesError": "class",
+    "createMachines": "function"
+  },
   "openvibe-sdk/media": {
     "DEFAULT_PUBLIC_ORIGIN": "string",
     "createMediaClient": "function",

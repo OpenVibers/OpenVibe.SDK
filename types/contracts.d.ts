@@ -125,7 +125,7 @@ export interface Problem {
   [k: string]: unknown | undefined;
 }
 
-/** registry.service-manifest@1.1.0 (owner: network) */
+/** registry.service-manifest@1.2.0 (owner: network) */
 /**
  * What a service is, where it lives and what it offers. The ecosystem registry is built from these, not from hard-coded route maps.
  */
@@ -1924,11 +1924,21 @@ export interface ServiceManifest {
        */
       statusApi?: string;
     };
+    /**
+     * The room's launcher group in OpenVibe.Shared rooms.js and OpenVibe.Network frame/sites.js; optional so older manifests retain their meaning.
+     */
+    neighbourhood?: "streams" | "games" | "answers" | "make" | "shop" | "people" | "build";
   };
   capabilities: string[];
   eventsProduced: string[];
   eventsConsumed: string[];
   namespacesOwned: string[];
+  machineRoles?: {
+    id: string;
+    name: string;
+    installs: string;
+    shows: string;
+  }[];
   contractRanges?: {
     [k: string]: string | undefined;
   };
