@@ -26,6 +26,36 @@ function eventsClient() {
 
 function cases(label, open) {
     return [
+        [`${label}: pending() and rejected() keep their count for countsCacheMs, shared by callers at the same moment`, async () => {
+            const { db, done } = await open();
+            try {
+                const { events } = eventsClient();
+                let counts = 0;
+                const watched = new Proxy(db, {
+                    get(target, key) {
+                        if (key === 'value') return (...args) => { counts += 1; return target.value(...args); };
+                        const v = target[key];
+                        return typeof v === 'function' ? v.bind(target) : v;
+                    },
+                });
+                let t = 1000;
+                const kept = createPgOutbox(watched, { events, now: () => t, countsCacheMs: 30000 });
+                const [a, b] = await Promise.all([kept.pending(), kept.pending()]);
+                assert.equal(counts, 1, 'two callers at once: one count');
+                assert.equal(a, b);
+                await db.tx((tx) => kept.enqueue(tx, { event_type: 'live.stream.started', actor, subject }));
+                assert.equal(await kept.pending(), 0, 'within the window: the kept count');
+                assert.equal(counts, 1);
+                t += 30000;
+                assert.equal(await kept.pending(), 1, 'past it: counted again');
+                assert.equal(await kept.rejected(), 0);
+                assert.equal(counts, 3, 'rejected() keeps its own count');
+                const every = createPgOutbox(watched, { events });
+                await every.pending();
+                await every.pending();
+                assert.equal(counts, 5, 'without countsCacheMs (and outside production) every call counts');
+            } finally { await done(); }
+        }],
         [`${label}: a kick() from inside a transaction never hands the relay that transaction`, async () => {
             const { db, done } = await open();
             try {

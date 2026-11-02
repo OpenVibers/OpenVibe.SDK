@@ -96,9 +96,29 @@ function inboxSchema(table = 'idempotency_receipts') {
  * relay one table without double-sending; a relay that dies mid-batch leaves its rows to the next after the
  * lease. Delivery stays at least once (Events answers a repeated event_id as a duplicate).
  */
+/**
+ * A count kept for keepMs, shared by callers at the same moment. pending() and rejected() count the outbox table
+ * (rejected rows have no index, so a large outbox is read whole: 115 ms on Deals, 45 ms on Search, 2026-11-02),
+ * and the metric gauges and readiness ask on every scrape and probe.
+ */
+function keptCount(read, keepMs, now) {
+    let kept = null;
+    return () => {
+        if (!(keepMs > 0)) return read();
+        const t = now();
+        if (kept && (kept.pending || t - kept.at < keepMs)) return kept.pending || Promise.resolve(kept.value);
+        const pending = Promise.resolve().then(read);
+        kept = { at: t, pending };
+        return pending.then((value) => { if (kept && kept.pending === pending) kept = { at: t, value }; return value; },
+            (err) => { if (kept && kept.pending === pending) kept = null; throw err; });
+    };
+}
+
 function createPgOutbox(db, {
     events, table = 'event_outbox', batchSize = 50, intervalMs = 1000, leaseMs = 60000,
     backoffMs = [1000, 5000, 30000, 120000, 600000], now = () => Date.now(), onError = null,
+    // How long pending() and rejected() keep their count: 30 s in production (NODE_ENV), every call counts elsewhere.
+    countsCacheMs = process.env.NODE_ENV === 'production' ? 30000 : 0,
 } = {}) {
     if (!db || typeof db.query !== 'function' || typeof db.tx !== 'function') throw new TypeError('an openvibe-sdk/db handle is required');
     if (!events || typeof events.publish !== 'function' || typeof events.prepare !== 'function') {
@@ -201,8 +221,8 @@ function createPgOutbox(db, {
         start() { if (!running) { running = true; schedule(0); } },
         stop() { running = false; clearTimeout(timer); timer = null; return flush.idle(); },
         kick() { schedule(0); },
-        pending: () => db.value(`SELECT count(*) FROM ${table} WHERE sent_at IS NULL AND rejected_at IS NULL`),
-        rejected: () => db.value(`SELECT count(*) FROM ${table} WHERE rejected_at IS NOT NULL`),
+        pending: keptCount(() => db.value(`SELECT count(*) FROM ${table} WHERE sent_at IS NULL AND rejected_at IS NULL`), countsCacheMs, now),
+        rejected: keptCount(() => db.value(`SELECT count(*) FROM ${table} WHERE rejected_at IS NOT NULL`), countsCacheMs, now),
         prune: (olderThanMs = 7 * 24 * 60 * 60 * 1000) => db.exec(`DELETE FROM ${table} WHERE sent_at IS NOT NULL AND sent_at < $1`, [now() - olderThanMs]),
     };
 }
