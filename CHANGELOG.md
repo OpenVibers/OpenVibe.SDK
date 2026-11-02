@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.81.0 (2026-11-02)
 
 - **`openvibe-sdk/vision`: familiar faces (`face.familiar`), F1 of the L24 plan.** The camera owner's own Vision
   library, reached with the owner's token:
