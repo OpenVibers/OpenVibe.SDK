@@ -305,6 +305,12 @@
       "import": "./esm/actor.mjs",
       "default": "./src/actor.js"
     },
+    "./app-signin": {
+      "types": "./types/app-signin.d.ts",
+      "browser": null,
+      "import": "./esm/app-signin.mjs",
+      "default": "./src/app-signin/index.js"
+    },
     "./run": {
       "types": "./types/run.d.ts",
       "browser": null,
