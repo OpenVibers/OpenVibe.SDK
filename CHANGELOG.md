@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **`openvibe-sdk/vision`: familiar faces (`face.familiar`), F1 of the L24 plan.** The camera owner's own Vision
+  library, reached with the owner's token:
+  - `list`, `create({ camera_ids, region, threshold })`, `get`, `update` and `remove` the library. The region picks
+    strict mode (Illinois, Texas, Washington, the EU, the UK; an unknown region too) or open mode.
+  - `enroll(libraryId, image, { name, subject })` names the crop the camera saw; in strict mode it answers a
+    `pending_consent` person with no template and a private `consent_request.url` until the person accepts.
+  - `match(libraryId, image)` matches only that library: a top match over its threshold, or `unknown person`.
+  - `people`, `patchPerson` (rename or mute), `removePerson`, `requestConsent`, `checkConsent`, `acceptConsent` and
+    `denyConsent`.
+  - The types in `types/vision.d.ts` say what the JSON says; no template, crop or other library is ever in an answer.
 - **`openvibe-sdk/live`: the rest of the Go live screen.** `live.slots.history(id)` (the slot's past streams),
   `live.slots.quality(id, { resolution, fps, bitrate })` and `live.slots.titleIdeas(id, { weekday, hour, title })` (the
   card's ✨ Suggest: three titles for the next stream). With these, an app does everything Live's Go live page does
