@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.82.0 (2026-11-02)
+
+- **`openvibe-sdk/events` outbox: `pending()` and `rejected()` keep their count** (`countsCacheMs`, 30 s when
+  `NODE_ENV` is production, off elsewhere), and callers at the same moment share one count. The metric gauges and
+  readiness ask on every scrape and probe, and `rejected()` has no index, so a large outbox was read whole each time:
+  115 ms on Deals, 56 ms on Trade, 49 ms on Sources, 45 ms on Search and 24 ms on Reviews (pg_stat_statements,
+  2026-11-02). Pass `countsCacheMs: 0` to count on every call.
+
 ## 0.81.0 (2026-11-02)
 
 - **`openvibe-sdk/vision`: familiar faces (`face.familiar`), F1 of the L24 plan.** The camera owner's own Vision
