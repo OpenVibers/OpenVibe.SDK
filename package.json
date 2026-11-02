@@ -72,6 +72,12 @@
       "import": "./esm/media.mjs",
       "default": "./src/media.js"
     },
+    "./meme": {
+      "types": "./types/meme.d.ts",
+      "browser": "./src/meme.js",
+      "import": "./esm/meme.mjs",
+      "default": "./src/meme.js"
+    },
     "./community": {
       "types": "./types/community.d.ts",
       "import": "./esm/community.mjs",
@@ -304,6 +310,12 @@
       "browser": null,
       "import": "./esm/actor.mjs",
       "default": "./src/actor.js"
+    },
+    "./app-signin": {
+      "types": "./types/app-signin.d.ts",
+      "browser": null,
+      "import": "./esm/app-signin.mjs",
+      "default": "./src/app-signin/index.js"
     },
     "./run": {
       "types": "./types/run.d.ts",

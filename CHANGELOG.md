@@ -12,6 +12,28 @@
   - `people`, `patchPerson` (rename or mute), `removePerson`, `requestConsent`, `checkConsent`, `acceptConsent` and
     `denyConsent`.
   - The types in `types/vision.d.ts` say what the JSON says; no template, crop or other library is ever in an answer.
+- **`openvibe-sdk/meme`:** the client for OpenVibe.Meme's encyclopedia, trends, analyser, deep dives and generator.
+  - `createMemeClient(client, { baseUrl? })` (both browser and server; audience `openvibe.meme`, service id `meme`).
+  - `search({ scope, q, status, label, kind, sort, window, channel, limit, cursor })`, `entry(slug)`, `revisions(slug)`,
+    `trends({ window: 'day'|'week', limit })`, `analyze({ url | media_id })`, `research(topic)` (202, poll
+    `researchGet(id)`), `saveResearch(id)` and `generate({ template | template_slug | topic, lines? })`.
+  - `analyze` refuses locally unless exactly one of `url`/`media_id` is given, and `generate` refuses with neither a
+    template nor a topic; no request is sent for either. Types are in `types/meme.d.ts`; the browser bundle includes
+    the client. The `meme` namespace is on `openvibe-sdk` and in the browser bundle, and `openvibe-sdk/meme`
+    (`createMemeClient`) is in docs/api-surface.json.
+- **`openvibe-sdk/app-signin`: "Sign in with OpenVibe" for developer apps, in one call.**
+  - `createAppSignIn({ clientId, clientSecret, redirectUri, networkUrl, audience, scope, session })` gives a router
+    with `/login`, `/callback`, `/logout`, `/me` and `/health`, built on the SDK's own auth helpers
+    (authorization code + PKCE, the state check): nothing here re-implements OAuth.
+  - The same recovery as `openvibe-sdk/sso` 0.73.0: a lost or expired flow and a code the Network no longer accepts
+    start the sign-in once more by themselves; the second failure shows the same plain page (`failurePage`, now
+    exported by `openvibe-sdk/sso`), with "Try again" and the way back. Neither ever sets a session.
+  - The same client check: `GET /health` and `checkClient()` answer whether the Network accepts the app's
+    credentials (a code that is never issued; cached 10 minutes; 503 only when they are refused).
+  - The app token is verified offline against the Network's JWKS and only trusted when it was minted for THIS app
+    (`sub = app:<clientId>`), before `on_behalf_of` names the person.
+  - The session: your own store (`session: { get, set, clear }`) or, by default, an in-memory store with an opaque
+    httpOnly cookie. The secret, the PKCE verifier and the token never reach the browser and never appear in a log.
 - **`openvibe-sdk/live`: the rest of the Go live screen.** `live.slots.history(id)` (the slot's past streams),
   `live.slots.quality(id, { resolution, fps, bitrate })` and `live.slots.titleIdeas(id, { weekday, hour, title })` (the
   card's ✨ Suggest: three titles for the next stream). With these, an app does everything Live's Go live page does

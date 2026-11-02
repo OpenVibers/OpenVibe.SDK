@@ -165,6 +165,11 @@
         "mediaUrls"
       ]
     },
+    "meme": {
+      "object": [
+        "createMemeClient"
+      ]
+    },
     "modules": {
       "object": [
         "createModulesClient"
@@ -354,6 +359,10 @@
     "OPS": "array",
     "TERMINAL": "object",
     "createAiClient": "function"
+  },
+  "openvibe-sdk/app-signin": {
+    "createAppSignIn": "function",
+    "normalizeScope": "function"
   },
   "openvibe-sdk/auth": {
     "TOKEN_VALID_AFTER": "string",
@@ -581,6 +590,9 @@
     "createMediaClient": "function",
     "createObjectsClient": "function",
     "mediaUrls": "function"
+  },
+  "openvibe-sdk/meme": {
+    "createMemeClient": "function"
   },
   "openvibe-sdk/modules": {
     "createModulesClient": "function"
