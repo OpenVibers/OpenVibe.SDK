@@ -1,6 +1,6 @@
 {
   "name": "openvibe-sdk",
-  "version": "0.74.0",
+  "version": "0.80.0",
   "description": "Supported browser and server clients for the OpenVibe platform: auth (incl. developer apps), registry discovery, identity, user modules, events, realtime, media, community, Bot robots, search, chat, AI runs, Tools (registry, run API and jobs), VIP memberships and developer projects, the async PostgreSQL data layer (db) and the Valkey cache, limits store, queue and pub/sub, with deadlines, safe retries, problem errors and trace propagation.",
   "main": "index.js",
   "types": "types/index.d.ts",
@@ -27,12 +27,6 @@
       "types": "./types/auth-browser.d.ts",
       "import": "./esm/auth-browser.mjs",
       "default": "./src/auth/browser.js"
-    },
-    "./app-signin": {
-      "types": "./types/app-signin.d.ts",
-      "browser": null,
-      "import": "./esm/app-signin.mjs",
-      "default": "./src/app-signin/index.js"
     },
     "./registry": {
       "types": "./types/registry.d.ts",
@@ -87,6 +81,11 @@
       "types": "./types/bot.d.ts",
       "import": "./esm/bot.mjs",
       "default": "./src/bot.js"
+    },
+    "./machines": {
+      "types": "./types/machines.d.ts",
+      "import": "./esm/machines.mjs",
+      "default": "./src/machines.js"
     },
     "./search": {
       "types": "./types/search.d.ts",
@@ -378,10 +377,26 @@
       "import": "./esm/news.mjs",
       "default": "./src/news.js"
     },
+    "./explicit": {
+      "types": "./types/explicit.d.ts",
+      "import": "./esm/explicit.mjs",
+      "default": "./src/explicit.js"
+    },
     "./no-looks": {
       "types": "./types/no-looks.d.ts",
       "import": "./esm/no-looks.mjs",
       "default": "./src/no-looks.js"
+    },
+    "./redact": {
+      "types": "./types/redact.d.ts",
+      "import": "./esm/redact.mjs",
+      "default": "./src/redact.js"
+    },
+    "./consent": {
+      "types": "./types/consent.d.ts",
+      "browser": null,
+      "import": "./esm/consent.mjs",
+      "default": "./src/consent.js"
     },
     "./vision": {
       "types": "./types/vision.d.ts",
@@ -460,7 +475,7 @@
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
     "iovalkey": "^0.4.0",
-    "openvibe-contracts": "https://codeload.github.com/OpenVibers/OpenVibe.Contracts/tar.gz/refs/tags/v0.225.0",
+    "openvibe-contracts": "https://codeload.github.com/OpenVibers/OpenVibe.Contracts/tar.gz/refs/tags/v0.261.0",
     "pg": "^8.23.0"
   },
   "peerDependencies": {

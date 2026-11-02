@@ -21,6 +21,7 @@ module.exports = {
     bench: require('./src/bench'),
     vision: require('./src/vision'),
     themes: require('./src/themes'),
+    redact: require('./src/redact'),
     chat: require('./src/chat'),
     ai: require('./src/ai'),
     jobs: require('./src/jobs'),

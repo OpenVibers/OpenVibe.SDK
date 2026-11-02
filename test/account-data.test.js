@@ -1,14 +1,16 @@
 'use strict';
 /**
  * openvibe-sdk/account-data against real PostgreSQL (PGlite) and a stand-in Network: the export part, the erase
- * (delete, anonymize, keep, aliases), idempotency per export/deletion id, retries, and the signed consumer.
+ * (delete, anonymize, keep, aliases), idempotency per export/deletion id, retries, the signed consumer, the telemetry
+ * the SDK covers by itself and the guard that finds a table with a person column nobody covers.
  */
 const assert = require('node:assert/strict');
 const http = require('node:http');
 const { run, stubServer } = require('./helpers');
 const { createDb } = require('../src/db');
 const { signDeliveryHeaders } = require('../src/events');
-const { createAccountData, createNetworkSender, startSubscriptions, ACCOUNT_DATA_SCHEMA, TOPICS } = require('../src/account-data');
+const { telemetrySchema } = require('../src/telemetry');
+const { createAccountData, createNetworkSender, startSubscriptions, uncovered, ACCOUNT_DATA_SCHEMA, TOPICS } = require('../src/account-data');
 
 const A = 'usr_01JZ0000000000000000000AAA';
 const B = 'usr_01JZ0000000000000000000BBB';
@@ -141,6 +143,73 @@ run([
         assert.equal(await accountData.apply({ ...exportEvent, source: 'chat' }, { send }), 'ignored:source');
         assert.equal(await accountData.apply({ ...exportEvent, payload: { export_id: 'nope', subject: A } }, { send }), 'ignored:payload');
         assert.equal(await accountData.apply({ ...deleteEvent, payload: { deletion_id: DEL, subject: 'user:1' } }, { send }), 'ignored:payload');
+        await db.close();
+    }],
+
+    ['telemetry is covered once: the six readable fields as telemetry.json, anonymized on deletion', async () => {
+        const db = createDb({ pglite: true });
+        await db.exec(telemetrySchema());
+        await db.exec(`INSERT INTO telemetry_samples (at, service, operation, subject, resource, status, latency_ms) VALUES
+            ('2026-10-01T00:00:00Z', 'codes', 'run.start', '${A}', 'run_1', 'ok', 12),
+            ('2026-10-02T00:00:00Z', 'codes', 'run.finish', '${A}', 'run_1', 'ok', 34),
+            ('2026-10-02T00:00:00Z', 'codes', 'run.finish', '${B}', 'run_2', 'error', 56)`);
+        const accountData = createAccountData({ db, service: 'codes', log: quiet, tables: [] });
+        assert.throws(() => createAccountData({ db, service: 'codes', tables: [{ table: 'plans', subject: 'owner', file: 'telemetry.json' }] }), /already exports to telemetry\.json/);
+        const part = await accountData.exportPart(A);
+        assert.deepEqual(part.files.map((f) => f.name), ['telemetry.json']);
+        const rows = part.files[0].content;
+        assert.equal(rows.length, 2, 'only this person\'s samples');
+        assert.deepEqual(Object.keys(rows[0]).sort(), ['at', 'latency_ms', 'operation', 'resource', 'service', 'status']);
+        assert.equal(rows[0].operation, 'run.finish', 'newest first');
+        assert.ok(!JSON.stringify(part.files).includes(A), 'the subject is not in the file');
+        assert.deepEqual(await accountData.erase([A]), { erased: {}, retained: { tombstones: 2 } });
+        assert.equal(await db.value('SELECT COUNT(*)::int FROM telemetry_samples'), 3, 'the samples are kept');
+        assert.equal(await db.value('SELECT COUNT(*)::int FROM telemetry_samples WHERE subject IS NULL'), 2);
+        assert.equal(await db.value(`SELECT COUNT(*)::int FROM telemetry_samples WHERE subject = '${B}'`), 1);
+        await db.close();
+    }],
+
+    ['a service that lists telemetry_samples itself keeps its own entry', async () => {
+        const db = createDb({ pglite: true });
+        await db.exec(telemetrySchema());
+        await db.exec(`INSERT INTO telemetry_samples (at, service, operation, subject) VALUES
+            ('2026-10-01T00:00:00Z', 'codes', 'run.start', '${A}'), ('2026-10-02T00:00:00Z', 'codes', 'run.finish', '${A}')`);
+        const accountData = createAccountData({
+            db, service: 'codes', log: quiet,
+            tables: [{ table: 'telemetry_samples', subject: 'subject', file: 'mine.json', erase: 'delete' }],
+        });
+        const part = await accountData.exportPart(A);
+        assert.deepEqual(part.files.map((f) => f.name), ['mine.json']);
+        assert.ok('service' in part.files[0].content[0], 'its own columns');
+        assert.deepEqual(await accountData.erase([A]), { erased: { telemetry_samples: 2 }, retained: {} });
+        assert.equal(await db.value('SELECT COUNT(*)::int FROM telemetry_samples'), 0);
+        await db.close();
+    }],
+
+    ['uncovered() names every table with a person column that nothing covers; telemetry is covered by itself', async () => {
+        const db = createDb({ pglite: true });
+        await db.exec(`CREATE TABLE plans (id TEXT, owner TEXT);
+            CREATE TABLE notes (id TEXT, created_by TEXT);
+            CREATE TABLE orders (id TEXT, user_id TEXT);
+            CREATE TABLE members (id TEXT, person TEXT);
+            CREATE TABLE mixed (id TEXT, owner TEXT, subject TEXT);
+            CREATE TABLE scan_tasks (id TEXT, subject TEXT);
+            CREATE TABLE account_data_events (id TEXT, subject TEXT);
+            CREATE TABLE posts (id TEXT, author TEXT);
+            CREATE TABLE plain (id TEXT)`);
+        await db.exec(telemetrySchema());
+        assert.deepEqual(await uncovered(db, {
+            tables: ['plans'],
+            taskKeyed: ['scan_tasks'],
+            exempt: { account_data_events: 'the ledger of requests itself' },
+        }), ['members', 'mixed', 'notes', 'orders'], 'telemetry_samples covered, author not person-shaped, one entry per table');
+        assert.deepEqual(await uncovered(db, {
+            tables: ['plans', { table: 'notes' }, 'orders', 'members', 'mixed'],
+            taskKeyed: ['scan_tasks'],
+            exempt: { account_data_events: 'the ledger of requests itself' },
+        }), [], 'every person table covered');
+        await assert.rejects(uncovered(db, { tables: ['plans'], exempt: { notes: '' } }), /needs a reason/);
+        await assert.rejects(uncovered(db, { tables: 'plans' }), /must be an array/);
         await db.close();
     }],
 

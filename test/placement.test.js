@@ -44,10 +44,10 @@ run([
         const r = plan(req(), [provider('mystery', 'rc_missing')], { now: T });
         assert.equal(r.selected, null);
     }],
-    ['a user-owned offer is eligible under trust: [\'user-owned\'], and for workloads that name no trust list', async () => {
+    ['a user-owned offer is eligible only under trust: [\'user-owned\'], never by default', async () => {
         const own = node('usr-node', 0.2, { trust: 'user-owned' });
         assert.equal(excluded(req({ trust: ['user-owned'] }), own), null, 'user-owned trust is accepted');
-        assert.equal(excluded(req(), own), null, 'a workload that names no trust list accepts every TRUST_ORDER class');
+        assert.match(excluded(req(), own), /first-party/, 'the contract default leaves user-owned out');
         assert.match(excluded(req({ trust: ['partner'] }), own), /partner/, 'a narrower trust list still refuses it');
         const r = plan(req({ objective: 'cheapest', trust: ['user-owned'] }), [own, provider('ext', 'rc')], { rateCards: [card('rc', 'ext', 1e9, 0)], now: T });
         assert.equal(r.selected, 'usr-node');

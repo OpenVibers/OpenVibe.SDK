@@ -210,6 +210,12 @@
         "subscribe"
       ]
     },
+    "redact": {
+      "object": [
+        "onlySecret",
+        "redact"
+      ]
+    },
     "registry": {
       "object": [
         "createRegistryClient"
@@ -338,7 +344,8 @@
     "TOPICS": "array",
     "createAccountData": "function",
     "createNetworkSender": "function",
-    "startSubscriptions": "function"
+    "startSubscriptions": "function",
+    "uncovered": "function"
   },
   "openvibe-sdk/actor": {
     "createActorClient": "function"
@@ -416,6 +423,15 @@
   "openvibe-sdk/community": {
     "actingHeaders": "function",
     "createCommunityClient": "function"
+  },
+  "openvibe-sdk/consent": {
+    "DEFAULT_TIMEOUT_MS": "number",
+    "DEFAULT_TTL_MS": "number",
+    "FEATURES": "array",
+    "KINDS": "array",
+    "MAX_SUBJECTS": "number",
+    "PURPOSES": "array",
+    "createConsent": "function"
   },
   "openvibe-sdk/core": {
     "CONTRACTS_RANGE": "string",
@@ -498,6 +514,9 @@
     "verifyDelivery": "function",
     "verifyDeliveryV2": "function"
   },
+  "openvibe-sdk/explicit": {
+    "isExplicit": "function"
+  },
   "openvibe-sdk/food": {
     "createFoodClient": "function"
   },
@@ -556,6 +575,11 @@
   "openvibe-sdk/live": {
     "createLiveClient": "function"
   },
+  "openvibe-sdk/machines": {
+    "DEFAULT_TIMEOUT_MS": "number",
+    "MachinesError": "class",
+    "createMachines": "function"
+  },
   "openvibe-sdk/media": {
     "DEFAULT_PUBLIC_ORIGIN": "string",
     "createMediaClient": "function",
@@ -587,19 +611,26 @@
     "createOpenReClient": "function"
   },
   "openvibe-sdk/placement": {
+    "DEFAULT_TRUST": "array",
     "TRUST_CLASSES": "array",
     "TRUST_ORDER": "array",
     "canonical": "function",
     "createPlanHolder": "function",
+    "escalate": "function",
     "excluded": "function",
     "forecast": "function",
+    "learn": "function",
+    "lineFor": "function",
     "marginalCost": "function",
+    "optionKey": "function",
     "ownedLoadCost": "function",
     "pickTwo": "function",
+    "place": "function",
     "plan": "function",
     "priceOf": "function",
     "rendezvous": "function",
     "signPlan": "function",
+    "successOf": "function",
     "verifyPlan": "function"
   },
   "openvibe-sdk/play": {
@@ -625,6 +656,10 @@
     "createRealtimeClient": "function",
     "parseSSE": "function",
     "subscribe": "function"
+  },
+  "openvibe-sdk/redact": {
+    "onlySecret": "function",
+    "redact": "function"
   },
   "openvibe-sdk/registry": {
     "createRegistryClient": "function"

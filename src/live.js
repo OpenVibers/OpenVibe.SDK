@@ -75,6 +75,15 @@ function createLiveClient(client, { baseUrl } = {}) {
          * restream_destinations, … }. A slot OpenRestream ingests answers OpenRestream's own whip_url and rtmp_url and no key.
          */
         profile: (slotId, { signal } = {}) => call({ path: `/api/streams/managed/${id(slotId, 'a slot id')}/profile`, signal }),
+        /** The slot's past streams, newest first → { sessions: [{ id, title, started_at, duration_seconds, peak_viewers, vod_id, … }] }. */
+        history: (slotId, { signal } = {}) => call({ path: `/api/streams/managed/${id(slotId, 'a slot id')}/history`, signal }),
+        /** The slot's quality: { resolution: '1080', fps: '30', bitrate: 4500 } (kbps), and the browser settings beside them. */
+        quality: (slotId, settings, { signal } = {}) => call({ method: 'PUT', path: '/api/streams/broadcast-settings', json: { managed_stream_id: Number(id(slotId, 'a slot id')), settings }, signal }),
+        /**
+         * Three title ideas for the slot's next stream (the Go live card's Suggest) → { titles }. weekday and hour are the
+         * streamer's own (Live does not know their time zone); title is what is typed now. A few a minute (429 says wait).
+         */
+        titleIdeas: (slotId, { weekday, hour, title } = {}, { signal } = {}) => call({ method: 'POST', path: `/api/streams/managed/${id(slotId, 'a slot id')}/title-ideas`, json: { weekday, hour, title }, signal }),
     };
 
     /** Go live from a slot → { stream, endpoint }. opts: title, category, tags, is_nsfw. */

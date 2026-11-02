@@ -10,6 +10,7 @@ import * as search from './search';
 import * as bench from './bench';
 import * as vision from './vision';
 import * as themes from './themes';
+import * as redact from './redact';
 import * as chat from './chat';
 import * as ai from './ai';
 import * as jobs from './jobs';
@@ -30,6 +31,7 @@ export * as search from './search';
 export * as bench from './bench';
 export * as vision from './vision';
 export * as themes from './themes';
+export * as redact from './redact';
 export * as chat from './chat';
 export * as ai from './ai';
 export * as jobs from './jobs';
@@ -39,6 +41,6 @@ export * as geo from './geo';
 
 declare const sdk: typeof core & {
     auth: typeof auth; registry: typeof registry; modules: typeof modules; realtime: typeof realtime;
-    media: typeof media; community: typeof community; bot: typeof bot; search: typeof search; bench: typeof bench; vision: typeof vision; themes: typeof themes; chat: typeof chat; ai: typeof ai; jobs: typeof jobs; tools: typeof tools; projects: typeof projects; geo: typeof geo;
+    media: typeof media; community: typeof community; bot: typeof bot; search: typeof search; bench: typeof bench; vision: typeof vision; themes: typeof themes; redact: typeof redact; chat: typeof chat; ai: typeof ai; jobs: typeof jobs; tools: typeof tools; projects: typeof projects; geo: typeof geo;
 };
 export default sdk;

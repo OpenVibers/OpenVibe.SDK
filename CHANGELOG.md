@@ -1,23 +1,128 @@
 # Changelog
 
+## Unreleased
+
+- **`openvibe-sdk/live`: the rest of the Go live screen.** `live.slots.history(id)` (the slot's past streams),
+  `live.slots.quality(id, { resolution, fps, bitrate })` and `live.slots.titleIdeas(id, { weekday, hour, title })` (the
+  card's ✨ Suggest: three titles for the next stream). With these, an app does everything Live's Go live page does
+  (https://openvibe.live/docs/streams-api).
+
+## 0.80.0 (2026-11-01)
+
+- **`openvibe-sdk/explicit`: nudity is art.** The owner, 2026-10-31: "naked and nude is fine… stop being against art on
+  my platform." `isExplicit()` now gates what OpenVibe.Live's own rule gates (Live#469), word for word.
+  - **Still gated:** sex acts and pornography (sexual acts or activity, having sex, porn, masturbation, intercourse,
+    oral sex, penetration, pornographic or sexually explicit content), and any text that puts a child and nudity
+    together.
+  - **No longer gated:** nudity and body words on their own. A nude figure-drawing class publishes; "a child is shown
+    naked" never does.
+
+## 0.79.0 (2026-10-31)
+
+- **`openvibe-sdk/machines`: the network's machines hub** (plan L34, step M2; Contracts 0.258.0). A person's machines
+  are the network's: Bot stays the registry underneath, and OpenVibe.Network fronts it on openvibe.network/machines for
+  the person and for the apps the person consented to.
+  - `createMachines({ networkUrl, token, fetch, timeoutMs })`: `token` returns the caller's own bearer token — the
+    person's session token, or an app's token holding `network.machines.read` or `network.machines.manage` with the
+    person's consent.
+  - `list()` → `{ machines }`, `get(id)` → `{ machine }`, `catalogue()` → `{ roles }` (what a machine may do for the
+    network), `pair()` → `{ pairing }` (a one-time code and the command to run), `rename(id, name)` → `{ machine }`,
+    `roles(id, roles)` → `{ machine }` (the whole set, not a change), `revoke(id)` → `{ machine }`.
+  - A refusal throws a `MachinesError` with the hub's own `status` and `code` (`capability.denied`,
+    `capability.owner_denied`, `registry.unknown_role`, a 404 for a machine that is not the caller's). A hub that does
+    not answer is a `machines.timeout`, never a hang.
+  - The machines' own capabilities stay where they are: `openvibe-sdk/bot`'s `machines.desk()` and `machines.chat()`
+    talk to Bot itself and are unchanged.
+
+## 0.78.0 (2026-10-31)
+
+- **`openvibe-sdk/consent`:** the client for the L24 consent registry. Nothing a person makes is off-limits to AI or
+  data use by design; each use is off until that person turns it on in OpenVibe.Network. A service asks this check
+  before it uses a person's content or likeness.
+  - `createConsent({ networkUrl, token, ttlMs = 60_000, fetch, log })`: `token` returns a service token holding
+    `network.consent.read`. `allowed(subject, purpose, { kind, client, feature })` → a boolean;
+    `filter(subjects, purpose, opts)` → the allowed subset, in input order, in batches of 500;
+    `onChange(event)` drops a subject's answers for a purpose on `network.consent.changed` (wire the payload or the
+    envelope); `mock(map)` answers from `{ subject: ['purpose'] }` without the network.
+  - **Fails closed:** a network error, the 2 s timeout, a non-200, a malformed answer or a token that cannot be
+    minted is false for everyone asked. A failure is never cached as a yes; it logs at most once a minute.
+  - An answer is cached for `ttlMs` (60 s), per subject, purpose, kind, client and feature; an answer in flight when
+    a change arrives is not stored, so a revocation cannot be overwritten.
+  - Server-side (`browser: null`): the token is a service token. Types are in `types/consent.d.ts`, the dataset-build
+    example in `docs/consent.md`.
+
+## 0.77.0 (2026-10-31)
+
+- **AI text may describe people** (the owner, 2026-10-31: "there should be no reason it can't describe people … remove
+  all that crap"). `openvibe-sdk/no-looks` is deprecated. `noLooks`, `noLooksTags` and `hasLooks` return what they are
+  given, and `RULES_VERSION` is `'off'`, so a service that still calls them keeps working until its next release
+  removes the calls.
+- **`openvibe-sdk/explicit`:** `isExplicit(...texts)`, the rule that stays. AI text that says a scene shows sexual
+  content is not published. `no-looks` re-exports it.
+
+## 0.76.0 (2026-10-30)
+
+- **`openvibe-sdk/placement`: placement v1 — quality, the person's rules, learning and a reason (agent plan A1).**
+  - `place(requirements, offers, ctx)` is `plan()` with the plan's road: the person's rules and ownership, a quality
+    floor (default 0.5) with a fallback, the success estimate, cost per success, escalation and one plain sentence
+    saying why. It returns `{ result, line, ranked, rejected, fallback }`; `result` is exactly what `plan()` returns
+    for the offers left in, validated as today.
+  - `learn(outcomes, {person, key, kind, ok, at})` and `successOf(outcomes, {person, key, kind, prior, now})` keep
+    and read plain counts with a 14-day half-life, a Beta mean, Bench priors, the global weight `min(1, 20/nG)` over
+    **everyone else's** counts (the person's rows are not counted twice) and the dotted-kind fallback.
+    `escalate(previous, failure, requirements, offers, ctx)` handles quality, busy, offline, refused, budget and
+    timeout, and asks the person after two escalations. It learns the failed try exactly once and returns the new
+    counts as `outcomes`; the caller persists that set and must not record the same failure again.
+    `optionKey(offer)` and `lineFor(facts)` are exported too.
+  - On the person's own free machine the line claims only what the step asked for: `harness:tools` (the harness's
+    own tools, including the signed-in CLI) says "your sign-in", and `harness:host-access` (the person's machine and
+    its files) says "your files". With neither it says "your own machine".
+  - `plan()` takes an optional `success: { [offer_id]: p }`: when present the cost part of the score is
+    `estimated_cost_usd / p`, while `estimated_cost_usd` in the result stays the raw cost. When absent, scoring is
+    unchanged.
+  - **Behaviour fix: `user-owned` is never a default.** When `requirements.trust` is absent, `plan()` now uses
+    `DEFAULT_TRUST` (`first-party`, `partner`, `community`, `external`). The contract
+    (`platform.workload-requirements@1`) says exactly that: "when absent, first-party, partner, community and
+    external. user-owned is never a default: a user-owned offer is eligible only when this list names it". A
+    stranger's machine must never be a default. `TRUST_ORDER` keeps all five classes as the preference order;
+    `DEFAULT_TRUST` is the four-class default. `place()` also requires a user-owned offer's `owner` to be the person
+    of the step.
+  - **Streaming machines.** A step that asks for a GPU or 2 or more cores excludes an offer whose
+    `health.streaming` is `true`, with the reason "it is streaming". The field is not in
+    `platform.resource-offer@1` yet (Node reports `screen.state` in its own status, Bot's offer does not carry it),
+    so this release fixes the name the Node can start sending; a top-level `offer.streaming` is tolerated too.
+  - README and [docs/placement.md](docs/placement.md): the API, the rules, the estimate, escalation and the line
+    templates.
+
+All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
+release may change an API and says so here.
+
+## 0.75.0 (2026-10-30)
+
+- **`openvibe-sdk/redact`: one secret scrubber for the Node and AI (Memory M2).**
+  - `redact(text)` → `{ text, count }` ports OpenVibe.Node's `internal/memory/redact.go` (Node #87): the same shapes,
+    the whole-text pass with a sentinel before the per-item pass, the unterminated private key block, Luhn card
+    numbers, and the deliberately wide environment-assignment rule. `onlySecret(text)` says an item was nothing but a
+    secret, so AI refuses it.
+  - `test/redact-corpus.json` holds every case of Node's `TestRedactEveryShape`, the split and unterminated key
+    blocks, the `.env` block and the harmless texts that must not change. Node copies the file and runs the same
+    cases against its Go scrubber, so the two ends share one list and one corpus.
+  - Pure functions, no dependencies: exported for Node and the browser, with ESM and TypeScript entries.
+
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
 
 ## 0.74.0 (2026-10-30)
 
-- **`openvibe-sdk/app-signin`: "Sign in with OpenVibe" for developer apps, in one call.**
-  - `createAppSignIn({ clientId, clientSecret, redirectUri, networkUrl, audience, scope, session })` gives a router
-    with `/login`, `/callback`, `/logout`, `/me` and `/health`, built on the SDK's own auth helpers
-    (authorization code + PKCE, the state check): nothing here re-implements OAuth.
-  - The same recovery as `openvibe-sdk/sso` 0.73.0: a lost or expired flow and a code the Network no longer accepts
-    start the sign-in once more by themselves; the second failure shows the same plain page (`failurePage`, now
-    exported by `openvibe-sdk/sso`), with "Try again" and the way back. Neither ever sets a session.
-  - The same client check: `GET /health` and `checkClient()` answer whether the Network accepts the app's
-    credentials (a code that is never issued; cached 10 minutes; 503 only when they are refused).
-  - The app token is verified offline against the Network's JWKS and only trusted when it was minted for THIS app
-    (`sub = app:<clientId>`), before `on_behalf_of` names the person.
-  - The session: your own store (`session: { get, set, clear }`) or, by default, an in-memory store with an opaque
-    httpOnly cookie. The secret, the PKCE verifier and the token never reach the browser and never appear in a log.
+- **`openvibe-sdk/account-data`: telemetry leaves with the person, and a guard finds a table nobody covers (ADR-033).**
+  - `createAccountData` handles `telemetry_samples` by itself when the table exists: the person's samples are exported
+    as `telemetry.json` (`at`, `service`, `operation`, `resource`, `status`, `latency_ms`), and a deletion anonymizes
+    them (`subject` set to NULL, the sample kept) instead of removing them. A service that lists the table itself
+    keeps its own entry.
+  - `uncovered(db, {tables, taskKeyed, exempt})` lists every table in the current schema with a person-shaped column
+    (`subject`, `owner`, `created_by`, `user_id`, `person`) that the table map, the telemetry handling, a task-keyed
+    list or a reasoned exemption does not cover. A service's test asserts the list is empty, so a new table fails CI
+    until it is covered or exempted with a reason.
 
 ## 0.73.0 (2026-10-30)
 

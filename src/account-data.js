@@ -41,6 +41,16 @@
  * apply() answers 'exported' | 'erased' | 'confirmed' | 'closed' | 'unchanged' | 'ignored:<why>', and throws when
  * Network refuses for a reason worth retrying, so Events redelivers. It is idempotent per export and deletion id
  * (account_data_events): a redelivered deletion never erases twice, and a confirmation that failed is sent again.
+ *
+ * Telemetry is handled once here, for every service: when the telemetry table (telemetry_samples) exists and the
+ * service's table map does not list it, that person's samples are exported as telemetry.json (at, service, operation,
+ * resource, status, latency_ms) and erased by anonymizing (subject NULL, the sample kept, counted as a tombstone). A
+ * service that lists telemetry_samples itself keeps its own entry.
+ *
+ * uncovered(db, { tables, taskKeyed, exempt }) lists the tables in the current schema with a person-shaped column
+ * (subject, owner, created_by, user_id, person) that none of `tables`, the telemetry handling above, `taskKeyed` or
+ * `exempt` (table → why) covers. A service's test asserts the list is empty, so a new table with a person column
+ * fails CI until it is covered or exempted with a reason.
  */
 const { parseDelivery } = require('./events');
 const { createServiceTokenClient } = require('./auth/tokens');
@@ -52,6 +62,12 @@ const DELETION_RE = /^del_[0-9A-HJKMNP-TV-Z]{26}$/;
 const IDENT = /^[a-z_][a-z0-9_]{0,62}$/;
 const FILE_RE = /^[a-z0-9][a-z0-9_.-]{0,62}\.json$/;
 const MAX_FILES = 64;
+
+/** The telemetry table openvibe-sdk/telemetry writes, and the sample fields a person may read (not `subject`). */
+const TELEMETRY_TABLE = 'telemetry_samples';
+const TELEMETRY_COLUMNS = Object.freeze(['at', 'service', 'operation', 'resource', 'status', 'latency_ms']);
+/** The columns that name a person; uncovered() looks for a table carrying any of them. */
+const PERSON_COLUMNS = Object.freeze(['subject', 'owner', 'created_by', 'user_id', 'person']);
 
 const ACCOUNT_DATA_SCHEMA = `CREATE TABLE IF NOT EXISTS account_data_events (
     id TEXT PRIMARY KEY,
@@ -98,6 +114,15 @@ function createAccountData({ db, service, tables, extraExport = null, extraErase
     if (!db || typeof db.many !== 'function' || typeof db.tx !== 'function') throw new TypeError('openvibe-sdk/account-data: db must be an openvibe-sdk/db handle');
     if (typeof service !== 'string' || !service) throw new TypeError('openvibe-sdk/account-data: service is required');
     const entries = normaliseTables(tables || []);
+    // Telemetry is every service's, so the SDK covers it once; a service that names the table keeps its own entry.
+    const handled = entries.slice();
+    if (!entries.some((e) => e.table === TELEMETRY_TABLE)) {
+        if (entries.some((e) => e.file === 'telemetry.json')) throw new TypeError('openvibe-sdk/account-data: a table already exports to telemetry.json, the telemetry export');
+        handled.push({
+            table: TELEMETRY_TABLE, subject: 'subject', file: 'telemetry.json', columns: [...TELEMETRY_COLUMNS],
+            order: 'at', erase: { anonymize: {} }, value: (s) => s, kind: TELEMETRY_TABLE,
+        });
+    }
     const columnCache = new Map();
 
     /** The table's columns, or null when the table does not exist (yet): a table a migration has not made is skipped. */
@@ -117,7 +142,7 @@ function createAccountData({ db, service, tables, extraExport = null, extraErase
     async function exportPart(subject) {
         const files = [];
         const truncated = [];
-        for (const e of entries) {
+        for (const e of handled) {
             if (e.file === null) continue;
             const cols = await columnsOf(db, e.table);
             if (!cols || !cols.includes(e.subject)) continue;
@@ -142,7 +167,7 @@ function createAccountData({ db, service, tables, extraExport = null, extraErase
         const retained = {};
         const add = (o, k, n) => { if (n) o[k] = (o[k] || 0) + n; };
         await db.tx(async (t) => {
-            for (const e of entries) {
+            for (const e of handled) {
                 const cols = await columnsOf(t, e.table);
                 if (!cols || !cols.includes(e.subject)) continue;
                 const forms = formsOf(e, subjects);
@@ -258,6 +283,41 @@ function createAccountData({ db, service, tables, extraExport = null, extraErase
 }
 
 /**
+ * The tables in the current schema that name a person but that no account-data table map covers: the guard that
+ * makes a forgotten table fail a service's test instead of being found five deletion stages later.
+ *
+ *   assert.deepEqual(await uncovered(db, { tables: accountData.tables, taskKeyed: ['scan_tasks'],
+ *       exempt: { account_data_events: 'the ledger of requests itself' } }), []);
+ *
+ * `tables` is the service's table map (entries or table names). `taskKeyed` names tables whose person column is a
+ * task's key and whose rows go with the task, not the account. `exempt` is table → why; every exemption needs a
+ * reason. `telemetry_samples` is covered by createAccountData itself, so it need not be listed. A table with any of
+ * the person columns (subject, owner, created_by, user_id, person) and no cover is returned, sorted by name.
+ */
+async function uncovered(db, { tables = [], taskKeyed = [], exempt = {} } = {}) {
+    if (!db || typeof db.many !== 'function') throw new TypeError('openvibe-sdk/account-data: uncovered needs an openvibe-sdk/db handle');
+    const rows = await db.many(`SELECT DISTINCT c.table_name AS table
+        FROM information_schema.columns c
+        JOIN information_schema.tables t ON t.table_schema = c.table_schema AND t.table_name = c.table_name
+        WHERE c.table_schema = current_schema() AND t.table_type = 'BASE TABLE' AND c.column_name = ANY($1::text[])
+        ORDER BY c.table_name`, [[...PERSON_COLUMNS]]);
+    const covered = new Set([TELEMETRY_TABLE]);
+    const add = (list, what) => {
+        if (!Array.isArray(list)) throw new TypeError(`openvibe-sdk/account-data: uncovered: ${what} must be an array`);
+        for (const entry of list) covered.add(ident(typeof entry === 'string' ? entry : entry && entry.table, `${what} entry`));
+    };
+    add(tables, 'tables');
+    add(taskKeyed, 'taskKeyed');
+    if (!exempt || typeof exempt !== 'object' || Array.isArray(exempt)) throw new TypeError('openvibe-sdk/account-data: uncovered: exempt must be a table → reason object');
+    for (const [table, reason] of Object.entries(exempt)) {
+        ident(table, 'exempt table');
+        if (typeof reason !== 'string' || !reason.trim()) throw new TypeError(`openvibe-sdk/account-data: uncovered: exempt "${table}" needs a reason`);
+        covered.add(table);
+    }
+    return rows.map((r) => r.table).filter((table) => !covered.has(table));
+}
+
+/**
  * send(path, body) → Response: POST to Network's internal routes with this service's own client-credentials token
  * (audience openvibe.network). A 401 refreshes the token once.
  */
@@ -337,4 +397,4 @@ function startSubscriptions({
     return { topics: [...topics], endpoint, done, stop() { stopped = true; if (timer) clearTimeout(timer); timer = null; settle(false); } };
 }
 
-module.exports = { createAccountData, createNetworkSender, startSubscriptions, ACCOUNT_DATA_SCHEMA, TOPICS };
+module.exports = { createAccountData, createNetworkSender, startSubscriptions, uncovered, ACCOUNT_DATA_SCHEMA, TOPICS };

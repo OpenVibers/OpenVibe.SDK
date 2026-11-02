@@ -2,6 +2,6 @@
 import cjs from '../src/account-data.js';
 
 export const {
-    createAccountData, createNetworkSender, startSubscriptions, ACCOUNT_DATA_SCHEMA, TOPICS,
+    createAccountData, createNetworkSender, startSubscriptions, uncovered, ACCOUNT_DATA_SCHEMA, TOPICS,
 } = cjs;
 export default cjs;
