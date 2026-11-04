@@ -870,6 +870,12 @@
   "openvibe-sdk/valkey": {
     "createValkey": "function"
   },
+  "openvibe-sdk/vibes": {
+    "SIGNATURE_TOLERANCE_SEC": "number",
+    "VibesError": "class",
+    "createVibesClient": "function",
+    "verifyWebhook": "function"
+  },
   "openvibe-sdk/video": {
     "createVideoClient": "function"
   },
