@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.84.0 (2026-11-04)
+
+- **`openvibe-sdk/vibes`: Vibes Pay for developer apps** (MONEY.md, D12). A server creates a charge with its app
+  token (`billing.vibes.charge`), the person pays on OpenVibe's pay sheet in whole Vibes, and Billing moves them
+  once to the project's Vibes wallet.
+  - `createVibesClient({appToken | tokenProvider, billingUrl})` with `charges.create({amount, description, reference,
+    return_url})`, `charges.get(id)` and `charges.refund(id, {reason?})`. `amount` is a positive whole number of Vibes;
+    a float, zero or negative amount is a `TypeError` before any request. The app's `reference` is the
+    `Idempotency-Key`, so a retried create is the same charge. A token provider may be a function, an object with
+    `getToken()`/`invalidate()`, or one with `authHeaders()`; a 401 invalidates it and retries once with the same key.
+    problem+json becomes `VibesError` with `status`, `code`, `body` and `retryable`.
+  - `webhooks.verify(rawBody, signatureHeader, secret)` checks the raw body in constant time against
+    `X-OpenVibe-Signature-V2: t=<unix seconds>,v2=<hex HMAC-SHA256 of "<t>.<raw body>">`, and rejects a timestamp
+    more than 300 s from the server's clock either way. The legacy `sha256=<hex>` (or bare hex) body-only form is
+    accepted. Bad input is `false`, never an exception. The same function is exported as `verifyWebhook`.
 ## 0.83.0 (2026-11-03)
 
 - **`openvibe-sdk/placement`: `planAi()`, the AI Exchange face of the ONE planner** (plan-state 2026-10-22 §E,
