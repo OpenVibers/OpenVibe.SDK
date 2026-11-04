@@ -24,6 +24,14 @@
  *    binding resource is busy, then rises so work spills to free or paid capacity before the node saturates;
  *  - hysteresis: a candidate replaces the current placement only when it is clearly better (`minGain`), or when
  *    the current one is no longer eligible (failover is immediate).
+ *
+ *   const { planAi } = require('openvibe-sdk/placement');
+ *   const r = planAi(requirements, deployments, { enabled: true, usage, evidence, rates });
+ *   // → { chosen, rejected: [{ id, reason }], objective, estimate, explain }
+ *
+ * planAi() is the AI Exchange face of this ONE planner (plan-state 2026-10-22 §E, G-P1/P7; decisions D1 and D5):
+ * the same hard-constraints-first rule, priced in integer nano-USD and ranked by the expected cost per SUCCESS.
+ * It is OFF by default: without `enabled: true` it answers nothing and changes no behaviour.
  */
 const crypto = require('crypto');
 
@@ -573,6 +581,417 @@ function escalate(previous, failure, requirements, offers, ctx = {}) {
     return { ...next, line, escalations: attempts + 1, outcomes: outcomes || [] };
 }
 
+// ── The AI Exchange planner (plan-state 2026-10-22 §E, G-P1/P7; decision D1 and D5) ────────────────────────────
+//
+// planAi() is the ONE planner's AI Exchange face: the same hard-constraints-first rule, but priced in integer
+// nano-USD and ranked by the cost of one SUCCESS rather than by the cost of one attempt. It is a new entry point,
+// not a second router: plan() still answers platform.placement-result@1 and is untouched.
+//
+// It is OFF by default. A caller must pass `enabled: true` (or set the feature flag) to get an answer; without
+// it the planner refuses with the reason, so nothing changes behaviour until the owner turns it on.
+//
+// The rules:
+//  - hard gates first, each one a reason, never a weight: the exact artifact, the commercial right
+//    (provider_access), the privacy/trust class, the capabilities (tools, json, vision, stream, context), the
+//    context bound, the health, and the cost ceiling;
+//  - then the objective: the expected cost per SUCCESS, `expected_cost / max(p_success, floor)`, where p_success
+//    comes from optional quality evidence and its confidence. Sparse evidence is MARKED (sparse_evidence), not
+//    trusted: a candidate whose evidence is thin keeps a neutral probability and may not win on quality alone;
+//  - money is integer nano-USD (D1): the four token classes and the per-request fee, charged once each, ceil.
+//
+// The answer explains itself: `explain.rejected` lists every candidate that was left out and why, and
+// `explain.objective` says what the planner optimised for. No secret, no key, no host, no endpoint ever appears
+// in a reason.
+
+const { nanoUsd, expectedCostNano, costPerSuccessNano, formatNanoUsd } = require('./cost');
+
+/** The commercial rights a paid managed route may use (decision D3). */
+const PAID_PROVIDER_ACCESS = new Set(['OWN_DEPLOYMENT', 'AUTHORIZED_WHOLESALE']);
+
+/** The provider_access values of the AI Exchange (ai.inference-deployment@1). */
+const PROVIDER_ACCESS = ['OWN_DEPLOYMENT', 'AUTHORIZED_WHOLESALE', 'CUSTOMER_BYOK', 'RESTRICTED', 'UNVERIFIED'];
+
+/** The privacy classes a deployment may carry, from the strictest to the loosest. */
+const PRIVACY_CLASSES = ['zero_retention', 'no_training', 'standard', 'unknown'];
+
+/** The default probability floor: a candidate never divides its cost by less than this. */
+const DEFAULT_P_FLOOR = 0.1;
+
+/** The evidence below this many observations is sparse: it is marked, never trusted. */
+const SPARSE_SAMPLE_COUNT = 20;
+
+/** The capabilities a model may declare (ai.model@1): tools, json, vision, stream. */
+const MODEL_CAPABILITIES = ['tools', 'json', 'vision', 'stream'];
+
+/**
+ * A reason a candidate was left out, with everything secret stripped: no key, no host, no endpoint, no path.
+ * The candidate's own id is never in its own reason (the answer already says which candidate it was).
+ */
+function safeReason(text) {
+    let s = String(text == null ? '' : text);
+    s = s.replace(/\b[a-z]{2,8}_[0-9A-HJKMNP-TV-Z]{26}\b/gi, 'a key');                 // usr_…, prj_…, sec_…
+    s = s.replace(/\b(?:sk|pk|rk)-[A-Za-z0-9_-]{8,}\b/g, 'a key');                    // provider keys
+    s = s.replace(/\bhttps?:\/\/[^\s,;)]+/gi, 'an endpoint');                          // urls
+    s = s.replace(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, 'a host');                           // ipv4
+    s = s.replace(/\b[a-zA-Z0-9-]+\.(?:internal|local|lan)\b/g, 'a host');           // internal host names
+    s = s.replace(/(?:^|\s)\/(?:[^/\s]+\/)+[^\s]*/g, ' a path');                      // paths
+    s = s.replace(/\s+/g, ' ').trim();
+    return s || 'not eligible';
+}
+
+/** The candidate's id: the deployment id, else the model id, else the offer id. */
+function candidateId(c) {
+    return String((c && (c.id || c.deployment_id || c.offer_id || c.model_id)) || '');
+}
+
+/** The model the candidate runs: ai.model@1 id, else the artifact it loads, else the candidate's own id. */
+function candidateModel(c) {
+    return String((c && (c.model_id || c.model || c.artifact_id)) || candidateId(c));
+}
+
+/** The commercial right of the candidate, as ai.inference-deployment@1 names it. */
+function candidateAccess(c) {
+    return String((c && (c.provider_access || c.commercial_rights)) || '').toUpperCase();
+}
+
+/** The privacy class of the candidate: an explicit privacy_policy, else its trust tier. */
+function candidatePrivacy(c) {
+    const p = c && c.privacy_policy;
+    if (p) return String(p);
+    const tier = c && c.trust_tier;
+    if (tier === 'first_party' || tier === 'owner_node') return 'zero_retention';
+    if (tier === 'approved_wholesale') return 'standard';
+    return 'unknown';
+}
+
+/** The capabilities the candidate declares: ai.model@1's four, read from the model or the candidate itself. */
+function candidateCapabilities(c) {
+    const src = (c && (c.capabilities || (c.model && c.model.capabilities) || (c.model_info && c.model_info.capabilities))) || {};
+    const out = new Set();
+    for (const k of MODEL_CAPABILITIES) if (src[k]) out.add(k);
+    return out;
+}
+
+/** The context bound of the candidate, in tokens: the deployment's limit, else the model's context. */
+function candidateContext(c) {
+    const limits = c && c.limits;
+    if (limits && limits.context_tokens != null) return Number(limits.context_tokens);
+    const m = c && (c.model || c.model_info);
+    if (m && m.context != null) return Number(m.context);
+    if (m && m.context_window != null) return Number(m.context_window);
+    return null;
+}
+
+/** The quality evidence for a candidate: { p_success, confidence, samples, source }. */
+function evidenceOf(evidence, id) {
+    if (!evidence) return null;
+    if (evidence instanceof Map) return evidence.get(id) || null;
+    return evidence[id] || null;
+}
+
+/**
+ * The chance a request succeeds on a candidate, from optional quality evidence, and how much that evidence may
+ * be trusted. Sparse evidence (few observations, or no confidence given) is MARKED, not trusted: the probability
+ * is pulled toward the neutral prior and the candidate may not win on quality alone.
+ *
+ * The evidence is `{ p_success, confidence, samples }`:
+ *  - `p_success` in (0, 1]: the measured chance the request succeeds there;
+ *  - `confidence` in (0, 1]: how much the measurement may be trusted (0.5 = a prior, 1 = a full measurement);
+ *  - `samples`: how many observations the measurement rests on.
+ */
+function qualityOf(ev, { prior = 0.9, floor = SPARSE_SAMPLE_COUNT } = {}) {
+    if (!ev) return { p_success: prior, confidence: 0, samples: 0, sparse: true, source: 'prior' };
+    const p = Number(ev.p_success);
+    const conf = Number(ev.confidence);
+    const samples = Number(ev.samples || 0);
+    const sparse = !Number.isFinite(conf) || conf <= 0 || samples < floor;
+    if (!Number.isFinite(p) || p <= 0) return { p_success: 0, confidence: 0, samples, sparse: true, source: ev.source || 'evidence' };
+    // A trusted measurement is used as it is; a sparse one is pulled toward the prior, so it cannot dominate.
+    const trust = sparse ? 0 : Math.min(1, Math.max(0, conf));
+    const blended = trust > 0 ? trust * p + (1 - trust) * prior : prior;
+    return {
+        p_success: Math.max(0, Math.min(1, blended)),
+        confidence: sparse ? 0 : trust,
+        samples,
+        sparse,
+        source: ev.source || (sparse ? 'sparse_evidence' : 'evidence'),
+    };
+}
+
+/**
+ * The hard gates of the AI Exchange. Each returns a reason when the candidate may not run the workload, or null.
+ * The order is the order of the reasons an operator reads: what it runs, who may serve it, what may see the
+ * request, what it can do, what it costs.
+ */
+function aiExcluded(req, c, ctx) {
+    const id = candidateId(c);
+
+    // 1. The exact artifact: a pinned model id is never substituted (decision D3).
+    const exact = req.exact_artifact || req.artifact_id || req.exact_model;
+    if (exact) {
+        const model = candidateModel(c);
+        const artifact = String(c.artifact_id || '');
+        if (model !== exact && artifact !== exact) return `exact model requested (${exact})`;
+    }
+
+    // 2. The commercial right: a paid managed route needs OWN_DEPLOYMENT or AUTHORIZED_WHOLESALE (decision D3).
+    const access = candidateAccess(c);
+    const paid = c.paid_managed === true || req.paid_managed === true;
+    if (paid) {
+        if (!access) return 'no recorded commercial right';
+        if (!PAID_PROVIDER_ACCESS.has(access)) return `commercial right ${access} may not serve a paid route`;
+    } else if (access && !PAID_PROVIDER_ACCESS.has(access) && req.allow_restricted === true) {
+        return `commercial right ${access} is restricted`;
+    }
+
+    // 3. The privacy / trust class: the request may not reach a looser class than the workload allows.
+    if (req.privacy_class) {
+        const allowed = PRIVACY_CLASSES.filter((p) => PRIVACY_CLASSES.indexOf(p) <= PRIVACY_CLASSES.indexOf(req.privacy_class));
+        const have = candidatePrivacy(c);
+        if (!allowed.includes(have)) return `privacy class ${have} is not within ${req.privacy_class}`;
+    }
+    if (req.trust && req.trust.length) {
+        const tier = c.trust_tier;
+        if (tier && !req.trust.includes(tier)) return `trust tier ${tier} is not allowed`;
+    }
+
+    // 4. The capabilities: tools, json, vision, stream.
+    const wanted = req.capabilities || [];
+    const have = candidateCapabilities(c);
+    for (const k of wanted) {
+        if (!MODEL_CAPABILITIES.includes(k)) continue;      // a non-model capability is the caller's own gate
+        if (!have.has(k)) return `lacks ${k}`;
+    }
+
+    // 5. The context bound.
+    if (req.context_tokens != null) {
+        const ctxTokens = candidateContext(c);
+        if (ctxTokens != null && ctxTokens < req.context_tokens) return `context ${ctxTokens} tokens is under ${req.context_tokens}`;
+    }
+
+    // 6. The health of the deployment.
+    const status = c.status || (c.health && c.health.healthy === false ? 'offline' : null);
+    if (status && !['ready', 'warming', 'degraded'].includes(status)) return `status ${status}`;
+    if (c.health && c.health.healthy === false) return 'not healthy';
+
+    return null;
+}
+
+/**
+ * The cost ceiling: the expected cost of the request on this candidate, in nano-USD, against the ceiling.
+ * A candidate without a rate is never assumed free: it is rejected, not priced at zero.
+ */
+function aiCostExcluded(req, c, ctx) {
+    const ceiling = req.max_cost_nano_usd != null ? req.max_cost_nano_usd : (req.max_cost_usd != null ? null : null);
+    if (ceiling == null && req.max_cost_usd == null) return null;
+    const usage = ctx.usage || {};
+    const rates = ctx.ratesFor(c);
+    if (!rates) return 'no rate: the cost is unknown';
+    const cost = expectedCostNano(usage, rates);
+    const limit = req.max_cost_nano_usd != null ? nanoUsd(req.max_cost_nano_usd) : BigInt(Math.ceil(req.max_cost_usd * 1e9));
+    if (cost > limit) return `expected cost ${formatNanoUsd(cost)} nano-USD is over the ${formatNanoUsd(limit)} ceiling`;
+    return null;
+}
+
+/**
+ * planAi(requirements, candidates, opts) → the AI Exchange answer.
+ *
+ *   const r = planAi(
+ *       { exact_artifact: 'qwen/qwen3-9b-abliterated:q4_k_m@3f2a1c9', capabilities: ['tools'], paid_managed: true,
+ *         max_cost_nano_usd: '50000', objective: 'cheapest' },
+ *       candidates,                         // ai.inference-deployment@1 + its ai.model@1 entry
+ *       { enabled: true, usage: { input_tokens: 800, output_tokens: 400 },
+ *         evidence: { 'dep-qwen-9b-us-east-001': { p_success: 0.95, confidence: 0.9, samples: 120 } },
+ *         rates: { 'dep-qwen-9b-us-east-001': { input_nano_usd_per_m: '3000', ... } },
+ *         current: 'dep-qwen-9b-us-east-001', now: Date.now() },
+ *   );
+ *   // → { chosen, rejected: [{ id, reason }], objective, estimate, explain: { rejected, objective, ... } }
+ *
+ * `opts.enabled` is the flag: it is off by default, and without it the planner answers
+ * `{ chosen: null, rejected: [], objective, disabled: true, explain: { objective, disabled: true } }`.
+ *
+ * Hysteresis and affinity are the ones plan() has: `current` (the deployment the workload runs on now) is kept
+ * unless another candidate is clearly better (`minGain`, default 0.15), and `affinity` (a map of deployment id to a
+ * stickiness bonus, 0..1) keeps a workload on the deployment it is warm on.
+ */
+function planAi(req, candidates, opts = {}) {
+    const {
+        enabled = false, now = Date.now(), current = null, minGain = 0.15,
+        usage = {}, evidence = null, rates = null, pFloor = DEFAULT_P_FLOOR,
+        affinity = null, affinityGain = 0.05, prior = 0.9, sparseSampleFloor = SPARSE_SAMPLE_COUNT,
+    } = opts;
+    const objective = req.objective || 'cheapest';
+    const list = Array.isArray(candidates) ? candidates : [];
+
+    if (!enabled) {
+        return {
+            chosen: null,
+            rejected: [],
+            objective,
+            disabled: true,
+            explain: { objective, disabled: true, rejected: [], candidates: [], decided_at: new Date(now).toISOString() },
+        };
+    }
+
+    const ctx = {
+        now, usage,
+        ratesFor: (c) => {
+            const id = candidateId(c);
+            if (rates instanceof Map) return rates.get(id) || null;
+            if (rates && typeof rates === 'object') return rates[id] || null;
+            return c.retail_rate || c.rate || null;
+        },
+    };
+
+    const rejected = [];
+    const seen = new Set();
+    const reject = (id, reason) => {
+        if (seen.has(id)) return;
+        seen.add(id);
+        rejected.push({ id, reason: safeReason(reason) });
+    };
+
+    const scored = [];
+    for (const c of list) {
+        const id = candidateId(c);
+        if (!id) continue;
+        const why = aiExcluded(req, c, ctx) || aiCostExcluded(req, c, ctx);
+        if (why) { reject(id, why); continue; }
+        const ratesForThis = ctx.ratesFor(c);
+        if (!ratesForThis) { reject(id, 'no rate: the cost is unknown'); continue; }
+        const expected = expectedCostNano(usage, ratesForThis);
+        const ev = evidenceOf(evidence, id);
+        const q = qualityOf(ev, { prior, floor: sparseSampleFloor });
+        if (q.p_success <= 0) { reject(id, 'no chance of success'); continue; }
+        const cps = costPerSuccessNano(expected, q.p_success, pFloor);
+        if (cps == null) { reject(id, 'no chance of success'); continue; }
+        scored.push({
+            id,
+            model: candidateModel(c),
+            expected_cost_nano_usd: expected,
+            p_success: q.p_success,
+            confidence: q.confidence,
+            samples: q.samples,
+            sparse_evidence: q.sparse,
+            evidence_source: q.source,
+            cost_per_success_nano_usd: cps,
+            latency_ms: c.latency_ms != null ? Number(c.latency_ms) : null,
+        });
+    }
+
+    if (!scored.length) {
+        return {
+            chosen: null, rejected, objective,
+            explain: { objective, rejected, candidates: [], decided_at: new Date(now).toISOString(), no_eligible_candidate: true },
+        };
+    }
+
+    // Rank by the cost of one success. A candidate whose evidence is sparse may not win on a thin measurement:
+    // it is compared as if its probability were the prior, so a sparse candidate only wins on price.
+    //
+    // The objective says how the cost per success is weighed against the other things the caller cares about
+    // (PLAN §E): `cheapest` is the cost per success alone; `fastest` prefers the latency; `best` prefers the
+    // measured quality; `balanced` weighs cost and latency; `exact` is a pinned artifact (the exact gate already
+    // left one candidate); `private` is a trust constraint (the privacy gate already left the rest).
+    const priorCost = (s) => costPerSuccessNano(s.expected_cost_nano_usd, prior, pFloor);
+    const costOf = (s) => (s.sparse_evidence ? priorCost(s) : s.cost_per_success_nano_usd);
+    const qualityOf_ = (s) => (s.sparse_evidence ? prior : s.p_success);
+    const latencyOf_ = (s) => (s.latency_ms == null ? null : Number(s.latency_ms));
+
+    // The scales the objective weighs against each other: the cost per success, the latency and the quality.
+    const lats = scored.map(latencyOf_).filter((x) => x != null);
+    const maxLat = lats.length ? lats.reduce((m, l) => (l > m ? l : m), 0) : 0;
+
+    const weights = {
+        cheapest: { cost: 1, latency: 0, quality: 0 },
+        balanced: { cost: 0.7, latency: 0.3, quality: 0 },
+        fastest: { cost: 0.2, latency: 0.8, quality: 0 },
+        best: { cost: 0.2, latency: 0, quality: 0.8 },
+        exact: { cost: 1, latency: 0, quality: 0 },
+        private: { cost: 1, latency: 0, quality: 0 },
+    }[objective] || { cost: 1, latency: 0, quality: 0 };
+
+    const ranked = scored.slice().sort((a, b) => {
+        const ca = costOf(a); const cb = costOf(b);
+        if (ca !== cb && (weights.cost > 0)) {
+            // The cost per success decides unless another objective outweighs it.
+            const latA = latencyOf_(a); const latB = latencyOf_(b);
+            const latGap = (latA != null && latB != null && maxLat > 0) ? (latA - latB) / maxLat : 0;
+            const qGap = qualityOf_(a) - qualityOf_(b);
+            const advantage = weights.latency * latGap - weights.quality * qGap;
+            if (advantage > 0.05) return 1;
+            if (advantage < -0.05) return -1;
+            return ca < cb ? -1 : 1;
+        }
+        const latA = latencyOf_(a); const latB = latencyOf_(b);
+        if (latA != null && latB != null && latA !== latB) return latA - latB;
+        return a.id < b.id ? -1 : 1;
+    });
+
+    let best = ranked[0];
+    const reasons = [];
+    // Affinity: a workload stays on the deployment it is warm on. It is a tie-breaker, never a gate.
+    if (affinity) {
+        const bonus = (id) => Number((affinity instanceof Map ? affinity.get(id) : affinity[id]) || 0);
+        const warm = ranked.find((s) => bonus(s.id) > 0);
+        if (warm && warm !== best) {
+            const cb = costOf(best); const cw = costOf(warm);
+            const gap = cb === 0n ? 0 : Number((cb - cw) * 1000n / (cb || 1n)) / 1000;
+            if (gap <= Number(affinityGain)) { best = warm; reasons.push(`stays on ${warm.id}: it is warm (affinity)`); }
+        }
+    }
+    // Hysteresis: the current placement is kept unless another one is clearly better.
+    const cur = current && scored.find((s) => s.id === current);
+    if (cur && cur !== best) {
+        const cb = costOf(best); const cc = costOf(cur);
+        const gain = cc > 0n ? Number((cc - cb) * 1000n / cc) / 1000 : 0;
+        if (gain < minGain) { best = cur; reasons.push(`stays on ${cur.id}: the best alternative is only ${(gain * 100).toFixed(1)}% better`); }
+    } else if (current && !cur) {
+        reasons.push(`${current} is no longer eligible: moved`);
+    }
+    if (best.sparse_evidence) reasons.push(`${best.id} has sparse quality evidence: it is priced as if it were at the prior`);
+    reasons.push(`objective ${objective}: the expected cost per success`);
+
+    const chosen = scored.find((s) => s.id === best.id);
+    for (const s of scored) {
+        if (s.id === chosen.id) continue;
+        if (!seen.has(s.id)) reject(s.id, 'a higher expected cost per success');
+    }
+
+    const estimate = {
+        charge_nano_usd: formatNanoUsd(chosen.expected_cost_nano_usd),
+        input_tokens: Math.max(0, Math.floor(Number(usage.input_tokens) || 0)),
+        cached_read_tokens: Math.max(0, Math.floor(Number(usage.cached_read_tokens) || 0)),
+        cache_write_tokens: Math.max(0, Math.floor(Number(usage.cache_write_tokens) || 0)),
+        output_tokens: Math.max(0, Math.floor(Number(usage.output_tokens) || 0)),
+    };
+
+    return {
+        chosen: chosen.id,
+        rejected,
+        objective,
+        estimate,
+        explain: {
+            objective,
+            rejected,
+            reasons,
+            candidates: scored.map((s) => ({
+                id: s.id,
+                model: s.model,
+                expected_cost_nano_usd: formatNanoUsd(s.expected_cost_nano_usd),
+                cost_per_success_nano_usd: formatNanoUsd(s.cost_per_success_nano_usd),
+                p_success: Number(s.p_success.toFixed(6)),
+                confidence: Number(s.confidence.toFixed(6)),
+                samples: s.samples,
+                sparse_evidence: s.sparse_evidence,
+                evidence_source: s.evidence_source,
+                selected: s.id === chosen.id,
+            })),
+            decided_at: new Date(now).toISOString(),
+        },
+    };
+}
+
 // ── Stable assignment and local balancing ────────────────────────────────────
 
 /** Weighted rendezvous (highest random weight) hashing: the target for `key`; adding or removing one moves little. */
@@ -658,5 +1077,8 @@ module.exports = {
     plan, excluded, marginalCost, priceOf, forecast, ownedLoadCost, rendezvous, pickTwo,
     signPlan, verifyPlan, createPlanHolder, canonical,
     place, escalate, optionKey, learn, successOf, lineFor,
+    planAi, aiExcluded, qualityOf, safeReason,
     TRUST_CLASSES, TRUST_ORDER, DEFAULT_TRUST,
+    PAID_PROVIDER_ACCESS, PROVIDER_ACCESS, PRIVACY_CLASSES, MODEL_CAPABILITIES,
+    DEFAULT_P_FLOOR, SPARSE_SAMPLE_COUNT,
 };

@@ -13,6 +13,70 @@ export type RateCard = { id: string; provider: string; metric: string; unit_size
 export type ProviderState = { provider: string; period_start: string; period_end: string; usage: Record<string, number>; forecast?: Record<string, number>; reserve?: Record<string, number> };
 export type Candidate = { id: string; eligible: boolean; excluded_because?: string; estimated_cost_usd?: number; estimated_latency_ms?: number; score?: number };
 export type PlacementResult = { selected: string | null; objective: string; reasons: string[]; candidates: Candidate[]; decided_at: string };
+
+// ── The AI Exchange face (plan-state 2026-10-22 §E, G-P1/P7; decisions D1 and D5) ──────────────────────────
+/** The commercial rights of the AI Exchange (ai.inference-deployment@1). */
+export type ProviderAccess = 'OWN_DEPLOYMENT' | 'AUTHORIZED_WHOLESALE' | 'CUSTOMER_BYOK' | 'RESTRICTED' | 'UNVERIFIED';
+/** The privacy classes, from the strictest to the loosest. */
+export type PrivacyClass = 'zero_retention' | 'no_training' | 'standard' | 'unknown';
+/** The model capabilities (ai.model@1). */
+export type ModelCapability = 'tools' | 'json' | 'vision' | 'stream';
+/** One deployment to place (ai.inference-deployment@1) with its model entry (ai.model@1). */
+export type AiDeployment = { id: string; artifact_id?: string; region?: string;
+    trust_tier?: 'first_party' | 'owner_node' | 'approved_wholesale' | 'unverified';
+    operator?: string; status?: 'warming' | 'ready' | 'full' | 'degraded' | 'offline';
+    limits?: { max_concurrency?: number; context_tokens?: number; max_output_tokens?: number };
+    provider_access?: ProviderAccess; commercial_rights?: ProviderAccess; privacy_policy?: string | null;
+    health?: { healthy?: boolean; last_check_at?: string | null; reason?: string | null };
+    capabilities?: Partial<Record<ModelCapability, boolean>>;
+    model_id?: string; model?: { id?: string; context?: number; context_window?: number; capabilities?: Partial<Record<ModelCapability, boolean>> };
+    latency_ms?: number; retail_rate?: AiRate; rate?: AiRate; paid_managed?: boolean };
+/** The rates of one model: integer nano-USD per million tokens (ai.model@1 retail_rate) or the nested settlement shape. */
+export type AiRate = { version?: string;
+    input_nano_usd_per_m?: string; cached_read_nano_usd_per_m?: string; cache_write_nano_usd_per_m?: string;
+    output_nano_usd_per_m?: string; per_request_nano_usd?: string;
+    nano_usd_per_m?: { input?: string; cached_read?: string; cache_write?: string; output?: string } };
+/** The tokens of one request, in the four classes the settlement uses. */
+export type AiUsage = { input_tokens?: number; cached_read_tokens?: number; cache_write_tokens?: number; output_tokens?: number };
+/** The quality evidence for one candidate: a measured chance and how much it may be trusted. */
+export type AiEvidence = { p_success: number; confidence?: number; samples?: number; source?: string };
+/** What the workload needs of the deployment. */
+export type AiRequirements = { objective?: 'cheapest' | 'balanced' | 'fastest' | 'best' | 'private' | 'exact';
+    exact_artifact?: string; artifact_id?: string; exact_model?: string;
+    paid_managed?: boolean; allow_restricted?: boolean;
+    privacy_class?: PrivacyClass; trust?: string[]; capabilities?: ModelCapability[];
+    context_tokens?: number; max_cost_nano_usd?: string; max_cost_usd?: number };
+/** One candidate in the explanation. */
+export type AiCandidate = { id: string; model?: string; expected_cost_nano_usd: string; cost_per_success_nano_usd: string;
+    p_success: number; confidence: number; samples: number; sparse_evidence: boolean; evidence_source: string; selected: boolean };
+/** The explanation: what was left out and why, and what the planner optimised for. */
+export type AiExplain = { objective: string; rejected: { id: string; reason: string }[]; reasons?: string[];
+    candidates: AiCandidate[]; decided_at: string; disabled?: boolean; no_eligible_candidate?: boolean };
+/** The AI Exchange answer: ai.route-explain@1 shaped. */
+export type AiPlanResult = { chosen: string | null; rejected: { id: string; reason: string }[]; objective: string;
+    estimate?: { charge_nano_usd: string; input_tokens: number; cached_read_tokens: number; cache_write_tokens: number; output_tokens: number };
+    explain: AiExplain; disabled?: boolean };
+/**
+ * The AI Exchange planner. OFF by default: without `enabled: true` it answers nothing and changes no behaviour.
+ * Money is integer nano-USD; the objective is the expected cost per success.
+ */
+export declare function planAi(req: AiRequirements, candidates: AiDeployment[], opts?: { enabled?: boolean; now?: number;
+    current?: string | null; minGain?: number; usage?: AiUsage; evidence?: Record<string, AiEvidence> | Map<string, AiEvidence>;
+    rates?: Record<string, AiRate> | Map<string, AiRate>; pFloor?: number; affinity?: Record<string, number> | Map<string, number>;
+    affinityGain?: number; prior?: number; sparseSampleFloor?: number }): AiPlanResult;
+/** Why a deployment may not run the workload, or null when it may. */
+export declare function aiExcluded(req: AiRequirements, c: AiDeployment, ctx?: any): string | null;
+/** The chance a request succeeds on a candidate, and how much that evidence may be trusted. */
+export declare function qualityOf(ev: AiEvidence | null | undefined, opts?: { prior?: number; floor?: number }):
+    { p_success: number; confidence: number; samples: number; sparse: boolean; source: string };
+/** A reason with every secret, host, endpoint and path stripped. */
+export declare function safeReason(text: unknown): string;
+export declare const PROVIDER_ACCESS: readonly ProviderAccess[];
+export declare const PAID_PROVIDER_ACCESS: readonly ProviderAccess[];
+export declare const PRIVACY_CLASSES: readonly PrivacyClass[];
+export declare const MODEL_CAPABILITIES: readonly ModelCapability[];
+export declare const DEFAULT_P_FLOOR: number;
+export declare const SPARSE_SAMPLE_COUNT: number;
 export declare function plan(req: Requirements, offers: Offer[], opts?: { rateCards?: RateCard[] | Map<string, RateCard>; states?: ProviderState[] | Map<string, ProviderState>;
     now?: number; current?: string | null; minGain?: number; weights?: { cost: number; latency: number }; owned?: { busy?: number; full?: number; maxUsd?: number };
     success?: Record<string, number> | Map<string, number> }): PlacementResult;

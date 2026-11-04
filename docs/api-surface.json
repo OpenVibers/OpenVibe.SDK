@@ -458,9 +458,26 @@
     "ulid": "function"
   },
   "openvibe-sdk/cost": {
+    "NANO_USD": "bigint",
+    "RATE_FIELDS": {
+      "object": [
+        "cache_write_tokens",
+        "cached_read_tokens",
+        "input_tokens",
+        "output_tokens"
+      ]
+    },
+    "TOKENS_PER_MILLION": "bigint",
+    "TOKEN_CLASSES": "array",
+    "chargeTokens": "function",
+    "costPerSuccessNano": "function",
     "costSnapshot": "function",
     "estimate": "function",
+    "expectedCostNano": "function",
+    "formatNanoUsd": "function",
+    "nanoUsd": "function",
     "rateCard": "function",
+    "rateFor": "function",
     "validateCostSnapshot": "function",
     "validateRateCard": "function"
   },
@@ -619,9 +636,16 @@
     "createOpenReClient": "function"
   },
   "openvibe-sdk/placement": {
+    "DEFAULT_P_FLOOR": "number",
     "DEFAULT_TRUST": "array",
+    "MODEL_CAPABILITIES": "array",
+    "PAID_PROVIDER_ACCESS": "object",
+    "PRIVACY_CLASSES": "array",
+    "PROVIDER_ACCESS": "array",
+    "SPARSE_SAMPLE_COUNT": "number",
     "TRUST_CLASSES": "array",
     "TRUST_ORDER": "array",
+    "aiExcluded": "function",
     "canonical": "function",
     "createPlanHolder": "function",
     "escalate": "function",
@@ -635,8 +659,11 @@
     "pickTwo": "function",
     "place": "function",
     "plan": "function",
+    "planAi": "function",
     "priceOf": "function",
+    "qualityOf": "function",
     "rendezvous": "function",
+    "safeReason": "function",
     "signPlan": "function",
     "successOf": "function",
     "verifyPlan": "function"
