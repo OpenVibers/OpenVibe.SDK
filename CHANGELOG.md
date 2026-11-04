@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.83.0 (2026-11-03)
+
+- **`openvibe-sdk/placement`: `planAi()`, the AI Exchange face of the ONE planner** (plan-state 2026-10-22 §E,
+  G-P1/P7; decisions D1 and D5). Not a second router: `plan()` still answers `platform.placement-result@1` and is
+  untouched. **Off by default** — without `enabled: true` the planner answers nothing and no behaviour changes.
+  - **The hard gates, before any scoring.** Each one is a reason, never a weight: the exact artifact (an exact id
+    is never substituted), the commercial right (a paid managed route needs `OWN_DEPLOYMENT` or
+    `AUTHORIZED_WHOLESALE`), the privacy class and the trust tier, the capabilities (`tools`, `json`, `vision`,
+    `stream`), the context bound, the health, and the cost ceiling. A candidate with no rate is never assumed
+    free: it is rejected with `no rate: the cost is unknown`.
+  - **The objective is the cost of one success.** `cost_per_success = expected_cost / max(p_success, floor)`, so a
+    candidate that is cheaper per token but fails more often loses to one that is dearer per token and succeeds
+    more. `p_success` comes from optional quality evidence with a confidence: **sparse evidence is marked, not
+    trusted** (no confidence, or fewer than 20 samples → `sparse_evidence: true`, no confidence, and the probability
+    is pulled back to the prior), so a thin measurement can never dominate the ranking.
+  - **Money is integer nano-USD** (decision D1), never a float of dollars: `ceil(tokens * rate_nano_per_m / 1e6)`
+    charged once per token class (input, cached read, cache write, output) plus the per-request fee, and the cost
+    per success rounded up to a whole nano-USD. `openvibe-sdk/cost` gains `nanoUsd`, `chargeTokens`,
+    `expectedCostNano`, `costPerSuccessNano` and `formatNanoUsd`; the rates travel in the flat `ai.model@1`
+    `retail_rate` shape or the nested settlement shape.
+  - **The answer explains itself.** `explain.rejected` is `[{ id, reason }]` (as `ai.route-explain@1` names it) and
+    `explain.objective` says what was optimised for. Every reason is stripped of keys, subject ids, hosts, IPs,
+    URLs and paths: no secret and no internal host ever reaches the answer.
+  - Hysteresis and affinity stay the ones `plan()` has: `current` is kept unless another candidate is clearly
+    better (`minGain`), and `affinity` keeps a workload on the deployment it is warm on.
+
 ## 0.82.0 (2026-11-02)
 
 - **`openvibe-sdk/events` outbox: `pending()` and `rejected()` keep their count** (`countsCacheMs`, 30 s when

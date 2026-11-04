@@ -157,3 +157,103 @@ its files) makes it say "your files". With neither it says only "your own machin
 
 `lineFor(facts)` is exported for tests and for a caller that already has the two factors; `place()` and `escalate()`
 build the facts from the result.
+
+## The AI Exchange face: `planAi()`
+
+`planAi()` is the same ONE planner for the AI Exchange (plan-state 2026-10-22 §E, G-P1/P7; decisions D1 and D5).
+It is a new entry point, not a second router: `plan()` still answers `platform.placement-result@1` and is untouched.
+
+**It is off by default.** A caller must pass `enabled: true`; without it the planner answers nothing and no
+behaviour changes until the owner turns it on.
+
+```js
+const { planAi } = require('openvibe-sdk/placement');
+
+const r = planAi(
+    { objective: 'cheapest', paid_managed: true,
+      exact_artifact: 'qwen/qwen3-9b-abliterated:q4_k_m@3f2a1c9',
+      capabilities: ['tools', 'json'], privacy_class: 'zero_retention',
+      max_cost_nano_usd: '50000' },
+    deployments,                    // ai.inference-deployment@1 + its ai.model@1 entry
+    {
+        enabled: true,
+        now: Date.parse('2026-11-03T12:00:00Z'),
+        usage: { input_tokens: 800, output_tokens: 400 },
+        rates: { 'dep-qwen-9b-us-east-001': { input_nano_usd_per_m: '3000', output_nano_usd_per_m: '15000', per_request_nano_usd: '0' } },
+        evidence: { 'dep-qwen-9b-us-east-001': { p_success: 0.95, confidence: 0.9, samples: 120 } },
+        current: 'dep-qwen-9b-us-east-001',
+    },
+);
+
+r.chosen;    // 'dep-qwen-9b-us-east-001'
+r.rejected;  // [{ id, reason }] — every candidate that was left out, and why
+r.objective; // 'cheapest'
+r.estimate;  // { charge_nano_usd: '9', input_tokens: 800, output_tokens: 400, … }
+r.explain;   // { objective, rejected, reasons, candidates, decided_at }
+```
+
+### The hard gates, before any scoring
+
+Each gate is a reason, never a weight: a candidate that misses one is excluded and never chosen, however cheap it
+is.
+
+| Gate | Requirement | Reason it gives |
+|---|---|---|
+| the exact artifact | `exact_artifact` | `exact model requested (org/model@rev)` — an exact id is never substituted (decision D3) |
+| the commercial right | `paid_managed` | `commercial right RESTRICTED may not serve a paid route` — a paid managed route needs `OWN_DEPLOYMENT` or `AUTHORIZED_WHOLESALE` (decision D3) |
+| the privacy class | `privacy_class` | `privacy class standard is not within zero_retention` |
+| the trust tier | `trust` | `trust tier approved_wholesale is not allowed` |
+| the capabilities | `capabilities` | `lacks tools` — for `tools`, `json`, `vision`, `stream` |
+| the context bound | `context_tokens` | `context 4096 tokens is under 32768` |
+| the health | — | `status offline`, `not healthy` |
+| the cost ceiling | `max_cost_nano_usd` | `expected cost 9 nano-USD is over the 8 ceiling` |
+
+A candidate with **no rate** is never assumed free: it is rejected with `no rate: the cost is unknown`.
+
+### The objective: the cost of one success
+
+Money is integer nano-USD (decision D1): one nano-USD is 1e-9 USD, and every amount is a `BigInt`. The expected
+cost of a request is the four token classes, each charged **once** at its own rate, plus the per-request fee:
+
+```
+charge(tokens, rate_nano_per_m) = ceil(tokens * rate_nano_per_m / 1e6)      // rounded up, never down
+expected_cost                   = input + cached_read + cache_write + output + per_request
+cost_per_success                = expected_cost / max(p_success, floor)      // rounded up to a whole nano-USD
+```
+
+The rates travel in either shape: the flat `ai.model@1` `retail_rate`
+(`input_nano_usd_per_m`, …) or the nested settlement shape (`nano_usd_per_m: { input, cached_read, … }`).
+
+`p_success` comes from optional quality evidence: `{ p_success, confidence, samples }`. **Sparse evidence is marked,
+not trusted**: an evidence set with no confidence, or fewer than 20 samples, is marked `sparse_evidence: true`,
+carries no confidence, and is pulled back to the prior — so it can never win on quality alone, only on price.
+A candidate with no chance of success is rejected with `no chance of success`.
+
+The planner therefore prefers the **cheaper per success** over the cheaper per token: a candidate that costs 9
+nano-USD and succeeds 60% of the time (15 per success) loses to one that costs 13 and succeeds 95% (14 per success).
+
+### The objectives
+
+`objective` says what the planner weighed (PLAN §E's named policies):
+
+| Objective | What it weighs |
+|---|---|
+| `cheapest` (the default) | the expected cost per success, alone |
+| `balanced` | the cost per success and the latency |
+| `fastest` | the latency, mostly |
+| `best` | the measured quality, mostly |
+| `exact` | the pinned artifact: the exact gate has already left one candidate |
+| `private` | the trust class: the privacy gate has already left the rest |
+
+`explain.objective` always says which one was used.
+
+### Hysteresis and affinity
+
+The same two rules `plan()` has. `current` (the deployment the workload runs on now) is kept unless another
+candidate is clearly better (`minGain`, default 0.15), and `affinity` (a map of deployment id to a stickiness
+between 0 and 1) keeps a workload on the deployment it is warm on. Both say so in `explain.reasons`.
+
+### The explanation never leaks
+
+Every reason is passed through `safeReason()`: no key, no subject id, no host, no IP, no URL, no path ever reaches
+the answer. `explain.rejected` is `[{ id, reason }]`, exactly as `ai.route-explain@1` names it.

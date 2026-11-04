@@ -5,6 +5,8 @@ export const {
     plan, excluded, marginalCost, priceOf, forecast, ownedLoadCost,
     rendezvous, pickTwo, signPlan, verifyPlan, createPlanHolder, canonical,
     place, escalate, optionKey, learn, successOf, lineFor,
-    TRUST_CLASSES, TRUST_ORDER, DEFAULT_TRUST,
+    planAi, aiExcluded, qualityOf, safeReason, TRUST_CLASSES, TRUST_ORDER,
+    DEFAULT_TRUST, PAID_PROVIDER_ACCESS, PROVIDER_ACCESS, PRIVACY_CLASSES, MODEL_CAPABILITIES, DEFAULT_P_FLOOR,
+    SPARSE_SAMPLE_COUNT,
 } = cjs;
 export default cjs;

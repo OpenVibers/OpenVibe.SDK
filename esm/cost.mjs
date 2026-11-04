@@ -2,6 +2,8 @@
 import cjs from '../src/cost.js';
 
 export const {
-    rateCard, costSnapshot, estimate, validateRateCard, validateCostSnapshot,
+    rateCard, costSnapshot, estimate, validateRateCard, validateCostSnapshot, nanoUsd,
+    chargeTokens, expectedCostNano, costPerSuccessNano, formatNanoUsd, rateFor, NANO_USD,
+    TOKENS_PER_MILLION, TOKEN_CLASSES, RATE_FIELDS,
 } = cjs;
 export default cjs;
