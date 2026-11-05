@@ -1,4 +1,4 @@
-/* Copied verbatim from openvibe-contracts v0.214.0 generated/typescript/index.d.ts (the SDK does not
+/* Copied verbatim from openvibe-contracts v0.289.1 generated/typescript/index.d.ts (the SDK does not
  * require the package at runtime; it is a devDependency for the tests). test/types.test.js checks
  * these against it. */
 /* eslint-disable */
@@ -176,7 +176,7 @@ export interface ServiceManifest {
     /**
      * Which legal wording its /terms, /privacy and /dmca use (openvibe-shared/legal).
      */
-    legalProfile: "streaming" | "tools" | "ugc" | "games" | "hosting" | "account" | "info";
+    legalProfile: "streaming" | "tools" | "ugc" | "games" | "hosting" | "account" | "info" | "public" | "service";
     /**
      * Order in site lists.
      */
