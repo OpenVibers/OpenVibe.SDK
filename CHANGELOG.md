@@ -9,7 +9,7 @@
 - GET for a people-locked item answers each member's `key_slot`, and for the owner each member's `key_fingerprint` and `fingerprint_changed`, so the sheet can warn and re-wrap.
 - The agent client gains `addLocked('@name', { contentKey })` (looks up the person's key, wraps, saves the member and the slot) and `removeLocked('@name', { contentKey | envelope })` (re-seals for the owner and the members who stay, then removes); `share({ base, token, network })` names the key directory. `transfer(to, { key_slot })` passes the recipient's slot.
 - `openvibe-sdk/locker`: `open`/`rewrap` accept `{ contentKey }`, so an agent that sealed an item can open or re-seal it without a private key. `openvibe-sdk/locker/server` exports `peopleSlotOk`.
-- The new fields are in openvibe-contracts v0.293.0 (`share.update-request@1.envelope`, `share.transfer-request@1.key_slot`, `share.member@1.key_fingerprint`); the devDependency pin stays at v0.292.0 until that tag exists.
+- The new fields are in openvibe-contracts v0.296.0 (`share.update-request@1.envelope`, `share.transfer-request@1.key_slot`, `share.member@1.key_fingerprint`); the devDependency pin stays at v0.292.0 until that tag exists.
 
 ## 0.87.0 (2026-11-06)
 
