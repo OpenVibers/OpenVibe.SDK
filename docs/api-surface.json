@@ -670,7 +670,8 @@
   },
   "openvibe-sdk/locker/server": {
     "checkHeader": "function",
-    "inspectEnvelope": "function"
+    "inspectEnvelope": "function",
+    "peopleSlotOk": "function"
   },
   "openvibe-sdk/locker/vectors": {
     "CASES": "array",

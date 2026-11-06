@@ -1,6 +1,6 @@
 # Network-wide sharing (Node)
 
-`openvibe-sdk/share` implements the 2026-11-06 sharing design in each service's PostgreSQL database. The service is the authority. The module never reads titles, content or media URLs. It uses openvibe-contracts v0.291.0 (share.v1).
+`openvibe-sdk/share` implements the 2026-11-06 sharing design in each service's PostgreSQL database. The service is the authority. The module never reads titles, content or media URLs. It uses openvibe-contracts v0.293.0 (share.v1, with the Locker lock kind and the member key slots).
 
 ```js
 const { createShares, sharesSchema, shareOpenApi } = require('openvibe-sdk/share');
@@ -11,6 +11,7 @@ const shares = createShares({
     notify,                     // async notification => Network delivery adapter
     onOwnerChange: async (ref, from, to, tx) => { /* update this service's resource using tx */ },
     onAudienceChange: async (ref, audience, tx) => { /* update visibility and search projection using tx */ },
+    onReseal: async (ref, envelope, tx) => { /* store the re-sealed locker envelope using tx */ },
 });
 // Include sharesSchema() in an expand migration run by the migration role.
 // await shares.migrate() is a convenience for tests or that same migration role.
@@ -34,19 +35,19 @@ The migration creates `shares`, `share_members`, `share_transfers`, `share_acces
 
 | Server method | Result |
 | --- | --- |
-| `register(ref, { owner_subject, audience = 'private' })` | Share; trusted service-only initialization, never an HTTP operation |
+| `register(ref, { owner_subject, audience = 'private', lock = 'none' })` | Share; trusted service-only initialization, never an HTTP operation. `lock` is how the item is sealed (`locker.envelope@1`); a locked item cannot be public |
 | `canView(viewer, ref)`, `canEdit(viewer, ref)` | boolean; missing resources deny. A plain snapshot: page views never take a row lock |
 | `get(viewer, ref)` | the enriched share (people, `you`, pending `requests`); owner or staff. The router adds `describe()` on top |
 | `getWithRevision(viewer, ref)` | `{ value: ShareView, etag }` |
 | `present(viewer, ref, share)` | enrich a raw share with person projections and the caller's role |
 | `lookup(viewer, '@name')` | `{ person }` or `{ person: null }`, on the same rate-limit budget as name resolution |
 | `setAudience(viewer, ref, audience)` | Share |
-| `addMembers(viewer, ref, ['@name' \| subject \| { name \| subject, role, expires_at? }])` | Share; exact names or canonical active user subjects |
-| `removeMember(viewer, ref, subject)` | Share |
-| `update(viewer, ref, { audience?, members?, notify? }, { ifMatch? }?)` | Share; atomically replaces members when provided. `notify: false` suppresses `share.added` for that save only |
+| `addMembers(viewer, ref, ['@name' \| subject \| { name \| subject, role, expires_at?, key_slot? }])` | Share; exact names or canonical active user subjects |
+| `removeMember(viewer, ref, subject, { envelope }?)` | Share; on a people-locked item `envelope` (base64) is required |
+| `update(viewer, ref, { audience?, members?, notify?, lock?, envelope? }, { ifMatch? }?)` | Share; atomically replaces members when provided. `notify: false` suppresses `share.added` for that save only. `lock` may only echo the registered value; `envelope` stores a re-seal |
 | `requestAccess(viewer, ref)` | AccessRequest; deduplicated pending request and owner notification |
 | `dismiss(viewer, ref, requestId)` | Share; owner sets a pending request to `dismissed` |
-| `transfer(viewer, ref, { to: '@name' \| subject \| { subject } \| { name }, keep_access = false })` | Transfer |
+| `transfer(viewer, ref, { to: '@name' \| subject \| { subject } \| { name }, keep_access = false, key_slot? })` | Transfer; `key_slot` is required on a people-locked item |
 | `accept(viewer, ref, transferId)`, `decline(...)`, `cancel(...)` | Transfer |
 | `sharedWithMe(viewer, { service?, limit = 50, cursor? }?)` | `{ items, next_cursor }`; ids and access metadata only |
 | `expireMembers({ limit = 100 }?)` | number of resources swept, including expired transfers |
@@ -70,6 +71,36 @@ Name-based mutations must run outside a caller-created ambient transaction so a 
 The five Events payloads are `share.granted`, `share.revoked`, `share.transfer.requested`, `share.transfer.accepted`, `share.transfer.declined`. All audiences carry ids and ACL metadata only. Payload `ref.service` and envelope `source` identify the adopting service. Declare these produced types in its service manifest when adopting. Audience updates include the new audience; cancellation/expiry emit revocation of the preview grant, and acceptance includes both subjects. Grant/revoke payloads carry `reason` (member_added, member_removed, member_expired, audience_changed, transfer_cancelled, transfer_expired, ownership_changed) and the relevant `transfer_id`. Event consumers must combine audience, membership and transfer state; a revoked preview is not deletion of an independent membership. Network's aggregated list must recheck local access before disclosing content.
 
 The uniform routes and request/response schemas are exposed by `shareOpenApi()` (OpenAPI 3.1); merge its `paths` and bearer security scheme into the service document. The exact routes are GET/PUT `/api/v1/{kind}/{id}/share`, POST `.../share/requests`, POST `.../share/requests/{id}/dismiss`, POST `.../share/transfer`, POST `.../share/transfer/{accept,decline,cancel}`, GET `/api/v1/share/people?name=`, and GET `/api/v1/shared-with-me`. GET settings returns the GET body and an ETag; PUT supports If-Match and returns 412 on a stale revision. PUT, POST transfer, cancel, dismiss, and a recipient's accept or decline all answer with the GET body (and an ETag) so the sheet redraws from one shape; a recipient's accept or decline keeps the plain transfer shape its banner expects. Transfer answers take `{ transfer_id }`; a transfer request accepts `to` as `'@name'`, a subject object, `{ subject }` or `{ name }`. `POST .../requests` answers the access request. `GET /api/v1/share/people?name=exact` is signed-in only and answers `{ person }` or `{ person: null }`. HTTP errors use `{ code, error: message }`, which the SDK core maps to typed errors; unknown server errors are a generic 500.
+
+## Locked items (Locker)
+
+Sharing decides who may fetch a thing; `locker.envelope@1` decides who can read it. A share records how its item is sealed (`lock: none | people | password | link`) and the module stores the slots, never a content key. Locked items (`lock !== 'none'`) can never be public: `register` and `update` refuse `audience: 'public'` with `400 share.lock_public`, and `lock` is fixed once registered (`409 share.lock_fixed`; a save may echo it).
+
+For a **people** lock each member carries `key_slot`, the content key wrapped for that member's public key (`locker.people-slot@1`). The browser, or an agent with `openvibe-sdk/locker`, makes the slot; the server only checks it:
+
+* a member without a slot is refused: `400 share.slot_required`;
+* a slot is refused when it names another subject (`400 share.invalid`) or a key other than the one Network's key directory has for that person now (`GET /api/v1/people/:subject/keys`, through the same `network` client; `409 share.key_changed`);
+* a person with no locker yet is `409 share.no_key`.
+
+Removing a member is a re-seal, not a row deletion: the caller sends the content sealed again for the people who stay (`envelope`, base64 of a people-locked `locker.envelope@1`) with the members that remain, or as `removeMember(..., { envelope })`. The envelope must not still hold the leaving member's slot (`400 share.reseal_invalid`), and it is stored through `onReseal(ref, envelopeBytes, tx)` **inside** the transaction and before the member row goes. Without an envelope the save is `400 share.reseal_required`; without the hook, `409 share.reseal_unavailable`. A hook error rolls everything back, member included. An expired member is revoked by the sweep without a re-seal: access stops, and the service should re-seal when it can.
+
+A transfer of a people-locked item carries the recipient's slot with the offer (`key_slot`; `400 share.slot_required`, checked like any member slot). Accepting removes the former owner's membership unless `keep_access`; a former owner who keeps access starts without a slot, because the fresh content key is the new owner's to wrap for them.
+
+GET for a people-locked item answers each member's `key_slot`, and for the owner each member's `key_fingerprint` (from the key directory) and `fingerprint_changed` — true when the key the slot was made for is not the person's key now — so the sheet can warn and re-wrap. `describe()` cannot override `lock`. The body limit stays 64 KiB except for a save that carries an envelope (up to 8 MiB).
+
+```js
+const sdk = require('openvibe-sdk');
+const locker = require('openvibe-sdk/locker');
+const item = sdk.share({ base: 'https://community.openvibe.network', token }).for('paste', id);
+const contentKey = crypto.getRandomValues(new Uint8Array(32));      // keep it
+const sealed = await locker.seal('a note', { lock: 'people', contentKey, keys: [{ subject: me, publicKey: myKey }] });
+await item.setAudience('people');
+await item.addLocked('@maticus', { contentKey });                   // looks up his key, wraps, saves both
+await item.removeLocked('@maticus', { contentKey, envelope: sealed }); // re-seals for those who stay, removes
+await item.transfer('@xenia', { key_slot: await locker.wrapFor(contentKey, xeniaKey, { subject: xenia }) });
+```
+
+`removeLocked(target, { envelope })` also accepts an envelope that the caller has already re-sealed; with `contentKey` the envelope is opened and sealed again for the owner and the members who stay (their public keys come from the directory, or pass `keys`).
 
 ```js
 const sdk = require('openvibe-sdk');

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.87.0 (2026-11-06)
+
+- `openvibe-sdk/share` learns locked items (Locker). A share records how its item is sealed — `lock: none | people | password | link`, set by `register(ref, { lock })` and answered by GET — and `describe()` cannot override it. A locked item is never public (`share.lock_public`), and the lock cannot change after registration (`share.lock_fixed`). Expand-only migration: `shares.lock`, `share_members.key_slot`, `share_transfers.key_slot`.
+- A people-locked item carries each member's key slot (`locker.people-slot@1`). `addMembers`/`update` refuse a member without a slot (`share.slot_required`), refuse a slot for another subject or key, and answer `share.key_changed` (409) when the slot's `recipient_key` is not the RFC 7638 thumbprint of that person's key in Network's key directory now (`GET /api/v1/people/:subject/keys`, cached a minute). A person with no locker yet is `share.no_key`.
+- Removing somebody from a people-locked item is a re-seal: the save carries `envelope` (base64 of a people-locked `locker.envelope@1`), or `removeMember(..., { envelope })`. The envelope must not still hold the leaving member's slot (`share.reseal_invalid`), and it is stored through the new `onReseal(ref, envelopeBytes, tx)` hook inside the transaction, before the member row goes; a hook error rolls everything back. Without an envelope: `share.reseal_required`; without the hook: `share.reseal_unavailable`. A save that carries an envelope may be up to 8 MiB; every other body stays at 64 KiB.
+- A transfer of a people-locked item carries the recipient's `key_slot` with the offer (required, checked like a member slot); accepting drops the former owner's membership unless `keep_access`.
+- GET for a people-locked item answers each member's `key_slot`, and for the owner each member's `key_fingerprint` and `fingerprint_changed`, so the sheet can warn and re-wrap.
+- The agent client gains `addLocked('@name', { contentKey })` (looks up the person's key, wraps, saves the member and the slot) and `removeLocked('@name', { contentKey | envelope })` (re-seals for the owner and the members who stay, then removes); `share({ base, token, network })` names the key directory. `transfer(to, { key_slot })` passes the recipient's slot.
+- `openvibe-sdk/locker`: `open`/`rewrap` accept `{ contentKey }`, so an agent that sealed an item can open or re-seal it without a private key. `openvibe-sdk/locker/server` exports `peopleSlotOk`.
+- The new fields are in openvibe-contracts v0.293.0 (`share.update-request@1.envelope`, `share.transfer-request@1.key_slot`, `share.member@1.key_fingerprint`); the devDependency pin stays at v0.292.0 until that tag exists.
+
 ## 0.86.0 (2026-11-06)
 
 - Add `openvibe-sdk/locker`: the Locker envelope (`locker.envelope@1`), end-to-end encryption for anything on OpenVibe, in Node and in the browser. WebCrypto only (`globalThis.crypto.subtle`), no other crypto library and nothing hand-rolled.

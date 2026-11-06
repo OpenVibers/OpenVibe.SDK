@@ -1,6 +1,8 @@
 'use strict';
 const { randomUUID } = require('node:crypto');
 const { newEventId } = require('../core/ids');
+const { inspectEnvelope } = require('../locker/server');
+const { jwkThumbprint } = require('../locker/keys');
 const v = require('./validation');
 const { migrateShares } = require('./schema');
 const WEEK = 7 * 24 * 60 * 60 * 1000;
@@ -10,18 +12,23 @@ const where = 'service=$1 AND kind=$2 AND resource_id=$3';
 const iso = value => new Date(value).toISOString();
 const personKey = subject => `${subject.type}:${subject.id}`;
 const unknownPerson = subject => ({ subject, username: null, display_name: null, avatar_url: null });
+const slotKey = slot => (slot && slot.recipient_key) || null;
 const transferShape = row => ({ id: row.id, from: row.from_subject, to: row.to_subject, keep_access: row.keep_access,
     requested_at: iso(row.requested_at), expires_at: iso(row.expires_at), state: row.state });
 const memberShape = row => ({ subject: row.subject, role: row.role, ...(row.expires_at ? { expires_at: iso(row.expires_at) } : {}),
-    added_by: row.added_by, added_at: iso(row.added_at) });
+    added_by: row.added_by, added_at: iso(row.added_at), ...(row.key_slot ? { key_slot: row.key_slot } : {}) });
+/** A public key we can name by its thumbprint: an EC P-256 JWK with both coordinates. */
+const usableKey = jwk => !!jwk && jwk.kty === 'EC' && jwk.crv === 'P-256'
+    && typeof jwk.x === 'string' && typeof jwk.y === 'string';
 
-function createShares({ db, network, events, notify, onOwnerChange, onAudienceChange, now = Date.now, nameLimit = 30, nameWindowMs = 60000 } = {}) {
+function createShares({ db, network, events, notify, onOwnerChange, onAudienceChange, onReseal, now = Date.now, nameLimit = 30, nameWindowMs = 60000 } = {}) {
     if (!db || !db.tx || !network || !network.json || !events || !events.publish || typeof notify !== 'function') {
         throw new TypeError('createShares requires db, network.json, events.publish and notify');
     }
     if (!Number.isInteger(nameLimit) || nameLimit < 1 || !Number.isInteger(nameWindowMs) || nameWindowMs < 1) throw new TypeError('Invalid name rate limit');
     const timestamp = () => iso(now());
     const peopleCache = new Map();
+    const keyCache = new Map();
     async function row(t, ref) { const s = await t.maybe(`SELECT * FROM shares WHERE ${where} FOR UPDATE`, key(ref)); if (!s) v.hidden(); return s; }
     async function log(t, ref, actor, action, details = {}) {
         await t.exec('INSERT INTO share_log(id,service,kind,resource_id,actor,action,details,occurred_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)', [randomUUID(), ...key(ref), actor, action, details, timestamp()]);
@@ -53,7 +60,7 @@ function createShares({ db, network, events, notify, onOwnerChange, onAudienceCh
     async function pending(t, ref) { return t.maybe(`SELECT * FROM share_transfers WHERE ${where} AND state='pending' AND expires_at>$4`, [...key(ref), timestamp()]); }
     async function snapshot(t, ref, s) {
         const tr = await pending(t, ref);
-        return { ref, owner_subject: s.owner_subject, audience: s.audience, members: (await members(t, ref)).map(memberShape), ...(tr ? { transfer: transferShape(tr) } : {}) };
+        return { ref, owner_subject: s.owner_subject, audience: s.audience, lock: s.lock || 'none', members: (await members(t, ref)).map(memberShape), ...(tr ? { transfer: transferShape(tr) } : {}) };
     }
     async function bump(t, ref) { await t.exec(`UPDATE shares SET revision=revision+1 WHERE ${where}`, key(ref)); }
     async function access(t, ref, s, viewer, edit) {
@@ -137,20 +144,83 @@ function createShares({ db, network, events, notify, onOwnerChange, onAudienceCh
         if (!found) return { person: null };
         return { person: { subject: found.subject, username: found.username, display_name: found.display_name || found.username, avatar_url: found.avatar_url || null } };
     }
-    async function inputs(viewer, list) {
+    /**
+     * A person's current public keys from Network's key directory (GET /api/v1/people/:subject/keys),
+     * cached for a minute. null means the person has no locker yet. The thumbprint is what a slot
+     * names, so it is the thing a member's slot is checked against.
+     */
+    async function directoryKeys(subject) {
+        const at = now(), hit = keyCache.get(subject.id);
+        if (hit && at - hit.at < PEOPLE_TTL) return hit.keys;
+        let keys = null;
+        try {
+            const found = await network.json({ service: 'network', audience: 'openvibe.network',
+                path: `/api/v1/people/${encodeURIComponent(subject.id)}/keys` });
+            if (found && usableKey(found.ecdh) && typeof found.fingerprint === 'string') {
+                keys = { ecdh: found.ecdh, fingerprint: found.fingerprint, thumbprint: await jwkThumbprint(found.ecdh) };
+            }
+        } catch (err) { if (err.status !== 404) throw err; }
+        keyCache.set(subject.id, { at, keys });
+        return keys;
+    }
+    /** Everyone's current keys, one lookup each and never inside a transaction. */
+    async function currentKeys(subjects) {
+        const unique = [];
+        for (const s of subjects) if (!unique.some(u => v.equal(u, s))) unique.push(s);
+        const found = await Promise.all(unique.map(directoryKeys));
+        return new Map(unique.map((s, i) => [personKey(s), found[i]]));
+    }
+    /** A slot is for this person only if it names them and the key Network has for them now. */
+    async function checkSlot(subject, slot) {
+        if (!v.equal(slot.subject, subject)) v.invalid();
+        const keys = await directoryKeys(subject);
+        if (!keys) v.fail(409, 'share.no_key', 'That person has no locker key yet; they make one the first time they open a locked item');
+        if (keys.thumbprint !== slot.recipient_key) {
+            v.fail(409, 'share.key_changed', 'That person\'s key changed; wrap the content key for their new key');
+        }
+        return slot;
+    }
+    /** The lock kind of a registered item, read before name and key resolution so that check runs outside a transaction. */
+    async function storedLock(ref) {
+        const s = await db.maybe(`SELECT lock FROM shares WHERE ${where}`, key(ref));
+        if (!s) v.hidden();
+        return s.lock;
+    }
+    /** A re-sealed envelope: base64 in, bytes out, and it must be a people-locked envelope we can read. */
+    function sealed(base64) {
+        const bytes = v.envelope(base64);
+        const read = inspectEnvelope(bytes);
+        if (!read.valid || read.lock !== 'people') v.fail(400, 'share.reseal_invalid', 'A re-seal is a valid people-locked envelope');
+        return bytes;
+    }
+    /** Stores a re-seal through the service's hook, inside the transaction and before the member goes. */
+    async function reseal(t, ref, s, bytes, actor, gone) {
+        if (s.lock !== 'people') v.fail(400, 'share.reseal_invalid', 'Only a people-locked item is re-sealed');
+        if (typeof onReseal !== 'function') v.fail(409, 'share.reseal_unavailable', 'This service cannot store a re-sealed envelope');
+        // The point of a re-seal is that the person leaving cannot open what they fetch next: their slot
+        // has to be gone from the envelope, not only from the member table.
+        const recipients = new Set(inspectEnvelope(bytes).header.slots.people.map(slot => slot.recipient_key));
+        for (const m of gone) {
+            const left = slotKey(m.key_slot);
+            if (left && recipients.has(left)) v.fail(400, 'share.reseal_invalid', 'The re-sealed envelope still holds the slot of the member who is leaving');
+        }
+        await onReseal(ref, bytes, t);
+        await log(t, ref, actor, 'lock.resealed', { removed: gone.map(m => m.subject), bytes: bytes.length });
+    }
+    async function inputs(viewer, list, lock = 'none') {
         if (!Array.isArray(list) || list.length > 100) v.invalid();
         const parsed = list.map(item => {
             if (typeof item === 'string') item = { name: item, role: 'viewer' };
-            v.object(item, ['name', 'subject', 'role', 'expires_at']);
+            v.object(item, ['name', 'subject', 'role', 'expires_at', 'key_slot']);
             if (Object.hasOwn(item, 'name') === Object.hasOwn(item, 'subject') || !['viewer', 'editor'].includes(item.role)) v.invalid();
-            return { item, expires_at: v.expiry(item.expires_at, now()) };
+            return { item, expires_at: v.expiry(item.expires_at, now()), key_slot: item.key_slot === undefined ? null : v.keySlot(item.key_slot) };
         });
         // Canonical subjects are people too: verify them in one Network batch, never trust the object alone.
         const subjects = parsed.filter(x => Object.hasOwn(x.item, 'subject')).map(x => v.subject(x.item.subject));
         for (const s of subjects) if (s.type !== 'user') v.fail(400, 'share.not_person', 'Not an OpenVibe account');
         const people = subjects.length ? await peopleOf(subjects) : new Map();
         const out = new Map();
-        for (const { item, expires_at } of parsed) {
+        for (const { item, expires_at, key_slot } of parsed) {
             let subject;
             if (Object.hasOwn(item, 'name')) subject = await resolve(viewer, item.name);
             else {
@@ -159,9 +229,15 @@ function createShares({ db, network, events, notify, onOwnerChange, onAudienceCh
                 if (!person || !person.username) v.fail(400, 'share.name_not_found', 'No OpenVibe account is that subject');
             }
             // Last entry wins after resolution, so the client's add('@name') can update an existing subject.
-            out.set(JSON.stringify(subject), { subject, role: item.role, expires_at });
+            out.set(JSON.stringify(subject), { subject, role: item.role, expires_at, key_slot });
         }
-        return [...out.values()];
+        const resolved = [...out.values()];
+        // A people-locked item is only shared with a key slot each: the server can check it, never make it.
+        if (lock === 'people') {
+            for (const m of resolved) if (!m.key_slot) v.fail(400, 'share.slot_required', 'A people-locked item needs a key slot for every member');
+            await Promise.all(resolved.map(m => checkSlot(m.subject, m.key_slot)));
+        } else for (const m of resolved) if (m.key_slot) v.fail(400, 'share.key_slot_unexpected', 'Only a people-locked item carries key slots');
+        return resolved;
     }
     async function revoke(t, ref, s, actor, m, reason) {
         await t.exec(`DELETE FROM share_members WHERE ${where} AND subject=$4`, [...key(ref), m.subject]);
@@ -193,11 +269,14 @@ function createShares({ db, network, events, notify, onOwnerChange, onAudienceCh
         if (v.equal(m.subject, s.owner_subject)) v.invalid();
         if (m.expires_at && Date.parse(m.expires_at) <= now()) v.invalid();
         const existing = await t.maybe(`SELECT * FROM share_members WHERE ${where} AND subject=$4`, [...key(ref), m.subject]);
-        if (existing && existing.role === m.role && (existing.expires_at ? iso(existing.expires_at) : null) === m.expires_at) return;
-        await t.exec(`INSERT INTO share_members(service,kind,resource_id,subject,role,expires_at,added_by,added_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-            ON CONFLICT(service,kind,resource_id,subject) DO UPDATE SET role=$5,expires_at=$6,added_by=$7,added_at=$8`, [...key(ref), m.subject, m.role, m.expires_at, actor, timestamp()]);
+        // A new slot for the same person is a change even when the role and the expiry are not.
+        const slot = m.key_slot || null;
+        if (existing && existing.role === m.role && (existing.expires_at ? iso(existing.expires_at) : null) === m.expires_at
+            && slotKey(existing.key_slot) === slotKey(slot)) return;
+        await t.exec(`INSERT INTO share_members(service,kind,resource_id,subject,role,expires_at,added_by,added_at,key_slot) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+            ON CONFLICT(service,kind,resource_id,subject) DO UPDATE SET role=$5,expires_at=$6,added_by=$7,added_at=$8,key_slot=$9`, [...key(ref), m.subject, m.role, m.expires_at, actor, timestamp(), slot]);
         await t.exec(`UPDATE share_access_requests SET state='granted' WHERE ${where} AND subject=$4 AND state='pending'`, [...key(ref), m.subject]);
-        await log(t, ref, actor, 'member.added', { subject: m.subject, role: m.role });
+        await log(t, ref, actor, 'member.added', { subject: m.subject, role: m.role, ...(slot ? { recipient_key: slot.recipient_key } : {}) });
         await event(t, ref, s, actor, 'share.granted', m.subject, { reason: 'member_added', role: m.role, ...(m.expires_at ? { expires_at: m.expires_at } : {}) });
         // Only a person who was not a member before hears about it; a role or expiry change does not.
         if (!existing && notify) await notice(t, ref, 'share.added', m.subject, actor);
@@ -213,20 +292,26 @@ function createShares({ db, network, events, notify, onOwnerChange, onAudienceCh
         });
     }
     async function update(viewer, input, body, { ifMatch } = {}) {
-        const ref = v.ref(input); v.object(body, ['audience', 'members', 'notify']);
+        const ref = v.ref(input); v.object(body, ['audience', 'members', 'notify', 'lock', 'envelope']);
         if (!Object.keys(body).length) v.invalid();
         if (body.audience !== undefined) v.audience(body.audience);
         if (body.notify !== undefined && typeof body.notify !== 'boolean') v.invalid();
+        if (body.lock !== undefined) v.lock(body.lock);
         await authorize(viewer, ref);
-        const list = body.members === undefined ? undefined : await inputs(viewer, body.members);
+        // How an item is sealed is set when it is created; a save may echo it, never change it.
+        const lock = await storedLock(ref);
+        if (body.lock !== undefined && body.lock !== lock) v.fail(409, 'share.lock_fixed', 'How an item is sealed is set when it is created');
+        if (body.audience === 'public' && lock !== 'none') v.fail(400, 'share.lock_public', 'A locked item cannot be public');
+        const list = body.members === undefined ? undefined : await inputs(viewer, body.members, lock);
+        const resealed = body.envelope === undefined ? null : sealed(body.envelope);
         const notify = body.notify !== false;
         return mutate(viewer, ref, async (t, ref, s, actor, staff) => {
             if (ifMatch !== undefined && ifMatch !== `"${s.revision}"`) v.fail(412, 'share.changed', 'Sharing changed; reload and try again');
+            const have = await members(t, ref);
             if (staff) {
                 // Staff narrow access only: private and removals. No widening, additions or role raises.
                 if (body.audience !== undefined && body.audience !== 'private') v.hidden();
                 if (list) {
-                    const have = await members(t, ref);
                     for (const m of list) {
                         const cur = have.find(x => v.equal(x.subject, m.subject));
                         if (!cur || cur.role !== m.role || (cur.expires_at ? iso(cur.expires_at) : null) !== m.expires_at) v.hidden();
@@ -234,9 +319,16 @@ function createShares({ db, network, events, notify, onOwnerChange, onAudienceCh
                 }
             }
             if (body.audience !== undefined) await changeAudience(t, ref, s, actor, body.audience);
+            const gone = list ? have.filter(m => !list.some(x => v.equal(x.subject, m.subject))) : [];
+            // Somebody leaving a people-locked item: the content is re-sealed for those who stay, and the
+            // service stores it before the member row goes. The envelope is checked before the hook, so the
+            // service never receives bytes it cannot check.
+            if (gone.length && s.lock === 'people' && !resealed) {
+                v.fail(400, 'share.reseal_required', 'Removing somebody from a people-locked item needs the content re-sealed for those who stay');
+            }
+            if (resealed) await reseal(t, ref, s, resealed, actor, gone);
             if (list) {
-                const have = await members(t, ref);
-                for (const m of have) if (!list.some(x => v.equal(x.subject, m.subject))) await revoke(t, ref, s, actor, m, 'removed');
+                for (const m of gone) await revoke(t, ref, s, actor, m, 'removed');
                 for (const m of list) await grant(t, ref, s, actor, m, notify);
             }
             return snapshot(t, ref, s);
@@ -251,7 +343,7 @@ function createShares({ db, network, events, notify, onOwnerChange, onAudienceCh
             if (item && typeof item === 'object' && Object.hasOwn(item, 'type')) return { subject: v.subject(item), role: 'viewer' };
             return item;
         });
-        const resolved = await inputs(viewer, normalized);
+        const resolved = await inputs(viewer, normalized, await storedLock(ref));
         return mutate(viewer, ref, async (t, ref, s, a, staff) => {
             if (staff) v.hidden();
             const have = await members(t, ref);
@@ -260,21 +352,27 @@ function createShares({ db, network, events, notify, onOwnerChange, onAudienceCh
             return snapshot(t, ref, s);
         });
     }
-    async function removeMember(viewer, ref, input) {
+    async function removeMember(viewer, ref, input, { envelope } = {}) {
         const subject = v.subject(input);
+        const resealed = envelope === undefined ? null : sealed(envelope);
         return mutate(viewer, ref, async (t, ref, s, a) => {
             const m = await t.maybe(`SELECT * FROM share_members WHERE ${where} AND subject=$4`, [...key(ref), subject]);
-            if (m) await revoke(t, ref, s, a, m, 'removed');
+            if (m) {
+                if (s.lock === 'people' && !resealed) v.fail(400, 'share.reseal_required', 'Removing somebody from a people-locked item needs the content re-sealed for those who stay');
+                if (resealed) await reseal(t, ref, s, resealed, a, [m]);
+                await revoke(t, ref, s, a, m, 'removed');
+            }
             return snapshot(t, ref, s);
         });
     }
-    async function register(input, { owner_subject, audience = 'private' }) {
-        const ref = v.ref(input), a = v.subject(owner_subject); v.audience(audience);
+    async function register(input, { owner_subject, audience = 'private', lock = 'none' }) {
+        const ref = v.ref(input), a = v.subject(owner_subject); v.audience(audience); v.lock(lock);
+        if (lock !== 'none' && audience === 'public') v.fail(400, 'share.lock_public', 'A locked item cannot be public');
         return db.tx(async t => {
-            const made = await t.exec('INSERT INTO shares(service,kind,resource_id,owner_subject,audience) VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING', [...key(ref), a, audience]);
+            const made = await t.exec('INSERT INTO shares(service,kind,resource_id,owner_subject,audience,lock) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING', [...key(ref), a, audience, lock]);
             const s = await row(t, ref);
-            if (!v.equal(s.owner_subject, a) || s.audience !== audience) v.fail(409, 'share.exists', 'Sharing already registered');
-            if (made) await log(t, ref, a, 'registered', { audience });
+            if (!v.equal(s.owner_subject, a) || s.audience !== audience || s.lock !== lock) v.fail(409, 'share.exists', 'Sharing already registered');
+            if (made) await log(t, ref, a, 'registered', { audience, lock });
             return snapshot(t, ref, s);
         });
     }
@@ -286,9 +384,23 @@ function createShares({ db, network, events, notify, onOwnerChange, onAudienceCh
         try { people = await peopleOf(subjects); }
         catch { people = new Map(subjects.map(s => [personKey(s), unknownPerson(s)])); }
         const person = subject => people.get(personKey(subject)) || unknownPerson(subject);
+        // The owner of a people-locked item sees each member's current fingerprint and whether the slot
+        // is still for the key that person has now, so the sheet can warn before it wraps again. A read
+        // that cannot reach the key directory says nothing rather than claiming every key changed.
+        let keys = null;
+        if (share.lock === 'people' && v.equal(viewer.subject, share.owner_subject) && (share.members || []).length) {
+            try { keys = await currentKeys(share.members.map(m => m.subject)); }
+            catch { keys = null; }
+        }
+        const member = m => {
+            if (!keys) return { ...m, ...person(m.subject) };
+            const found = keys.get(personKey(m.subject));
+            return { ...m, ...person(m.subject), key_fingerprint: found ? found.fingerprint : null,
+                fingerprint_changed: !found || found.thumbprint !== slotKey(m.key_slot) };
+        };
         return { ...share,
             owner: person(share.owner_subject),
-            members: (share.members || []).map(m => ({ ...m, ...person(m.subject) })),
+            members: (share.members || []).map(member),
             ...(share.transfer ? { transfer: { ...share.transfer, to: person(share.transfer.to) } } : {}),
             you: { subject: v.actor(viewer), role: v.equal(viewer.subject, share.owner_subject) ? 'owner' : 'staff' },
             requests: requests.map(r => ({ id: r.id, ...person(r.subject), requested_at: iso(r.requested_at) })) };
@@ -325,22 +437,29 @@ function createShares({ db, network, events, notify, onOwnerChange, onAudienceCh
             return snapshot(t, ref, s);
         });
     }
-    async function transfer(viewer, input, { to, keep_access = false } = {}) {
+    async function transfer(viewer, input, { to, keep_access = false, key_slot } = {}) {
         const ref = v.ref(input); if (typeof keep_access !== 'boolean') v.invalid();
+        const slot = key_slot === undefined ? null : v.keySlot(key_slot);
         await authorize(viewer, ref);
+        const lock = await storedLock(ref);
         let target = to;
         if (to && typeof to === 'object' && !Object.hasOwn(to, 'type')) {
             if (Object.hasOwn(to, 'subject') === Object.hasOwn(to, 'name')) v.invalid();
             target = Object.hasOwn(to, 'subject') ? to.subject : to.name;
         }
         const recipient = await resolve(viewer, target);
+        // The new owner must be able to open it: their slot comes with the offer, checked against their key now.
+        if (lock === 'people') {
+            if (!slot) v.fail(400, 'share.slot_required', 'A transfer of a people-locked item needs the recipient\'s key slot');
+            await checkSlot(recipient, slot);
+        } else if (slot) v.fail(400, 'share.key_slot_unexpected', 'Only a people-locked item carries key slots');
         return mutate(viewer, ref, async (t, ref, s, a) => {
             // Staff may moderate, but cannot give somebody else's ownership away.
             if (!v.equal(a, s.owner_subject)) v.hidden();
             if (v.equal(recipient, s.owner_subject)) v.invalid();
             if (await pending(t, ref)) v.fail(409, 'share.transfer_pending', 'A transfer is already pending');
-            const tr = await t.one(`INSERT INTO share_transfers VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending') RETURNING *`,
-                [randomUUID(), ...key(ref), s.owner_subject, recipient, keep_access, timestamp(), iso(now() + WEEK)]);
+            const tr = await t.one(`INSERT INTO share_transfers(id,service,kind,resource_id,from_subject,to_subject,keep_access,requested_at,expires_at,state,key_slot) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'pending',$10) RETURNING *`,
+                [randomUUID(), ...key(ref), s.owner_subject, recipient, keep_access, timestamp(), iso(now() + WEEK), slot]);
             const result = transferShape(tr);
             await log(t, ref, a, 'transfer.requested', { transfer_id: tr.id, from: tr.from_subject, to: recipient, keep_access });
             await event(t, ref, s, a, 'share.transfer.requested', recipient, { transfer: result });
@@ -372,6 +491,8 @@ function createShares({ db, network, events, notify, onOwnerChange, onAudienceCh
                 await log(t, ref, a, 'ownership.incoming', { transfer_id: tr.id, from, to: a });
                 if (tr.keep_access) {
                     if (s.audience === 'private') await changeAudience(t, ref, s, a, 'people');
+                    // A people-locked item leaves the former owner without a slot until the new owner wraps
+                    // for them: the fresh content key is not theirs to hold.
                     await grant(t, ref, s, a, { subject: from, role: 'viewer', expires_at: null }, true);
                 } else await event(t, ref, s, a, 'share.revoked', from, { reason: 'ownership_changed', transfer_id: tr.id });
             }
