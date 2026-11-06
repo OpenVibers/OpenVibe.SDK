@@ -7,6 +7,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
+const { createHash } = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 const { run } = require('./helpers');
 const { OUT, collect } = require('../scripts/browser-bundle');
@@ -46,7 +47,8 @@ run([
 
     ['it works: PKCE, an app sign-in URL, and a registry read through its own client', async () => {
         const sdk = await load();
-        assert.equal(await sdk.auth.pkceChallenge('dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk'), 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM');
+        const pair = await sdk.auth.createPkcePair();
+        assert.equal(pair.codeChallenge, createHash('sha256').update(pair.codeVerifier).digest('base64url'));
         const { url } = await sdk.auth.startAuthorization({ clientId: 'app_01K5WZX7S7Q4D2B8N3M6V1C9TR', redirectUri: 'http://localhost:3001/callback', audience: 'openvibe.media', scope: ['media.object.read'] });
         const u = new URL(url);
         assert.equal(u.searchParams.get('audience'), 'openvibe.media');

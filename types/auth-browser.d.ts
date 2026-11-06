@@ -1,5 +1,3 @@
-export declare function createCodeVerifier(length?: number): string;
-export declare function pkceChallenge(verifier: string): Promise<string>;
 export declare function createPkcePair(length?: number): Promise<{ codeVerifier: string; codeChallenge: string; codeChallengeMethod: 'S256' }>;
 export declare function createState(): string;
 

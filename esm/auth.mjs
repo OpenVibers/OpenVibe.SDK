@@ -2,9 +2,9 @@
 import cjs from '../src/auth/index.js';
 
 export const {
-    createCodeVerifier, pkceChallenge, createPkcePair, createState, buildAuthorizeUrl, startAuthorization,
-    readCallback, base64url, decodeUnverified, unverifiedClaims, createServiceTokenClient, verifyUserToken,
-    verifyAppToken, verifyServiceToken, createJwksClient, jwksClient, jwksStatus, createNetworkKeys,
-    exchangeCode, refreshUserToken, createPgRevocationStore, revocationSchema, TOKEN_VALID_AFTER,
+    createPkcePair, createState, buildAuthorizeUrl, startAuthorization, readCallback, base64url,
+    decodeUnverified, unverifiedClaims, createServiceTokenClient, verifyUserToken, verifyAppToken, verifyServiceToken,
+    createJwksClient, jwksClient, jwksStatus, createNetworkKeys, exchangeCode, refreshUserToken,
+    createPgRevocationStore, revocationSchema, TOKEN_VALID_AFTER,
 } = cjs;
 export default cjs;
