@@ -29,3 +29,6 @@ export function inspectEnvelope(bytes: Uint8Array, options?: { maxHeaderBytes?: 
 
 /** The header's shape: what it says, and whether the slots match the lock it names. */
 export function checkHeader(header: unknown): string[];
+
+/** One people slot's shape: whose it is, which key it names, and the bytes it must hold. */
+export function peopleSlotOk(slot: unknown): boolean;
