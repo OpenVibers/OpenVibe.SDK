@@ -26,7 +26,7 @@ export type CommerceOptions = {
     tokenClients?: Record<string, CommerceTokenClient> | null;
     timeoutMs?: number;
 };
-export type CommerceCall = { key?: string; traceparent?: string };
+export type CommerceCall = { key?: string; traceparent?: string; /** Extra headers for the call (the subject assertion rides on them). */ headers?: Record<string, string> };
 export type CommerceClient = {
     createIntent(a: { provider: string; kind?: 'purchase' | 'subscription'; subject: string; bits?: number; creator?: string; tier?: number; autoRenew?: boolean; successUrl?: string; cancelUrl?: string } & CommerceCall): Promise<any>;
     createTransfer(a: { from: string; to: string; amount: number; kind?: string; target?: unknown; message?: string } & CommerceCall): Promise<any>;
