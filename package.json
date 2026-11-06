@@ -305,6 +305,12 @@
       "import": "./esm/live.mjs",
       "default": "./src/live.js"
     },
+    "./streams": {
+      "types": "./types/streams.d.ts",
+      "browser": null,
+      "import": "./esm/streams.mjs",
+      "default": "./src/streams.js"
+    },
     "./inventory": {
       "types": "./types/inventory.d.ts",
       "browser": null,
@@ -532,7 +538,7 @@
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
     "iovalkey": "^0.4.0",
-    "openvibe-contracts": "https://codeload.github.com/OpenVibers/OpenVibe.Contracts/tar.gz/refs/tags/v0.297.0",
+    "openvibe-contracts": "https://codeload.github.com/OpenVibers/OpenVibe.Contracts/tar.gz/refs/tags/v0.298.0",
     "pg": "^8.23.0"
   },
   "peerDependencies": {
