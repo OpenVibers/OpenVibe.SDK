@@ -9,7 +9,7 @@
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const { run } = require('./helpers');
-const { requestSubjectAssertion, verifySubjectAssertion, createSubjectAssertionVerifier } = require('../src/assertions');
+const { requestSubjectAssertion, verifySubjectAssertion, createSubjectAssertionVerifier, createSubjectAssertionMinter } = require('../src/assertions');
 
 const PERSON = 'usr_01H8XYZABCDEFGHJKMNPQRRSTV';
 const OTHER = 'usr_01H8XYZABCDEFGHJKMNPQRRSTW';
@@ -172,5 +172,38 @@ run([
             tokenClient: { getToken: async () => 'from-client' }, fetch: fetchImpl,
         });
         assert.equal(seen.headers.Authorization, 'Bearer from-client');
+    }],
+    ['the minter asks Network with the service token and the person token', async () => {
+        const seen = [];
+        const fetchImpl = async (url, opts) => {
+            seen.push({ url, opts });
+            if (url.endsWith('/oauth/token')) {
+                return { ok: true, status: 200, json: async () => ({ access_token: 'service-token', expires_in: 300 }) };
+            }
+            return { ok: true, status: 200, json: async () => ({ assertion: 'a.b.c', subject: PERSON, audience: 'openvibe.billing' }) };
+        };
+        const minter = createSubjectAssertionMinter({
+            internalUrl: 'http://127.0.0.1:4000', oauth: { clientId: 'live', clientSecret: 'secret' }, fetch: fetchImpl,
+        });
+        const assertion = await minter.mint({ userToken: 'person-token', subject: PERSON, audience: 'openvibe.billing' });
+        assert.equal(assertion, 'a.b.c');
+        const mint = seen.find((c) => c.url.endsWith('/internal/subject-assertions'));
+        assert.ok(mint, 'the mint route was called');
+        assert.equal(mint.opts.headers.Authorization, 'Bearer service-token');
+        assert.deepEqual(JSON.parse(mint.opts.body), { user_token: 'person-token', audience: 'openvibe.billing', subject: PERSON });
+    }],
+
+    ['the minter answers null (never throws) when the assertion cannot be had', async () => {
+        const noSecret = createSubjectAssertionMinter({ internalUrl: 'http://127.0.0.1:4000', oauth: { clientId: 'live' } });
+        assert.equal(await noSecret.mint({ userToken: 'person-token', audience: 'openvibe.billing' }), null);
+
+        const noToken = createSubjectAssertionMinter({ internalUrl: 'http://127.0.0.1:4000', oauth: { clientId: 'live', clientSecret: 's' } });
+        assert.equal(await noToken.mint({ audience: 'openvibe.billing' }), null);
+
+        const down = createSubjectAssertionMinter({
+            internalUrl: 'http://127.0.0.1:4000', oauth: { clientId: 'live', clientSecret: 's' },
+            fetch: async () => { throw new Error('ECONNREFUSED'); },
+        });
+        assert.equal(await down.mint({ userToken: 'person-token', audience: 'openvibe.billing' }), null);
     }],
 ]);

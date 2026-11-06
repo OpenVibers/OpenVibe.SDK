@@ -81,6 +81,31 @@ export interface SubjectAssertionVerifier {
 export declare function createSubjectAssertionVerifier(opts: { jwks?: VerifySubjectAssertionOptions['jwks']; audience?: string | string[]; issuer?: string; clockSkewSec?: number; replayWindowMs?: number; log?: JwksClientOptions['log'] }): SubjectAssertionVerifier;
 /** The header a money call carries the assertion in. */
 export declare function subjectAssertionHeader(assertion: string): { 'x-ov-subject-assertion': string };
+export interface SubjectAssertionMinterOptions {
+    /** Where Network lives (public URL). */
+    network?: string | { internalUrl?: string; url?: string };
+    /** Where Network's /internal lives (loopback, same host). */
+    internalUrl?: string;
+    /** The whole endpoint, when it is neither of the two above. */
+    url?: string;
+    /** The caller's own OAuth client: the service token it presents to Network. */
+    oauth?: { clientId?: string; clientSecret?: string };
+    /** The audience of that service token (openvibe.network). */
+    audience?: string;
+    scope?: string | string[];
+    fetch?: FetchLike;
+    timeoutMs?: number;
+    log?: JwksClientOptions['log'];
+}
+export interface SubjectAssertionMinter {
+    /** The assertion for a person, or null when it cannot be had (never throws). */
+    mint(opts: { userToken?: string | null; subject?: string; audience: string | string[]; for?: string | string[] }): Promise<string | null>;
+    /** Where the assertions are asked for. */
+    endpoint: string;
+}
+/** The caller's own minter: ask Network to sign the person's token into an assertion. */
+export declare function createSubjectAssertionMinter(opts?: SubjectAssertionMinterOptions): SubjectAssertionMinter;
+
 
 
 /** The header a money call carries the assertion in. */

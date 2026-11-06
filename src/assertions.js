@@ -119,6 +119,65 @@ async function requestSubjectAssertion({
 /** The header a money call carries the assertion in: { 'x-ov-subject-assertion': assertion }. */
 function subjectAssertionHeader(assertion) { return { [ASSERTION_HEADER]: String(assertion || '') }; }
 
+/**
+ * The caller's own minter: one helper every service uses to ask Network for an assertion.
+ *
+ *   const minter = createSubjectAssertionMinter({
+ *       network: { internalUrl: 'http://127.0.0.1:4000' },
+ *       oauth: { clientId: 'live', clientSecret: process.env.OV_OAUTH_CLIENT_SECRET },
+ *   });
+ *   const assertion = await minter.mint({ userToken: req.token, subject: 'usr_…', audience: 'openvibe.billing' });
+ *
+ * The service token it presents to Network is its own (client_credentials, audience openvibe.network);
+ * the person's own access token is what makes the assertion. Without a secret, without the person's
+ * token, or when Network is down, `mint` answers null: the call then travels the old way (the
+ * receiver's flag decides whether that is still allowed). Nothing here throws into the request.
+ */
+function createSubjectAssertionMinter({
+    network, internalUrl, url, oauth, audience: tokenAudience = 'openvibe.network', scope,
+    fetch: fetchImpl = globalThis.fetch, timeoutMs = 5000, log = null,
+} = {}) {
+    const base = String(internalUrl || (network && (network.internalUrl || network.url)) || url || '').replace(/\/+$/, '');
+    const endpoint = url || `${base}/internal/subject-assertions`;
+    let client = null;
+    /** The caller's own service token (cached by the token client). */
+    async function serviceToken() {
+        const secret = oauth && oauth.clientSecret;
+        if (!secret || !oauth.clientId) return null;
+        if (!client) {
+            const { serviceAuth } = require('openvibe-contracts');
+            client = serviceAuth.createTokenClient({
+                tokenUrl: `${base}/oauth/token`,
+                clientId: oauth.clientId,
+                clientSecret: secret,
+                audience: tokenAudience,
+                ...(scope ? { scope } : {}),
+                fetchImpl,
+            });
+        }
+        return await client.getToken();
+    }
+    /**
+     * The assertion for a person, or null when it cannot be had. Never throws: a money call must
+     * not fail because the proof could not be fetched (the receiver's flag is what turns it off).
+     */
+    async function mint({ userToken, subject, audience, for: forServices } = {}) {
+        if (!userToken || !audience) return null;
+        try {
+            const token = await serviceToken();
+            if (!token) return null;
+            const out = await requestSubjectAssertion({
+                userToken, subject, audience, for: forServices, token, url: endpoint, fetch: fetchImpl, timeoutMs,
+            });
+            return out.assertion || null;
+        } catch (err) {
+            try { (log && (log.warn || log.error) || (() => {})).call(log, `[openvibe-sdk] no subject assertion: ${(err && err.message) || err}`); } catch { /* never throw from logging */ }
+            return null;
+        }
+    }
+    return { mint, endpoint };
+}
+
 /** The ES256 signature check (raw r||s, as JWT ES256 signs it). */
 function verifyEs256(keys, header, input, sig) {
     const byKid = header.kid ? keys.filter((k) => k.kid === header.kid) : [];
@@ -229,4 +288,4 @@ function createSubjectAssertionVerifier({ jwks, audience, issuer, clockSkewSec =
     };
 }
 
-module.exports = { requestSubjectAssertion, verifySubjectAssertion, createSubjectAssertionVerifier, subjectAssertionHeader, ASSERTION_HEADER, ASSERTION_TTL_S, REPLAY_WINDOW_MS, CLOCK_SKEW_SEC };
+module.exports = { requestSubjectAssertion, verifySubjectAssertion, createSubjectAssertionVerifier, createSubjectAssertionMinter, subjectAssertionHeader, ASSERTION_HEADER, ASSERTION_TTL_S, REPLAY_WINDOW_MS, CLOCK_SKEW_SEC };
