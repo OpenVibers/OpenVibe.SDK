@@ -3,12 +3,13 @@
   "stage": "alpha",
   "code": true,
   "wave": "W2",
-  "version": "0.88.0",
-  "plan": "OpenVibe End-to-End Realignment & Implementation Plan, revision 3 (20 Sep 2026), \u00a73.2; roadmap \u00a730",
+  "version": "0.89.0",
+  "plan": "OpenVibe End-to-End Realignment & Implementation Plan, revision 3 (20 Sep 2026), §3.2; roadmap §30",
   "deployed": false,
   "deployment": "none: a package released as git tags; services and apps pin a tag",
   "contracts": "openvibe-contracts v0.292.0",
   "features": [
+    "exchange (openvibe-sdk/exchange): the buyer side (chat, models, offers, presets, usage, receipts) and the seller side (offer, earnings, verification) of OpenVibe.Exchange, with the platform webhook signature check",
     "locker (openvibe-sdk/locker, openvibe-sdk/locker/server): the Locker envelope (locker.envelope@1) for end-to-end encryption, WebCrypto only, in Node and the browser: seal/open for text and bytes, sealStream/openStream, the three locks (people, password, link), person key pairs (ECDH P-256, ECDSA P-256), the eight-word fingerprint, wrapFor and rewrap, recoveryWords for the phrase to write down, opening a people lock by key, inspect for what an envelope says about itself, and the header checks a service runs without a key",
     "the 1.0 core surface is frozen now, before 1.0 (core, auth, events, db, media): docs/one-point-oh.json gives every export its tier, test/surface.test.js pins the exact names, and removing or renaming one needs a major release; createCodeVerifier and pkceChallenge left in 0.86.0",
     "share (openvibe-sdk/share): transactional local sharing, audience and membership checks, exact-name resolution, recipient-bound ownership transfers, audit, durable events/notifications, uniform API and agent client; locked items (Locker): the lock kind, per-member key slots checked against the key directory, a re-seal on removal through onReseal, and the transfer offer slot",
@@ -31,7 +32,7 @@
     "valkey, cache, queue, pubsub and a shared limits store on Valkey 9, each with an in-process twin for tests",
     "commerce (openvibe-sdk/commerce): the shared Billing client for Tips and VIP, with intentKey and receipt",
     "events: the PostgreSQL outbox (lease-claimed, several relays per table) and inbox (handler in its transaction)",
-    "usage: createUsageReporter (openvibe-sdk/usage), the shared platform.usage-sample@1 reporter \u2014 validated readings queued idempotency-keyed in an outbox and relayed to Billing with retry, never dropped, refused readings kept",
+    "usage: createUsageReporter (openvibe-sdk/usage), the shared platform.usage-sample@1 reporter — validated readings queued idempotency-keyed in an outbox and relayed to Billing with retry, never dropped, refused readings kept",
     "the HTTP telemetry kit (openvibe-sdk/service): the platform.telemetry-sample@1 middleware aggregated per route|method|status_class per flush, with active-requests, p95 and event-loop-lag gauges, lifted from Network's server/telemetry.js and server/observability.js",
     "the telemetry sink (openvibe-sdk/telemetry): telemetrySchema() DDL, createPgTelemetrySink() and pruneTelemetry(), a per-service PostgreSQL table every service stores platform.telemetry-sample@1 into",
     "account-data (openvibe-sdk/account-data, ADR-033): telemetry_samples covered once by the SDK (exported as telemetry.json, anonymized on deletion), and uncovered() listing every table with a person column that no table map, task-keyed list or reasoned exemption covers",
@@ -40,7 +41,7 @@
     "the AI Exchange face of the one planner (openvibe-sdk/placement planAi, off by default): the hard gates (exact artifact, commercial right, privacy class, trust tier, capabilities, context, health, cost ceiling), the expected cost per success in integer nano-USD, sparse quality evidence marked and not trusted, and an explanation that never carries a secret or a host; the money math in openvibe-sdk/cost (nanoUsd, chargeTokens, expectedCostNano, costPerSuccessNano)",
     "consent (openvibe-sdk/consent): the L24 check before any use of a person's content or likeness for AI or data; allowed() and filter() (batches of 500), onChange() drops a subject's answers on network.consent.changed, mock() for tests; fails closed, caches 60 s, server-side",
     "openvibe-sdk/machines: the network's machines hub (list, get, catalogue, pair, rename, roles, revoke) against OpenVibe.Network, for a person and for the apps they consented to",
-    "vibes (openvibe-sdk/vibes): Vibes Pay charges (create with the app reference as the Idempotency-Key, get, refund) and constant-time webhook verification (X-OpenVibe-Signature-V2, \u00b1300 s) for developer apps"
+    "vibes (openvibe-sdk/vibes): Vibes Pay charges (create with the app reference as the Idempotency-Key, get, refund) and constant-time webhook verification (X-OpenVibe-Signature-V2, ±300 s) for developer apps"
   ],
   "updated": "2026-11-06"
 }

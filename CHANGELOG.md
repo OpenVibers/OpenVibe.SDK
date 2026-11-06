@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.89.0 (2026-11-06)
+
+- Add `openvibe-sdk/exchange`: OpenVibe.Exchange, the buyer and the seller side of the model exchange (the plan of 2026-11-06, "For builders", item 7).
+  - The buyer side speaks the Exchange’s v1 API with a Network developer key: `chat()` (streaming and not, the OpenAI shape), `models()`, `offers(model)`, `catalog()`, `presets()` (list, create, update, delete), `usage()` and `receipt(id)`. Every call takes an `AbortSignal`, and a 429 or a 5xx is retried with a jittered backoff: a safe method always, a write only when it is idempotent, so a completion is never run twice.
+  - The seller side registers an offer in the Network’s user-owned AI offers — the same registry OpenVibe.Node’s "Offer to the network" writes to (`POST /internal/ai/offers/report`, the capability `network.resource.report`), so any server that speaks the OpenAI API can be a provider and not only a Node. The SDK sends the document that registry validates, field for field, and refuses an offer the registry would refuse before anything is sent; `earnings()` and `verification()` read the seller dashboard (the tokens served, the credits earned, the canaries, the spot re-runs, the reputation, the uptime).
+  - The webhooks (usage, earnings, an offer going down) carry `X-OpenVibe-Signature-V2`; `webhooks.verify` checks the raw body in constant time and refuses a timestamp more than 300 s either way.
+
 ## 0.88.0 (2026-11-06)
 
 - `openvibe-sdk/share` learns locked items (Locker). A share records how its item is sealed — `lock: none | people | password | link`, set by `register(ref, { lock })` and answered by GET — and `describe()` cannot override it. A locked item is never public (`share.lock_public`), and the lock cannot change after registration (`share.lock_fixed`). Expand-only migration: `shares.lock`, `share_members.key_slot`, `share_transfers.key_slot`.

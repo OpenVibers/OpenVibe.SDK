@@ -567,6 +567,30 @@
     "verifyDelivery": "function",
     "verifyDeliveryV2": "function"
   },
+  "openvibe-sdk/exchange": {
+    "DEFAULT_PATHS": {
+      "object": [
+        "catalog",
+        "catalogModels",
+        "chat",
+        "models",
+        "offerList",
+        "offerReport",
+        "platformUsage",
+        "presets",
+        "receipts",
+        "sell",
+        "usage"
+      ]
+    },
+    "EXCHANGE_BASE_URL": "string",
+    "ExchangeError": "class",
+    "NETWORK_BASE_URL": "string",
+    "RETRY_STATUS": "object",
+    "SIGNATURE_TOLERANCE_SEC": "number",
+    "createExchangeClient": "function",
+    "verifyWebhook": "function"
+  },
   "openvibe-sdk/explicit": {
     "isExplicit": "function"
   },
