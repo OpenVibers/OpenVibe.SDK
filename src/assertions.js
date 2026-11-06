@@ -64,9 +64,14 @@ function ecJwksClient(url, opts = {}) { return jwksClient(url, { ...opts, kty: '
  *
  * `tokenClient` may be given instead of `token` (the SDK's createServiceTokenClient, or anything
  * with getToken()). The person's token is never optional: Network refuses to sign without it.
+ *
+ * `audience` may be a list, when the assertion travels a chain: a tip goes from the site (Live) to
+ * Tips and on to Billing, so the assertion names both money services. `for` names the services that
+ * may carry it (the minting service is always in it); the receiver refuses an assertion presented by
+ * a service that is not.
  */
 async function requestSubjectAssertion({
-    userToken, audience, network, internalUrl, url, token, tokenClient, subject,
+    userToken, audience, for: forServices, network, internalUrl, url, token, tokenClient, subject,
     fetch: fetchImpl = globalThis.fetch, timeoutMs = 5000, log = null,
 } = {}) {
     if (!userToken) throw new TypeError('requestSubjectAssertion: the person\'s own access token is required');
@@ -77,7 +82,8 @@ async function requestSubjectAssertion({
     if (!bearer && tokenClient) bearer = await tokenClient.getToken();
     if (!bearer) throw new TypeError('requestSubjectAssertion: pass the caller\'s own service token (token or tokenClient)');
 
-    const body = { user_token: String(userToken), audience: String(audience) };
+    const body = { user_token: String(userToken), audience: Array.isArray(audience) ? audience.map(String) : String(audience) };
+    if (forServices) body.for = (Array.isArray(forServices) ? forServices : [forServices]).map(String);
     if (subject) body.subject = String(subject);
 
     let res;
@@ -103,7 +109,7 @@ async function requestSubjectAssertion({
     return {
         assertion: json.assertion,
         subject: json.subject || null,
-        audience: json.audience || String(audience),
+        audience: json.audience || (Array.isArray(audience) ? audience : String(audience)),
         jti: json.jti || null,
         expires_at: json.expires_at || null,
         expires_in: Number(json.expires_in) || ASSERTION_TTL_S,
@@ -129,9 +135,11 @@ function verifyEs256(keys, header, input, sig) {
  *   if (!r.ok) return problem(res, 403, r.code, { detail: r.reason });
  *   req.subject = { subject: r.claims.sub, act: r.claims.act, jti: r.claims.jti };
  *
- * `act` is the calling service the assertion was minted for (svc:live): pass it and an assertion
- * minted for another service is refused. `seen` is a Map or Set of jtis already used: an assertion
- * whose jti is in it is a replay and is refused.
+ * `caller` is the service presenting the assertion (svc:live). The assertion names the service
+ * that vouched for the person (`act`) and the services that may carry it (`for`, the minting
+ * service alone by default): an assertion presented by a service that is not in `for` is refused.
+ * `seen` is a Map or Set of jtis already used: an assertion whose jti is in it is a replay and is
+ * refused.
  *
  * Returns { ok: true, claims } or { ok: false, code, reason } with a stable code:
  * assertion.malformed | assertion.bad_signature | assertion.expired | assertion.not_yet_valid |
@@ -139,7 +147,7 @@ function verifyEs256(keys, header, input, sig) {
  * assertion.actor_mismatch | assertion.replayed | assertion.no_key.
  */
 async function verifySubjectAssertion(assertion, {
-    jwks, publicKey, audience, issuer, act, now = Date.now(), clockSkewSec = CLOCK_SKEW_SEC, seen = null, log = null,
+    jwks, publicKey, audience, issuer, caller, now = Date.now(), clockSkewSec = CLOCK_SKEW_SEC, seen = null, log = null,
 } = {}) {
     const fail = (code, reason) => ({ ok: false, code, reason });
     const parts = typeof assertion === 'string' ? assertion.split('.') : [];
@@ -175,7 +183,14 @@ async function verifySubjectAssertion(assertion, {
     }
     if (!USER_RE.test(String(claims.sub || ''))) return fail('assertion.invalid_claims', 'it names no person');
     if (claims.act !== undefined && !SERVICE_RE.test(String(claims.act))) return fail('assertion.invalid_claims', 'it names no service');
-    if (act && claims.act !== act) return fail('assertion.actor_mismatch', `it was minted for ${claims.act}`);
+    if (claims.for !== undefined && (!Array.isArray(claims.for) || !claims.for.every((f) => SERVICE_RE.test(String(f))))) {
+        return fail('assertion.invalid_claims', 'it names no service that may carry it');
+    }
+    if (caller) {
+        // The services that may carry the assertion: the `for` list, or the minting service alone.
+        const may = Array.isArray(claims.for) && claims.for.length ? claims.for.map(String) : [String(claims.act || '')];
+        if (!may.includes(String(caller))) return fail('assertion.actor_mismatch', `it may not be carried by ${caller}`);
+    }
     if (typeof claims.jti !== 'string' || !claims.jti) return fail('assertion.invalid_claims', 'it has no jti');
     if (seen) {
         if (seen instanceof Set) { if (seen.has(claims.jti)) return fail('assertion.replayed', 'this assertion was already used'); }

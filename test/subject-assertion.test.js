@@ -85,9 +85,21 @@ run([
 
     ['an assertion minted for another service is refused', async () => {
         const kp = keyPair();
-        const r = await verifySubjectAssertion(sign(claims({ act: 'svc:vip' }), kp.privateKey), { jwks: jwks(kp.publicKey), audience: 'openvibe.billing', act: 'svc:live' });
+        const r = await verifySubjectAssertion(sign(claims({ act: 'svc:vip' }), kp.privateKey), { jwks: jwks(kp.publicKey), audience: 'openvibe.billing', caller: 'svc:live' });
         assert.equal(r.ok, false);
         assert.equal(r.code, 'assertion.actor_mismatch');
+    }],
+
+    ['an assertion a chain may carry is accepted by the service it names', async () => {
+        const kp = keyPair();
+        // Live vouches for the person; Tips may carry it on to Billing.
+        const c = claims({ act: 'svc:live', for: ['svc:live', 'svc:tips'], aud: ['openvibe.tips', 'openvibe.billing'] });
+        const r = await verifySubjectAssertion(sign(c, kp.privateKey), { jwks: jwks(kp.publicKey), audience: 'openvibe.billing', caller: 'svc:tips' });
+        assert.equal(r.ok, true);
+        assert.equal(r.claims.sub, PERSON);
+        const other = await verifySubjectAssertion(sign(c, kp.privateKey), { jwks: jwks(kp.publicKey), audience: 'openvibe.billing', caller: 'svc:vip' });
+        assert.equal(other.ok, false);
+        assert.equal(other.code, 'assertion.actor_mismatch');
     }],
 
     ['an assertion naming no person is refused', async () => {
