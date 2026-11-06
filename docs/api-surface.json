@@ -942,6 +942,9 @@
     "storageOffer": "function",
     "validateStorageOffer": "function"
   },
+  "openvibe-sdk/streams": {
+    "createStreamsClient": "function"
+  },
   "openvibe-sdk/telemetry": {
     "createPgTelemetrySink": "function",
     "createTelemetry": "function",

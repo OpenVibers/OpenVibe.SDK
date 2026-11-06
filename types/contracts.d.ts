@@ -74,7 +74,7 @@ export type ServiceTokenClaims = {
    */
   env?: "sandbox" | "production";
   /**
-   * The person who authorized an app through the authorization-code flow, or the owner an agent acts for (always present on agent tokens). Absent on client_credentials tokens.
+   * The person who authorized an app through the authorization-code flow, or the owner an agent acts for (always present on agent tokens). Also present on a node token that asks for an audience where the machine acts for its owner (Agent Streams S1: openvibe.live and live.agent_stream.publish); absent on every other client_credentials token.
    */
   on_behalf_of?: string;
   /**
