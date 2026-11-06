@@ -40,7 +40,8 @@ developers outside the organisation, who are not in the count.
   - `createNetworkKeys` (12): service key handling;
   - `createJwksClient`: the uncached constructor behind `jwksClient`, which is what code should call;
   - `base64url`: an encoding helper, not an auth API.
-- **leaving:** `createCodeVerifier` and `pkceChallenge`. They are the two halves of `createPkcePair`, and no repository uses them.
+- **leaving:** none. `createCodeVerifier` and `pkceChallenge` went in 0.86.0: they were the two halves of
+  `createPkcePair`, and no repository's `main` imported them.
 
 ## events
 
@@ -49,7 +50,9 @@ developers outside the organisation, who are not in the count.
   - receiving: `parseDelivery` (15), `verifyDeliveryV2`;
   - signing in tests and senders: `signDeliveryHeaders`, `signDeliveryV2`.
 - **platform:** `createPgOutbox`, `createServiceOutbox`, `createPgInbox`, `outboxSchema`, `inboxSchema`. They are the PostgreSQL outbox and inbox a service keeps beside its own tables. Their schema and relay behaviour change with the platform; 0.63.0 added a 429 pause and pruning.
-- **leaving:** `signDelivery` and `verifyDelivery`, the v1 signature.
+- **leaving:** `signDelivery` and `verifyDelivery`, the v1 signature. They cannot go yet: `signDelivery` is still
+  imported by the test helpers of OpenVibe.Deals, Examples, Reviews, Tips, Trade and VIP on `main` (checked
+  2026-11-06). They go once a pin round moves those onto `signDeliveryHeaders` / `signDeliveryV2`.
   - v1 signs no time, so a captured delivery verifies forever.
   - OpenVibe.Events sends only v2 (`X-OpenVibe-Signature-V2`, over the timestamp and the body, within five minutes).
   - Every production receiver already calls `parseDelivery(..., { requireV2: true })`.
@@ -63,6 +66,7 @@ All frozen:
 
 ## Before 1.0
 
-1. The leaving names go: remove them, update `docs/api-surface.json`, and the test lists them as breaking.
+1. The last leaving names (`signDelivery`, `verifyDelivery`) go once the pin round above frees them: remove them,
+   update `docs/api-surface.json`, and the test lists them as breaking.
 2. Publish to npm (owner's account), so that `npm i openvibe-sdk` works without a tarball pin.
 3. From then on, a breaking change marked `[1.0 core]` needs a major release.

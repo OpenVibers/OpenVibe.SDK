@@ -88,7 +88,7 @@ run([
         s = await signIn(platform, { audience: 'openvibe.media' });
         await assert.rejects(auth.exchangeCode({ fetch: platform.fetch, clientId: PUBLIC_APP, clientSecret: 'nope', code: s.code, codeVerifier: s.codeVerifier, redirectUri: REDIRECT, audience: 'openvibe.media' }), { code: 'invalid_client' });
         s = await signIn(platform, { audience: 'openvibe.media' });
-        await assert.rejects(auth.exchangeCode({ fetch: platform.fetch, clientId: PUBLIC_APP, code: s.code, codeVerifier: auth.createCodeVerifier(), redirectUri: REDIRECT, audience: 'openvibe.media' }), (e) => e.code === 'invalid_grant' && /PKCE/.test(e.detail));
+        await assert.rejects(auth.exchangeCode({ fetch: platform.fetch, clientId: PUBLIC_APP, code: s.code, codeVerifier: (await auth.createPkcePair()).codeVerifier, redirectUri: REDIRECT, audience: 'openvibe.media' }), (e) => e.code === 'invalid_grant' && /PKCE/.test(e.detail));
         await assert.rejects(auth.exchangeCode({ fetch: platform.fetch, clientId: PUBLIC_APP, code: s.code, codeVerifier: s.codeVerifier, redirectUri: REDIRECT, audience: 'openvibe.media' }), { code: 'invalid_grant' }, 'burnt');
     }],
 

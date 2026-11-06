@@ -2,16 +2,16 @@
 
 > Supported browser and server clients for the OpenVibe platform.
 
-**Status:** alpha, v0.86.0 (roadmap Wave 2; developer apps from Wave 20; Media objects v2 from Wave 4; the Tools platform API; Search, Chat, AI, Vision and consent clients; sign-in with recovery and a client health check). Every release is tagged (see [CHANGELOG.md](CHANGELOG.md)). Tested against local stub servers and the built-in mock platform only, never against the live platform. Services pin release tags; each repository's `STATUS.json` names the one it uses.
+**Status:** alpha, v0.87.0 (the five 1.0 core entries — `core`, `auth`, `events`, `db` and `media` — are frozen: their exported names change only with a major release; roadmap Wave 2; developer apps from Wave 20; Media objects v2 from Wave 4; the Tools platform API; Search, Chat, AI, Vision and consent clients; sign-in with recovery and a client health check). Every release is tagged (see [CHANGELOG.md](CHANGELOG.md)). Tested against local stub servers and the built-in mock platform only, never against the live platform. Services pin release tags; each repository's `STATUS.json` names the one it uses.
 **Plan:** OpenVibe End-to-End Realignment & Implementation Plan, revision 3 (20 Sep 2026), §3.2; roadmap §30.  
 **License:** MIT ([LICENSE](LICENSE)). This package is a library that apps outside the network embed, so it uses MIT. The OpenVibe services themselves stay AGPL-3.0.
 
 **If a capability is not in the SDK, it is not public.** Apps call services through `openvibe-sdk` and never build internal routes themselves. A route with no SDK wrapper is internal, even when you can reach it, and it can change without notice. To make a capability public, first define it in OpenVibe.Contracts, then wrap it here.
 
-After v0.86.0 is tagged:
+After v0.87.0 is tagged:
 
 ```bash
-npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.86.0
+npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.87.0
 ```
 
 It has no runtime dependencies. It needs Node ≥ 20, or any browser with `fetch`, Web Crypto and `TextDecoder`. There is no build step. The package is CommonJS with ESM entry points (`import` works). Each subpath has its own `.d.ts`. For a page with no bundler, `browser/openvibe-sdk.mjs` is one self-contained ES module of the browser-safe subpaths (see [Browser without a bundler](#browser-without-a-bundler)). It does not depend on `openvibe-contracts` at runtime: it copies the contract types it uses (from the temporary Contracts sharing branch, a devDependency the tests check them against).
@@ -164,7 +164,7 @@ Until OpenVibe.Tools serves the gateway facade (Tools S6), point the jobs client
 | Subpath | Where | What |
 |---|---|---|
 | `openvibe-sdk/core` | both | `createClient()`, `OpenVibeError`, `paginate()`, `offsetPager()`, trace and id helpers, `CONTRACTS_RANGE` |
-| `openvibe-sdk/auth` | server (browser build: PKCE only) | `createServiceTokenClient()` (+ `getTokenInfo()`), `createNetworkKeys()`, `verifyUserToken()`, `verifyAppToken()`, `verifyServiceToken()`, `exchangeCode()`, `refreshUserToken()`; `startAuthorization()`, `buildAuthorizeUrl()`, `createPkcePair()`, `pkceChallenge()`, `readCallback()`, `decodeUnverified()`, `unverifiedClaims()` |
+| `openvibe-sdk/auth` | server (browser build: PKCE only) | `createServiceTokenClient()` (+ `getTokenInfo()`), `createNetworkKeys()`, `verifyUserToken()`, `verifyAppToken()`, `verifyServiceToken()`, `exchangeCode()`, `refreshUserToken()`; `startAuthorization()`, `buildAuthorizeUrl()`, `createPkcePair()`, `readCallback()`, `decodeUnverified()`, `unverifiedClaims()` |
 | `openvibe-sdk/registry` | both | `createRegistryClient(client)`: `services({status})`, `service(id)`, `capabilities({owner})`, `capability(id)`, `namespaces()`, `contracts()`, `topics()`, `domain(host)`, `descriptor()` |
 | `openvibe-sdk/identity` | server | `createIdentityClient(client)`: `resolve({subjectId} \| {system,type,id})`, `resolveBatch({subjectIds} \| {system,type,ids})` |
 | `openvibe-sdk/notifications` | server | `createNotificationsClient(client)`: `push({subjectId \| userId, type, title, message, url, category, priority, …})` through Network (`network.notifications.push`); `{ sent, skipped }` or `{ sent: false, reason: 'unknown_subject' }`; attempted once, the caller retries |
@@ -488,6 +488,7 @@ Install the drivers the service uses: `pg` and `iovalkey` (production), `@electr
 ## Versioning
 
 - `openvibe-sdk` follows semver. While it is 0.x, a minor release may break an API, and [CHANGELOG.md](CHANGELOG.md) says so. Pin a tag.
+- **The 1.0 core surface is already frozen.** `core`, `auth`, `events`, `db` and `media` are stable now, before 1.0: removing or renaming one of their exports needs a major release. `docs/one-point-oh.json` gives each name its tier (frozen, platform, leaving), `test/surface.test.js` pins the exact export list of the five entries, and `node scripts/surface.js --check` marks a break there as `[1.0 core]`.
 - [docs/api-surface.json](docs/api-surface.json) lists every name each entry exports and what it is (function, class, a plain object's keys, …). `test/surface.test.js` fails when the exports and the file disagree, so a removal or a change of kind is a reviewed line in a diff, never a surprise on a service's next pin round; `node scripts/surface.js --check` names each change as breaking or added, and `node scripts/surface.js` updates the file. 1.0 freezes `core`, `auth`, `events`, `db` and `media` first: a breaking change there is marked `[1.0 core]`. Inside them each name is frozen, platform (exported, not frozen) or leaving before 1.0: [docs/one-point-oh.md](docs/one-point-oh.md).
 - Each release states the openvibe-contracts range it was tested against (`CONTRACTS_RANGE`), and `discover()` checks it at runtime. Contract types are copied into `types/contracts.d.ts`. `test/types.test.js` fails if they differ from the pinned Contracts release, the `openvibe-contracts` devDependency (temporarily the sharing branch), which the tools tests also use to validate requests and answers. It is never a runtime or peer dependency.
 - A new public capability ships as a minor release: first the contract, then the wrapper here, then the service's route. Removing a wrapper is a major release, after the capability's deprecation window in Contracts has passed.

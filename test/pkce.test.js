@@ -10,22 +10,22 @@ const { createMockPlatform } = require('../src/testing');
 const s256 = (v) => crypto.createHash('sha256').update(v).digest('base64url');
 
 run([
-    ['RFC 7636 appendix B vector', async () => {
-        assert.equal(await browser.pkceChallenge('dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk'), 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM');
+    ['the challenge is S256 of the verifier (RFC 7636)', async () => {
+        const { codeVerifier, codeChallenge, codeChallengeMethod } = await browser.createPkcePair();
+        assert.equal(codeChallenge, s256(codeVerifier));
+        assert.equal(codeChallengeMethod, 'S256');
     }],
 
-    ['verifiers are 43..128 unreserved characters and the challenge is S256 of them', async () => {
+    ['verifiers are 43..128 unreserved characters', async () => {
         for (const len of [43, 64, 128]) {
-            const { codeVerifier, codeChallenge, codeChallengeMethod } = await browser.createPkcePair(len);
+            const { codeVerifier } = await browser.createPkcePair(len);
             assert.equal(codeVerifier.length, len);
             assert.match(codeVerifier, /^[A-Za-z0-9\-._~]+$/);
-            assert.equal(codeChallenge, s256(codeVerifier));
-            assert.equal(codeChallengeMethod, 'S256');
         }
-        assert.throws(() => browser.createCodeVerifier(42), RangeError);
-        assert.throws(() => browser.createCodeVerifier(129), RangeError);
-        const a = browser.createCodeVerifier();
-        const b = browser.createCodeVerifier();
+        await assert.rejects(browser.createPkcePair(42), RangeError);
+        await assert.rejects(browser.createPkcePair(129), RangeError);
+        const a = (await browser.createPkcePair()).codeVerifier;
+        const b = (await browser.createPkcePair()).codeVerifier;
         assert.notEqual(a, b);
     }],
 
@@ -69,7 +69,7 @@ run([
 
         await assert.rejects(exchangeCode({ fetch: platform.fetch, clientId: 'demo', clientSecret: 'demo-secret', code, redirectUri, codeVerifier }), { code: 'invalid_grant' });
         const code2 = platform.authorize({ clientId: 'demo', redirectUri, subjectId: user.subject_id, codeChallenge });
-        await assert.rejects(exchangeCode({ fetch: platform.fetch, clientId: 'demo', clientSecret: 'demo-secret', code: code2, redirectUri, codeVerifier: browser.createCodeVerifier() }), (err) => err.code === 'invalid_grant' && /PKCE/.test(err.detail));
+        await assert.rejects(exchangeCode({ fetch: platform.fetch, clientId: 'demo', clientSecret: 'demo-secret', code: code2, redirectUri, codeVerifier: (await browser.createPkcePair()).codeVerifier }), (err) => err.code === 'invalid_grant' && /PKCE/.test(err.detail));
 
         const refreshed = await refreshUserToken({ fetch: platform.fetch, clientId: 'demo', clientSecret: 'demo-secret', refreshToken: tokens.refresh_token });
         assert.ok(refreshed.access_token);

@@ -2,7 +2,7 @@
 import cjs from '../src/auth/browser.js';
 
 export const {
-    createCodeVerifier, pkceChallenge, createPkcePair, createState, buildAuthorizeUrl, startAuthorization,
-    readCallback, base64url, decodeUnverified, unverifiedClaims,
+    createPkcePair, createState, buildAuthorizeUrl, startAuthorization, readCallback, base64url,
+    decodeUnverified, unverifiedClaims,
 } = cjs;
 export default cjs;

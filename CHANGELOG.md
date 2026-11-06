@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.87.0 (2026-11-06)
+
+- **The 1.0 core surface is frozen now.** `core`, `auth`, `events`, `db` and `media` are stable before 1.0:
+  removing or renaming one of their exports needs a major release. `docs/one-point-oh.json` keeps each name's tier,
+  `docs/api-surface.json` records every export, and `test/surface.test.js` now pins the exact export list of the five
+  entries, so a break there is a deliberate line in a diff rather than a surprise on a pin round.
+- **Removed the two `auth` leaving names**, planned for 1.0 in `docs/one-point-oh.md`: `createCodeVerifier` and
+  `pkceChallenge`. They were the two halves of `createPkcePair`, which stays frozen; no OpenVibers repository's `main`
+  imported them (checked 2026-11-06). Use `createPkcePair()` for both halves.
+- **`signDelivery` and `verifyDelivery` (the v1 signature) stay for now.** They are still the last leaving names, but
+  `signDelivery` is imported by the test helpers of OpenVibe.Deals, Examples, Reviews, Tips, Trade and VIP on `main`, so
+  they go once a pin round moves those onto `signDeliveryHeaders` / `signDeliveryV2`. `parseDelivery` still requires
+  v2 by default.
+
 ## 0.86.0 (2026-11-06)
 
 - Add `openvibe-sdk/locker`: the Locker envelope (`locker.envelope@1`), end-to-end encryption for anything on OpenVibe, in Node and in the browser. WebCrypto only (`globalThis.crypto.subtle`), no other crypto library and nothing hand-rolled.

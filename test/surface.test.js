@@ -22,6 +22,19 @@ run([
         assert.equal(recorded['openvibe-sdk/core'].createClient, 'function');
     }],
 
+    ['the five 1.0 core entries export exactly these names: the freeze', async () => {
+        const expected = {
+            'openvibe-sdk/core': ['CONTRACTS_RANGE', 'DEFAULT_NETWORK', 'OpenVibeError', 'SDK_VERSION', 'compareVersions', 'contextFromHeaders', 'createClient', 'isActingSubjectId', 'isOpenVibeError', 'newEventId', 'newIdempotencyKey', 'offsetPager', 'paginate', 'parseTraceparent', 'satisfiesRange', 'startSpan', 'ulid'],
+            'openvibe-sdk/auth': ['TOKEN_VALID_AFTER', 'base64url', 'buildAuthorizeUrl', 'createJwksClient', 'createNetworkKeys', 'createPgRevocationStore', 'createPkcePair', 'createServiceTokenClient', 'createState', 'decodeUnverified', 'exchangeCode', 'jwksClient', 'jwksStatus', 'readCallback', 'refreshUserToken', 'revocationSchema', 'startAuthorization', 'unverifiedClaims', 'verifyAppToken', 'verifyServiceToken', 'verifyUserToken'],
+            'openvibe-sdk/events': ['appSource', 'createAppEvents', 'createEventsClient', 'createPgInbox', 'createPgOutbox', 'createServiceOutbox', 'inboxSchema', 'outboxSchema', 'parseDelivery', 'projectKey', 'signDelivery', 'signDeliveryHeaders', 'signDeliveryV2', 'verifyDelivery', 'verifyDeliveryV2'],
+            'openvibe-sdk/db': ['DbError', 'ISOLATION', 'PARSERS', 'createDb', 'sql'],
+            'openvibe-sdk/media': ['DEFAULT_PUBLIC_ORIGIN', 'createMediaClient', 'createObjectsClient', 'mediaUrls'],
+        };
+        assert.deepEqual(Object.keys(expected).sort(), [...CORE].sort());
+        const now = current();
+        for (const spec of CORE) assert.deepEqual(Object.keys(now[spec]), expected[spec], `${spec}: a frozen export name changed; removing or renaming one needs a major release`);
+    }],
+
     ['every name in the 1.0 core entries has exactly one tier (docs/one-point-oh.json), and every tiered name exists', async () => {
         const recorded = JSON.parse(fs.readFileSync(FILE, 'utf8'));
         assert.deepEqual(Object.keys(TIERS).sort(), [...CORE].sort());

@@ -137,4 +137,4 @@ function unverifiedClaims(token) {
     return d ? d.claims : null;
 }
 
-module.exports = { createCodeVerifier, pkceChallenge, createPkcePair, createState, buildAuthorizeUrl, startAuthorization, readCallback, base64url, decodeUnverified, unverifiedClaims };
+module.exports = { createPkcePair, createState, buildAuthorizeUrl, startAuthorization, readCallback, base64url, decodeUnverified, unverifiedClaims };
