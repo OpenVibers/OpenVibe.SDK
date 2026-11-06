@@ -9,7 +9,7 @@
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const { run } = require('./helpers');
-const { requestSubjectAssertion, verifySubjectAssertion, createSubjectAssertionVerifier } = require('../src/auth/subject-assertion');
+const { requestSubjectAssertion, verifySubjectAssertion, createSubjectAssertionVerifier } = require('../src/assertions');
 
 const PERSON = 'usr_01H8XYZABCDEFGHJKMNPQRRSTV';
 const OTHER = 'usr_01H8XYZABCDEFGHJKMNPQRRSTW';

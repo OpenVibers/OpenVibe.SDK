@@ -68,7 +68,7 @@ run([
                 })().catch((err) => { console.error(err); process.exit(1); });`;
             const res = execFileSync(process.execPath, ['-e', script], { cwd: app, encoding: 'utf8' });
             assert.match(res, new RegExp(`consumer ok: ${subpaths.length} subpaths \\+ the browser bundle`));
-            assert.equal(subpaths.length, 81);   // 0.86.0 adds openvibe-sdk/locker, its server and its vectors
+            assert.equal(subpaths.length, 82);   // openvibe-sdk/assertions (the subject assertions) joins the 81 of 0.87.0
             assert.ok(!fs.existsSync(path.join(app, 'node_modules/openvibe-contracts')), 'the optional peer is not installed');
         } finally {
             fs.rmSync(tmp, { recursive: true, force: true });

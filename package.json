@@ -28,6 +28,12 @@
       "import": "./esm/auth-browser.mjs",
       "default": "./src/auth/browser.js"
     },
+    "./assertions": {
+      "types": "./types/assertions.d.ts",
+      "browser": null,
+      "import": "./esm/assertions.mjs",
+      "default": "./src/assertions.js"
+    },
     "./registry": {
       "types": "./types/registry.d.ts",
       "import": "./esm/registry.mjs",

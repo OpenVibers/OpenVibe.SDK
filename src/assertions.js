@@ -1,6 +1,7 @@
 'use strict';
 /**
- * Subject assertions (ADR-003, amendment 2026-11-06; plan H1).
+ * openvibe-sdk/assertions: subject assertions (ADR-003, amendment 2026-11-06; plan H1).
+ *
  *
  * A subject assertion is a short-lived, Network-signed proof that a person authorized the calling
  * service to act for them on ONE other service (the audience). It is what a money call carries
@@ -27,8 +28,8 @@
  * carried to another service, and a replayed one is refused.
  */
 const crypto = require('node:crypto');
-const { OpenVibeError } = require('../core/errors');
-const { jwksClient, keysFromJwks } = require('./jwks');
+const { OpenVibeError } = require('./core/errors');
+const { jwksClient, keysFromJwks } = require('./auth/jwks');
 
 /** The header a money call carries the assertion in. */
 const ASSERTION_HEADER = 'x-ov-subject-assertion';
