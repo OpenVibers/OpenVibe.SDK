@@ -1,0 +1,17 @@
+# gitleaks configuration, used by the shared security workflow
+# (OpenVibers/OpenVibe.Shared/.github/workflows/security.yml). The default rules stay on; every
+# allowlist below is one proven false positive, matched on path AND value so nothing else is hidden.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "The test vectors' wrapped content keys: made-up base64 in the file that exists to be checked"
+condition = "AND"
+paths = ['''^src/locker/vectors\.js$''']
+regexes = ['''^(t9FBCQEiSb87EYFaqq9yjm45qITqW8p8qMoz49vKUhbbUznoz9T0iwJXSmBBaTLN|pnLvXu5bTR3lmWGT2GFfWc2v43dG67dM7lrStqWOPrL4f\+SI6YivVWwXK0BvVjiR)$''']
+
+[[allowlists]]
+description = "The name of the password key derivation, in a test that reads it from the header"
+condition = "AND"
+paths = ['''^test/locker\.test\.js$''']
+regexes = ['''^PBKDF2-SHA-256$''']

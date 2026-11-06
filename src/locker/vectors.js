@@ -1,0 +1,150 @@
+'use strict';
+/**
+ * The shared test vectors. The browser module (openvibe-shared/ov-locker.js) runs the same cases,
+ * so both runtimes must produce the same bytes for the same input: the same header, the same
+ * envelope, the same four words.
+ *
+ * Everything here is fixed: the keys, the byte source and the content. The keys below are test
+ * keys, made for this file and used for nothing else.
+ */
+
+/**
+ * A fixed byte source: the same bytes every time, so a vector is the same on every runtime and
+ * in every browser. It is a test helper, not a random source: never use it for anything real.
+ */
+function fixedRandom(seed = 0x1a2b3c4d) {
+    let state = seed >>> 0;
+    return (length) => {
+        const out = new Uint8Array(length);
+        for (let i = 0; i < length; i++) {
+            state ^= state << 13; state >>>= 0;
+            state ^= state >>> 17;
+            state ^= state << 5; state >>>= 0;
+            out[i] = state & 0xff;
+        }
+        return out;
+    };
+}
+
+/** The content of every case. */
+const CONTENT = 'The quick brown fox jumps over the lazy dog.';
+
+/** A person's keys, made for these vectors. */
+const PERSON = {
+    "ecdh": {
+        "key_ops": [
+            "deriveBits"
+        ],
+        "ext": true,
+        "kty": "EC",
+        "x": "pNngpTSE3X3C_CGzfpAtenjliLPFZ9arBVNtI0ctPXw",
+        "y": "fXZT2JcDDiXEb6xH3LUrqlPakM3GQwe3aqbV_1vhVLI",
+        "crv": "P-256",
+        "d": "cG9YgmeoPeaI8lXZRpijV5--2sC4rYWSqWbyGCYKPu0"
+    },
+    "signing": {
+        "key_ops": [
+            "sign"
+        ],
+        "ext": true,
+        "kty": "EC",
+        "x": "ytN7TbH08BDhIld7Tt-8R80FoRosnzgTxSn75z135Gk",
+        "y": "D0axhLHKheyPLSc4GW0PpSfM48FPCLcC4OiRn-ZqN1w",
+        "crv": "P-256",
+        "d": "fMd3QfF8zWlqrml-sgPHlQygx49XEW_FHWACSihxAEk"
+    },
+    "ecdhPublic": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "pNngpTSE3X3C_CGzfpAtenjliLPFZ9arBVNtI0ctPXw",
+        "y": "fXZT2JcDDiXEb6xH3LUrqlPakM3GQwe3aqbV_1vhVLI"
+    },
+    "signingPublic": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "ytN7TbH08BDhIld7Tt-8R80FoRosnzgTxSn75z135Gk",
+        "y": "D0axhLHKheyPLSc4GW0PpSfM48FPCLcC4OiRn-ZqN1w"
+    },
+    "fingerprint": "lichen brick plateau yew"
+};
+
+/** The subject the people case is for. */
+const SUBJECT = {
+    "type": "user",
+    "id": "usr_01JAB2C3D4E5F6G7H8J9K0MNPQ"
+};
+
+/** The cases: the same content, sealed three ways. */
+const CASES = [
+    {
+        "name": "people",
+        "envelope_sha256": "3f50740af8d47de374ba7858a104a76e0617c2d5efe35355fec09ad23279716d",
+        "header": {
+            "version": "locker.envelope.v1",
+            "suite": "AES-256-GCM",
+            "chunk_size": 1048576,
+            "padded_size": 1048576,
+            "nonce_base": "ghT0ZBfkXps=",
+            "lock": "people",
+            "slots": {
+                "people": [
+                    {
+                        "subject": {
+                            "type": "user",
+                            "id": "usr_01JAB2C3D4E5F6G7H8J9K0MNPQ"
+                        },
+                        "algorithm": "ECDH-P256/HKDF-SHA256/AES-256-GCM",
+                        "ephemeral_public_key": {
+                            "kty": "EC",
+                            "crv": "P-256",
+                            "x": "pNngpTSE3X3C_CGzfpAtenjliLPFZ9arBVNtI0ctPXw",
+                            "y": "fXZT2JcDDiXEb6xH3LUrqlPakM3GQwe3aqbV_1vhVLI"
+                        },
+                        "salt": "pGphaA6OCYR5+nzvUl/WQQ==",
+                        "nonce": "0uLZzrvm1lBfW87O",
+                        "wrapped_key": "t9FBCQEiSb87EYFaqq9yjm45qITqW8p8qMoz49vKUhbbUznoz9T0iwJXSmBBaTLN"
+                    }
+                ]
+            }
+        }
+    },
+    {
+        "name": "password",
+        "envelope_sha256": "a112ef1fb31bd7f1831cc00c877bc136cc859a140002c8d19f3b6bd873bbfa13",
+        "header": {
+            "version": "locker.envelope.v1",
+            "suite": "AES-256-GCM",
+            "chunk_size": 1048576,
+            "padded_size": 1048576,
+            "nonce_base": "YXEf22DEcq8=",
+            "lock": "password",
+            "slots": {
+                "password": {
+                    "algorithm": "PBKDF2-SHA256/AES-256-GCM",
+                    "kdf": "PBKDF2-SHA-256",
+                    "iterations": 600000,
+                    "salt": "jtNXQP80hz5f78yryNnM0w==",
+                    "nonce": "onI04DQDAwHgUsR4",
+                    "wrapped_key": "pnLvXu5bTR3lmWGT2GFfWc2v43dG67dM7lrStqWOPrL4f+SI6YivVWwXK0BvVjiR"
+                }
+            }
+        }
+    },
+    {
+        "name": "link",
+        "envelope_sha256": "709d0e03da6b42ab379f4824aafd7ad41e0a2f74f348df879b9a0e03a154d38b",
+        "header": {
+            "version": "locker.envelope.v1",
+            "suite": "AES-256-GCM",
+            "chunk_size": 1048576,
+            "padded_size": 1048576,
+            "nonce_base": "Rb2p0icJ0nY=",
+            "lock": "link",
+            "slots": {
+                "link": {}
+            }
+        }
+    }
+];
+
+module.exports = { fixedRandom, CONTENT, PERSON, SUBJECT, CASES };

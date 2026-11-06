@@ -8,6 +8,7 @@ const core = require('./src/core');
 module.exports = {
     ...core,
     auth: require('./src/auth/browser'),
+    locker: require('./src/locker'),
     registry: require('./src/registry'),
     modules: require('./src/modules'),
     realtime: require('./src/realtime'),

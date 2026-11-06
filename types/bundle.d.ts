@@ -18,6 +18,7 @@ import * as jobs from './jobs';
 import * as tools from './tools';
 import * as projects from './projects';
 import * as geo from './geo';
+import * as locker from './locker';
 import * as core from './core';
 
 export * from './core';
@@ -40,9 +41,10 @@ export * as jobs from './jobs';
 export * as tools from './tools';
 export * as projects from './projects';
 export * as geo from './geo';
+export * as locker from './locker';
 
 declare const sdk: typeof core & {
     auth: typeof auth; registry: typeof registry; modules: typeof modules; realtime: typeof realtime;
-    media: typeof media; community: typeof community; bot: typeof bot; search: typeof search; bench: typeof bench; meme: typeof meme; vision: typeof vision; themes: typeof themes; redact: typeof redact; chat: typeof chat; ai: typeof ai; jobs: typeof jobs; tools: typeof tools; projects: typeof projects; geo: typeof geo;
+    media: typeof media; community: typeof community; bot: typeof bot; search: typeof search; bench: typeof bench; meme: typeof meme; vision: typeof vision; themes: typeof themes; redact: typeof redact; chat: typeof chat; ai: typeof ai; jobs: typeof jobs; tools: typeof tools; projects: typeof projects; geo: typeof geo; locker: typeof locker;
 };
 export default sdk;
