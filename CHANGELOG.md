@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.91.0 (2026-11-06)
+
+- `openvibe-sdk/streams`: the Agent Streams plan, stage 1 — an agent's own stream on OpenVibe.Live (a stream of kind `agent`, id `ags_…`, no stream key and no slot, published with a ticket instead of a key).
+  - `startAgentStream({ title, task, visibility, allowSites })` answers `{ stream, publish }`: the stream (live.agent-stream@1) and the publish part (live.agent-stream-publish@1) with the WHIP url, the publish ticket (shown once; Live keeps only its hash) and the moment it dies.
+  - `renewTicket(id)` and `revokeTicket(id)`: the ticket lives four hours (the desk renews it at three) and revoking it is the kill switch — Live ends the WHIP session at once.
+  - `state(id, { ticket })` is what the desk polls every ten seconds: `{ viewers, encode, curtain, ends_at }`. While `encode` is false the desk stops encoding and sends a snapshot every five seconds with `postFrame(id, bytes, { ticket, contentType })` (JPEG or WebP, at most 200 KB).
+  - `setCurtain(id, up, reason)` raises the desk's privacy screen (while it is up Live pauses every viewer's consumer, so a viewer sees "Private screen" and never why), `setVisibility(id, v)` switches who may watch, `end(id)` ends the stream (the card stays, with the last frame and the VOD) and `viewTicket(id)` mints the player's view ticket (ten minutes).
+  - The publish ticket is a bearer of its own: on the desk's routes (`state`, `postFrame`) the desk sends the ticket, never the person's token. Every body is checked in the module before it leaves, and a bad id, visibility, curtain reason or an oversized frame is refused with a TypeError.
+  - The capability behind it is `live.agent_stream.publish` for the audience `openvibe.live` (Contracts 0.298.0): a Node principal acting for its owner, Codes or Actor. Never a developer-app token, never another person's stream.
+
 ## 0.90.0 (2026-11-06)
 
 - **Subject assertions** (ADR-003, the 2026-11-06 amendment; plan H1). A money call carries a Network-signed
