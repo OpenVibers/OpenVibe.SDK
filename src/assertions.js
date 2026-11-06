@@ -37,6 +37,8 @@ const ASSERTION_HEADER = 'x-ov-subject-assertion';
 const ASSERTION_TTL_S = 60;
 /** The default replay window: a jti is remembered this long after it was seen. */
 const REPLAY_WINDOW_MS = 2 * 60 * 1000;
+/** How much clock difference is forgiven. An assertion lives 60 s, so this stays small. */
+const CLOCK_SKEW_SEC = 10;
 
 const USER_RE = /^usr_[0-9A-HJKMNP-TV-Z]{26}$/;
 const SERVICE_RE = /^svc:[a-z][a-z0-9-]{1,39}$/;
@@ -137,7 +139,7 @@ function verifyEs256(keys, header, input, sig) {
  * assertion.actor_mismatch | assertion.replayed | assertion.no_key.
  */
 async function verifySubjectAssertion(assertion, {
-    jwks, publicKey, audience, issuer, act, now = Date.now(), clockSkewSec = 30, seen = null, log = null,
+    jwks, publicKey, audience, issuer, act, now = Date.now(), clockSkewSec = CLOCK_SKEW_SEC, seen = null, log = null,
 } = {}) {
     const fail = (code, reason) => ({ ok: false, code, reason });
     const parts = typeof assertion === 'string' ? assertion.split('.') : [];
@@ -190,7 +192,7 @@ async function verifySubjectAssertion(assertion, {
  *   const verifier = createSubjectAssertionVerifier({ jwks, audience: 'openvibe.billing' });
  *   const r = await verifier.verify(assertion, { act: 'svc:live' });
  */
-function createSubjectAssertionVerifier({ jwks, audience, issuer, clockSkewSec = 30, replayWindowMs = REPLAY_WINDOW_MS, now = () => Date.now(), log = null } = {}) {
+function createSubjectAssertionVerifier({ jwks, audience, issuer, clockSkewSec = CLOCK_SKEW_SEC, replayWindowMs = REPLAY_WINDOW_MS, now = () => Date.now(), log = null } = {}) {
     const seen = new Map();       // jti -> the time it was seen
     function prune() {
         const t = now();
@@ -212,4 +214,4 @@ function createSubjectAssertionVerifier({ jwks, audience, issuer, clockSkewSec =
     };
 }
 
-module.exports = { requestSubjectAssertion, verifySubjectAssertion, createSubjectAssertionVerifier, subjectAssertionHeader, ASSERTION_HEADER, ASSERTION_TTL_S, REPLAY_WINDOW_MS };
+module.exports = { requestSubjectAssertion, verifySubjectAssertion, createSubjectAssertionVerifier, subjectAssertionHeader, ASSERTION_HEADER, ASSERTION_TTL_S, REPLAY_WINDOW_MS, CLOCK_SKEW_SEC };

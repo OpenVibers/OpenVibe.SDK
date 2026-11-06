@@ -402,6 +402,7 @@
   "openvibe-sdk/assertions": {
     "ASSERTION_HEADER": "string",
     "ASSERTION_TTL_S": "number",
+    "CLOCK_SKEW_SEC": "number",
     "REPLAY_WINDOW_MS": "number",
     "createSubjectAssertionVerifier": "function",
     "requestSubjectAssertion": "function",

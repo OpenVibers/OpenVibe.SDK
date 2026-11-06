@@ -3,6 +3,6 @@ import cjs from '../src/assertions.js';
 
 export const {
     requestSubjectAssertion, verifySubjectAssertion, createSubjectAssertionVerifier, subjectAssertionHeader, ASSERTION_HEADER, ASSERTION_TTL_S,
-    REPLAY_WINDOW_MS,
+    REPLAY_WINDOW_MS, CLOCK_SKEW_SEC,
 } = cjs;
 export default cjs;

@@ -87,3 +87,5 @@ export declare const ASSERTION_HEADER: string;
 export declare const ASSERTION_TTL_S: number;
 /** The default replay window (milliseconds). */
 export declare const REPLAY_WINDOW_MS: number;
+/** How much clock difference is forgiven (seconds). */
+export declare const CLOCK_SKEW_SEC: number;
