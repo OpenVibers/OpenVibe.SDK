@@ -59,10 +59,10 @@ adult gate. A request names one as `model: '@preset/<name>'`.
 
 ## The seller side
 
-The seller registers an offer in the Network's user-owned AI offers: the same registry OpenVibe.Node's "Offer to the
-network" writes to (`POST /internal/ai/offers/report`, the capability `network.resource.report`), so any server
-that speaks the OpenAI API can be a provider and not only a Node. There is one offer API and this is it; the SDK
-sends the document that registry validates, field for field.
+An offer has two forms. A **Node machine** reports its offer to the Network's user-owned AI offers — the same registry
+OpenVibe.Node's "Offer to the network" writes to (`POST /internal/ai/offers/report`, the capability
+`network.resource.report`). A **standalone server** registers itself on the Exchange's public seller API with the
+developer key, so it needs no Node at all. The SDK validates both before anything is sent.
 
 ```js
 const offer = await exchange.seller.offer({
@@ -84,9 +84,39 @@ concurrency is 1 to 8, the price is credits per million tokens, and the audience
 `group` (with a group id). The SDK refuses an offer the registry would refuse before anything is sent.
 
 The endpoint is checked first: the SDK asks the server for its OpenAI model list, so a server that does not speak
-the OpenAI API is caught before the offer is registered (`probe: false` turns that off). The registry's offer
-document has no slot for a server address, so the router reaches a community offer over the seller's registered
-machine; a standalone server is registered by its address once the Exchange's seller route lands.
+the OpenAI API is caught before the offer is registered (`probe: false` turns that off).
+
+### A standalone server: the endpoint form
+
+A server that speaks the OpenAI Chat Completions API can sell without an OpenVibe Node. Give `endpoint` and no
+`machineId`; the offer is registered on the Exchange's public seller API
+(`POST /api/v1/exchange/seller/offers`) with the same developer key as the buyer side.
+
+```js
+const { offer, endpoint } = await exchange.seller.offer({
+    endpoint: 'https://my-server.example/v1',   // https only: the platform refuses an IP literal or port other than 443/8443
+    models: ['qwen3:32b', 'qwen3:8b'],
+    price: { in_per_million: 10, out_per_million: 30 },   // 0 volunteers
+    hours: { start: '00:00', end: '23:59', tz: 'Europe/Lisbon' },
+    concurrency: 2,
+    audience: 'everyone',
+    name: 'my 3090',
+});
+// { offer: { id: 'ep_…', offer_id: 'endpoint:ep_…', base_url, models, hours, price, audience, … },
+//   endpoint: { url, models } }
+
+const { owner, offers } = await exchange.seller.endpointOffers();
+await exchange.seller.removeEndpointOffer(offer.id);
+```
+
+The owner is the person the developer key acts for (a developer app's project owner), never a body field. AI reaches
+the address only through its egress guard: https, a public DNS answer checked inside the connection (never an IP
+literal), redirects judged again, a timeout, a response byte cap, and no buyer identity in any header. No bearer token
+is sent, so the endpoint must accept the POST as it is (`endpointKey` only authenticates the SDK's own probe). The
+endpoint is verified exactly as a Node machine (the canaries, the model fingerprint, about 1% spot re-runs), serves the
+free tier only until verified, and earns 0 on the owner's own requests. An answer from it is labelled a community
+endpoint on the receipt (`provider: community-endpoint:<id>`, `provider_access: COMMUNITY_ENDPOINT`). It sees the
+prompt: only requests that opt in to community capacity reach it.
 
 ### Earnings and verification
 
