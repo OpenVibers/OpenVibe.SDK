@@ -7,7 +7,7 @@
   "plan": "OpenVibe End-to-End Realignment & Implementation Plan, revision 3 (20 Sep 2026), \u00a73.2; roadmap \u00a730",
   "deployed": false,
   "deployment": "none: a package released as git tags; services and apps pin a tag",
-  "contracts": "openvibe-contracts feat/locker-core-contracts (temporary branch pin; repin after the orchestrator releases Contracts 0.292.0)",
+  "contracts": "openvibe-contracts v0.292.0",
   "features": [
     "locker (openvibe-sdk/locker, openvibe-sdk/locker/server): the Locker envelope (locker.envelope@1) for end-to-end encryption, WebCrypto only, in Node and the browser: seal/open for text and bytes, sealStream/openStream, the three locks (people, password, link), person key pairs (ECDH P-256, ECDSA P-256), the eight-word fingerprint, wrapFor and rewrap, recoveryWords for the phrase to write down, opening a people lock by key, inspect for what an envelope says about itself, and the header checks a service runs without a key",
     "share (openvibe-sdk/share): transactional local sharing, audience and membership checks, exact-name resolution, recipient-bound ownership transfers, audit, durable events/notifications, uniform API and agent client",

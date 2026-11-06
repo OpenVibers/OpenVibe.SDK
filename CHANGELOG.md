@@ -16,7 +16,7 @@
 - A people lock can now be opened by key: `open(bytes, { person })` finds the slot that names the reader's key, without a subject. An envelope with no slot for that key fails with the new code `locker.no_slot`, which says the key is not on the list (`locker.wrong_key` is for a key that is on it).
 - Add `inspect(bytes)`: what an envelope says about itself — the lock, the version, the padded size, the recipients' key thumbprints and the password's iteration count — without a key and without decrypting anything.
 - The fingerprint's two groups of four are joined by a middle dot, not a hyphen: a hyphen reads as one compound word.
-- Temporarily pin Contracts to `feat/locker-core-contracts` (0.292.0). The orchestrator releases Contracts and repins the SDK before release.
+- Pins openvibe-contracts v0.292.0 (locker.envelope.v1 and the key directory API).
 
 ## 0.85.0 (2026-11-05)
 
