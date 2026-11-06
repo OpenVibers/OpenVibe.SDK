@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.87.0 (2026-11-06)
+## 0.88.0 (2026-11-06)
 
 - `openvibe-sdk/share` learns locked items (Locker). A share records how its item is sealed — `lock: none | people | password | link`, set by `register(ref, { lock })` and answered by GET — and `describe()` cannot override it. A locked item is never public (`share.lock_public`), and the lock cannot change after registration (`share.lock_fixed`). Expand-only migration: `shares.lock`, `share_members.key_slot`, `share_transfers.key_slot`.
 - A people-locked item carries each member's key slot (`locker.people-slot@1`). `addMembers`/`update` refuse a member without a slot (`share.slot_required`), refuse a slot for another subject or key, and answer `share.key_changed` (409) when the slot's `recipient_key` is not the RFC 7638 thumbprint of that person's key in Network's key directory now (`GET /api/v1/people/:subject/keys`, cached a minute). A person with no locker yet is `share.no_key`.
@@ -10,6 +10,20 @@
 - The agent client gains `addLocked('@name', { contentKey })` (looks up the person's key, wraps, saves the member and the slot) and `removeLocked('@name', { contentKey | envelope })` (re-seals for the owner and the members who stay, then removes); `share({ base, token, network })` names the key directory. `transfer(to, { key_slot })` passes the recipient's slot.
 - `openvibe-sdk/locker`: `open`/`rewrap` accept `{ contentKey }`, so an agent that sealed an item can open or re-seal it without a private key. `openvibe-sdk/locker/server` exports `peopleSlotOk`.
 - The new fields are in openvibe-contracts v0.293.0 (`share.update-request@1.envelope`, `share.transfer-request@1.key_slot`, `share.member@1.key_fingerprint`); the devDependency pin stays at v0.292.0 until that tag exists.
+
+## 0.87.0 (2026-11-06)
+
+- **The 1.0 core surface is frozen now.** `core`, `auth`, `events`, `db` and `media` are stable before 1.0:
+  removing or renaming one of their exports needs a major release. `docs/one-point-oh.json` keeps each name's tier,
+  `docs/api-surface.json` records every export, and `test/surface.test.js` now pins the exact export list of the five
+  entries, so a break there is a deliberate line in a diff rather than a surprise on a pin round.
+- **Removed the two `auth` leaving names**, planned for 1.0 in `docs/one-point-oh.md`: `createCodeVerifier` and
+  `pkceChallenge`. They were the two halves of `createPkcePair`, which stays frozen; no OpenVibers repository's `main`
+  imported them (checked 2026-11-06). Use `createPkcePair()` for both halves.
+- **`signDelivery` and `verifyDelivery` (the v1 signature) stay for now.** They are still the last leaving names, but
+  `signDelivery` is imported by the test helpers of OpenVibe.Deals, Examples, Reviews, Tips, Trade and VIP on `main`, so
+  they go once a pin round moves those onto `signDeliveryHeaders` / `signDeliveryV2`. `parseDelivery` still requires
+  v2 by default.
 
 ## 0.86.0 (2026-11-06)
 
