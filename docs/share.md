@@ -1,6 +1,6 @@
 # Network-wide sharing (Node)
 
-`openvibe-sdk/share` implements the 2026-11-06 sharing design in each service's PostgreSQL database. The service is the authority. The module never reads titles, content or media URLs. It uses openvibe-contracts v0.296.0 (share.v1, with the Locker lock kind and the member key slots).
+`openvibe-sdk/share` implements the 2026-11-06 sharing design in each service's PostgreSQL database. The service is the authority. The module never reads titles, content or media URLs. It uses openvibe-contracts v0.297.0 (share.v1, with the Locker lock kind and the member key slots).
 
 ```js
 const { createShares, sharesSchema, shareOpenApi } = require('openvibe-sdk/share');
