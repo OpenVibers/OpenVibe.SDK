@@ -1341,7 +1341,11 @@ function passwordSlotAad(iterations, salt) {
 
 /** A public key as WebCrypto wants it. */
 async function importPublicKey(jwk) {
-    return subtle().importKey('jwk', publicJwk(jwk), { name: 'ECDH', namedCurve: CURVE }, true, []);
+    try {
+        return await subtle().importKey('jwk', publicJwk(jwk), { name: 'ECDH', namedCurve: CURVE }, true, []);
+    } catch {
+        fail('locker.invalid', 'The public key is not a P-256 key');
+    }
 }
 
 /**
@@ -1523,7 +1527,7 @@ const {
 } = __load(12);
 const { fail } = __load(13);
 const {
-    MAGIC, VERSION, SUITE, CHUNK_SIZE, NONCE_BASE_SIZE, LENGTH_PREFIX, FINAL_FLAG,
+    MAGIC, VERSION, SUITE, CHUNK_SIZE, TAG_SIZE, NONCE_BASE_SIZE, LENGTH_PREFIX, FINAL_FLAG,
     coreOf, chunkAad, encodeHeader, encodeEnvelope, readHeader, chunkCount, paddedSize,
     chunkNonce, encodeChunk, nonceBaseBytes,
 } = __load(11);
@@ -1714,6 +1718,27 @@ async function seal(content, options = {}) {
     return envelope;
 }
 
+/** The header's core, as a reader needs it: the fields must be the ones we write. */
+function readCore(header) {
+    if (!header || typeof header !== 'object' || Array.isArray(header)) {
+        fail('locker.bad_envelope', 'The envelope header is not an object');
+    }
+    if (header.version !== VERSION) fail('locker.bad_envelope', 'This envelope is another version');
+    if (header.suite !== SUITE) fail('locker.bad_envelope', 'This envelope uses another suite');
+    if (header.chunk_size !== CHUNK_SIZE) fail('locker.bad_envelope', 'This envelope uses another chunk size');
+    if (!Number.isInteger(header.padded_size) || header.padded_size <= 0
+        || header.padded_size % CHUNK_SIZE !== 0) {
+        fail('locker.bad_envelope', 'The padded size is not a whole number of chunks');
+    }
+    if (!['people', 'password', 'link'].includes(header.lock)) {
+        fail('locker.bad_envelope', 'The lock is not one we know');
+    }
+    if (!header.slots || typeof header.slots !== 'object') {
+        fail('locker.bad_envelope', 'The envelope has no slots');
+    }
+    return header;
+}
+
 /** The content key out of the header, with the credentials the reader has. */
 async function openContentKey(header, credentials = {}) {
     if (header.lock === 'people') {
@@ -1724,6 +1749,7 @@ async function openContentKey(header, credentials = {}) {
     }
     if (header.lock === 'password') {
         if (!credentials.password) fail('locker.no_key', 'A password lock needs the password');
+        if (!header.slots.password) fail('locker.bad_envelope', 'The envelope has no password slot');
         return unwrapPasswordSlot(header.slots.password, credentials.password);
     }
     if (!credentials.key) fail('locker.no_key', 'A link lock needs the key from the link');
@@ -1752,7 +1778,11 @@ async function importPrivateKey(key) {
     if (!key) return null;
     if (key.type === 'private' && key.algorithm && key.algorithm.name === 'ECDH') return key;
     if (key.kty === 'EC' && key.crv === 'P-256' && key.d) {
-        return subtle().importKey('jwk', key, { name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+        try {
+            return await subtle().importKey('jwk', key, { name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveBits']);
+        } catch {
+            fail('locker.invalid', 'The private key is not a P-256 key');
+        }
     }
     fail('locker.invalid', 'The private key must be an ECDH P-256 key');
 }
@@ -1822,6 +1852,11 @@ async function* openPieces(reader, header, key) {
         }
         if (counter >= expected) fail('locker.bad_envelope', 'The envelope has more chunks than its size says');
         const cipherLength = readU32be(lengthBytes, 0);
+        // The length is checked before it is used: a header that claims a huge chunk must not
+        // make the reader wait for it.
+        if (cipherLength !== CHUNK_SIZE + TAG_SIZE) {
+            fail('locker.bad_envelope', 'A chunk is not the size the envelope says');
+        }
         const flags = (await reader.take(1))[0];
         const nonce = await reader.take(12);
         const ciphertext = await reader.take(cipherLength);
@@ -1832,9 +1867,6 @@ async function* openPieces(reader, header, key) {
         const wanted = chunkNonce(nonceBase, counter);
         for (let i = 0; i < wanted.length; i++) {
             if (nonce[i] !== wanted[i]) fail('locker.bad_envelope', 'A chunk carries the wrong nonce');
-        }
-        if (ciphertext.length !== CHUNK_SIZE + 16) {
-            fail('locker.bad_envelope', 'A chunk is not the size the envelope says');
         }
         let plain;
         try {
@@ -1875,6 +1907,7 @@ async function* openPieces(reader, header, key) {
 async function open(envelope, credentials = {}) {
     const bytes = envelopeBytes(envelope);
     const { header, chunkOffset } = readHeader(bytes);
+    readCore(header);
     const contentKey = await openContentKey(header, credentials);
     const key = await importContentKey(contentKey, ['decrypt']);
     const reader = arrayReader(bytes.subarray(chunkOffset));
@@ -1936,6 +1969,7 @@ function openStream(stream, credentials = {}) {
         let header;
         try { header = JSON.parse(fromUtf8(headerBytes)); }
         catch { fail('locker.bad_envelope', 'The envelope header is not JSON'); }
+        readCore(header);
         const contentKey = await openContentKey(header, credentials);
         const key = await importContentKey(contentKey, ['decrypt']);
         yield* openPieces(reader, header, key);
@@ -1964,6 +1998,7 @@ async function rewrap(envelope, { add = [], remove = [], credentials = {}, rando
     const bytes = envelopeBytes(envelope);
     const { header, chunkOffset } = readHeader(bytes);
     if (header.lock !== 'people') fail('locker.invalid', 'Only a people-locked envelope can be re-wrapped');
+    readCore(header);
     const contentKey = await openContentKey(header, credentials);
     const gone = new Set(remove.map(who => (typeof who === 'string' ? who : who.id)));
     const people = (header.slots.people || []).filter(slot => !gone.has(slot.subject.id));
@@ -1989,7 +2024,7 @@ async function rewrap(envelope, { add = [], remove = [], credentials = {}, rando
 
 module.exports = {
     seal, open, sealStream, openStream, rewrap,
-    envelopeBytes, toBytes, openContentKey, prepare, makeHeader, Chunker,
+    envelopeBytes, toBytes, openContentKey, readCore, prepare, makeHeader, Chunker,
 };
 },
 // ── 17: src/registry.js ─────────────────────────────────────────────
