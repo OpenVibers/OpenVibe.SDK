@@ -1,6 +1,6 @@
 # Network-wide sharing (Node)
 
-`openvibe-sdk/share` implements the 2026-11-06 sharing design in each service's PostgreSQL database. The service is the authority. The module never reads titles, content or media URLs. Contracts is temporarily pinned to `feat/sharing-core-contracts` (0.291.0), pending the orchestrator's release and repin. Both core PRs require Opus's line-by-line security review before adoption.
+`openvibe-sdk/share` implements the 2026-11-06 sharing design in each service's PostgreSQL database. The service is the authority. The module never reads titles, content or media URLs. It uses openvibe-contracts v0.291.0 (share.v1).
 
 ```js
 const { createShares, sharesSchema, shareOpenApi } = require('openvibe-sdk/share');
