@@ -451,6 +451,27 @@ run([
         }), 'locker.invalid');
     }],
 
+    ['a caller that holds the content key needs no private key', async () => {
+        const contentKey = new Uint8Array(32).fill(9);
+        const sealed = await locker.seal('a note', {
+            lock: 'people',
+            keys: [{ subject: A, publicKey: alice.ecdhPublic }],
+            contentKey,
+        });
+        // An agent that sealed the item kept its key: it can open it, or re-seal it for the people who
+        // stay, without the private key of a recipient.
+        assert.equal(decoder.decode(await locker.open(sealed, { contentKey })), 'a note');
+        const again = await locker.rewrap(sealed, {
+            remove: [B],
+            keys: [{ subject: A, publicKey: alice.ecdhPublic }],
+            credentials: { contentKey },
+        });
+        assert.equal(decoder.decode(await locker.open(again, { privateKey: alice.ecdh.privateKey, subject: A })), 'a note');
+        // The re-seal made a new content key: the one the caller kept opens the old envelope only.
+        await assert.rejects(() => locker.open(again, { contentKey }), (err) => err.code === 'locker.wrong_key');
+        await fails(() => locker.open(sealed, { contentKey: new Uint8Array(31) }), 'locker.invalid');
+    }],
+
     ['every seal makes a new key and a new nonce base', async () => {
         const one = await locker.seal('the same note', { lock: 'password', password: 'x' });
         const two = await locker.seal('the same note', { lock: 'password', password: 'x' });

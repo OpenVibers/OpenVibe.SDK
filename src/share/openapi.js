@@ -5,9 +5,11 @@ function shareOpenApi() {
     const response = name => ({ description: 'Sharing result (ids and access metadata only)', content: { 'application/json': { schema: schema(name) } } });
     const op = (id, result, request, status = '200') => ({ operationId: id, security: [{ bearerAuth: [] }],
         ...(request ? { requestBody: { required: true, content: { 'application/json': { schema: schema(request) } } } } : {}),
-        responses: { [status]: response(result), '400': { description: 'Invalid request or unknown exact name' }, '403': { description: 'Cross-site write refused (share.csrf)' },
-            '404': { description: 'Not found (also unauthorized, no resource metadata)' }, '409': { description: 'Inactive or conflicting transfer' },
-            '412': { description: 'If-Match revision is stale' }, '429': { description: 'Name lookup rate limit' } } });
+        responses: { [status]: response(result), '400': { description: 'Invalid request or unknown exact name (also share.slot_required, share.reseal_required, share.reseal_invalid, share.lock_public)' },
+            '403': { description: 'Cross-site write refused (share.csrf)' },
+            '404': { description: 'Not found (also unauthorized, no resource metadata)' },
+            '409': { description: 'Inactive or conflicting transfer, a member key that changed (share.key_changed), a member with no locker key (share.no_key), a fixed lock (share.lock_fixed) or no re-seal storage (share.reseal_unavailable)' },
+            '412': { description: 'If-Match revision is stale' }, '413': { description: 'Request too large (share.too_large)' }, '429': { description: 'Name lookup rate limit' } } });
     const parameters = ['kind', 'id'].map(name => ({ in: 'path', name, required: true, schema: { type: 'string' } }));
     const base = '/api/v1/{kind}/{id}/share';
     const paths = {

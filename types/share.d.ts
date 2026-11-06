@@ -3,22 +3,37 @@ import type { SubjectRef } from './contracts';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 export type Audience = 'public' | 'link' | 'people' | 'private';
 export type Role = 'viewer' | 'editor';
+/** How an item is sealed (Locker). `none` is stored as it is. */
+export type Lock = 'none' | 'people' | 'password' | 'link';
 export interface ResourceRef { service: string; kind: string; id: string }
 /** Trusted output of service authentication. Never constructed from a request body. */
 export interface Viewer { subject: SubjectRef; staff?: boolean }
-export type MemberInput = ({ name: string; subject?: never } | { subject: SubjectRef; name?: never }) & { role: Role; expires_at?: string };
-export interface Member { subject: SubjectRef; role: Role; expires_at?: string; added_by: SubjectRef; added_at: string }
+/** The content key wrapped for one person (locker.people-slot@1). The server stores it, never opens it. */
+export interface PeopleSlot {
+    subject: SubjectRef;
+    algorithm: 'ECDH-P256/HKDF-SHA256/AES-256-GCM';
+    /** The RFC 7638 thumbprint of the recipient's ECDH key: what the store checks against the key directory. */
+    recipient_key: string;
+    ephemeral_public_key: { kty: 'EC'; crv: 'P-256'; x: string; y: string };
+    salt: string;
+    nonce: string;
+    wrapped_key: string;
+}
+export type MemberInput = ({ name: string; subject?: never } | { subject: SubjectRef; name?: never }) & { role: Role; expires_at?: string; key_slot?: PeopleSlot };
+export interface Member { subject: SubjectRef; role: Role; expires_at?: string; added_by: SubjectRef; added_at: string; key_slot?: PeopleSlot }
+/** What the owner of a people-locked item sees per member: their current fingerprint, and whether it changed. */
+export interface MemberKeyInfo { key_fingerprint?: string | null; fingerprint_changed?: boolean }
 /** Network's public projection of a person. An unknown subject has a null username. */
 export interface Person { subject: SubjectRef; username: string | null; display_name: string | null; avatar_url: string | null }
 export interface You { subject: SubjectRef; role: 'owner' | 'staff' }
 export interface AccessRequestView extends Person { id: string; requested_at: string }
 export interface Transfer { id: string; from: SubjectRef; to: SubjectRef; keep_access: boolean; requested_at: string; expires_at: string; state: 'pending' | 'accepted' | 'declined' | 'cancelled' | 'expired' }
 export interface TransferView extends Omit<Transfer, 'to'> { to: Person }
-export interface Share { ref: ResourceRef; owner_subject: SubjectRef; audience: Audience; members: Member[]; transfer?: Transfer }
+export interface Share { ref: ResourceRef; owner_subject: SubjectRef; audience: Audience; lock: Lock; members: Member[]; transfer?: Transfer }
 /** The store's enriched share: people in place of bare subjects, the caller's role and pending requests. */
 export interface ShareView extends Omit<Share, 'members' | 'transfer'> {
     owner: Person;
-    members: Array<Member & Person>;
+    members: Array<Member & Person & MemberKeyInfo>;
     transfer?: TransferView;
     you: You;
     requests: AccessRequestView[];
@@ -44,13 +59,19 @@ export interface ShareOptions {
     /** Transactional hooks: write local resource/media state through tx; never external I/O. */
     onOwnerChange?(ref: ResourceRef, from: SubjectRef, to: SubjectRef, tx: Tx): Promise<unknown>;
     onAudienceChange?(ref: ResourceRef, audience: Audience, tx: Tx): Promise<unknown>;
+    /**
+     * Stores a re-sealed envelope (a `locker.envelope@1` for the people who stay) when somebody is
+     * removed from a people-locked item. Called inside the transaction, before the member row goes.
+     * A service that allows people locks must pass it; otherwise a removal answers 409 share.reseal_unavailable.
+     */
+    onReseal?(ref: ResourceRef, envelope: Uint8Array, tx: Tx): Promise<unknown>;
     now?(): number;
     nameLimit?: number;
     nameWindowMs?: number;
 }
 export interface Shares {
     migrate(): Promise<void>;
-    register(ref: ResourceRef, input: { owner_subject: SubjectRef; audience?: Audience }): Promise<Share>;
+    register(ref: ResourceRef, input: { owner_subject: SubjectRef; audience?: Audience; lock?: Lock }): Promise<Share>;
     canView(viewer: Viewer | null, ref: ResourceRef): Promise<boolean>;
     canEdit(viewer: Viewer | null, ref: ResourceRef): Promise<boolean>;
     get(viewer: Viewer, ref: ResourceRef): Promise<ShareView>;
@@ -59,13 +80,14 @@ export interface Shares {
     present(viewer: Viewer, ref: ResourceRef, share: Share): Promise<ShareView>;
     /** Exact @name → person (null when unknown, banned or deleted), on the same rate-limit budget as resolve(). */
     lookup(viewer: Viewer, name: string): Promise<PeopleLookup>;
-    update(viewer: Viewer, ref: ResourceRef, input: { audience?: Audience; members?: MemberInput[]; notify?: boolean }, options?: { ifMatch?: string }): Promise<Share>;
+    update(viewer: Viewer, ref: ResourceRef, input: { audience?: Audience; members?: MemberInput[]; notify?: boolean; lock?: Lock; envelope?: string }, options?: { ifMatch?: string }): Promise<Share>;
     setAudience(viewer: Viewer, ref: ResourceRef, audience: Audience): Promise<Share>;
     addMembers(viewer: Viewer, ref: ResourceRef, members: Array<MemberInput | SubjectRef | string>): Promise<Share>;
-    removeMember(viewer: Viewer, ref: ResourceRef, subject: SubjectRef): Promise<Share>;
+    /** On a people-locked item, `envelope` is required: the content re-sealed for those who stay. */
+    removeMember(viewer: Viewer, ref: ResourceRef, subject: SubjectRef, options?: { envelope?: string }): Promise<Share>;
     requestAccess(viewer: Viewer, ref: ResourceRef): Promise<AccessRequest>;
     dismiss(viewer: Viewer, ref: ResourceRef, requestId: string): Promise<Share>;
-    transfer(viewer: Viewer, ref: ResourceRef, input: { to: SubjectRef | string | { subject: SubjectRef } | { name: string }; keep_access?: boolean }): Promise<Transfer>;
+    transfer(viewer: Viewer, ref: ResourceRef, input: { to: SubjectRef | string | { subject: SubjectRef } | { name: string }; keep_access?: boolean; key_slot?: PeopleSlot }): Promise<Transfer>;
     accept(viewer: Viewer, ref: ResourceRef, transferId: string): Promise<Transfer>;
     decline(viewer: Viewer, ref: ResourceRef, transferId: string): Promise<Transfer>;
     cancel(viewer: Viewer, ref: ResourceRef, transferId: string): Promise<Transfer>;
@@ -80,17 +102,26 @@ export function migrateShares(db: Db): Promise<void>;
 export class ShareError extends Error { status: number; code: string; constructor(status: number, code: string, message: string) }
 export interface ShareResourceClient {
     get(): Promise<ShareResponse>;
-    update(input: { audience?: Audience; members?: MemberInput[]; notify?: boolean }, options?: { ifMatch?: string }): Promise<ShareResponse>;
+    update(input: { audience?: Audience; members?: MemberInput[]; notify?: boolean; lock?: Lock; envelope?: string }, options?: { ifMatch?: string }): Promise<ShareResponse>;
     setAudience(audience: Audience): Promise<ShareResponse>;
     add(target: string | SubjectRef, options?: { role?: Role; expires_at?: string }): Promise<ShareResponse>;
     remove(subject: SubjectRef): Promise<ShareResponse>;
+    /** A people-locked item: looks up their key, wraps the content key for it, saves the member and the slot. */
+    addLocked(target: string | SubjectRef, options: { contentKey: Uint8Array | string; role?: Role; expires_at?: string }): Promise<ShareResponse>;
+    /**
+     * A people-locked item: removes a member with a re-seal. With `contentKey`, `envelope` is the item's
+     * current envelope, opened and sealed again for the people who stay (the owner keeps their slot);
+     * without it, `envelope` is the envelope already re-sealed. `keys` ({ subject, publicKey }[]) skips
+     * the key-directory lookups.
+     */
+    removeLocked(target: string | SubjectRef, options: { contentKey?: Uint8Array | string; envelope?: Uint8Array | { bytes: Uint8Array }; keys?: Array<{ subject: SubjectRef; publicKey: unknown }> }): Promise<ShareResponse>;
     requestAccess(): Promise<AccessRequest>;
     dismiss(requestId: string): Promise<ShareResponse>;
-    transfer(to: string | SubjectRef, options?: { keep_access?: boolean }): Promise<Transfer | ShareResponse>;
+    transfer(to: string | SubjectRef, options?: { keep_access?: boolean; key_slot?: PeopleSlot }): Promise<Transfer | ShareResponse>;
     accept(transferId: string): Promise<Transfer>;
     decline(transferId: string): Promise<Transfer>;
     cancel(transferId: string): Promise<ShareResponse>;
 }
-export function share(options: { base: string; token?: string; fetch?: typeof globalThis.fetch }): { for(kind: string, id: string): ShareResourceClient; sharedWithMe(options?: { limit?: number; cursor?: string }): Promise<ShareList>; people(name: string): Promise<PeopleLookup> };
+export function share(options: { base: string; token?: string; fetch?: typeof globalThis.fetch; /** Where the key directory is; defaults to https://openvibe.network. */ network?: string }): { for(kind: string, id: string): ShareResourceClient; sharedWithMe(options?: { limit?: number; cursor?: string }): Promise<ShareList>; people(name: string): Promise<PeopleLookup> };
 export const createShareClient: typeof share;
 export function shareOpenApi(): { openapi: string; info: { title: string; version: string }; paths: Record<string, unknown>; components: Record<string, unknown> };
