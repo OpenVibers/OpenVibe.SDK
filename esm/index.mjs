@@ -4,14 +4,14 @@ import cjs from '../index.js';
 export const {
     createClient, OpenVibeError, isOpenVibeError, paginate, offsetPager, parseTraceparent,
     startSpan, contextFromHeaders, ulid, newEventId, newIdempotencyKey, isActingSubjectId,
-    satisfiesRange, compareVersions, CONTRACTS_RANGE, DEFAULT_NETWORK, SDK_VERSION, auth,
-    registry, identity, modules, events, realtime, media,
-    community, bot, search, bench, meme, vision,
-    themes, redact, chat, ai, jobs, tools,
-    projects, resources, vip, quest, live, inventory,
-    tips, blog, reviews, wiki, coupons, deals,
-    trade, space, host, news, food, actor,
-    run, video, work, zone, play, download,
-    openre, geo, usage, commerce, telemetry,
+    satisfiesRange, compareVersions, CONTRACTS_RANGE, DEFAULT_NETWORK, SDK_VERSION, share,
+    auth, registry, identity, modules, events, realtime,
+    media, community, bot, search, bench, meme,
+    vision, themes, redact, chat, ai, jobs,
+    tools, projects, resources, vip, quest, live,
+    inventory, tips, blog, reviews, wiki, coupons,
+    deals, trade, space, host, news, food,
+    actor, run, video, work, zone, play,
+    download, openre, geo, usage, commerce, telemetry,
 } = cjs;
 export default cjs;

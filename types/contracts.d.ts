@@ -1,4 +1,4 @@
-/* Copied verbatim from openvibe-contracts v0.289.1 generated/typescript/index.d.ts (the SDK does not
+/* Copied verbatim from openvibe-contracts feat/sharing-core-contracts (0.291.0) generated/typescript/index.d.ts (the SDK does not
  * require the package at runtime; it is a devDependency for the tests). test/types.test.js checks
  * these against it. */
 /* eslint-disable */
