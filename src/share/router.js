@@ -1,5 +1,6 @@
 'use strict';
 const v = require('./validation');
+const { MAX_ENVELOPE_BYTES } = v;
 function send(res, status, body, headers = {}) {
     res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store', Vary: 'Authorization, Cookie', ...headers });
     res.end(JSON.stringify(body));
@@ -7,16 +8,25 @@ function send(res, status, body, headers = {}) {
 async function body(req) {
     if (!(req.headers['content-type'] || '').toLowerCase().startsWith('application/json')) v.fail(415, 'share.json_required', 'JSON required');
     if (req.body !== undefined) {
-        if (Buffer.byteLength(JSON.stringify(req.body)) > 65536) v.fail(413, 'share.too_large', 'Request too large');
+        if (Buffer.byteLength(JSON.stringify(req.body)) > MAX_BODY(req.body)) v.fail(413, 'share.too_large', 'Request too large');
         return req.body;
     }
     const chunks = []; let size = 0;
+    // A save may carry a re-sealed envelope, so it may be larger than an ACL edit; nothing else may.
     for await (const chunk of req) {
         size += chunk.length;
-        if (size > 65536) v.fail(413, 'share.too_large', 'Request too large');
+        if (size > MAX_ENVELOPE_BYTES + 65536) v.fail(413, 'share.too_large', 'Request too large');
         chunks.push(chunk);
     }
-    try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { v.invalid(); }
+    const raw = Buffer.concat(chunks);
+    let parsed;
+    try { parsed = JSON.parse(raw.toString('utf8')); } catch { v.invalid(); }
+    if (raw.length > MAX_BODY(parsed)) v.fail(413, 'share.too_large', 'Request too large');
+    return parsed;
+}
+/** 64 KiB, unless the save carries a re-sealed envelope (bounded by v.envelope). */
+function MAX_BODY(json) {
+    return json && typeof json.envelope === 'string' ? MAX_ENVELOPE_BYTES + 65536 : 65536;
 }
 /**
  * Node/Express middleware. authenticate must use verified server credentials. describe(ref) may add { title, link,
@@ -60,7 +70,10 @@ function router(shares, { service, authenticate, describe, csrf } = {}) {
             const ref = v.ref({ service, kind, id }), rest = match[3];
             const view = async (status = 200) => {
                 const result = await shares.getWithRevision(viewer, ref);
-                return send(res, status, { ...result.value, ...(await detail(ref)) }, { ETag: result.etag });
+                const extra = await detail(ref);
+                // How an item is sealed is the store's to answer, never a service's describe().
+                delete extra.lock;
+                return send(res, status, { ...result.value, ...extra, lock: result.value.lock }, { ETag: result.etag });
             };
             if (!rest && req.method === 'GET') return await view();
             if (!rest && req.method === 'PUT') { await shares.update(viewer, ref, await body(req), { ifMatch: req.headers['if-match'] }); return await view(); }
@@ -74,7 +87,7 @@ function router(shares, { service, authenticate, describe, csrf } = {}) {
                 await shares.dismiss(viewer, ref, requestId);
                 return await view();
             }
-            if (rest === 'transfer') { v.object(input, ['to', 'keep_access']); await shares.transfer(viewer, ref, input); return await view(201); }
+            if (rest === 'transfer') { v.object(input, ['to', 'keep_access', 'key_slot']); await shares.transfer(viewer, ref, input); return await view(201); }
             const answer = rest.match(/^transfer\/(accept|decline|cancel)$/);
             if (answer) {
                 v.object(input, ['transfer_id']); v.uuid(input.transfer_id);

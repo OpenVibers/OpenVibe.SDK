@@ -1,4 +1,5 @@
 'use strict';
+const { peopleSlotOk } = require('../locker/server');
 class ShareError extends Error {
     constructor(status, code, message) { super(message); this.name = 'ShareError'; this.status = status; this.code = code; }
 }
@@ -24,6 +25,23 @@ function ref(v) {
     return { service: v.service, kind: v.kind, id: v.id };
 }
 function audience(v) { if (!['public', 'link', 'people', 'private'].includes(v)) invalid(); return v; }
+const LOCKS = ['none', 'people', 'password', 'link'];
+function lock(v) { if (!LOCKS.includes(v)) invalid(); return v; }
+/** A people slot: the shape, and the subject it names. The key check needs Network, so the store does it. */
+function keySlot(v) {
+    if (!peopleSlotOk(v) || Object.keys(v).some(k => !['subject', 'algorithm', 'recipient_key', 'ephemeral_public_key', 'salt', 'nonce', 'wrapped_key'].includes(k))) invalid();
+    return { ...v, subject: subject(v.subject) };
+}
+/** The largest re-sealed envelope a save may carry: a whole content chunk plus room for its header. */
+const MAX_ENVELOPE_BYTES = 8 * 1024 * 1024;
+/** A base64 locker.envelope@1, as bytes. Its header is checked by the caller, which knows the lock. */
+function envelope(v) {
+    if (typeof v !== 'string' || !v.length || v.length > Math.ceil(MAX_ENVELOPE_BYTES / 3) * 4
+        || !/^[A-Za-z0-9+/]+={0,2}$/.test(v)) invalid();
+    const bytes = Buffer.from(v, 'base64');
+    if (!bytes.length || bytes.length > MAX_ENVELOPE_BYTES) invalid();
+    return bytes;
+}
 function actor(viewer) { if (!viewer || !viewer.subject) hidden(); return subject(viewer.subject); }
 function equal(a, b) { return !!a && !!b && a.type === b.type && a.id === b.id; }
 function name(v) { if (typeof v !== 'string' || !/^@?[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}$/.test(v)) invalid(); return v.replace(/^@/, ''); }
@@ -39,4 +57,4 @@ function expiry(v, now) {
     if (month < 1 || month > 12 || day < 1 || day > days[month - 1] || hour > 23 || minute > 59 || second > 59) invalid();
     return new Date(v).toISOString();
 }
-module.exports = { ShareError, fail, invalid, hidden, object, subject, ref, audience, actor, equal, name, uuid, expiry };
+module.exports = { ShareError, fail, invalid, hidden, object, subject, ref, audience, actor, equal, name, uuid, expiry, lock, LOCKS, keySlot, envelope, MAX_ENVELOPE_BYTES };

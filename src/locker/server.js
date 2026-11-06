@@ -153,4 +153,4 @@ function inspectEnvelope(bytes, { maxHeaderBytes = MAX_HEADER_BYTES } = {}) {
     };
 }
 
-module.exports = { inspectEnvelope, checkHeader };
+module.exports = { inspectEnvelope, checkHeader, peopleSlotOk };

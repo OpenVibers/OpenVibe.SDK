@@ -232,6 +232,15 @@ function readCore(header) {
 
 /** The content key out of the header, with the credentials the reader has. */
 async function openContentKey(header, credentials = {}) {
+    // A caller that still holds the content key needs no private key: an agent that sealed the item
+    // can open it, or wrap it for the people who stay, with the key it kept. A string is base64url,
+    // as the link key travels.
+    if (credentials.contentKey) {
+        const given = typeof credentials.contentKey === 'string'
+            ? fromBase64url(credentials.contentKey) : toBytes(credentials.contentKey);
+        if (given.length !== KEY_BYTES) fail('locker.invalid', 'The content key is 32 bytes');
+        return given;
+    }
     if (header.lock === 'people') {
         // A person may be named by their key instead of their subject: the slot says which key
         // it is for, so the reader does not need to know who they are.
