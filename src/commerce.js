@@ -116,11 +116,11 @@ function createCommerceClient(config, { caps, fetchImpl = globalThis.fetch, toke
             body: { subscriber: user(subscriber), streamer: user(creator), source: 'credit', auto_renew: autoRenew !== false, ...(tier != null ? { tier } : {}) },
             key, traceparent, headers,
         }),
-        cancelSubscription: async ({ id, key, traceparent }) => await call('subscription', 'POST', `/api/v1/subscriptions/${encodeURIComponent(id)}/cancel`, { body: {}, key, traceparent }),
-        getSubscription: async (id) => await call('entitlement', 'GET', `/api/v1/subscriptions/${encodeURIComponent(id)}`),
-        listSubscriptions: async ({ streamer, subscriber, status } = {}) => await call('entitlement', 'GET', `/api/v1/subscriptions${qs({ streamer, subscriber, status })}`),
+        cancelSubscription: async ({ id, key, traceparent, headers }) => await call('subscription', 'POST', `/api/v1/subscriptions/${encodeURIComponent(id)}/cancel`, { body: {}, key, traceparent, headers }),
+        getSubscription: async (id, { headers } = {}) => await call('entitlement', 'GET', `/api/v1/subscriptions/${encodeURIComponent(id)}`, { headers }),
+        listSubscriptions: async ({ streamer, subscriber, status } = {}, { headers } = {}) => await call('entitlement', 'GET', `/api/v1/subscriptions${qs({ streamer, subscriber, status })}`, { headers }),
         /** { active, expires_at, subscription }: the authoritative answer. */
-        entitlement: async (subject, creator) => await call('entitlement', 'GET', `/api/v1/entitlements/${encodeURIComponent(subject)}${qs({ streamer: creator })}`),
+        entitlement: async (subject, creator, { headers } = {}) => await call('entitlement', 'GET', `/api/v1/entitlements/${encodeURIComponent(subject)}${qs({ streamer: creator })}`, { headers }),
         rates: async () => await call(caps.rates ? 'rates' : 'entitlement', 'GET', '/api/v1/rates'),
         /** { streamer, tiers: [{ tier, price_cents, status }], default_price_cents, min_price_cents, max_price_cents, max_tiers }: Billing prices a creator's tiers. */
         listTiers: async (creator) => await call(caps.tier ? 'tier' : 'intent', 'GET', `/api/v1/tiers/${encodeURIComponent(creator)}`),

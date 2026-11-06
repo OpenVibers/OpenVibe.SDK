@@ -33,9 +33,9 @@ export type CommerceClient = {
     refundTransfer(a: { txnId: string; amount?: number; reason?: string; key?: string }): Promise<any>;
     subscribeWithCredit(a: { subscriber: string; creator: string; tier?: number; autoRenew?: boolean } & CommerceCall): Promise<any>;
     cancelSubscription(a: { id: string } & CommerceCall): Promise<any>;
-    getSubscription(id: string): Promise<any>;
-    listSubscriptions(a?: { streamer?: string; subscriber?: string; status?: string }): Promise<any>;
-    entitlement(subject: string, creator?: string): Promise<any>;
+    getSubscription(id: string, o?: { headers?: Record<string, string> }): Promise<any>;
+    listSubscriptions(a?: { streamer?: string; subscriber?: string; status?: string }, o?: { headers?: Record<string, string> }): Promise<any>;
+    entitlement(subject: string, creator?: string, o?: { headers?: Record<string, string> }): Promise<any>;
     rates(): Promise<any>;
     /** A creator's tier prices (Billing, contracts 0.201.0); uses caps.tier, else caps.intent. */
     listTiers(creator: string): Promise<{ streamer: { type: 'user'; id: string }; tiers: CommerceTier[]; default_price_cents: number; min_price_cents: number; max_price_cents: number; max_tiers: number }>;
