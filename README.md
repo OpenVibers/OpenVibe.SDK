@@ -564,9 +564,9 @@ Nothing at runtime. `openvibe-contracts` and `@electric-sql/pglite` are devDepen
 Part of the [OpenVibe network](https://openvibe.network). Built in the open by [OpenVibers](https://github.com/OpenVibers).
 
 <!-- versions:start -->
-- openvibe-contracts: feat/sharing-core-contracts (0.291.0, temporary branch pin)
+- openvibe-contracts: v0.291.0
 <!-- versions:end -->
 
 ### Network-wide sharing (Node)
 
-`openvibe-sdk/share` provides local access enforcement, expiring memberships and confirmed ownership transfer. See [the sharing module](docs/share.md) for integration, API signatures, migrations and the uniform OpenAPI fragment. Agents use `require('openvibe-sdk').share({ base, token }).for('paste', id)`. Contracts is temporarily pinned to the `feat/sharing-core-contracts` branch; the orchestrator will repin after its release.
+`openvibe-sdk/share` provides local access enforcement, expiring memberships and confirmed ownership transfer. See [the sharing module](docs/share.md) for integration, API signatures, migrations and the uniform OpenAPI fragment. Agents use `require('openvibe-sdk').share({ base, token }).for('paste', id)`.

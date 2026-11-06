@@ -7,7 +7,7 @@
   "plan": "OpenVibe End-to-End Realignment & Implementation Plan, revision 3 (20 Sep 2026), \u00a73.2; roadmap \u00a730",
   "deployed": false,
   "deployment": "none: a package released as git tags; services and apps pin a tag",
-  "contracts": "openvibe-contracts feat/sharing-core-contracts (temporary branch pin; repin after orchestrator releases Contracts 0.291.0)",
+  "contracts": "openvibe-contracts v0.291.0",
   "features": [
     "share (openvibe-sdk/share): transactional local sharing, audience and membership checks, exact-name resolution, recipient-bound ownership transfers, audit, durable events/notifications, uniform API and agent client",
     "redact (openvibe-sdk/redact): the shared secret scrubber for memory, the same shapes and corpus as OpenVibe.Node's internal/memory/redact.go (redact, onlySecret)",
