@@ -119,7 +119,8 @@ const test = (name, fn) => tests.push([name, fn]);
         const slot = await slotFor(X.id);
         const kept = KEYS[X.id]; delete KEYS[X.id];
         try { await bad(async () => shares.addMembers(owner, ref, [{ subject: X, role: 'viewer', key_slot: slot }]), 409, 'share.no_key'); }
-        finally { KEYS[X.id] = kept; }
+        // The miss is cached for a minute like a hit; let it expire so the next test sees the key again.
+        finally { KEYS[X.id] = kept; time += 61000; }
     });
 
     test('removing somebody is a re-seal refused without an envelope and stored before the member goes', async () => {
@@ -153,6 +154,36 @@ const test = (name, fn) => tests.push([name, fn]);
         // The envelope as it was: still holds V's slot.
         await bad(async () => shares.update(owner, ref, { members: [], envelope: base64((await sealedFor([U.id, V.id])).bytes) }), 400, 'share.reseal_invalid');
         assert.equal((await shares.get(owner, ref)).members.length, 1);
+    });
+
+    test('a re-seal must be fresh: the envelope already stored is refused', async () => {
+        const ref = await fresh();
+        await shares.addMembers(owner, ref, [{ subject: V, role: 'viewer', key_slot: await slotFor(V.id) }]);
+        const first = await sealedFor([U.id]);
+        await shares.update(owner, ref, { members: [], envelope: base64(first.bytes) });
+        // Somebody comes back, and the caller sends the envelope that is already stored: the content key
+        // is the one the item had before, so the re-seal proves nothing.
+        await shares.addMembers(owner, ref, [{ subject: V, role: 'viewer', key_slot: await slotFor(V.id) }]);
+        await bad(async () => shares.update(owner, ref, { members: [], envelope: base64(first.bytes) }), 400, 'share.reseal_not_fresh');
+        assert.equal((await shares.get(owner, ref)).members.length, 1);
+        // A new seal has a new nonce base, and it goes through.
+        const second = await sealedFor([U.id]);
+        assert.notEqual(second.header.nonce_base, first.header.nonce_base);
+        assert.equal((await shares.update(owner, ref, { members: [], envelope: base64(second.bytes) })).members.length, 0);
+    });
+
+    test('a re-seal that wraps the old content key for a member who stays is refused', async () => {
+        const ref = await fresh();
+        // The stored envelope, and the member's slot is the one inside it (a member added for that very seal).
+        const env = await sealedFor([U.id, V.id]);
+        const fromEnvelope = env.header.slots.people.find(slot => slot.subject.id === V.id);
+        await shares.addMembers(owner, ref, [{ subject: V, role: 'viewer', key_slot: fromEnvelope }]);
+        await shares.addMembers(owner, ref, [{ subject: X, role: 'viewer', key_slot: await slotFor(X.id) }]);
+        // A member with no stored slot (what keep_access leaves) can go without a leaver-slot check, so the
+        // only thing left to catch is the wrap V keeps.
+        await db.exec("UPDATE share_members SET key_slot=NULL WHERE service='community' AND kind='paste' AND resource_id=$1 AND subject->>'id'=$2", [ref.id, X.id]);
+        await bad(async () => shares.update(owner, ref, { members: [{ subject: V, role: 'viewer', key_slot: fromEnvelope }], envelope: base64(env.bytes) }), 400, 'share.reseal_not_fresh');
+        assert.equal((await shares.get(owner, ref)).members.length, 2);
     });
 
     test('a transfer of a people-locked item needs the recipient\'s slot and drops the old owner', async () => {

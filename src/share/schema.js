@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS shares (
     owner_subject jsonb NOT NULL, audience text NOT NULL CHECK (audience IN ('public','link','people','private')),
     revision integer NOT NULL DEFAULT 1,
     lock text NOT NULL DEFAULT 'none',
+    reseal_nonce_base text,
     PRIMARY KEY (service, kind, resource_id)
 );
 CREATE TABLE IF NOT EXISTS share_members (
@@ -65,6 +66,7 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 ALTER TABLE share_members ADD COLUMN IF NOT EXISTS key_slot jsonb;
 ALTER TABLE share_transfers ADD COLUMN IF NOT EXISTS key_slot jsonb;
+ALTER TABLE shares ADD COLUMN IF NOT EXISTS reseal_nonce_base text;
 `;
 }
 async function migrateShares(db) { await db.tx(async (t) => { await t.exec(sharesSchema()); }); }

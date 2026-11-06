@@ -197,14 +197,36 @@ function createShares({ db, network, events, notify, onOwnerChange, onAudienceCh
     async function reseal(t, ref, s, bytes, actor, gone) {
         if (s.lock !== 'people') v.fail(400, 'share.reseal_invalid', 'Only a people-locked item is re-sealed');
         if (typeof onReseal !== 'function') v.fail(409, 'share.reseal_unavailable', 'This service cannot store a re-sealed envelope');
+        const read = inspectEnvelope(bytes);
+        // Every seal writes a new nonce base, and a re-seal wraps a new content key. The nonce base the
+        // envelope already stored is the one to beat: the same value is that envelope sent again, and the
+        // member who is leaving could still open what is served next.
+        if (gone.length && s.reseal_nonce_base && read.header.nonce_base === s.reseal_nonce_base) {
+            v.fail(400, 'share.reseal_not_fresh', 'That is the envelope already stored; seal the content again with a new key');
+        }
+        // A wrap is randomised every time, so a slot that is byte for byte the stored one means the old
+        // key, still wrapped for the same person, came back.
+        if (gone.length) {
+            const people = new Map(read.header.slots.people.map(slot => [personKey(slot.subject), slot]));
+            const staying = await t.many(`SELECT subject, key_slot FROM share_members WHERE ${where} AND key_slot IS NOT NULL`, key(ref));
+            for (const m of staying) {
+                if (gone.some(g => v.equal(g.subject, m.subject))) continue;
+                const slot = people.get(personKey(m.subject));
+                if (slot && slot.salt === m.key_slot.salt && slot.nonce === m.key_slot.nonce && slot.wrapped_key === m.key_slot.wrapped_key) {
+                    v.fail(400, 'share.reseal_not_fresh', 'The re-sealed envelope still wraps the old content key for a member who stays');
+                }
+            }
+        }
         // The point of a re-seal is that the person leaving cannot open what they fetch next: their slot
         // has to be gone from the envelope, not only from the member table.
-        const recipients = new Set(inspectEnvelope(bytes).header.slots.people.map(slot => slot.recipient_key));
+        const recipients = new Set(read.header.slots.people.map(slot => slot.recipient_key));
         for (const m of gone) {
             const left = slotKey(m.key_slot);
             if (left && recipients.has(left)) v.fail(400, 'share.reseal_invalid', 'The re-sealed envelope still holds the slot of the member who is leaving');
         }
         await onReseal(ref, bytes, t);
+        await t.exec(`UPDATE shares SET reseal_nonce_base=$4 WHERE ${where}`, [...key(ref), read.header.nonce_base]);
+        s.reseal_nonce_base = read.header.nonce_base;
         await log(t, ref, actor, 'lock.resealed', { removed: gone.map(m => m.subject), bytes: bytes.length });
     }
     async function inputs(viewer, list, lock = 'none') {
