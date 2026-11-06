@@ -567,7 +567,7 @@ Nothing at runtime. `openvibe-contracts` and `@electric-sql/pglite` are devDepen
 Part of the [OpenVibe network](https://openvibe.network). Built in the open by [OpenVibers](https://github.com/OpenVibers).
 
 <!-- versions:start -->
-- openvibe-contracts: v0.292.0
+- openvibe-contracts: v0.297.0
 <!-- versions:end -->
 
 ### Network-wide sharing (Node)

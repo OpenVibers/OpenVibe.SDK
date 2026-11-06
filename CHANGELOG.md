@@ -10,6 +10,21 @@
   - The publish ticket is a bearer of its own: on the desk's routes (`state`, `postFrame`) the desk sends the ticket, never the person's token. Every body is checked in the module before it leaves, and a bad id, visibility, curtain reason or an oversized frame is refused with a TypeError.
   - The capability behind it is `live.agent_stream.publish` for the audience `openvibe.live` (Contracts 0.298.0): a Node principal acting for its owner, Codes or Actor. Never a developer-app token, never another person's stream.
 
+## 0.90.0 (2026-11-06)
+
+- **Subject assertions** (ADR-003, the 2026-11-06 amendment; plan H1). A money call carries a Network-signed
+  proof that the person allowed the calling service to act for them, beside the name of the person.
+  - `requestSubjectAssertion({ userToken, audience, token | tokenClient, network | internalUrl })` asks Network to
+    sign the person's own access token into a 60-second assertion for one audience (`openvibe.billing`). The
+    person's token is the only thing that can produce one: without it Network signs nothing.
+  - `verifySubjectAssertion(assertion, { jwks, audience, act, seen })` checks the ES256 signature against
+    Network's JWKS (the EC keys, cached like the RS256 ones), the audience, the expiry and the jti; a forged,
+    expired, wrong-audience or wrong-service assertion is refused with a stable code
+    (`assertion.bad_signature`, `assertion.expired`, `assertion.wrong_audience`, `assertion.actor_mismatch`, …).
+  - `createSubjectAssertionVerifier({ jwks, audience })` remembers the jtis it has seen, so a replayed assertion is
+    refused inside the replay window.
+  - `subjectAssertionHeader(assertion)` gives the `x-ov-subject-assertion` header for the call.
+
 ## 0.89.0 (2026-11-06)
 
 - Add `openvibe-sdk/exchange`: OpenVibe.Exchange, the buyer and the seller side of the model exchange (the plan of 2026-11-06, "For builders", item 7).
