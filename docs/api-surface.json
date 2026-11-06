@@ -399,6 +399,17 @@
     "createAppSignIn": "function",
     "normalizeScope": "function"
   },
+  "openvibe-sdk/assertions": {
+    "ASSERTION_HEADER": "string",
+    "ASSERTION_TTL_S": "number",
+    "CLOCK_SKEW_SEC": "number",
+    "REPLAY_WINDOW_MS": "number",
+    "createSubjectAssertionMinter": "function",
+    "createSubjectAssertionVerifier": "function",
+    "requestSubjectAssertion": "function",
+    "subjectAssertionHeader": "function",
+    "verifySubjectAssertion": "function"
+  },
   "openvibe-sdk/auth": {
     "TOKEN_VALID_AFTER": "string",
     "base64url": "function",

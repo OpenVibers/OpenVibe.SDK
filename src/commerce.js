@@ -73,10 +73,10 @@ function createCommerceClient(config, { caps, fetchImpl = globalThis.fetch, toke
         return clients.get(cap);
     };
 
-    async function call(logical, method, path, { body, key, traceparent, retried = false } = {}) {
+    async function call(logical, method, path, { body, key, traceparent, headers: extraHeaders, retried = false } = {}) {
         let auth;
         try { auth = await tokensFor(logical).authHeaders(); } catch (e) { throw new CommerceError(`token (${capFor(logical)}): ${e.message}`); }
-        const headers = { Accept: 'application/json', ...auth };
+        const headers = { Accept: 'application/json', ...auth, ...(extraHeaders || {}) };
         if (body !== undefined) headers['Content-Type'] = 'application/json';
         if (key) headers['Idempotency-Key'] = key;
         if (traceparent) headers.traceparent = traceparent;
@@ -86,7 +86,7 @@ function createCommerceClient(config, { caps, fetchImpl = globalThis.fetch, toke
         } catch (e) {
             throw new CommerceError(`Billing unreachable: ${e.message}`);
         }
-        if (res.status === 401 && !retried) { tokensFor(logical).invalidate(); return await call(logical, method, path, { body, key, traceparent, retried: true }); }
+        if (res.status === 401 && !retried) { tokensFor(logical).invalidate(); return await call(logical, method, path, { body, key, traceparent, headers: extraHeaders, retried: true }); }
         const data = await res.json().catch(() => null);
         if (!res.ok) {
             const code = (data && (data.code || data.error)) || `http_${res.status}`;
@@ -97,30 +97,30 @@ function createCommerceClient(config, { caps, fetchImpl = globalThis.fetch, toke
 
     return {
         /** { intent, checkout_url }: kind purchase buys `bits` of credit; kind subscription is a checkout for `subject` to `creator` (at `tier`'s price, 1 by default). */
-        createIntent: async ({ provider, kind = 'purchase', subject, bits, creator, tier, autoRenew, successUrl, cancelUrl, key, traceparent }) => await call('intent', 'POST', '/api/v1/intents', {
+        createIntent: async ({ provider, kind = 'purchase', subject, bits, creator, tier, autoRenew, successUrl, cancelUrl, key, traceparent, headers }) => await call('intent', 'POST', '/api/v1/intents', {
             body: {
                 provider, kind, subject: user(subject),
                 ...(kind === 'subscription' ? { streamer: user(creator), auto_renew: !!autoRenew, ...(tier != null ? { tier } : {}) } : { bits }),
                 success_url: successUrl, cancel_url: cancelUrl,
             },
-            key, traceparent,
+            key, traceparent, headers,
         }),
         /** { transaction }: credit of `from` to payable of `to`, tagged with the interaction. */
-        createTransfer: async ({ from, to, amount, kind, target, message, key, traceparent }) => await call('transfer', 'POST', '/api/v1/transfers', {
+        createTransfer: async ({ from, to, amount, kind, target, message, key, traceparent, headers }) => await call('transfer', 'POST', '/api/v1/transfers', {
             body: { from: user(from), to: user(to), amount, kind, target, message: message || undefined },
-            key, traceparent,
+            key, traceparent, headers,
         }),
         refundTransfer: async ({ txnId, amount, reason, key }) => await call('transfer', 'POST', `/api/v1/transfers/${encodeURIComponent(txnId)}/refund`, { body: { amount, reason }, key }),
         /** { subscription, entitlement, transaction }: one period paid from the member's credit (at `tier`'s price, 1 by default). */
-        subscribeWithCredit: async ({ subscriber, creator, tier, autoRenew, key, traceparent }) => await call('subscription', 'POST', '/api/v1/subscriptions', {
+        subscribeWithCredit: async ({ subscriber, creator, tier, autoRenew, key, traceparent, headers }) => await call('subscription', 'POST', '/api/v1/subscriptions', {
             body: { subscriber: user(subscriber), streamer: user(creator), source: 'credit', auto_renew: autoRenew !== false, ...(tier != null ? { tier } : {}) },
-            key, traceparent,
+            key, traceparent, headers,
         }),
-        cancelSubscription: async ({ id, key, traceparent }) => await call('subscription', 'POST', `/api/v1/subscriptions/${encodeURIComponent(id)}/cancel`, { body: {}, key, traceparent }),
-        getSubscription: async (id) => await call('entitlement', 'GET', `/api/v1/subscriptions/${encodeURIComponent(id)}`),
-        listSubscriptions: async ({ streamer, subscriber, status } = {}) => await call('entitlement', 'GET', `/api/v1/subscriptions${qs({ streamer, subscriber, status })}`),
+        cancelSubscription: async ({ id, key, traceparent, headers }) => await call('subscription', 'POST', `/api/v1/subscriptions/${encodeURIComponent(id)}/cancel`, { body: {}, key, traceparent, headers }),
+        getSubscription: async (id, { headers } = {}) => await call('entitlement', 'GET', `/api/v1/subscriptions/${encodeURIComponent(id)}`, { headers }),
+        listSubscriptions: async ({ streamer, subscriber, status } = {}, { headers } = {}) => await call('entitlement', 'GET', `/api/v1/subscriptions${qs({ streamer, subscriber, status })}`, { headers }),
         /** { active, expires_at, subscription }: the authoritative answer. */
-        entitlement: async (subject, creator) => await call('entitlement', 'GET', `/api/v1/entitlements/${encodeURIComponent(subject)}${qs({ streamer: creator })}`),
+        entitlement: async (subject, creator, { headers } = {}) => await call('entitlement', 'GET', `/api/v1/entitlements/${encodeURIComponent(subject)}${qs({ streamer: creator })}`, { headers }),
         rates: async () => await call(caps.rates ? 'rates' : 'entitlement', 'GET', '/api/v1/rates'),
         /** { streamer, tiers: [{ tier, price_cents, status }], default_price_cents, min_price_cents, max_price_cents, max_tiers }: Billing prices a creator's tiers. */
         listTiers: async (creator) => await call(caps.tier ? 'tier' : 'intent', 'GET', `/api/v1/tiers/${encodeURIComponent(creator)}`),

@@ -26,19 +26,25 @@ const TTL_MS = 6 * 60 * 60 * 1000;
 const MIN_REFETCH_MS = 30 * 1000;
 const BACKOFF_MS = [1000, 2000, 4000, 8000, 16000, 32000, 64000, 128000, 300000];
 
-function keysFromJwks(doc) {
+/**
+ * The usable keys of a JWKS document. `kty` picks the family: 'RSA' (the session and service
+ * tokens, RS256) is the default, 'EC' (Network's subject-assertion key, ES256) is what
+ * ./subject-assertion.js asks for.
+ */
+function keysFromJwks(doc, { kty = 'RSA' } = {}) {
     const out = [];
+    const alg = kty === 'EC' ? 'ES256' : 'RS256';
     for (const jwk of (doc && Array.isArray(doc.keys) ? doc.keys : [])) {
-        if (!jwk || typeof jwk !== 'object' || jwk.kty !== 'RSA' || (jwk.use && jwk.use !== 'sig') || (jwk.alg && jwk.alg !== 'RS256')) continue;
+        if (!jwk || typeof jwk !== 'object' || jwk.kty !== kty || (jwk.use && jwk.use !== 'sig') || (jwk.alg && jwk.alg !== alg)) continue;
         try { out.push({ kid: jwk.kid || null, key: crypto.createPublicKey({ key: jwk, format: 'jwk' }) }); } catch { /* skip unusable key */ }
     }
-    if (!out.length && doc && typeof doc.public_key === 'string') {
+    if (!out.length && kty === 'RSA' && doc && typeof doc.public_key === 'string') {
         try { out.push({ kid: null, key: crypto.createPublicKey(doc.public_key) }); } catch { /* skip */ }
     }
     return out;
 }
 
-function createJwksClient(url, { fetch: fetchImpl = globalThis.fetch, log = null, ttlMs = TTL_MS, minRefetchMs = MIN_REFETCH_MS, timeoutMs = 5000, now = () => Date.now() } = {}) {
+function createJwksClient(url, { fetch: fetchImpl = globalThis.fetch, log = null, ttlMs = TTL_MS, minRefetchMs = MIN_REFETCH_MS, timeoutMs = 5000, now = () => Date.now(), kty = 'RSA' } = {}) {
     const st = { keys: null, fetchedAt: 0, attemptAt: 0, kidAt: 0, failures: 0, nextTryAt: 0, lastError: null, inflight: null, timer: null, retry: null };
     const warn = (msg) => { try { (log && (log.warn || log.error) || console.warn).call(log || console, msg); } catch { /* never throw from logging */ } };
     const info = (msg) => { try { (log && (log.info || log.log) || (() => {})).call(log || console, msg); } catch { /* */ } };
@@ -50,8 +56,8 @@ function createJwksClient(url, { fetch: fetchImpl = globalThis.fetch, log = null
             try {
                 const res = await fetchImpl(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(timeoutMs) });
                 if (!res.ok) throw new Error(`answered ${res.status}`);
-                const keys = keysFromJwks(await res.json());
-                if (!keys.length) throw new Error('no usable RS256 key in the document');
+                const keys = keysFromJwks(await res.json(), { kty });
+                if (!keys.length) throw new Error(`no usable ${kty === 'EC' ? 'ES256' : 'RS256'} key in the document`);
                 if (st.failures) info(`[openvibe-sdk] JWKS ${url} recovered after ${st.failures} failed fetch${st.failures === 1 ? '' : 'es'}`);
                 Object.assign(st, { keys, fetchedAt: now(), failures: 0, nextTryAt: 0, lastError: null });
                 return keys;
@@ -119,11 +125,13 @@ function createJwksClient(url, { fetch: fetchImpl = globalThis.fetch, log = null
     return api;
 }
 
-// One client per URL for the process: verifyUserToken/verifyAppToken share it, and services read its status.
+// One client per URL and key family for the process: verifyUserToken/verifyAppToken share the RSA
+// one, the subject-assertion verifier (./subject-assertion.js) the EC one, and services read the status.
 const clients = new Map();
 function jwksClient(url, opts = {}) {
-    let c = clients.get(url);
-    if (!c) { c = createJwksClient(url, opts); clients.set(url, c); }
+    const key = `${url}|${opts.kty || 'RSA'}`;
+    let c = clients.get(key);
+    if (!c) { c = createJwksClient(url, opts); clients.set(key, c); }
     return c;
 }
 /** Status of every JWKS client this process uses (for /api/ready). */
