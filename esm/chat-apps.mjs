@@ -4,6 +4,7 @@ import cjs from '../src/chat-apps.js';
 export const {
     verifyTelegram, verifySlack, verifyDiscord, verifyDelivery, signCallback, verifyCallback,
     parseTelegramUpdate, parseDiscordInteraction, parseSlackEvent, parseSlackInteraction, splitText, commandOf,
-    safeEqual, APP_LIMITS, PROVIDERS, TOLERANCE_SEC,
+    safeEqual, signButton, verifyButton, parseDiscordMessage, APP_LIMITS, PROVIDERS,
+    TOLERANCE_SEC,
 } = cjs;
 export default cjs;

@@ -114,9 +114,8 @@ function verifyCallback({ secret, token, now = Date.now(), maxAgeMs = 15 * 60 * 
     let payload;
     try { payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8')); } catch { return null; }
     if (!payload || typeof payload !== 'object') return null;
-    const exp = Number(payload.exp);
-    if (Number.isFinite(exp)) { if (now >= exp) return null; }
-    else if (now - Number(payload.iat || 0) > maxAgeMs) return null;
+    if (typeof payload.exp === 'number' && Number.isFinite(payload.exp)) { if (now >= payload.exp) return null; }
+    else if (typeof payload.iat !== 'number' || !Number.isFinite(payload.iat) || payload.iat > now || now - payload.iat > maxAgeMs) return null;
     return payload;
 }
 
@@ -133,8 +132,9 @@ function commandOf(body) {
 }
 
 /**
- * A Telegram update (a message, an edited message or a channel post) as the common shape. A callback
- * query (a button) is the same shape with kind 'button'.
+ * A Telegram update (a new message) as the common shape. An edit of a message that was already
+ * answered and a channel post are not answered: only `update.message` is read. A callback query
+ * (a button) is the same shape with kind 'button'. A message from a bot is never read.
  */
 function parseTelegramUpdate(update, { botUsername = null, botUserId = null } = {}) {
     if (!update || typeof update !== 'object') return null;
@@ -148,17 +148,19 @@ function parseTelegramUpdate(update, { botUsername = null, botUserId = null } = 
             attachments: [], button: { id: text(q.data, 200) }, messageId: String((q.message && q.message.message_id) || ''), raw: q,
         };
     }
-    const m = update.message || update.edited_message || update.channel_post;
+    const m = update.message;
+    if (m && m.from && m.from.is_bot) return null;
     if (!m) return null;
     const chat = m.chat || {};
     const from = m.from || {};
     const body = text(m.text != null ? m.text : m.caption, 4000);
     const cmd = commandOf(body);
+    if (cmd && cmd.mentionName && (!botUsername || cmd.mentionName !== String(botUsername).toLowerCase())) return null;
     const replyUser = m.reply_to_message && m.reply_to_message.from;
     const mentioned = Boolean(botUsername && body.toLowerCase().includes(`@${String(botUsername).toLowerCase()}`))
         || Boolean(botUserId && replyUser && String(replyUser.id) === String(botUserId));
     const attachments = [];
-    if (Array.isArray(m.document) && m.document.file_id) attachments.push({ kind: 'file', id: m.document.file_id, name: text(m.document.file_name, 120) || null, mime: text(m.document.mime_type, 80) || null });
+    if (m.document && m.document.file_id) attachments.push({ kind: 'file', id: m.document.file_id, name: text(m.document.file_name, 120) || null, mime: text(m.document.mime_type, 80) || null });
     return {
         app: 'telegram', kind: cmd ? 'command' : mentioned ? 'mention' : 'message',
         chatId: String(chat.id == null ? '' : chat.id),
@@ -181,7 +183,7 @@ function parseDiscordInteraction(interaction, { botUserId = null } = {}) {
     const channel = interaction.channel || {};
     const guildId = interaction.guild_id || (interaction.guild && interaction.guild.id) || null;
     const base = {
-        app: 'discord', chatId: String(channel.id == null ? '' : channel.id),
+        app: 'discord', chatId: String(channel.id || interaction.channel_id || ''),
         chatType: guildId ? 'group' : 'private', userId: String(user.id == null ? '' : user.id),
         userName: text(user.global_name || user.username, 64) || null, text: '', command: null, args: '',
         mention: false, replyToBot: false, attachments: [], button: null,
@@ -209,6 +211,7 @@ function parseDiscordInteraction(interaction, { botUserId = null } = {}) {
  */
 function parseSlackEvent(event, { botUserId = null } = {}) {
     if (!event || typeof event !== 'object') return null;
+    if (event.bot_id || (botUserId && event.user === botUserId)) return null;
     if (event.type === 'app_mention') {
         const user = event.user || '';
         return {
@@ -217,10 +220,12 @@ function parseSlackEvent(event, { botUserId = null } = {}) {
             attachments: [], button: null, threadTs: text(event.thread_ts, 64) || null, raw: event,
         };
     }
-    if (event.type !== 'message' && event.type !== 'message_changed') return null;
-    const m = event.type === 'message_changed' ? (event.message || {}) : event;
-    if (event.bot_id || (botUserId && m.user === botUserId)) return null;   // the bot's own message
-    if (m.subtype === 'bot_message' || m.subtype === 'message_changed') return null;
+    if (event.type !== 'message') return null;
+    // A file a person shares is a message; an edit of one already answered, a join and a bot's own
+    // message are not. Reading an edit would answer twice, and a join is not something said.
+    if (event.subtype && event.subtype !== 'file_share') return null;
+    if (botUserId && event.user === botUserId) return null;   // the bot's own message
+    const m = event;
     const channelType = text(event.channel_type, 20);
     const cmd = commandOf(m.text);
     const files = Array.isArray(m.files) ? m.files.map((f) => ({ kind: 'file', id: text(f.id, 80), name: text(f.name, 120) || null, url: text(f.url_private || f.permalink, 300) || null })) : [];
@@ -228,7 +233,7 @@ function parseSlackEvent(event, { botUserId = null } = {}) {
         app: 'slack', kind: cmd ? 'command' : channelType === 'im' ? 'message' : 'message',
         chatId: text(event.channel, 64), chatType: channelType === 'im' ? 'private' : channelType === 'channel' ? 'channel' : 'group',
         userId: text(m.user, 64), userName: null, text: text(m.text, 4000), command: cmd ? cmd.command : null,
-        args: cmd ? cmd.args : '', mention: cmd ? true : false, replyToBot: Boolean(m.thread_ts && botUserId && m.parent_user_id === botUserId),
+        args: cmd ? cmd.args : '', mention: Boolean(botUserId && String(m.text || '').includes(`<@${botUserId}>`)), replyToBot: Boolean(m.thread_ts && botUserId && m.parent_user_id === botUserId),
         attachments: files, button: null, threadTs: text(m.thread_ts, 64) || null, raw: m,
     };
 }
@@ -271,10 +276,33 @@ function splitText(app, body, limit) {
     return out;
 }
 
+/** Compact signed row reference: 44 ASCII bytes, under Telegram's 64-byte limit.
+ * Identity, action, expiry and consumption are checked atomically against the caller's stored row. */
+function signButton({ secret, id }) {
+    if (!secret || !/^[A-Za-z0-9_-]{16}$/.test(id)) throw new TypeError('invalid button');
+    const body = `b1.${id}`;
+    return `${body}.${crypto.createHmac('sha256', secret).update(body).digest().subarray(0, 18).toString('base64url')}`;
+}
+function verifyButton({ secret, token }) {
+    if (!secret || typeof token !== 'string' || !/^b1\.[A-Za-z0-9_-]{16}\.[A-Za-z0-9_-]{24}$/.test(token)) return null;
+    const id = token.split('.')[1];
+    return safeEqual(token, signButton({ secret, id })) ? id : null;
+}
+function parseDiscordMessage(m, { botUserId } = {}) {
+    if (!m || !m.author || m.author.bot || m.webhook_id) return null;
+    const cmd = commandOf(m.content);
+    return { app: 'discord', kind: cmd ? 'command' : 'message', chatId: String(m.channel_id || ''),
+        chatType: m.guild_id ? 'group' : 'private', userId: String(m.author.id || ''), userName: m.author.username || null,
+        text: text(m.content), command: cmd ? cmd.command : null, args: cmd ? cmd.args : '',
+        mention: Boolean(botUserId && (m.mentions || []).some(u => String(u.id) === String(botUserId))),
+        replyToBot: Boolean(botUserId && m.referenced_message && m.referenced_message.author && String(m.referenced_message.author.id) === String(botUserId)),
+        messageId: String(m.id || ''), attachments: (m.attachments || []).map(f => ({ kind: 'file', url: f.url, name: f.filename })), button: null, raw: m };
+}
+
 module.exports = {
     verifyTelegram, verifySlack, verifyDiscord, verifyDelivery,
     signCallback, verifyCallback,
     parseTelegramUpdate, parseDiscordInteraction, parseSlackEvent, parseSlackInteraction,
-    splitText, commandOf, safeEqual,
+    splitText, commandOf, safeEqual, signButton, verifyButton, parseDiscordMessage,
     APP_LIMITS, PROVIDERS, TOLERANCE_SEC,
 };

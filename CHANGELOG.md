@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.90.0 (2026-11-06)
+## 0.92.0 (2026-11-06)
 
 - Add `openvibe-sdk/chat-apps`: the three chat apps (Telegram, Discord, Slack) in one place, so a service that answers
   a chat app reads them the same way (the plan of 2026-10-30, stage A4: "your agent in Telegram, Discord and Slack").
@@ -9,12 +9,30 @@
     over "<timestamp><body>" with the application's public key) and `verifyDelivery()` (the provider names its own
     scheme; a provider this does not know is never verified). The code came from OpenVibe.Watch, which has checked
     these deliveries since 2026-11-03 (Watch #194 and #195).
-  - The buttons: `signCallback()` and `verifyCallback()`. A callback token is "v1.<base64url(payload)>.<hex hmac>"
-    over the payload with the app's own secret; the payload carries its own expiry. A token that was changed, is
-    replayed or is too old is refused.
-  - The messages: `parseTelegramUpdate()`, `parseDiscordInteraction()`, `parseSlackEvent()` and `parseSlackInteraction()`
-    give each app's payload the same shape (who said it, where, what they said, whether it was said to the bot, and
-    the button that was pressed), and `splitText()` splits one answer the way the app accepts it.
+  - The buttons: `signCallback()` and `verifyCallback()` carry a whole signed payload with its expiry;
+    `signButton()` and `verifyButton()` carry a 16-character row id in 44 bytes, inside Telegram's 64-byte
+    `callback_data`, and the caller checks who may press it, what it does, that it is used once and that it has
+    not expired against its own row. A token that was changed, replayed or is too old is refused.
+  - The messages: `parseTelegramUpdate()`, `parseDiscordInteraction()`, `parseDiscordMessage()`, `parseSlackEvent()`
+    and `parseSlackInteraction()` give each app's payload the same shape (who said it, where, what they said,
+    whether it was said to the bot, and the button that was pressed), never the app's own JSON and never a
+    message the bot itself sent. `splitText()` splits one answer the way the app accepts it, and `commandOf()`
+    reads a command and its arguments.
+
+## 0.90.0 (2026-11-06)
+
+- **Subject assertions** (ADR-003, the 2026-11-06 amendment; plan H1). A money call carries a Network-signed
+  proof that the person allowed the calling service to act for them, beside the name of the person.
+  - `requestSubjectAssertion({ userToken, audience, token | tokenClient, network | internalUrl })` asks Network to
+    sign the person's own access token into a 60-second assertion for one audience (`openvibe.billing`). The
+    person's token is the only thing that can produce one: without it Network signs nothing.
+  - `verifySubjectAssertion(assertion, { jwks, audience, act, seen })` checks the ES256 signature against
+    Network's JWKS (the EC keys, cached like the RS256 ones), the audience, the expiry and the jti; a forged,
+    expired, wrong-audience or wrong-service assertion is refused with a stable code
+    (`assertion.bad_signature`, `assertion.expired`, `assertion.wrong_audience`, `assertion.actor_mismatch`, …).
+  - `createSubjectAssertionVerifier({ jwks, audience })` remembers the jtis it has seen, so a replayed assertion is
+    refused inside the replay window.
+  - `subjectAssertionHeader(assertion)` gives the `x-ov-subject-assertion` header for the call.
 
 ## 0.89.0 (2026-11-06)
 

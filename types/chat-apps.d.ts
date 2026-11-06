@@ -54,3 +54,7 @@ export function safeEqual(a: unknown, b: unknown): boolean;
 export const APP_LIMITS: { telegram: number; discord: number; slack: number };
 export const PROVIDERS: string[];
 export const TOLERANCE_SEC: number;
+
+export function signButton(args: { secret: string; id: string }): string;
+export function verifyButton(args: { secret: string; token: string }): string | null;
+export function parseDiscordMessage(message: any, opts?: { botUserId?: string | null }): ChatMessage | null;

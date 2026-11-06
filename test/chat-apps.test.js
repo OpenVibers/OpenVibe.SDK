@@ -170,3 +170,28 @@ run([
         assert.deepEqual(splitText('telegram', ''), []);
     }],
 ]);
+
+// Provider fixture regressions: unrelated bot commands, attachments, workspace payloads and bounded callbacks.
+{
+    const sdk = require('../src/chat-apps');
+    const id = 'abcdefghijklmnop';
+    const token = sdk.signButton({ secret: 'fixture-only', id });
+    assert.ok(Buffer.byteLength(token) <= 64);
+    assert.equal(sdk.verifyButton({ secret: 'fixture-only', token }), id);
+    assert.equal(sdk.verifyButton({ secret: 'wrong', token }), null);
+    assert.equal(sdk.verifyButton({ secret: 'fixture-only', token: token + 'x' }), null);
+    assert.equal(sdk.parseTelegramUpdate({ message: { text: '/link@another_bot', from: { id: 1 }, chat: { id: 1, type: 'private' } } }, { botUsername: 'our_bot' }), null);
+    assert.equal(sdk.parseTelegramUpdate({ message: { from: { id: 1 }, chat: { id: 1, type: 'private' }, document: { file_id: 'doc', file_name: 'a.pdf' } } }).attachments[0].id, 'doc');
+    assert.equal(sdk.parseDiscordInteraction({ type: 2, channel_id: '123', user: { id: '9' }, data: { name: 'link' } }).chatId, '123');
+    assert.equal(sdk.parseDiscordMessage({ id: '1', channel_id: '2', guild_id: '3', author: { id: '4' }, content: 'hello', mentions: [{ id: '9' }] }, { botUserId: '9' }).mention, true);
+    assert.equal(sdk.parseDiscordMessage({ author: { bot: true } }), null);
+    assert.equal(sdk.verifyCallback({ secret: 's', token: sdk.signCallback({ secret: 's', payload: { iat: 'invalid' } }) }), null);
+    assert.equal(sdk.parseSlackEvent({ type: 'app_mention', bot_id: 'B1', text: 'loop' }), null);
+    assert.equal(sdk.parseTelegramUpdate({ edited_message: { text: 'changed', from: { id: 1 }, chat: { id: 1 } } }), null);
+    assert.equal(sdk.parseTelegramUpdate({ message: { from: { id: 1, is_bot: true }, chat: { id: 1 }, text: 'bot' } }), null);
+    const file = sdk.parseSlackEvent({ type: 'message', subtype: 'file_share', channel: 'C1', channel_type: 'channel', user: 'U1', text: 'the report', files: [{ id: 'F1', name: 'report.pdf', url_private: 'https://files.slack.com/report.pdf' }] }, { botUserId: 'U9' });
+    assert.equal(file.attachments[0].name, 'report.pdf');
+    assert.equal(file.attachments[0].url, 'https://files.slack.com/report.pdf');
+    assert.equal(sdk.parseSlackEvent({ type: 'message', subtype: 'message_changed', channel: 'C1', message: { user: 'U1', text: 'edited' } }, { botUserId: 'U9' }), null);
+    assert.equal(sdk.parseSlackEvent({ type: 'message', subtype: 'channel_join', channel: 'C1', user: 'U1' }, { botUserId: 'U9' }), null);
+}
