@@ -80,3 +80,10 @@ export declare function createSubjectAssertionVerifier(opts: { jwks?: VerifySubj
 /** The header a money call carries the assertion in. */
 export declare function subjectAssertionHeader(assertion: string): { 'x-ov-subject-assertion': string };
 
+
+/** The header a money call carries the assertion in. */
+export declare const ASSERTION_HEADER: string;
+/** How long an assertion lives (seconds). */
+export declare const ASSERTION_TTL_S: number;
+/** The default replay window (milliseconds). */
+export declare const REPLAY_WINDOW_MS: number;
