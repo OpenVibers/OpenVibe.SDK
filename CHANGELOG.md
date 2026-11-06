@@ -15,7 +15,7 @@
 
 - Add server-only `openvibe-sdk/share`: PostgreSQL/PGlite store and expand-only migration, audience/role checks, exact name resolution with persistent per-caller limits, expiring membership, access requests, and recipient-bound seven-day ownership transfers. Each mutation and its append-only audit and delivery records commit atomically. Transactional owner/audience hooks update local resources.
 - Add uniform HTTP router, OpenAPI 3.1 fragment, CJS/ESM/TypeScript exports and `sdk.share({ base, token }).for(kind, id)` agent client. Conditional member updates detect concurrent ACL changes. Failures return generic 404 without resource content; staff overrides are audited.
-- Temporarily pin Contracts to `feat/sharing-core-contracts` (0.291.0). The orchestrator releases Contracts and repins the SDK before release. No service integrations or media migration are included in this core package.
+- Pins openvibe-contracts v0.291.0 (share.v1). No service integrations or media migration are included in this core package.
 
 ## 0.84.0 (2026-11-04)
 

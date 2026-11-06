@@ -4,9 +4,12 @@ const { newEventId } = require('../core/ids');
 const v = require('./validation');
 const { migrateShares } = require('./schema');
 const WEEK = 7 * 24 * 60 * 60 * 1000;
+const PEOPLE_TTL = 60 * 1000;
 const key = ref => [ref.service, ref.kind, ref.id];
 const where = 'service=$1 AND kind=$2 AND resource_id=$3';
 const iso = value => new Date(value).toISOString();
+const personKey = subject => `${subject.type}:${subject.id}`;
+const unknownPerson = subject => ({ subject, username: null, display_name: null, avatar_url: null });
 const transferShape = row => ({ id: row.id, from: row.from_subject, to: row.to_subject, keep_access: row.keep_access,
     requested_at: iso(row.requested_at), expires_at: iso(row.expires_at), state: row.state });
 const memberShape = row => ({ subject: row.subject, role: row.role, ...(row.expires_at ? { expires_at: iso(row.expires_at) } : {}),
@@ -18,6 +21,7 @@ function createShares({ db, network, events, notify, onOwnerChange, onAudienceCh
     }
     if (!Number.isInteger(nameLimit) || nameLimit < 1 || !Number.isInteger(nameWindowMs) || nameWindowMs < 1) throw new TypeError('Invalid name rate limit');
     const timestamp = () => iso(now());
+    const peopleCache = new Map();
     async function row(t, ref) { const s = await t.maybe(`SELECT * FROM shares WHERE ${where} FOR UPDATE`, key(ref)); if (!s) v.hidden(); return s; }
     async function log(t, ref, actor, action, details = {}) {
         await t.exec('INSERT INTO share_log(id,service,kind,resource_id,actor,action,details,occurred_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)', [randomUUID(), ...key(ref), actor, action, details, timestamp()]);
@@ -32,14 +36,17 @@ function createShares({ db, network, events, notify, onOwnerChange, onAudienceCh
         await queue(t, 'event', { event_id: newEventId(now()), event_type: type, version: 1, timestamp: timestamp(), source: ref.service, actor, subject: { type: ref.kind, id: ref.id }, payload });
     }
     async function notice(t, ref, kind, recipient, actor, extra = {}) {
+        // Never tell somebody about their own action.
+        if (v.equal(recipient, actor)) return;
         await queue(t, 'notify', { kind, to: recipient, actor, ref, ...extra });
     }
-    async function owner(t, ref, s, viewer) {
+    async function permitted(t, ref, s, viewer, audit) {
         const a = v.actor(viewer);
-        if (v.equal(a, s.owner_subject)) return a;
-        if (viewer.staff === true) { await log(t, ref, a, 'staff.manage'); return a; }
+        if (v.equal(a, s.owner_subject)) return { actor: a, staff: false };
+        if (viewer.staff === true) { if (audit) await log(t, ref, a, 'staff.manage'); return { actor: a, staff: true }; }
         v.hidden();
     }
+    async function owner(t, ref, s, viewer) { return permitted(t, ref, s, viewer, true); }
     async function members(t, ref) {
         return t.many(`SELECT * FROM share_members WHERE ${where} AND (expires_at IS NULL OR expires_at>$4) ORDER BY added_at,subject`, [...key(ref), timestamp()]);
     }
@@ -62,15 +69,43 @@ function createShares({ db, network, events, notify, onOwnerChange, onAudienceCh
     }
     async function check(viewer, input, edit) {
         const ref = v.ref(input);
+        // A plain snapshot: a page view must never queue behind somebody else's ACL write.
         return db.tx(async t => {
-            const s = await t.maybe(`SELECT * FROM shares WHERE ${where} FOR UPDATE`, key(ref));
+            const s = await t.maybe(`SELECT * FROM shares WHERE ${where}`, key(ref));
             return s ? access(t, ref, s, viewer, edit) : false;
         });
     }
-    async function authorize(viewer, ref) { await db.tx(async t => { await owner(t, ref, await row(t, ref), viewer); }); }
-    async function resolve(viewer, target) {
-        if (typeof target !== 'string') return v.subject(target);
-        // A caller-controlled rollback must not refund account-enumeration attempts.
+    async function authorize(viewer, ref) { return db.tx(async t => permitted(t, ref, await row(t, ref), viewer, false)); }
+    /** Network projections for these subjects, cached for a minute. Unknown, banned and deleted are null. */
+    async function projections(subjects) {
+        const at = now(), out = new Map(), missing = [];
+        for (const s of subjects) {
+            const k = personKey(s), hit = peopleCache.get(k);
+            if (hit && at - hit.at < PEOPLE_TTL) out.set(k, hit.person);
+            else if (!missing.some(m => personKey(m) === k)) missing.push(s);
+        }
+        for (let i = 0; i < missing.length; i += 500) {
+            const chunk = missing.slice(i, i + 500);
+            const res = await network.json({ service: 'network', audience: 'openvibe.network', path: '/internal/identity/resolve-batch',
+                method: 'POST', json: { subject_ids: chunk.map(s => s.id) } });
+            const results = (res && res.results) || {};
+            for (const s of chunk) { const p = results[s.id] || null; peopleCache.set(personKey(s), { at, person: p }); out.set(personKey(s), p); }
+        }
+        return out;
+    }
+    function personShape(subject, p) {
+        if (!p || p.banned || p.deleted || !p.subject || p.subject.type !== 'user' || p.subject.id !== subject.id || typeof p.username !== 'string') return unknownPerson(subject);
+        return { subject, username: p.username, display_name: p.display_name || p.username, avatar_url: p.avatar_url || null };
+    }
+    async function peopleOf(subjects) {
+        const uniq = [];
+        for (const s of subjects) if (!uniq.some(u => v.equal(u, s))) uniq.push(s);
+        if (!uniq.length) return new Map();
+        const found = await projections(uniq);
+        return new Map(uniq.map(s => [personKey(s), personShape(s, found.get(personKey(s)))]));
+    }
+    /** One name lookup, sharing the per-caller budget with resolve(). null means no active person by that exact name. */
+    async function lookupName(viewer, target) {
         if (db.inTransaction()) throw new TypeError('Resolve sharing names outside an ambient transaction');
         const name = v.name(target), caller = v.actor(viewer);
         // Persistent and atomic across processes; denied and unknown lookups consume the same budget.
@@ -82,22 +117,47 @@ function createShares({ db, network, events, notify, onOwnerChange, onAudienceCh
         let found;
         try { found = await network.json({ service: 'network', audience: 'openvibe.network', path: '/internal/identity/resolve', query: { username: name } }); }
         catch (err) { if (err.status !== 404) throw err; }
-        if (!found || found.banned || typeof found.username !== 'string' || found.username.toLowerCase() !== name.toLowerCase()) {
-            v.fail(400, 'share.name_not_found', `No OpenVibe account is called @${name}`);
+        if (!found || found.banned || found.deleted || typeof found.username !== 'string' || found.username.toLowerCase() !== name.toLowerCase()) return null;
+        try { const subject = v.subject(found.subject); return subject.type === 'user' ? { ...found, subject } : null; } catch { return null; }
+    }
+    async function resolve(viewer, target) {
+        if (typeof target !== 'string') {
+            const subject = v.subject(target);
+            if (subject.type !== 'user') v.fail(400, 'share.not_person', 'Not an OpenVibe account');
+            const person = (await peopleOf([subject])).get(personKey(subject));
+            if (!person || !person.username) v.fail(400, 'share.name_not_found', 'No OpenVibe account is that subject');
+            return subject;
         }
-        const s = v.subject(found.subject);
-        if (s.type !== 'user') v.fail(400, 'share.name_not_found', `No OpenVibe account is called @${name}`);
-        return s;
+        const found = await lookupName(viewer, target);
+        if (!found) v.fail(400, 'share.name_not_found', `No OpenVibe account is called @${v.name(target)}`);
+        return found.subject;
+    }
+    async function lookup(viewer, name) {
+        const found = await lookupName(viewer, name);
+        if (!found) return { person: null };
+        return { person: { subject: found.subject, username: found.username, display_name: found.display_name || found.username, avatar_url: found.avatar_url || null } };
     }
     async function inputs(viewer, list) {
         if (!Array.isArray(list) || list.length > 100) v.invalid();
-        const out = new Map();
-        for (let item of list) {
+        const parsed = list.map(item => {
             if (typeof item === 'string') item = { name: item, role: 'viewer' };
             v.object(item, ['name', 'subject', 'role', 'expires_at']);
             if (Object.hasOwn(item, 'name') === Object.hasOwn(item, 'subject') || !['viewer', 'editor'].includes(item.role)) v.invalid();
-            const expires_at = v.expiry(item.expires_at, now());
-            const subject = await resolve(viewer, Object.hasOwn(item, 'name') ? item.name : item.subject);
+            return { item, expires_at: v.expiry(item.expires_at, now()) };
+        });
+        // Canonical subjects are people too: verify them in one Network batch, never trust the object alone.
+        const subjects = parsed.filter(x => Object.hasOwn(x.item, 'subject')).map(x => v.subject(x.item.subject));
+        for (const s of subjects) if (s.type !== 'user') v.fail(400, 'share.not_person', 'Not an OpenVibe account');
+        const people = subjects.length ? await peopleOf(subjects) : new Map();
+        const out = new Map();
+        for (const { item, expires_at } of parsed) {
+            let subject;
+            if (Object.hasOwn(item, 'name')) subject = await resolve(viewer, item.name);
+            else {
+                subject = v.subject(item.subject);
+                const person = people.get(personKey(subject));
+                if (!person || !person.username) v.fail(400, 'share.name_not_found', 'No OpenVibe account is that subject');
+            }
             // Last entry wins after resolution, so the client's add('@name') can update an existing subject.
             out.set(JSON.stringify(subject), { subject, role: item.role, expires_at });
         }
@@ -107,7 +167,6 @@ function createShares({ db, network, events, notify, onOwnerChange, onAudienceCh
         await t.exec(`DELETE FROM share_members WHERE ${where} AND subject=$4`, [...key(ref), m.subject]);
         await log(t, ref, actor, 'member.removed', { subject: m.subject, reason });
         await event(t, ref, s, actor, 'share.revoked', m.subject, { reason: reason === 'expired' ? 'member_expired' : 'member_removed' });
-        await notice(t, ref, 'share.added', m.subject, actor, { action: 'revoked' });
     }
     async function expire(t, ref, s) {
         const actor = { type: 'service', id: ref.service };
@@ -129,9 +188,8 @@ function createShares({ db, network, events, notify, onOwnerChange, onAudienceCh
         await log(t, ref, actor, 'audience.changed', { from: before, to: audience });
         // The owner-targeted metadata event lets Network invalidate its audience projection.
         await event(t, ref, s, actor, ['public', 'link', 'people'].includes(audience) ? 'share.granted' : 'share.revoked', s.owner_subject, { reason: 'audience_changed' });
-        await notice(t, ref, 'share.added', s.owner_subject, actor, { action: 'audience_changed', audience });
     }
-    async function grant(t, ref, s, actor, m) {
+    async function grant(t, ref, s, actor, m, notify) {
         if (v.equal(m.subject, s.owner_subject)) v.invalid();
         if (m.expires_at && Date.parse(m.expires_at) <= now()) v.invalid();
         const existing = await t.maybe(`SELECT * FROM share_members WHERE ${where} AND subject=$4`, [...key(ref), m.subject]);
@@ -141,47 +199,64 @@ function createShares({ db, network, events, notify, onOwnerChange, onAudienceCh
         await t.exec(`UPDATE share_access_requests SET state='granted' WHERE ${where} AND subject=$4 AND state='pending'`, [...key(ref), m.subject]);
         await log(t, ref, actor, 'member.added', { subject: m.subject, role: m.role });
         await event(t, ref, s, actor, 'share.granted', m.subject, { reason: 'member_added', role: m.role, ...(m.expires_at ? { expires_at: m.expires_at } : {}) });
-        await notice(t, ref, 'share.added', m.subject, actor);
+        // Only a person who was not a member before hears about it; a role or expiry change does not.
+        if (!existing && notify) await notice(t, ref, 'share.added', m.subject, actor);
     }
     async function mutate(viewer, input, fn) {
         const ref = v.ref(input);
         return db.tx(async t => {
-            const s = await row(t, ref), actor = await owner(t, ref, s, viewer);
+            const s = await row(t, ref), { actor, staff } = await owner(t, ref, s, viewer);
             await expire(t, ref, s);
-            const result = await fn(t, ref, s, actor);
+            const result = await fn(t, ref, s, actor, staff);
             await bump(t, ref);
             return result;
         });
     }
     async function update(viewer, input, body, { ifMatch } = {}) {
-        const ref = v.ref(input); v.object(body, ['audience', 'members']);
+        const ref = v.ref(input); v.object(body, ['audience', 'members', 'notify']);
         if (!Object.keys(body).length) v.invalid();
         if (body.audience !== undefined) v.audience(body.audience);
+        if (body.notify !== undefined && typeof body.notify !== 'boolean') v.invalid();
         await authorize(viewer, ref);
         const list = body.members === undefined ? undefined : await inputs(viewer, body.members);
-        return mutate(viewer, ref, async (t, ref, s, actor) => {
+        const notify = body.notify !== false;
+        return mutate(viewer, ref, async (t, ref, s, actor, staff) => {
             if (ifMatch !== undefined && ifMatch !== `"${s.revision}"`) v.fail(412, 'share.changed', 'Sharing changed; reload and try again');
+            if (staff) {
+                // Staff narrow access only: private and removals. No widening, additions or role raises.
+                if (body.audience !== undefined && body.audience !== 'private') v.hidden();
+                if (list) {
+                    const have = await members(t, ref);
+                    for (const m of list) {
+                        const cur = have.find(x => v.equal(x.subject, m.subject));
+                        if (!cur || cur.role !== m.role || (cur.expires_at ? iso(cur.expires_at) : null) !== m.expires_at) v.hidden();
+                    }
+                }
+            }
             if (body.audience !== undefined) await changeAudience(t, ref, s, actor, body.audience);
             if (list) {
                 const have = await members(t, ref);
                 for (const m of have) if (!list.some(x => v.equal(x.subject, m.subject))) await revoke(t, ref, s, actor, m, 'removed');
-                for (const m of list) await grant(t, ref, s, actor, m);
+                for (const m of list) await grant(t, ref, s, actor, m, notify);
             }
             return snapshot(t, ref, s);
         });
     }
     async function addMembers(viewer, input, list) {
-        const ref = v.ref(input); await authorize(viewer, ref);
+        const ref = v.ref(input);
+        // Staff may not add: refuse before touching the name budget or Network.
+        if ((await authorize(viewer, ref)).staff) v.hidden();
         if (!Array.isArray(list)) v.invalid();
         const normalized = list.map(item => {
             if (item && typeof item === 'object' && Object.hasOwn(item, 'type')) return { subject: v.subject(item), role: 'viewer' };
             return item;
         });
         const resolved = await inputs(viewer, normalized);
-        return mutate(viewer, ref, async (t, ref, s, a) => {
+        return mutate(viewer, ref, async (t, ref, s, a, staff) => {
+            if (staff) v.hidden();
             const have = await members(t, ref);
             if (new Set([...have, ...resolved].map(m => JSON.stringify(m.subject))).size > 100) v.invalid();
-            for (const m of resolved) await grant(t, ref, s, a, m);
+            for (const m of resolved) await grant(t, ref, s, a, m, true);
             return snapshot(t, ref, s);
         });
     }
@@ -203,9 +278,25 @@ function createShares({ db, network, events, notify, onOwnerChange, onAudienceCh
             return snapshot(t, ref, s);
         });
     }
+    /** The GET body: people, not bare subjects, plus the caller's own role and pending access requests. */
+    async function present(viewer, ref, share) {
+        const requests = await db.many(`SELECT * FROM share_access_requests WHERE ${where} AND state='pending' ORDER BY requested_at,id`, key(ref));
+        const subjects = [share.owner_subject, ...(share.members || []).map(m => m.subject), ...(share.transfer ? [share.transfer.to] : []), ...requests.map(r => r.subject)];
+        let people;
+        try { people = await peopleOf(subjects); }
+        catch { people = new Map(subjects.map(s => [personKey(s), unknownPerson(s)])); }
+        const person = subject => people.get(personKey(subject)) || unknownPerson(subject);
+        return { ...share,
+            owner: person(share.owner_subject),
+            members: (share.members || []).map(m => ({ ...m, ...person(m.subject) })),
+            ...(share.transfer ? { transfer: { ...share.transfer, to: person(share.transfer.to) } } : {}),
+            you: { subject: v.actor(viewer), role: v.equal(viewer.subject, share.owner_subject) ? 'owner' : 'staff' },
+            requests: requests.map(r => ({ id: r.id, ...person(r.subject), requested_at: iso(r.requested_at) })) };
+    }
     async function getWithRevision(viewer, input) {
         const ref = v.ref(input);
-        return db.tx(async t => { const s = await row(t, ref); await owner(t, ref, s, viewer); return { value: await snapshot(t, ref, s), etag: `"${s.revision}"` }; });
+        const { value, etag } = await db.tx(async t => { const s = await row(t, ref); await owner(t, ref, s, viewer); return { value: await snapshot(t, ref, s), etag: `"${s.revision}"` }; });
+        return { value: await present(viewer, ref, value), etag };
     }
     async function requestAccess(viewer, input) {
         const ref = v.ref(input), a = v.actor(viewer);
@@ -222,9 +313,27 @@ function createShares({ db, network, events, notify, onOwnerChange, onAudienceCh
             return { id: request.id, subject: request.subject, requested_at: iso(request.requested_at), state: request.state };
         });
     }
+    async function dismiss(viewer, input, requestId) {
+        const ref = v.ref(input); v.uuid(requestId);
+        return mutate(viewer, ref, async (t, ref, s, actor) => {
+            // Dismissing a request is the owner's call, not a staff moderation action.
+            if (!v.equal(actor, s.owner_subject)) v.hidden();
+            const request = await t.maybe(`SELECT * FROM share_access_requests WHERE ${where} AND id=$4`, [...key(ref), requestId]);
+            if (!request || request.state !== 'pending') v.hidden();
+            await t.exec(`UPDATE share_access_requests SET state='dismissed' WHERE id=$1`, [request.id]);
+            await log(t, ref, actor, 'access.dismissed', { request_id: request.id, subject: request.subject });
+            return snapshot(t, ref, s);
+        });
+    }
     async function transfer(viewer, input, { to, keep_access = false } = {}) {
         const ref = v.ref(input); if (typeof keep_access !== 'boolean') v.invalid();
-        await authorize(viewer, ref); const recipient = await resolve(viewer, to);
+        await authorize(viewer, ref);
+        let target = to;
+        if (to && typeof to === 'object' && !Object.hasOwn(to, 'type')) {
+            if (Object.hasOwn(to, 'subject') === Object.hasOwn(to, 'name')) v.invalid();
+            target = Object.hasOwn(to, 'subject') ? to.subject : to.name;
+        }
+        const recipient = await resolve(viewer, target);
         return mutate(viewer, ref, async (t, ref, s, a) => {
             // Staff may moderate, but cannot give somebody else's ownership away.
             if (!v.equal(a, s.owner_subject)) v.hidden();
@@ -263,15 +372,15 @@ function createShares({ db, network, events, notify, onOwnerChange, onAudienceCh
                 await log(t, ref, a, 'ownership.incoming', { transfer_id: tr.id, from, to: a });
                 if (tr.keep_access) {
                     if (s.audience === 'private') await changeAudience(t, ref, s, a, 'people');
-                    await grant(t, ref, s, a, { subject: from, role: 'viewer', expires_at: null });
+                    await grant(t, ref, s, a, { subject: from, role: 'viewer', expires_at: null }, true);
                 } else await event(t, ref, s, a, 'share.revoked', from, { reason: 'ownership_changed', transfer_id: tr.id });
             }
             await log(t, ref, a, `transfer.${action}`, { transfer_id: tr.id, from: tr.from_subject, to: tr.to_subject });
             const result = transferShape(tr);
             if (action === 'cancelled') await event(t, ref, s, a, 'share.revoked', tr.to_subject, { reason: 'transfer_cancelled', transfer_id: tr.id });
             else await event(t, ref, s, a, `share.transfer.${action}`, tr.to_subject, { transfer: result });
-            await notice(t, ref, 'share.transfer.answered', tr.from_subject, a, { transfer_id: tr.id, state: action });
-            await notice(t, ref, 'share.transfer.answered', tr.to_subject, a, { transfer_id: tr.id, state: action });
+            // The owner hears an answer (including expiry); the recipient hears a cancellation. Never both.
+            await notice(t, ref, 'share.transfer.answered', action === 'cancelled' ? tr.to_subject : tr.from_subject, a, { transfer_id: tr.id, state: action });
             await bump(t, ref);
             return result;
         });
@@ -326,8 +435,8 @@ function createShares({ db, network, events, notify, onOwnerChange, onAudienceCh
         return sent;
     }
     const api = { register, migrate: () => migrateShares(db), canView: (viewer, ref) => check(viewer, ref, false), canEdit: (viewer, ref) => check(viewer, ref, true),
-        get: async (viewer, ref) => (await getWithRevision(viewer, ref)).value, getWithRevision, update,
-        setAudience: (viewer, ref, audience) => update(viewer, ref, { audience }), addMembers, removeMember, requestAccess, transfer,
+        get: async (viewer, ref) => (await getWithRevision(viewer, ref)).value, getWithRevision, present, lookup, update,
+        setAudience: (viewer, ref, audience) => update(viewer, ref, { audience }), addMembers, removeMember, requestAccess, dismiss, transfer,
         accept: (viewer, ref, id) => answer(viewer, ref, id, 'accepted'), decline: (viewer, ref, id) => answer(viewer, ref, id, 'declined'),
         cancel: (viewer, ref, id) => answer(viewer, ref, id, 'cancelled'), expireMembers, sharedWithMe, flush };
     api.router = options => require('./router').router(api, options);
