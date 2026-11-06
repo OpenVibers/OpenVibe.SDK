@@ -13,6 +13,9 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..');
 const ENTRIES = {
     'share.mjs': '../src/share.js',
+    'locker.mjs': '../src/locker.js',
+    'locker-server.mjs': '../src/locker/server.js',
+    'locker-vectors.mjs': '../src/locker/vectors.js',
     'index.mjs': '../index.js',
     'core.mjs': '../src/core/index.js',
     'auth.mjs': '../src/auth/index.js',

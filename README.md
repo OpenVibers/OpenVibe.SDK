@@ -2,16 +2,16 @@
 
 > Supported browser and server clients for the OpenVibe platform.
 
-**Status:** alpha, v0.85.0 (roadmap Wave 2; developer apps from Wave 20; Media objects v2 from Wave 4; the Tools platform API; Search, Chat, AI, Vision and consent clients; sign-in with recovery and a client health check). Every release is tagged (see [CHANGELOG.md](CHANGELOG.md)). Tested against local stub servers and the built-in mock platform only, never against the live platform. Services pin release tags; each repository's `STATUS.json` names the one it uses.
+**Status:** alpha, v0.86.0 (roadmap Wave 2; developer apps from Wave 20; Media objects v2 from Wave 4; the Tools platform API; Search, Chat, AI, Vision and consent clients; sign-in with recovery and a client health check). Every release is tagged (see [CHANGELOG.md](CHANGELOG.md)). Tested against local stub servers and the built-in mock platform only, never against the live platform. Services pin release tags; each repository's `STATUS.json` names the one it uses.
 **Plan:** OpenVibe End-to-End Realignment & Implementation Plan, revision 3 (20 Sep 2026), §3.2; roadmap §30.  
 **License:** MIT ([LICENSE](LICENSE)). This package is a library that apps outside the network embed, so it uses MIT. The OpenVibe services themselves stay AGPL-3.0.
 
 **If a capability is not in the SDK, it is not public.** Apps call services through `openvibe-sdk` and never build internal routes themselves. A route with no SDK wrapper is internal, even when you can reach it, and it can change without notice. To make a capability public, first define it in OpenVibe.Contracts, then wrap it here.
 
-After v0.85.0 is tagged:
+After v0.86.0 is tagged:
 
 ```bash
-npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.85.0
+npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.86.0
 ```
 
 It has no runtime dependencies. It needs Node ≥ 20, or any browser with `fetch`, Web Crypto and `TextDecoder`. There is no build step. The package is CommonJS with ESM entry points (`import` works). Each subpath has its own `.d.ts`. For a page with no bundler, `browser/openvibe-sdk.mjs` is one self-contained ES module of the browser-safe subpaths (see [Browser without a bundler](#browser-without-a-bundler)). It does not depend on `openvibe-contracts` at runtime: it copies the contract types it uses (from the temporary Contracts sharing branch, a devDependency the tests check them against).
@@ -564,9 +564,13 @@ Nothing at runtime. `openvibe-contracts` and `@electric-sql/pglite` are devDepen
 Part of the [OpenVibe network](https://openvibe.network). Built in the open by [OpenVibers](https://github.com/OpenVibers).
 
 <!-- versions:start -->
-- openvibe-contracts: v0.291.0
+- openvibe-contracts: v0.292.0
 <!-- versions:end -->
 
 ### Network-wide sharing (Node)
 
 `openvibe-sdk/share` provides local access enforcement, expiring memberships and confirmed ownership transfer. See [the sharing module](docs/share.md) for integration, API signatures, migrations and the uniform OpenAPI fragment. Agents use `require('openvibe-sdk').share({ base, token }).for('paste', id)`.
+
+### Locker: end-to-end encryption (Node and the browser)
+
+`openvibe-sdk/locker` seals anything and opens it again: the Locker envelope (`locker.envelope@1`), the three locks (people, password, link), streams for files, person key pairs and the eight-word fingerprint, `wrapFor` and `rewrap` for sharing, `recoveryWords` for the phrase to write down, `inspect` for what an envelope says about itself, and opening a people lock by key. `openvibe-sdk/locker/server` gives a service the header checks without a key. WebCrypto only, in Node and the browser. See [the locker module](docs/locker.md).
