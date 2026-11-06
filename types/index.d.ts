@@ -14,6 +14,7 @@ export * as vision from './vision';
 export * as themes from './themes';
 export * as redact from './redact';
 export * as chat from './chat';
+export * as chatApps from './chat-apps';
 export * as ai from './ai';
 export * as jobs from './jobs';
 export * as tools from './tools';

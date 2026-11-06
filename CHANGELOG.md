@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.90.0 (2026-11-06)
+
+- Add `openvibe-sdk/chat-apps`: the three chat apps (Telegram, Discord, Slack) in one place, so a service that answers
+  a chat app reads them the same way (the plan of 2026-10-30, stage A4: "your agent in Telegram, Discord and Slack").
+  - The checks: `verifyTelegram()` (the `X-Telegram-Bot-Api-Secret-Token` header, compared in constant time),
+    `verifySlack()` (v0 over "v0:<timestamp>:<body>", the timestamp within five minutes), `verifyDiscord()` (Ed25519
+    over "<timestamp><body>" with the application's public key) and `verifyDelivery()` (the provider names its own
+    scheme; a provider this does not know is never verified). The code came from OpenVibe.Watch, which has checked
+    these deliveries since 2026-11-03 (Watch #194 and #195).
+  - The buttons: `signCallback()` and `verifyCallback()`. A callback token is "v1.<base64url(payload)>.<hex hmac>"
+    over the payload with the app's own secret; the payload carries its own expiry. A token that was changed, is
+    replayed or is too old is refused.
+  - The messages: `parseTelegramUpdate()`, `parseDiscordInteraction()`, `parseSlackEvent()` and `parseSlackInteraction()`
+    give each app's payload the same shape (who said it, where, what they said, whether it was said to the bot, and
+    the button that was pressed), and `splitText()` splits one answer the way the app accepts it.
+
 ## 0.89.0 (2026-11-06)
 
 - Add `openvibe-sdk/exchange`: OpenVibe.Exchange, the buyer and the seller side of the model exchange (the plan of 2026-11-06, "For builders", item 7).

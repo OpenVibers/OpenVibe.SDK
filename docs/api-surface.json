@@ -64,6 +64,26 @@
         "createInboxVisitor"
       ]
     },
+    "chatApps": {
+      "object": [
+        "APP_LIMITS",
+        "PROVIDERS",
+        "TOLERANCE_SEC",
+        "commandOf",
+        "parseDiscordInteraction",
+        "parseSlackEvent",
+        "parseSlackInteraction",
+        "parseTelegramUpdate",
+        "safeEqual",
+        "signCallback",
+        "splitText",
+        "verifyCallback",
+        "verifyDelivery",
+        "verifyDiscord",
+        "verifySlack",
+        "verifyTelegram"
+      ]
+    },
     "commerce": {
       "object": [
         "CommerceError",
@@ -449,6 +469,30 @@
     "createChatClient": "function",
     "createFeedPublisher": "function",
     "createInboxVisitor": "function"
+  },
+  "openvibe-sdk/chat-apps": {
+    "APP_LIMITS": {
+      "object": [
+        "discord",
+        "slack",
+        "telegram"
+      ]
+    },
+    "PROVIDERS": "array",
+    "TOLERANCE_SEC": "number",
+    "commandOf": "function",
+    "parseDiscordInteraction": "function",
+    "parseSlackEvent": "function",
+    "parseSlackInteraction": "function",
+    "parseTelegramUpdate": "function",
+    "safeEqual": "function",
+    "signCallback": "function",
+    "splitText": "function",
+    "verifyCallback": "function",
+    "verifyDelivery": "function",
+    "verifyDiscord": "function",
+    "verifySlack": "function",
+    "verifyTelegram": "function"
   },
   "openvibe-sdk/commerce": {
     "CommerceError": "class",

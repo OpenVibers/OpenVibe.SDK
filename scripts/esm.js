@@ -57,6 +57,7 @@ const ENTRIES = {
     'queue.mjs': '../src/queue.js',
     'pubsub.mjs': '../src/pubsub.js',
     'chat.mjs': '../src/chat.js',
+    'chat-apps.mjs': '../src/chat-apps.js',
     'ai.mjs': '../src/ai.js',
     'jobs.mjs': '../src/jobs.js',
     'tools.mjs': '../src/tools.js',
