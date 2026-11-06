@@ -68,7 +68,7 @@ run([
                 })().catch((err) => { console.error(err); process.exit(1); });`;
             const res = execFileSync(process.execPath, ['-e', script], { cwd: app, encoding: 'utf8' });
             assert.match(res, new RegExp(`consumer ok: ${subpaths.length} subpaths \\+ the browser bundle`));
-            assert.equal(subpaths.length, 84);   // 0.90.0 adds openvibe-sdk/assertions and 0.91.0 openvibe-sdk/streams
+            assert.equal(subpaths.length, 85);   // 0.90.0 assertions, 0.91.0 streams, 0.92.0 chat-apps
             assert.ok(!fs.existsSync(path.join(app, 'node_modules/openvibe-contracts')), 'the optional peer is not installed');
         } finally {
             fs.rmSync(tmp, { recursive: true, force: true });

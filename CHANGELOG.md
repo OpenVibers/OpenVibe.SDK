@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.92.0 (2026-11-06)
+
+- Add `openvibe-sdk/chat-apps`: the three chat apps (Telegram, Discord, Slack) in one place, so a service that answers
+  a chat app reads them the same way (the plan of 2026-10-30, stage A4: "your agent in Telegram, Discord and Slack").
+  - The checks: `verifyTelegram()` (the `X-Telegram-Bot-Api-Secret-Token` header, compared in constant time),
+    `verifySlack()` (v0 over "v0:<timestamp>:<body>", the timestamp within five minutes), `verifyDiscord()` (Ed25519
+    over "<timestamp><body>" with the application's public key) and `verifyDelivery()` (the provider names its own
+    scheme; a provider this does not know is never verified). The code came from OpenVibe.Watch, which has checked
+    these deliveries since 2026-11-03 (Watch #194 and #195).
+  - The buttons: `signCallback()` and `verifyCallback()` carry a whole signed payload with its expiry;
+    `signButton()` and `verifyButton()` carry a 16-character row id in 44 bytes, inside Telegram's 64-byte
+    `callback_data`, and the caller checks who may press it, what it does, that it is used once and that it has
+    not expired against its own row. A token that was changed, replayed or is too old is refused.
+  - The messages: `parseTelegramUpdate()`, `parseDiscordInteraction()`, `parseDiscordMessage()`, `parseSlackEvent()`
+    and `parseSlackInteraction()` give each app's payload the same shape (who said it, where, what they said,
+    whether it was said to the bot, and the button that was pressed), never the app's own JSON and never a
+    message the bot itself sent. `splitText()` splits one answer the way the app accepts it, and `commandOf()`
+    reads a command and its arguments.
+
 ## 0.91.0 (2026-11-06)
 
 - `openvibe-sdk/streams`: the Agent Streams plan, stage 1 — an agent's own stream on OpenVibe.Live (a stream of kind `agent`, id `ags_…`, no stream key and no slot, published with a ticket instead of a key).

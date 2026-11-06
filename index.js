@@ -26,6 +26,7 @@ module.exports = {
     themes: require('./src/themes'),
     redact: require('./src/redact'),
     chat: require('./src/chat'),
+    chatApps: require('./src/chat-apps'),
     ai: require('./src/ai'),
     jobs: require('./src/jobs'),
     tools: require('./src/tools'),
