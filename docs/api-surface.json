@@ -255,6 +255,7 @@
         "queryOf"
       ]
     },
+    "share": "function",
     "space": {
       "object": [
         "createSpaceClient"
@@ -781,6 +782,15 @@
     "validateTelemetrySample": "function",
     "within": "function",
     "wrap": "function"
+  },
+  "openvibe-sdk/share": {
+    "ShareError": "class",
+    "createShareClient": "function",
+    "createShares": "function",
+    "migrateShares": "function",
+    "share": "function",
+    "shareOpenApi": "function",
+    "sharesSchema": "function"
   },
   "openvibe-sdk/space": {
     "createSpaceClient": "function"

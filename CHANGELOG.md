@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.85.0 (2026-11-05)
+
+- Add server-only `openvibe-sdk/share`: PostgreSQL/PGlite store and expand-only migration, audience/role checks, exact name resolution with persistent per-caller limits, expiring membership, access requests, and recipient-bound seven-day ownership transfers. Each mutation and its append-only audit and delivery records commit atomically. Transactional owner/audience hooks update local resources.
+- Add uniform HTTP router, OpenAPI 3.1 fragment, CJS/ESM/TypeScript exports and `sdk.share({ base, token }).for(kind, id)` agent client. Conditional member updates detect concurrent ACL changes. Failures return generic 404 without resource content; staff overrides are audited.
+- Pins openvibe-contracts v0.291.0 (share.v1). No service integrations or media migration are included in this core package.
+
 ## 0.84.0 (2026-11-04)
 
 - **`openvibe-sdk/vibes`: Vibes Pay for developer apps** (MONEY.md, D12). A server creates a charge with its app

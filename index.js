@@ -8,6 +8,7 @@ const core = require('./src/core');
 
 module.exports = {
     ...core,
+    share: require('./src/share').share,
     auth: require('./src/auth'),
     registry: require('./src/registry'),
     identity: require('./src/identity'),
