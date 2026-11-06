@@ -16,24 +16,24 @@ module.exports = {
     ...core,
     auth: __load(8),
     locker: __load(9),
-    registry: __load(18),
-    modules: __load(19),
-    realtime: __load(20),
-    media: __load(21),
-    community: __load(23),
-    bot: __load(24),
-    search: __load(25),
-    bench: __load(26),
-    meme: __load(27),
-    vision: __load(28),
-    themes: __load(29),
-    redact: __load(30),
-    chat: __load(31),
-    ai: __load(32),
-    jobs: __load(33),
-    tools: __load(35),
-    projects: __load(36),
-    geo: __load(37),
+    registry: __load(20),
+    modules: __load(21),
+    realtime: __load(22),
+    media: __load(23),
+    community: __load(25),
+    bot: __load(26),
+    search: __load(27),
+    bench: __load(28),
+    meme: __load(29),
+    vision: __load(30),
+    themes: __load(31),
+    redact: __load(32),
+    chat: __load(33),
+    ai: __load(34),
+    jobs: __load(35),
+    tools: __load(37),
+    projects: __load(38),
+    geo: __load(39),
 };
 },
 // ── 1: src/core/index.js ───────────────────────────────────────────
@@ -866,6 +866,9 @@ const format = __load(11);
 const keys = __load(15);
 const seal = __load(17);
 const { padme } = __load(14);
+const { inspect } = __load(18);
+const { recoveryWords, isRecoveryPhrase, RECOVERY_WORDS } = __load(19);
+const { WORDS } = __load(16);
 const { LockerError } = __load(13);
 
 module.exports = {
@@ -886,8 +889,17 @@ module.exports = {
     openStream: seal.openStream,
     rewrap: seal.rewrap,
 
+    // What an envelope says about itself, without a key.
+    inspect,
+
     // The padding: the padded size of a content of a given size.
     padme,
+
+    // The recovery phrase: words to write down, and a check on a typed one.
+    recoveryWords,
+    isRecoveryPhrase,
+    RECOVERY_WORDS,
+    WORDS,
 
     // A person's keys, and the eight words that say which keys they are.
     generatePersonKeys: keys.generatePersonKeys,
@@ -1152,6 +1164,12 @@ function (module, exports) {
 /**
  * The one error Locker throws. The code says what went wrong, so a caller can tell a wrong
  * password from a truncated download from bytes that are not an envelope at all.
+ *
+ * The codes: locker.invalid (the caller asked for something impossible), locker.bad_envelope
+ * (the bytes are not an envelope we wrote), locker.truncated (the bytes stop early),
+ * locker.wrong_key (the key is not the one), locker.no_key (no key was given), locker.no_slot
+ * (there is no slot for this key), locker.size_mismatch (the size does not add up) and
+ * locker.no_crypto (the runtime has no WebCrypto).
  */
 class LockerError extends Error {
     constructor(code, message) {
@@ -1287,11 +1305,14 @@ function fingerprintMessage(ecdhPublic, signingPublic) {
  * groups of four. Sixty-four bits, not thirty-two: a server that swapped in its own key would
  * need about 2^32 key generations to land on the same four words, which is not "verify a
  * person"; with eight words it would need 2^64.
+ *
+ * The two groups are joined with a middle dot, not a hyphen: a hyphen reads as one compound
+ * word ("plateau yew-apple petal"), and the groups are meant to be read apart.
  */
 function fingerprintWords(hash) {
     const words = [];
     for (let i = 0; i < 8; i++) words.push(WORDS[hash[i]]);
-    return `${words.slice(0, 4).join(' ')}-${words.slice(4).join(' ')}`;
+    return `${words.slice(0, 4).join(' ')} · ${words.slice(4).join(' ')}`;
 }
 
 /**
@@ -1652,8 +1673,8 @@ const {
     lastChunkSize, paddedSize, chunkNonce, encodeChunk, nonceBaseBytes,
 } = __load(11);
 const {
-    KEY_BYTES, PASSWORD_ITERATIONS, subtle, platformRandom, importContentKey,
-    wrapFor, unwrapPeopleSlot, wrapForPassword, unwrapPasswordSlot, resolveEphemeral,
+    KEY_BYTES, PASSWORD_ITERATIONS, subtle, platformRandom, importContentKey, publicJwk,
+    jwkThumbprint, wrapFor, unwrapPeopleSlot, wrapForPassword, unwrapPasswordSlot, resolveEphemeral,
 } = __load(15);
 
 /** The content as bytes: a string is UTF-8, anything else is taken as it is. */
@@ -1869,6 +1890,14 @@ function readCore(header) {
 /** The content key out of the header, with the credentials the reader has. */
 async function openContentKey(header, credentials = {}) {
     if (header.lock === 'people') {
+        // A person may be named by their key instead of their subject: the slot says which key
+        // it is for, so the reader does not need to know who they are.
+        if (credentials.person) {
+            const slot = await slotForPerson(header, credentials.person);
+            const privateKey = await importPrivateKey(privateKeyOf(credentials.person) || credentials.privateKey);
+            if (!privateKey) fail('locker.no_key', 'A people lock needs the private key of a recipient');
+            return unwrapPeopleSlot(slot, privateKey);
+        }
         const slot = pickSlot(header, credentials.subject);
         const privateKey = await importPrivateKey(credentials.privateKey);
         if (!privateKey) fail('locker.no_key', 'A people lock needs the private key of a recipient');
@@ -1898,6 +1927,42 @@ function pickSlot(header, subject) {
     }
     if (slots.length > 1) fail('locker.no_key', 'This envelope has several slots: say which person you are');
     return slots[0];
+}
+
+/** The ECDH public key of a person, as a JWK. */
+async function publicKeyOf(person) {
+    if (!person || typeof person !== 'object') fail('locker.invalid', 'A people lock needs the person');
+    if (person.ecdhPublic) return publicJwk(person.ecdhPublic);
+    if (person.ecdh && person.ecdh.kty) return publicJwk(person.ecdh);
+    if (person.kty === 'EC') return publicJwk(person);
+    if (person.ecdh && person.ecdh.publicKey) {
+        return publicJwk(await subtle().exportKey('jwk', person.ecdh.publicKey));
+    }
+    fail('locker.invalid', 'The person has no ECDH public key');
+}
+
+/** The ECDH private key of a person, if they brought one. */
+function privateKeyOf(person) {
+    if (!person || typeof person !== 'object') return null;
+    if (person.ecdh && person.ecdh.privateKey) return person.ecdh.privateKey;
+    if (person.ecdhPrivateKey) return person.ecdhPrivateKey;
+    if (person.privateKey) return person.privateKey;
+    return null;
+}
+
+/**
+ * The slot that names this person's key. Every people slot carries the thumbprint of the key
+ * it was made for, so the reader finds its own slot without knowing anybody's subject. An
+ * envelope that has no slot for this key is not an envelope this person can open: that is
+ * locker.no_slot, which says the key is not on the list (not that the key is wrong).
+ */
+async function slotForPerson(header, person) {
+    const slots = (header.slots && header.slots.people) || [];
+    if (!slots.length) fail('locker.bad_envelope', 'The envelope has no people slots');
+    const thumbprint = await jwkThumbprint(await publicKeyOf(person));
+    const found = slots.find(slot => slot.recipient_key === thumbprint);
+    if (!found) fail('locker.no_slot', 'This envelope has no slot for that key');
+    return found;
 }
 
 /** A private key as WebCrypto wants it: a CryptoKey, or a JWK to import. */
@@ -2030,7 +2095,8 @@ async function* openPieces(reader, header, key) {
 /**
  * Opens an envelope: the content as bytes.
  *
- *   open(envelope, { privateKey, subject })   // a people lock
+ *   open(envelope, { privateKey, subject })   // a people lock, by subject
+ *   open(envelope, { person })                // a people lock, by key
  *   open(envelope, { password })               // a password lock
  *   open(envelope, { key })                    // a link lock
  */
@@ -2185,9 +2251,107 @@ async function rewrap(envelope, {
 module.exports = {
     seal, open, sealStream, openStream, rewrap,
     envelopeBytes, toBytes, openContentKey, readCore, prepare, makeHeader, Chunker,
+    publicKeyOf, privateKeyOf, slotForPerson,
 };
 },
-// ── 18: src/registry.js ─────────────────────────────────────────────
+// ── 18: src/locker/inspect.js ───────────────────────────────────────
+function (module, exports) {
+'use strict';
+/**
+ * inspect: what an envelope says about itself, without a key and without decrypting anything.
+ *
+ * A service, or a page that shows a locked item, often needs to know the lock kind, how big
+ * the item is, who it is for and how strong the password is — before it has any key at all.
+ * This reads the header and nothing else: no chunk is touched and no key is used.
+ *
+ * The header holds no content, only wrapped keys, so this says nothing the server does not
+ * already see.
+ */
+const { envelopeBytes, readCore } = __load(17);
+const { readHeader } = __load(11);
+
+/**
+ * What an envelope says about itself.
+ *
+ *   { version, lock, padded_size, recipients, iterations }
+ *
+ * `recipients` holds the thumbprint of each recipient's key for a people lock (the same
+ * strings the slots carry), and `iterations` the PBKDF2 count for a password lock. The other
+ * field is empty for the other lock kinds.
+ */
+function inspect(bytes) {
+    const data = envelopeBytes(bytes);
+    const { header } = readHeader(data);
+    readCore(header);
+    const out = {
+        version: header.version,
+        lock: header.lock,
+        padded_size: header.padded_size,
+        recipients: [],
+        iterations: null,
+    };
+    if (header.lock === 'people') {
+        out.recipients = (header.slots.people || []).map(slot => slot.recipient_key);
+    } else if (header.lock === 'password' && header.slots.password) {
+        out.iterations = header.slots.password.iterations;
+    }
+    return out;
+}
+
+module.exports = { inspect };
+},
+// ── 19: src/locker/recovery.js ──────────────────────────────────────
+function (module, exports) {
+'use strict';
+/**
+ * The recovery phrase: the words a person writes down.
+ *
+ * A phrase of n words from the same 256-word list the fingerprint uses, one byte per word from
+ * the platform's CSPRNG (crypto.getRandomValues). Eight bits per word, so the usual 24 words
+ * carry 192 bits: enough for a key nobody else has, and short enough to write on paper.
+ *
+ * There is no checksum in the phrase: the words are the secret, and a phrase that is typed
+ * wrong simply does not open anything. isRecoveryPhrase only says whether every word is one of
+ * the 256, so a UI can tell a typo from a word that was never in the list.
+ */
+const { fail } = __load(13);
+const { platformRandom } = __load(15);
+const { WORDS } = __load(16);
+
+/** How many words a recovery phrase has, unless the caller says otherwise. */
+const RECOVERY_WORDS = 24;
+
+/**
+ * A recovery phrase: n words from the list, one byte each.
+ *
+ *   recoveryWords()      // 24 words, 192 bits
+ *   recoveryWords(12)    // 12 words, 96 bits
+ */
+function recoveryWords(count = RECOVERY_WORDS, { random = platformRandom } = {}) {
+    if (!Number.isInteger(count) || count < 1 || count > WORDS.length) {
+        fail('locker.invalid', `A recovery phrase is one to ${WORDS.length} words`);
+    }
+    // One byte per word: the list has 256 words, so a byte picks one of them exactly.
+    const bytes = random(count);
+    const words = [];
+    for (const byte of bytes) words.push(WORDS[byte]);
+    return words.join(' ');
+}
+
+/**
+ * Whether a typed phrase is made of words from the list. It says nothing about the order or
+ * about whether the phrase is the right one: only that every word could have come from us.
+ */
+function isRecoveryPhrase(phrase) {
+    if (typeof phrase !== 'string') return false;
+    const words = phrase.trim().split(/\s+/).filter(Boolean);
+    if (!words.length) return false;
+    return words.every(word => WORDS.includes(word.toLowerCase()));
+}
+
+module.exports = { RECOVERY_WORDS, recoveryWords, isRecoveryPhrase };
+},
+// ── 20: src/registry.js ─────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -2224,7 +2388,7 @@ function createRegistryClient(client, { baseUrl } = {}) {
 
 module.exports = { createRegistryClient };
 },
-// ── 19: src/modules.js ──────────────────────────────────────────────
+// ── 21: src/modules.js ──────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -2303,7 +2467,7 @@ function createModulesClient(client, { baseUrl, maxAttempts = 5 } = {}) {
 
 module.exports = { createModulesClient };
 },
-// ── 20: src/realtime.js ─────────────────────────────────────────────
+// ── 22: src/realtime.js ─────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -2556,7 +2720,7 @@ function createRealtimeClient(client, defaults = {}) {
 
 module.exports = { subscribe, createRealtimeClient, parseSSE, DEFAULT_ORIGIN };
 },
-// ── 21: src/media.js ────────────────────────────────────────────────
+// ── 23: src/media.js ────────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -2578,7 +2742,7 @@ function (module, exports) {
  */
 const { isOpenVibeError } = __load(3);
 const { paginate, offsetPager } = __load(7);
-const { createObjectsClient } = __load(22);
+const { createObjectsClient } = __load(24);
 
 const DEFAULT_PUBLIC_ORIGIN = 'https://openvibe.media';
 const enc = encodeURIComponent;
@@ -2670,7 +2834,7 @@ function createMediaClient(client, { app, apiKey, actingUserId, baseUrl, publicO
 
 module.exports = { createMediaClient, createObjectsClient, mediaUrls, DEFAULT_PUBLIC_ORIGIN };
 },
-// ── 22: src/objects.js ──────────────────────────────────────────────
+// ── 24: src/objects.js ──────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -2989,7 +3153,7 @@ function createObjectsClient({
 
 module.exports = { createObjectsClient };
 },
-// ── 23: src/community.js ────────────────────────────────────────────
+// ── 25: src/community.js ────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -3108,7 +3272,7 @@ function createCommunityClient(client, defaults = {}) {
 
 module.exports = { createCommunityClient, actingHeaders };
 },
-// ── 24: src/bot.js ──────────────────────────────────────────────────
+// ── 26: src/bot.js ──────────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -3330,7 +3494,7 @@ function createBotClient(client, defaults = {}) {
 
 module.exports = { createBotClient, actingHeaders };
 },
-// ── 25: src/search.js ───────────────────────────────────────────────
+// ── 27: src/search.js ───────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -3443,7 +3607,7 @@ function createSearchClient(client, defaults = {}) {
 
 module.exports = { createSearchClient, queryOf, fabricOf };
 },
-// ── 26: src/bench.js ────────────────────────────────────────────────
+// ── 28: src/bench.js ────────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /** openvibe-sdk/bench: OpenVibe.Bench's JSON API and streamed open dataset. Browser-safe. */
@@ -3544,7 +3708,7 @@ function createBenchClient(client, defaults = {}) {
 
 module.exports = { createBenchClient };
 },
-// ── 27: src/meme.js ─────────────────────────────────────────────────
+// ── 29: src/meme.js ─────────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -3612,7 +3776,7 @@ function createMemeClient(client, defaults = {}) {
 
 module.exports = { createMemeClient };
 },
-// ── 28: src/vision.js ───────────────────────────────────────────────
+// ── 30: src/vision.js ───────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -3770,7 +3934,7 @@ function pick(o, keys) {
 
 module.exports = { createVisionClient, DEFAULT_AUDIENCE };
 },
-// ── 29: src/themes.js ───────────────────────────────────────────────
+// ── 31: src/themes.js ───────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -3920,7 +4084,7 @@ function followTheme(fn, opts = {}) {
 
 module.exports = { createThemesClient, followTheme, readTheme, applyTheme, seasonOn, onColor, DISPLAY_OPTIONS, TOKENS };
 },
-// ── 30: src/redact.js ───────────────────────────────────────────────
+// ── 32: src/redact.js ───────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -4167,7 +4331,7 @@ function onlySecret(text) {
 
 module.exports = { redact, onlySecret };
 },
-// ── 31: src/chat.js ─────────────────────────────────────────────────
+// ── 33: src/chat.js ─────────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -4409,7 +4573,7 @@ function createFeedPublisher(client, { feed, key, baseUrl } = {}) {
 
 module.exports = { createChatClient, createInboxVisitor, createFeedPublisher };
 },
-// ── 32: src/ai.js ───────────────────────────────────────────────────
+// ── 34: src/ai.js ───────────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -4484,7 +4648,7 @@ function createAiClient(client, defaults = {}) {
 
 module.exports = { createAiClient, TERMINAL, OPS };
 },
-// ── 33: src/jobs.js ─────────────────────────────────────────────────
+// ── 35: src/jobs.js ─────────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -4522,8 +4686,8 @@ function (module, exports) {
  */
 const { OpenVibeError, isOpenVibeError } = __load(3);
 const { newIdempotencyKey } = __load(5);
-const { appendFiles } = __load(34);
-const { parseSSE } = __load(20);
+const { appendFiles } = __load(36);
+const { parseSSE } = __load(22);
 
 const TERMINAL = new Set(['succeeded', 'failed', 'cancelled']);
 const TERMINAL_EVENTS = new Set(['job.succeeded', 'job.failed', 'job.cancelled']);
@@ -4686,7 +4850,7 @@ function createJobsClient(client, { baseUrl, service = 'tools', audience = 'open
 
 module.exports = { createJobsClient, isTerminal, TERMINAL_STATES: [...TERMINAL] };
 },
-// ── 34: src/core/form.js ────────────────────────────────────────────
+// ── 36: src/core/form.js ────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -4720,7 +4884,7 @@ function appendFiles(form, list, where) {
 
 module.exports = { isBlob, isUpload, appendFiles };
 },
-// ── 35: src/tools.js ────────────────────────────────────────────────
+// ── 37: src/tools.js ────────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -4754,8 +4918,8 @@ function (module, exports) {
  */
 const { OpenVibeError, isOpenVibeError } = __load(3);
 const { newIdempotencyKey } = __load(5);
-const { isUpload, appendFiles } = __load(34);
-const { createJobsClient } = __load(33);
+const { isUpload, appendFiles } = __load(36);
+const { createJobsClient } = __load(35);
 
 const enc = encodeURIComponent;
 const ID_RE = /^[a-z][a-z0-9-]{0,39}$/;
@@ -5005,7 +5169,7 @@ function createToolsClient(client, { baseUrl, service = 'tools', audience = 'ope
 
 module.exports = { createToolsClient, ToolRunError, isToolRunError };
 },
-// ── 36: src/projects.js ─────────────────────────────────────────────
+// ── 38: src/projects.js ─────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -5121,7 +5285,7 @@ function createProjectsClient(client, { baseUrl } = {}) {
 
 module.exports = { createProjectsClient };
 },
-// ── 37: src/geo.js ──────────────────────────────────────────────────
+// ── 39: src/geo.js ──────────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**

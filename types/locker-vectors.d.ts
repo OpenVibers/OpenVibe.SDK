@@ -2,7 +2,8 @@
  * openvibe-sdk/locker/vectors: the shared test vectors.
  *
  * The browser module (openvibe-shared/ov-locker.js) runs the same cases, so both runtimes must
- * produce the same bytes for the same input: the same header, the same envelope, the same four words.
+ * produce the same bytes for the same input: the same header, the same envelope, the same eight
+ * words, the same recovery phrase and the same reading of each envelope.
  */
 import type { LockerHeader, PublicKeyJwk } from './locker';
 
@@ -33,3 +34,15 @@ export interface VectorCase {
 
 /** The cases. */
 export const CASES: VectorCase[];
+
+/** A recovery phrase from a fixed byte source: the same words on every runtime. */
+export const RECOVERY: { phrase: string; words: string[] };
+
+/** What inspect() says about each case: the header, read without a key. */
+export const INSPECT: Record<string, {
+    version: string;
+    lock: string;
+    padded_size: number;
+    recipients: string[];
+    iterations: number | null;
+}>;

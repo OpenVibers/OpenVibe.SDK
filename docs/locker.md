@@ -144,6 +144,47 @@ The private keys are stored wrapped, by a key from the locker passphrase (PBKDF2
 passkey; see `locker.key-backup@1` in Contracts. There is no reset: if the passphrase and the recovery
 kit are both lost, nobody can open the locker, including OpenVibe.
 
+## The recovery phrase: words to write down
+
+`recoveryWords` gives a phrase of words from the same 256-word list, one byte per word from the
+platform's CSPRNG, so the usual 24 words carry 192 bits. `isRecoveryPhrase` says whether every word
+of a typed phrase is one of the 256, so a page can tell a typo from a word that was never ours.
+
+```js
+const { recoveryWords, isRecoveryPhrase, WORDS } = require('openvibe-sdk/locker');
+
+const phrase = recoveryWords();     // 24 words, 192 bits
+recoveryWords(12);                  // 12 words, 96 bits
+isRecoveryPhrase(phrase);           // true
+isRecoveryPhrase('amber anchor zzzz');   // false: zzzz is not one of the 256
+WORDS.length;                       // 256
+```
+
+## Opening by key: `person`
+
+A people lock can be opened without knowing anybody's subject: every slot names the key it was
+made for, so the reader finds its own slot by that key.
+
+```js
+const note = await open(sealed.bytes, { person });   // person.ecdhPublic and person.ecdh.privateKey
+```
+
+An envelope that has no slot for that key fails with `locker.no_slot`, which says the key is not on
+the list. `locker.wrong_key` is for a key that is on the list but does not open the slot.
+
+## What an envelope is: `inspect`
+
+`inspect` reads the header and nothing else: no key, no decryption. It is what a page shows before
+the reader has any key.
+
+```js
+const { lock, version, padded_size, recipients, iterations } = inspect(bytes);
+// recipients: the thumbprint of each recipient's key, for a people lock
+// iterations: the PBKDF2 count, for a password lock
+```
+
+The same checks, with the errors as words rather than exceptions, are in `openvibe-sdk/locker/server`.
+
 ## What a service does: openvibe-sdk/locker/server
 
 A service stores an envelope as opaque bytes and never opens it. This module gives it the checks in

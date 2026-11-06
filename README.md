@@ -573,4 +573,4 @@ Part of the [OpenVibe network](https://openvibe.network). Built in the open by [
 
 ### Locker: end-to-end encryption (Node and the browser)
 
-`openvibe-sdk/locker` seals anything and opens it again: the Locker envelope (`locker.envelope@1`), the three locks (people, password, link), streams for files, person key pairs and the eight-word fingerprint, `wrapFor` and `rewrap` for sharing. `openvibe-sdk/locker/server` gives a service the header checks without a key. WebCrypto only, in Node and the browser. See [the locker module](docs/locker.md).
+`openvibe-sdk/locker` seals anything and opens it again: the Locker envelope (`locker.envelope@1`), the three locks (people, password, link), streams for files, person key pairs and the eight-word fingerprint, `wrapFor` and `rewrap` for sharing, `recoveryWords` for the phrase to write down, `inspect` for what an envelope says about itself, and opening a people lock by key. `openvibe-sdk/locker/server` gives a service the header checks without a key. WebCrypto only, in Node and the browser. See [the locker module](docs/locker.md).

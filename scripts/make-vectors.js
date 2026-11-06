@@ -32,6 +32,16 @@ const sha256 = (bytes) => crypto.createHash('sha256').update(Buffer.from(bytes))
         link: await locker.seal(CONTENT, { lock: 'link', random }),
     };
     const fingerprint = await locker.fingerprintOf(person.ecdhPublic, person.signingPublic);
+    // A recovery phrase from its own fixed byte source, so the words are the same everywhere.
+    const recovery = {
+        phrase: locker.recoveryWords(24, { random: fixedRandom(0x5eed1e) }),
+        words: locker.recoveryWords(24, { random: fixedRandom(0x5eed1e) }).split(' '),
+    };
+    // What inspect() says about each case, without a key.
+    const inspect = {};
+    for (const name of ['people', 'password', 'link']) {
+        inspect[name] = locker.inspect(made[name].bytes);
+    }
     const cases = ['people', 'password', 'link'].map(name => ({
         name,
         envelope_sha256: sha256(made[name].bytes),
@@ -78,7 +88,13 @@ const SUBJECT = ${JSON.stringify(SUBJECT, null, 4)};
 /** The cases: the same content, sealed three ways. */
 const CASES = ${JSON.stringify(cases, null, 4)};
 
-module.exports = { fixedRandom, CONTENT, PERSON, SUBJECT, CASES };
+/** A recovery phrase from a fixed byte source: the same words on every runtime. */
+const RECOVERY = ${JSON.stringify(recovery, null, 4)};
+
+/** What inspect() says about each case: the header, read without a key. */
+const INSPECT = ${JSON.stringify(inspect, null, 4)};
+
+module.exports = { fixedRandom, CONTENT, PERSON, SUBJECT, CASES, RECOVERY, INSPECT };
 `;
     fs.writeFileSync(path.join(__dirname, '..', 'src', 'locker', 'vectors.js'), file);
     console.log('wrote src/locker/vectors.js');

@@ -4,8 +4,9 @@ import cjs from '../src/locker.js';
 export const {
     VERSION, SUITE, CHUNK_SIZE, MIN_PADDED_SIZE, MAX_HEADER_BYTES, PASSWORD_ITERATIONS,
     PASSWORD_ITERATIONS_MIN, PASSWORD_ITERATIONS_MAX, seal, open, sealStream, openStream,
-    rewrap, padme, generatePersonKeys, exportPersonKeys, exportPrivateKeys, importPersonKeys,
-    verifyPersonKeys, fingerprintOf, fingerprintWords, jwkThumbprint, wrapFor, wrapForPassword,
-    unwrapPeopleSlot, unwrapPasswordSlot, LockerError,
+    rewrap, inspect, padme, recoveryWords, isRecoveryPhrase, RECOVERY_WORDS,
+    WORDS, generatePersonKeys, exportPersonKeys, exportPrivateKeys, importPersonKeys, verifyPersonKeys,
+    fingerprintOf, fingerprintWords, jwkThumbprint, wrapFor, wrapForPassword, unwrapPeopleSlot,
+    unwrapPasswordSlot, LockerError,
 } = cjs;
 export default cjs;

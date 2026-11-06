@@ -43,6 +43,17 @@ export interface LockerHeader {
     slots: { people?: PeopleSlot[]; password?: PasswordSlot; link?: Record<string, never> };
 }
 
+/** What an envelope says about itself: the header, read without a key. */
+export interface EnvelopeInfo {
+    version: string;
+    lock: LockKind;
+    padded_size: number;
+    /** For a people lock: the thumbprint of each recipient's key. */
+    recipients: string[];
+    /** For a password lock: the PBKDF2 iteration count. */
+    iterations: number | null;
+}
+
 /** A sealed envelope: its bytes and its header. */
 export interface Envelope {
     version: string;
@@ -95,6 +106,21 @@ export interface OpenCredentials {
     privateKey?: CryptoKey | Record<string, unknown>;
     /** A people lock: which person you are. */
     subject?: SubjectRef | string;
+    /**
+     * A people lock: the person who is opening, with their ECDH key. The slot that names their
+     * key is found without knowing anybody's subject; an envelope with no slot for that key
+     * fails with locker.no_slot.
+     */
+    person?: {
+        ecdhPublic?: PublicKeyJwk;
+        ecdh?: { publicKey?: CryptoKey; privateKey?: CryptoKey } | PublicKeyJwk;
+        ecdhPrivateKey?: CryptoKey;
+        privateKey?: CryptoKey;
+        kty?: string;
+        crv?: string;
+        x?: string;
+        y?: string;
+    };
     /** A password lock. */
     password?: string;
     /** A link lock: the key from the link. */
@@ -149,6 +175,14 @@ export function jwkThumbprint(jwk: PublicKeyJwk): Promise<string>;
 /** The padded size of a content of this size: Padme's grid, never below the floor. */
 export function padme(size: number): number;
 
+/** What an envelope says about itself, without a key and without decrypting anything. */
+export function inspect(bytes: Uint8Array | Envelope): EnvelopeInfo;
+
+/** A recovery phrase: n words from the list, one byte each. */
+export function recoveryWords(count?: number, options?: { random?: (length: number) => Uint8Array }): string;
+/** Whether every word of a typed phrase is one of the 256. */
+export function isRecoveryPhrase(phrase: string): boolean;
+
 /** Wraps the content key for one person. */
 export function wrapFor(contentKey: Uint8Array, publicKey: PublicKeyJwk, options: { subject: SubjectRef; salt?: Uint8Array; random?: (length: number) => Uint8Array; ephemeral?: { private?: Record<string, unknown>; privateKey?: CryptoKey; publicKey?: CryptoKey } }): Promise<PeopleSlot>;
 /** Wraps the content key with a password. */
@@ -166,3 +200,7 @@ export const MAX_HEADER_BYTES: number;
 export const PASSWORD_ITERATIONS: number;
 export const PASSWORD_ITERATIONS_MIN: number;
 export const PASSWORD_ITERATIONS_MAX: number;
+/** How many words a recovery phrase has, unless the caller says otherwise. */
+export const RECOVERY_WORDS: number;
+/** The 256 words a fingerprint and a recovery phrase are made of. */
+export const WORDS: string[];

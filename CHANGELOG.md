@@ -12,6 +12,10 @@
   - `wrapFor` and `rewrap`: adding a member to a people-locked item re-wraps the content key and leaves the content alone.
 - Add `openvibe-sdk/locker/server`: what a service needs to know about an envelope without opening it, the header's shape and the envelope's size, with no key and no decryption.
 - Add `openvibe-sdk/locker/vectors`: the shared test vectors, so the browser module (`openvibe-shared/ov-locker.js`) runs the same cases and gets the same bytes.
+- Add `recoveryWords(n)`: a phrase of words from the same 256-word list, one byte per word from the platform's CSPRNG, so 24 words carry 192 bits. `isRecoveryPhrase` says whether every word of a typed phrase is one of the 256, and `WORDS` is the list itself.
+- A people lock can now be opened by key: `open(bytes, { person })` finds the slot that names the reader's key, without a subject. An envelope with no slot for that key fails with the new code `locker.no_slot`, which says the key is not on the list (`locker.wrong_key` is for a key that is on it).
+- Add `inspect(bytes)`: what an envelope says about itself — the lock, the version, the padded size, the recipients' key thumbprints and the password's iteration count — without a key and without decrypting anything.
+- The fingerprint's two groups of four are joined by a middle dot, not a hyphen: a hyphen reads as one compound word.
 - Temporarily pin Contracts to `feat/locker-core-contracts` (0.292.0). The orchestrator releases Contracts and repins the SDK before release.
 
 ## 0.85.0 (2026-11-05)

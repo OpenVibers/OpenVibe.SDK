@@ -9,7 +9,7 @@
   "deployment": "none: a package released as git tags; services and apps pin a tag",
   "contracts": "openvibe-contracts feat/locker-core-contracts (temporary branch pin; repin after the orchestrator releases Contracts 0.292.0)",
   "features": [
-    "locker (openvibe-sdk/locker, openvibe-sdk/locker/server): the Locker envelope (locker.envelope@1) for end-to-end encryption, WebCrypto only, in Node and the browser: seal/open for text and bytes, sealStream/openStream, the three locks (people, password, link), person key pairs (ECDH P-256, ECDSA P-256), the eight-word fingerprint, wrapFor and rewrap, and the header checks a service runs without a key",
+    "locker (openvibe-sdk/locker, openvibe-sdk/locker/server): the Locker envelope (locker.envelope@1) for end-to-end encryption, WebCrypto only, in Node and the browser: seal/open for text and bytes, sealStream/openStream, the three locks (people, password, link), person key pairs (ECDH P-256, ECDSA P-256), the eight-word fingerprint, wrapFor and rewrap, recoveryWords for the phrase to write down, opening a people lock by key, inspect for what an envelope says about itself, and the header checks a service runs without a key",
     "share (openvibe-sdk/share): transactional local sharing, audience and membership checks, exact-name resolution, recipient-bound ownership transfers, audit, durable events/notifications, uniform API and agent client",
     "redact (openvibe-sdk/redact): the shared secret scrubber for memory, the same shapes and corpus as OpenVibe.Node's internal/memory/redact.go (redact, onlySecret)",
     "core client: retries, timeouts, problem+json errors, trace propagation",

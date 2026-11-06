@@ -99,19 +99,89 @@ run([
         assert.equal(alice.ecdhPublic.kty, 'EC');
         assert.equal(alice.ecdhPublic.crv, 'P-256');
         assert.equal(alice.signingPublic.kty, 'EC');
-        // Eight words in two groups of four: sixty-four bits, not thirty-two.
-        assert.match(alice.fingerprint, /^[a-z]+ [a-z]+ [a-z]+ [a-z]+-[a-z]+ [a-z]+ [a-z]+ [a-z]+$/);
-        assert.equal(alice.fingerprint.split('-').length, 2);
-        assert.equal(alice.fingerprint.split('-')[0].split(' ').length, 4);
+        // Eight words in two groups of four, joined by a middle dot: sixty-four bits.
+        assert.match(alice.fingerprint, /^[a-z]+ [a-z]+ [a-z]+ [a-z]+ · [a-z]+ [a-z]+ [a-z]+ [a-z]+$/);
+        assert.equal(alice.fingerprint.split(' · ').length, 2);
+        assert.equal(alice.fingerprint.split(' · ')[0].split(' ').length, 4);
         assert.notEqual(alice.fingerprint, bob.fingerprint);
         const published = await locker.exportPersonKeys(alice);
         assert.equal(published.fingerprint, alice.fingerprint);
         assert.equal(await locker.verifyPersonKeys(published), true);
+        // And the published keys are the contract.
+        const checked = contracts.validate('locker.public-keys', {
+            subject: { type: 'user', id: 'usr_01JAB2C3D4E5F6G7H8J9K0MNPQ' },
+            ecdh: published.ecdh,
+            signing: published.signing,
+            fingerprint: published.fingerprint,
+            fingerprint_signature: published.fingerprint_signature,
+            updated_at: '2026-11-06T00:00:00Z',
+        });
+        assert.equal(checked.valid, true, JSON.stringify(checked.errors));
         // A fingerprint that does not belong to the keys is caught.
-        assert.equal(await locker.verifyPersonKeys({ ...published, fingerprint: 'wrong words here now-bad bad bad bad' }), false);
+        assert.equal(await locker.verifyPersonKeys({ ...published, fingerprint: 'wrong words here now · bad bad bad bad' }), false);
         // A signature over other keys is caught.
         const other = await locker.exportPersonKeys(bob);
         assert.equal(await locker.verifyPersonKeys({ ...published, fingerprint_signature: other.fingerprint_signature }), false);
+    }],
+
+    ['a recovery phrase is words from the list', async () => {
+        assert.equal(locker.WORDS.length, 256);
+        assert.equal(locker.RECOVERY_WORDS, 24);
+        const phrase = locker.recoveryWords();
+        const words = phrase.split(' ');
+        assert.equal(words.length, 24, 'the phrase has 24 words');
+        for (const word of words) assert.ok(locker.WORDS.includes(word), `${word} is one of the 256`);
+        // Two phrases are never the same: the words come from the platform's CSPRNG.
+        assert.notEqual(phrase, locker.recoveryWords());
+        assert.notEqual(phrase.split(' ')[0], locker.recoveryWords().split(' ')[0]);
+        // Another number of words, and the same check on a typed phrase.
+        assert.equal(locker.recoveryWords(12).split(' ').length, 12);
+        assert.equal(locker.isRecoveryPhrase(phrase), true);
+        assert.equal(locker.isRecoveryPhrase('  amber   anchor  '), true, 'the spacing does not matter');
+        assert.equal(locker.isRecoveryPhrase('amber anchor harbor zzzz'), false, 'a word that is not in the list');
+        assert.equal(locker.isRecoveryPhrase(''), false);
+        assert.equal(locker.isRecoveryPhrase('AMBER ANCHOR'), true, 'the list is lower case');
+        // The words come from the CSPRNG, not from a fixed source: the platform's bytes.
+        assert.throws(() => locker.recoveryWords(0), (err) => err.code === 'locker.invalid');
+        assert.throws(() => locker.recoveryWords(257), (err) => err.code === 'locker.invalid');
+    }],
+
+    ['a people lock opens by key, without a subject', async () => {
+        const sealed = await sealFor('a note');
+        // The reader knows their own key and nothing else.
+        const opened = await locker.open(sealed.bytes, { person: alice });
+        assert.equal(decoder.decode(opened), 'a note');
+        // The other person on the list opens it with their own key.
+        assert.equal(decoder.decode(await locker.open(sealed.bytes, { person: bob })), 'a note');
+        // A key that is not on the list: there is no slot for it, which is not a wrong key.
+        const stranger = await locker.generatePersonKeys();
+        await fails(() => locker.open(sealed.bytes, { person: stranger }), 'locker.no_slot');
+        // A person with no private key cannot open it either.
+        await fails(() => locker.open(sealed.bytes, { person: { ecdhPublic: alice.ecdhPublic } }), 'locker.no_key');
+    }],
+
+    ['inspect says what an envelope is, without a key', async () => {
+        const people = await sealFor('a note');
+        const seen = locker.inspect(people.bytes);
+        assert.equal(seen.version, 'locker.envelope.v1');
+        assert.equal(seen.lock, 'people');
+        assert.equal(seen.padded_size, people.header.padded_size);
+        assert.equal(seen.recipients.length, 2);
+        assert.equal(seen.recipients[0], people.header.slots.people[0].recipient_key);
+        assert.equal(seen.recipients[1], people.header.slots.people[1].recipient_key);
+        assert.equal(seen.iterations, null);
+        // A password lock names its iteration count.
+        const password = await locker.seal('a note', { lock: 'password', password: 'x', iterations: 700000 });
+        const seenPassword = locker.inspect(password.bytes);
+        assert.equal(seenPassword.lock, 'password');
+        assert.equal(seenPassword.iterations, 700000);
+        assert.deepEqual(seenPassword.recipients, []);
+        // A link lock says nothing about anybody.
+        const link = await locker.seal('a note', { lock: 'link' });
+        assert.deepEqual(locker.inspect(link.bytes).recipients, []);
+        assert.equal(locker.inspect(link.bytes).iterations, null);
+        // Bytes that are not an envelope at all. (inspect is synchronous, so it throws.)
+        assert.throws(() => locker.inspect(text('not an envelope')), (err) => err.code === 'locker.bad_envelope');
     }],
 
     ['the three locks round trip', async () => {
@@ -501,6 +571,14 @@ run([
         }
         // The fingerprint of the vector's keys is the one the file says.
         assert.equal(await locker.fingerprintOf(person.ecdhPublic, person.signingPublic), vectors.PERSON.fingerprint);
+        // The recovery phrase is the same words on every runtime.
+        assert.equal(locker.recoveryWords(24, { random: vectors.fixedRandom(0x5eed1e) }), vectors.RECOVERY.phrase);
+        assert.equal(locker.isRecoveryPhrase(vectors.RECOVERY.phrase), true);
+        assert.equal(vectors.RECOVERY.words.length, 24);
+        // And what inspect says about each case, without a key.
+        for (const testCase of vectors.CASES) {
+            assert.deepEqual(locker.inspect(made[testCase.name].bytes), vectors.INSPECT[testCase.name]);
+        }
         // And the vectors open with the vector's keys.
         const privateKey = await locker.importPersonKeys({ ecdh: person.ecdh, signing: person.signing });
         assert.equal(

@@ -66,11 +66,14 @@ function fingerprintMessage(ecdhPublic, signingPublic) {
  * groups of four. Sixty-four bits, not thirty-two: a server that swapped in its own key would
  * need about 2^32 key generations to land on the same four words, which is not "verify a
  * person"; with eight words it would need 2^64.
+ *
+ * The two groups are joined with a middle dot, not a hyphen: a hyphen reads as one compound
+ * word ("plateau yew-apple petal"), and the groups are meant to be read apart.
  */
 function fingerprintWords(hash) {
     const words = [];
     for (let i = 0; i < 8; i++) words.push(WORDS[hash[i]]);
-    return `${words.slice(0, 4).join(' ')}-${words.slice(4).join(' ')}`;
+    return `${words.slice(0, 4).join(' ')} · ${words.slice(4).join(' ')}`;
 }
 
 /**

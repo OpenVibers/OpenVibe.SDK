@@ -166,18 +166,23 @@
         "PASSWORD_ITERATIONS",
         "PASSWORD_ITERATIONS_MAX",
         "PASSWORD_ITERATIONS_MIN",
+        "RECOVERY_WORDS",
         "SUITE",
         "VERSION",
+        "WORDS",
         "exportPersonKeys",
         "exportPrivateKeys",
         "fingerprintOf",
         "fingerprintWords",
         "generatePersonKeys",
         "importPersonKeys",
+        "inspect",
+        "isRecoveryPhrase",
         "jwkThumbprint",
         "open",
         "openStream",
         "padme",
+        "recoveryWords",
         "rewrap",
         "seal",
         "sealStream",
@@ -637,18 +642,23 @@
     "PASSWORD_ITERATIONS": "number",
     "PASSWORD_ITERATIONS_MAX": "number",
     "PASSWORD_ITERATIONS_MIN": "number",
+    "RECOVERY_WORDS": "number",
     "SUITE": "string",
     "VERSION": "string",
+    "WORDS": "array",
     "exportPersonKeys": "function",
     "exportPrivateKeys": "function",
     "fingerprintOf": "function",
     "fingerprintWords": "function",
     "generatePersonKeys": "function",
     "importPersonKeys": "function",
+    "inspect": "function",
+    "isRecoveryPhrase": "function",
     "jwkThumbprint": "function",
     "open": "function",
     "openStream": "function",
     "padme": "function",
+    "recoveryWords": "function",
     "rewrap": "function",
     "seal": "function",
     "sealStream": "function",
@@ -665,6 +675,13 @@
   "openvibe-sdk/locker/vectors": {
     "CASES": "array",
     "CONTENT": "string",
+    "INSPECT": {
+      "object": [
+        "link",
+        "password",
+        "people"
+      ]
+    },
     "PERSON": {
       "object": [
         "ecdh",
@@ -672,6 +689,12 @@
         "fingerprint",
         "signing",
         "signingPublic"
+      ]
+    },
+    "RECOVERY": {
+      "object": [
+        "phrase",
+        "words"
       ]
     },
     "SUBJECT": {

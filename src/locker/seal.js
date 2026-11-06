@@ -16,8 +16,8 @@ const {
     lastChunkSize, paddedSize, chunkNonce, encodeChunk, nonceBaseBytes,
 } = require('./format');
 const {
-    KEY_BYTES, PASSWORD_ITERATIONS, subtle, platformRandom, importContentKey,
-    wrapFor, unwrapPeopleSlot, wrapForPassword, unwrapPasswordSlot, resolveEphemeral,
+    KEY_BYTES, PASSWORD_ITERATIONS, subtle, platformRandom, importContentKey, publicJwk,
+    jwkThumbprint, wrapFor, unwrapPeopleSlot, wrapForPassword, unwrapPasswordSlot, resolveEphemeral,
 } = require('./keys');
 
 /** The content as bytes: a string is UTF-8, anything else is taken as it is. */
@@ -233,6 +233,14 @@ function readCore(header) {
 /** The content key out of the header, with the credentials the reader has. */
 async function openContentKey(header, credentials = {}) {
     if (header.lock === 'people') {
+        // A person may be named by their key instead of their subject: the slot says which key
+        // it is for, so the reader does not need to know who they are.
+        if (credentials.person) {
+            const slot = await slotForPerson(header, credentials.person);
+            const privateKey = await importPrivateKey(privateKeyOf(credentials.person) || credentials.privateKey);
+            if (!privateKey) fail('locker.no_key', 'A people lock needs the private key of a recipient');
+            return unwrapPeopleSlot(slot, privateKey);
+        }
         const slot = pickSlot(header, credentials.subject);
         const privateKey = await importPrivateKey(credentials.privateKey);
         if (!privateKey) fail('locker.no_key', 'A people lock needs the private key of a recipient');
@@ -262,6 +270,42 @@ function pickSlot(header, subject) {
     }
     if (slots.length > 1) fail('locker.no_key', 'This envelope has several slots: say which person you are');
     return slots[0];
+}
+
+/** The ECDH public key of a person, as a JWK. */
+async function publicKeyOf(person) {
+    if (!person || typeof person !== 'object') fail('locker.invalid', 'A people lock needs the person');
+    if (person.ecdhPublic) return publicJwk(person.ecdhPublic);
+    if (person.ecdh && person.ecdh.kty) return publicJwk(person.ecdh);
+    if (person.kty === 'EC') return publicJwk(person);
+    if (person.ecdh && person.ecdh.publicKey) {
+        return publicJwk(await subtle().exportKey('jwk', person.ecdh.publicKey));
+    }
+    fail('locker.invalid', 'The person has no ECDH public key');
+}
+
+/** The ECDH private key of a person, if they brought one. */
+function privateKeyOf(person) {
+    if (!person || typeof person !== 'object') return null;
+    if (person.ecdh && person.ecdh.privateKey) return person.ecdh.privateKey;
+    if (person.ecdhPrivateKey) return person.ecdhPrivateKey;
+    if (person.privateKey) return person.privateKey;
+    return null;
+}
+
+/**
+ * The slot that names this person's key. Every people slot carries the thumbprint of the key
+ * it was made for, so the reader finds its own slot without knowing anybody's subject. An
+ * envelope that has no slot for this key is not an envelope this person can open: that is
+ * locker.no_slot, which says the key is not on the list (not that the key is wrong).
+ */
+async function slotForPerson(header, person) {
+    const slots = (header.slots && header.slots.people) || [];
+    if (!slots.length) fail('locker.bad_envelope', 'The envelope has no people slots');
+    const thumbprint = await jwkThumbprint(await publicKeyOf(person));
+    const found = slots.find(slot => slot.recipient_key === thumbprint);
+    if (!found) fail('locker.no_slot', 'This envelope has no slot for that key');
+    return found;
 }
 
 /** A private key as WebCrypto wants it: a CryptoKey, or a JWK to import. */
@@ -394,7 +438,8 @@ async function* openPieces(reader, header, key) {
 /**
  * Opens an envelope: the content as bytes.
  *
- *   open(envelope, { privateKey, subject })   // a people lock
+ *   open(envelope, { privateKey, subject })   // a people lock, by subject
+ *   open(envelope, { person })                // a people lock, by key
  *   open(envelope, { password })               // a password lock
  *   open(envelope, { key })                    // a link lock
  */
@@ -549,4 +594,5 @@ async function rewrap(envelope, {
 module.exports = {
     seal, open, sealStream, openStream, rewrap,
     envelopeBytes, toBytes, openContentKey, readCore, prepare, makeHeader, Chunker,
+    publicKeyOf, privateKeyOf, slotForPerson,
 };

@@ -2,6 +2,7 @@
 import cjs from '../src/locker/vectors.js';
 
 export const {
-    fixedRandom, CONTENT, PERSON, SUBJECT, CASES,
+    fixedRandom, CONTENT, PERSON, SUBJECT, CASES, RECOVERY,
+    INSPECT,
 } = cjs;
 export default cjs;

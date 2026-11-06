@@ -14,6 +14,9 @@ const format = require('./format');
 const keys = require('./keys');
 const seal = require('./seal');
 const { padme } = require('./padme');
+const { inspect } = require('./inspect');
+const { recoveryWords, isRecoveryPhrase, RECOVERY_WORDS } = require('./recovery');
+const { WORDS } = require('./words');
 const { LockerError } = require('./errors');
 
 module.exports = {
@@ -34,8 +37,17 @@ module.exports = {
     openStream: seal.openStream,
     rewrap: seal.rewrap,
 
+    // What an envelope says about itself, without a key.
+    inspect,
+
     // The padding: the padded size of a content of a given size.
     padme,
+
+    // The recovery phrase: words to write down, and a check on a typed one.
+    recoveryWords,
+    isRecoveryPhrase,
+    RECOVERY_WORDS,
+    WORDS,
 
     // A person's keys, and the eight words that say which keys they are.
     generatePersonKeys: keys.generatePersonKeys,

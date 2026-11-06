@@ -65,7 +65,7 @@ const PERSON = {
         "x": "ytN7TbH08BDhIld7Tt-8R80FoRosnzgTxSn75z135Gk",
         "y": "D0axhLHKheyPLSc4GW0PpSfM48FPCLcC4OiRn-ZqN1w"
     },
-    "fingerprint": "lichen brick plateau yew-apple petal rabbit sand"
+    "fingerprint": "lichen brick plateau yew · apple petal rabbit sand"
 };
 
 /** The subject the people case is for. */
@@ -148,4 +148,62 @@ const CASES = [
     }
 ];
 
-module.exports = { fixedRandom, CONTENT, PERSON, SUBJECT, CASES };
+/** A recovery phrase from a fixed byte source: the same words on every runtime. */
+const RECOVERY = {
+    "phrase": "whale robin orchid cricket olive jasmine dill clover kestrel night cypress arrow canyon opal shell coral indigo solar storm indigo forest comet desert melon",
+    "words": [
+        "whale",
+        "robin",
+        "orchid",
+        "cricket",
+        "olive",
+        "jasmine",
+        "dill",
+        "clover",
+        "kestrel",
+        "night",
+        "cypress",
+        "arrow",
+        "canyon",
+        "opal",
+        "shell",
+        "coral",
+        "indigo",
+        "solar",
+        "storm",
+        "indigo",
+        "forest",
+        "comet",
+        "desert",
+        "melon"
+    ]
+};
+
+/** What inspect() says about each case: the header, read without a key. */
+const INSPECT = {
+    "people": {
+        "version": "locker.envelope.v1",
+        "lock": "people",
+        "padded_size": 256,
+        "recipients": [
+            "TCGh2gH6HIuT0-A9Ge0jOTrFmRXWQkdA6fZG8JxikTA"
+        ],
+        "iterations": null
+    },
+    "password": {
+        "version": "locker.envelope.v1",
+        "lock": "password",
+        "padded_size": 256,
+        "recipients": [],
+        "iterations": 600000
+    },
+    "link": {
+        "version": "locker.envelope.v1",
+        "lock": "link",
+        "padded_size": 256,
+        "recipients": [],
+        "iterations": null
+    }
+};
+
+module.exports = { fixedRandom, CONTENT, PERSON, SUBJECT, CASES, RECOVERY, INSPECT };
