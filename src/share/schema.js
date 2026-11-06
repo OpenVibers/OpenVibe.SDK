@@ -26,7 +26,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS share_transfer_pending ON share_transfers(serv
 CREATE TABLE IF NOT EXISTS share_access_requests (
     id uuid PRIMARY KEY, service text NOT NULL, kind text NOT NULL, resource_id text NOT NULL,
     subject jsonb NOT NULL, requested_at timestamptz NOT NULL,
-    state text NOT NULL CHECK (state IN ('pending','granted')),
+    state text NOT NULL CHECK (state IN ('pending','granted','dismissed')),
     FOREIGN KEY (service,kind,resource_id) REFERENCES shares(service,kind,resource_id)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS share_request_pending ON share_access_requests(service,kind,resource_id,subject) WHERE state='pending';

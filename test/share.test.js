@@ -8,11 +8,24 @@ const U = { type: 'user', id: 'usr_01JAB2C3D4E5F6G7H8J9K0MNPQ' };
 const V = { type: 'user', id: 'usr_01JAB2C3D4E5F6G7H8J9K0MNPR' };
 const X = { type: 'user', id: 'usr_01JAB2C3D4E5F6G7H8J9K0MNPS' };
 const owner = { subject: U }, recipient = { subject: V }, other = { subject: X };
+const PEOPLE = {
+    [U.id]: { subject: U, username: 'ursula', display_name: 'Ursula', avatar_url: null, banned: false },
+    [V.id]: { subject: V, username: 'maticus', display_name: 'Maticus', avatar_url: 'https://cdn.example/avatars/maticus.png', banned: false },
+    [X.id]: { subject: X, username: 'xenia', display_name: 'Xenia', avatar_url: null, banned: false },
+};
 const db = createDb({ pglite: true });
 let time = Date.parse('2026-11-06T00:00:00Z'), seq = 0, failHook = false, failNotify = false;
 const published = [], notified = [], lookups = [], hooks = [];
 const options = { db, now: () => time, nameLimit: 3,
-    network: { json: async req => { lookups.push(req); return req.query.username.toLowerCase() === 'maticus' ? { subject: V, username: 'maticus', banned: false } : null; } },
+    network: { json: async req => {
+        lookups.push(req);
+        if (req.path === '/internal/identity/resolve-batch') {
+            const results = {};
+            for (const id of req.json.subject_ids) results[id] = PEOPLE[id] || null;
+            return { results };
+        }
+        return req.query.username.toLowerCase() === 'maticus' ? { ...PEOPLE[V.id] } : null;
+    } },
     events: { publish: async e => {
         assert.equal(contracts.validate(e.event_type, e.payload).valid, true, JSON.stringify(contracts.validate(e.event_type, e.payload).errors));
         assert.equal(contracts.validate('events.event-envelope', e).valid, true, JSON.stringify(contracts.validate('events.event-envelope', e).errors));
@@ -147,10 +160,20 @@ test('competing transfer actions serialize and only one ownership change wins', 
     const results = await Promise.allSettled([shares.accept(recipient, ref, tr.id), shares.accept(recipient, ref, tr.id)]);
     assert.equal(results.filter(r => r.status === 'fulfilled').length, 1);
 });
-test('staff moderation audited but staff cannot initiate ownership transfer', async () => {
-    const ref = await fresh('private'); await shares.setAudience({ ...other, staff: true }, ref, 'people');
+test('staff may narrow only: private and removals, never widen, add or raise a role', async () => {
+    const staff = { ...other, staff: true }, ref = await fresh('public');
+    await shares.setAudience(staff, ref, 'private');
+    assert.equal((await shares.get(owner, ref)).audience, 'private');
+    await denied(() => shares.setAudience(staff, ref, 'people'));
+    await shares.addMembers(owner, ref, [{ subject: V, role: 'viewer' }]);
+    await shares.removeMember(staff, ref, V);
+    assert.equal(await shares.canView(recipient, ref), false);
+    await denied(() => shares.addMembers(staff, ref, [{ subject: X, role: 'viewer' }]));
+    await shares.addMembers(owner, ref, [{ subject: V, role: 'editor' }]);
+    await denied(() => shares.update(staff, ref, { members: [{ subject: V, role: 'viewer' }] }));
+    await denied(() => shares.update(staff, ref, { audience: 'public', members: [] }));
     assert.ok(await db.value("SELECT count(*) FROM share_log WHERE resource_id=$1 AND action='staff.manage'", [ref.id]));
-    await denied(() => shares.transfer({ ...other, staff: true }, ref, { to: V }));
+    await denied(() => shares.transfer(staff, ref, { to: V }));
 });
 test('hooks run inside transaction; failure rolls back ACL, ownership, log and deliveries', async () => {
     const ref = await fresh('private'); const tr = await shares.transfer(owner, ref, { to: V });
@@ -266,11 +289,168 @@ test('HTTP uniform routes, agent client, generic 404, forged subjects and staff 
         const request = await remote.requestAccess(); assert.equal(request.state, 'pending');
         time += 60000;
         const tr = await client.transfer('@maticus', { keep_access: true });
-        assert.equal((await remote.accept(tr.id)).state, 'accepted');
+        assert.equal((await remote.accept(tr.transfer.id)).state, 'accepted');
         assert.equal((await remote.get()).owner_subject.id, V.id);
         assert.ok((await share({ base, token: 'owner' }).sharedWithMe()).items.some(i => i.ref.id === ref.id));
-        assert.equal(Object.keys(shareOpenApi().paths).length, 7);
+        assert.equal(Object.keys(shareOpenApi().paths).length, 9);
     } finally { await new Promise(r => server.close(r)); }
+});
+test('access checks take no row lock; writes still lock', async () => {
+    const ref = await fresh();
+    const statements = [];
+    const spy = Object.create(db);
+    spy.tx = (fn, opts) => db.tx(t => fn(new Proxy(t, { get(target, prop) {
+        const value = target[prop];
+        if (typeof value !== 'function') return value;
+        return (...args) => { if (typeof args[0] === 'string') statements.push(args[0]); return value.apply(target, args); };
+    } })), opts);
+    const checked = createShares({ ...options, db: spy });
+    statements.length = 0;
+    await checked.canView(owner, ref); await checked.canEdit(owner, ref);
+    assert.ok(statements.some(q => /FROM shares/.test(q)));
+    assert.ok(!statements.some(q => /FROM shares[\s\S]*FOR UPDATE/.test(q)), 'reads must not lock the sharing row');
+    statements.length = 0;
+    await checked.update(owner, ref, { audience: 'public' });
+    assert.ok(statements.some(q => /FROM shares[\s\S]*FOR UPDATE/.test(q)), 'writes keep their lock');
+});
+test('a member or transfer recipient must be a known, active user subject', async () => {
+    const ref = await fresh();
+    const guest = { type: 'guest', id: 'gst_01JAB2C3D4E5F6G7H8J9K0MNPQ' };
+    const unknown = { type: 'user', id: 'usr_01JAB2C3D4E5F6G7H8J9K0ZZZZ' };
+    await denied(() => shares.addMembers(owner, ref, [guest]), 400);
+    await denied(() => shares.addMembers(owner, ref, [unknown]), 400);
+    await denied(() => shares.transfer(owner, ref, { to: guest }), 400);
+    const flagged = flag => createShares({ ...options, network: { json: async req => {
+        if (req.path !== '/internal/identity/resolve-batch') return null;
+        const results = {};
+        for (const id of req.json.subject_ids) results[id] = id === V.id ? { ...PEOPLE[V.id], banned: flag === 'banned', deleted: flag === 'deleted' } : null;
+        return { results };
+    } } });
+    for (const flag of ['banned', 'deleted']) {
+        const strict = flagged(flag);
+        await denied(() => strict.addMembers(owner, ref, [{ subject: V, role: 'viewer' }]), 400);
+        await denied(() => strict.transfer(owner, ref, { to: V }), 400);
+    }
+    time += 60000;
+    const tombstone = createShares({ ...options, network: { json: async () => ({ ...PEOPLE[V.id], deleted: true }) } });
+    await denied(() => tombstone.addMembers(owner, ref, ['@maticus']), 400);
+});
+test('notifications: a new member hears once; role, expiry, removal and the owner\'s own change stay quiet', async () => {
+    await shares.flush({ limit: 1000 });
+    const ref = await fresh('people');
+    const added = () => notified.filter(n => n.kind === 'share.added' && n.ref.id === ref.id).length;
+    await shares.addMembers(owner, ref, [{ subject: V, role: 'viewer' }]); await shares.flush({ limit: 1000 });
+    assert.equal(added(), 1);
+    await shares.update(owner, ref, { members: [{ subject: V, role: 'editor' }] }); await shares.flush({ limit: 1000 });
+    assert.equal(added(), 1);
+    await shares.update(owner, ref, { audience: 'private' }); await shares.flush({ limit: 1000 });
+    assert.equal(added(), 1);
+    await shares.removeMember(owner, ref, V); await shares.flush({ limit: 1000 });
+    assert.equal(added(), 1);
+    await shares.addMembers(owner, ref, [{ subject: V, role: 'viewer', expires_at: new Date(time + 60000).toISOString() }]);
+    await shares.flush({ limit: 1000 });
+    assert.equal(added(), 2);
+});
+test('transfer notifications: recipient hears the offer and a cancellation; the owner hears the answer', async () => {
+    await shares.flush({ limit: 1000 });
+    const ref = await fresh('private');
+    const offers = () => notified.filter(n => n.kind === 'share.transfer.requested' && n.ref.id === ref.id);
+    const answers = () => notified.filter(n => n.kind === 'share.transfer.answered' && n.ref.id === ref.id);
+    const tr = await shares.transfer(owner, ref, { to: V }); await shares.flush({ limit: 1000 });
+    assert.equal(offers().length, 1); assert.equal(offers()[0].to.id, V.id);
+    await shares.cancel(owner, ref, tr.id); await shares.flush({ limit: 1000 });
+    assert.ok(answers().some(n => n.to.id === V.id && n.state === 'cancelled'));
+    assert.ok(!answers().some(n => n.to.id === U.id));
+    const tr2 = await shares.transfer(owner, ref, { to: V });
+    await shares.accept(recipient, ref, tr2.id); await shares.flush({ limit: 1000 });
+    assert.ok(answers().some(n => n.to.id === U.id && n.state === 'accepted'));
+    assert.ok(!answers().some(n => n.to.id === V.id && n.state === 'accepted'));
+    const ref2 = await fresh('private'); const tr3 = await shares.transfer(owner, ref2, { to: V });
+    await shares.decline(recipient, ref2, tr3.id); await shares.flush({ limit: 1000 });
+    assert.ok(notified.some(n => n.kind === 'share.transfer.answered' && n.ref.id === ref2.id && n.to.id === U.id && n.state === 'declined'));
+    const ref3 = await fresh('private'); await shares.transfer(owner, ref3, { to: V });
+    time += 7 * 86400000; await shares.expireMembers(); await shares.flush({ limit: 1000 });
+    assert.ok(notified.some(n => n.kind === 'share.transfer.answered' && n.ref.id === ref3.id && n.to.id === U.id && n.state === 'expired'));
+});
+test('PUT notify:false sends no share.added but events still flow', async () => {
+    await shares.flush({ limit: 1000 });
+    const ref = await fresh('people');
+    const added = () => notified.filter(n => n.kind === 'share.added' && n.ref.id === ref.id).length;
+    const events = () => published.filter(e => e.payload.ref.id === ref.id).length;
+    await shares.update(owner, ref, { members: [{ subject: V, role: 'viewer' }], notify: false });
+    await shares.flush({ limit: 1000 });
+    assert.equal(added(), 0); assert.equal(events(), 1);
+    await denied(() => shares.update(owner, ref, { notify: 'yes' }), 400);
+});
+test('HTTP answers the sheet: people, you, describe, requests, dismiss and the GET body on writes', async () => {
+    time += 60000;
+    const ref = await fresh('people');
+    await shares.requestAccess(other, ref);
+    const staff = { ...other, staff: true };
+    const handler = shares.router({ service: 'community',
+        describe: r => ({ title: `Paste ${r.id}`, link: `https://community.example/p/${r.id}`, roles: ['viewer', 'editor'] }),
+        authenticate: req => ({ owner, recipient, other, staff })[(req.headers.authorization || '').replace('Bearer ', '')] || null });
+    const server = http.createServer(handler); await new Promise(r => server.listen(0, '127.0.0.1', r));
+    const base = `http://127.0.0.1:${server.address().port}`, path = `/api/v1/paste/${ref.id}/share`;
+    const json = (method, url, token, value) => fetch(base + url, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, ...(value === undefined ? {} : { body: JSON.stringify(value) }) });
+    try {
+        const res = await json('GET', path, 'owner'); const view = await res.json(); const etag = res.headers.get('etag');
+        assert.equal(res.status, 200);
+        assert.equal(view.owner.username, 'ursula'); assert.deepEqual(view.you, { subject: U, role: 'owner' });
+        assert.equal(view.title, `Paste ${ref.id}`); assert.equal(view.link, `https://community.example/p/${ref.id}`); assert.deepEqual(view.roles, ['viewer', 'editor']);
+        assert.deepEqual(view.audiences, ['public', 'link', 'people', 'private']); assert.equal(view.transferable, true);
+        assert.equal(view.requests.length, 1); assert.equal(view.requests[0].username, 'xenia'); assert.ok(view.requests[0].id);
+        assert.equal((await (await json('GET', path, 'staff')).json()).you.role, 'staff');
+        const put = await json('PUT', path, 'owner', { audience: 'people', members: [{ subject: V, role: 'viewer' }], notify: false });
+        const saved = await put.json();
+        assert.equal(put.status, 200); assert.ok(put.headers.get('etag')); assert.notEqual(put.headers.get('etag'), etag);
+        assert.equal(saved.members.length, 1); assert.equal(saved.members[0].username, 'maticus'); assert.equal(saved.members[0].avatar_url, PEOPLE[V.id].avatar_url);
+        const dismissed = await json('POST', `${path}/requests/${view.requests[0].id}/dismiss`, 'owner', {});
+        assert.equal(dismissed.status, 200); assert.equal((await dismissed.json()).requests.length, 0);
+        assert.equal(await db.value('SELECT state FROM share_access_requests WHERE id=$1', [view.requests[0].id]), 'dismissed');
+        const started = await json('POST', `${path}/transfer`, 'owner', { to: { subject: V }, keep_access: true });
+        const offer = await started.json();
+        assert.equal(started.status, 201); assert.equal(offer.transfer.to.username, 'maticus'); assert.equal(offer.transfer.state, 'pending');
+        assert.equal(offer.title, `Paste ${ref.id}`);
+        const cancelled = await json('POST', `${path}/transfer/cancel`, 'owner', { transfer_id: offer.transfer.id });
+        assert.equal(cancelled.status, 200); const afterCancel = await cancelled.json();
+        assert.equal(afterCancel.transfer, undefined); assert.equal(afterCancel.audience, 'people');
+        const second = await (await json('POST', `${path}/transfer`, 'owner', { to: { subject: V } })).json();
+        const accepted = await json('POST', `${path}/transfer/accept`, 'recipient', { transfer_id: second.transfer.id });
+        const answer = await accepted.json();
+        assert.equal(accepted.status, 200); assert.equal(answer.state, 'accepted'); assert.equal(answer.id, second.transfer.id); assert.equal(answer.audience, undefined);
+        const person = await (await json('GET', `/api/v1/share/people?name=maticus`, 'owner')).json();
+        assert.equal(person.person.username, 'maticus'); assert.deepEqual(person.person.subject, V);
+        const nobody = await (await json('GET', `/api/v1/share/people?name=nobody`, 'owner')).json();
+        assert.equal(nobody.person, null);
+        assert.equal((await fetch(base + '/api/v1/share/people?name=maticus')).status, 404);
+    } finally { await new Promise(r => server.close(r)); }
+});
+test('CSRF: cookie writes need X-Requested-With or a same-site marker; bearer is exempt and csrf:false disables it', async () => {
+    const ref = await fresh('private');
+    const authenticate = req => req.headers.cookie === 'sid=owner' ? owner : ({ owner, recipient, other })[(req.headers.authorization || '').replace('Bearer ', '')] || null;
+    const listen = handler => http.createServer(handler);
+    const server = listen(shares.router({ service: 'community', authenticate }));
+    const loose = listen(shares.router({ service: 'community', authenticate, csrf: false }));
+    await new Promise(r => server.listen(0, '127.0.0.1', r)); await new Promise(r => loose.listen(0, '127.0.0.1', r));
+    const base = `http://127.0.0.1:${server.address().port}`, looseBase = `http://127.0.0.1:${loose.address().port}`;
+    const path = `/api/v1/paste/${ref.id}/share`;
+    const write = (root, headers, value) => fetch(root + path, { method: 'PUT', headers: { Cookie: 'sid=owner', 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(value) });
+    try {
+        let res = await write(base, {}, { audience: 'public' });
+        assert.equal(res.status, 403); assert.equal((await res.json()).code, 'share.csrf');
+        assert.equal((await shares.get(owner, ref)).audience, 'private');
+        assert.equal((await write(base, { 'X-Requested-With': 'ov-share' }, { audience: 'public' })).status, 200);
+        await shares.setAudience(owner, ref, 'private');
+        assert.equal((await write(base, { 'Sec-Fetch-Site': 'same-origin' }, { audience: 'public' })).status, 200);
+        await shares.setAudience(owner, ref, 'private');
+        res = await fetch(base + path, { method: 'PUT', headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' }, body: JSON.stringify({ audience: 'public' }) });
+        assert.equal(res.status, 200);
+        await shares.setAudience(owner, ref, 'private');
+        assert.equal((await write(looseBase, {}, { audience: 'public' })).status, 200);
+    } finally {
+        await new Promise(r => server.close(r)); await new Promise(r => loose.close(r));
+    }
 });
 (async () => {
     let count = 0;

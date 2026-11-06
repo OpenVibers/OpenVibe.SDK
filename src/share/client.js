@@ -12,6 +12,7 @@ function share({ base, token, fetch } = {}) {
     }
     return {
         sharedWithMe: options => call('/api/v1/shared-with-me', { query: options }),
+        people: name => call('/api/v1/share/people', { query: { name } }),
         for(kind, id) {
             v.ref({ service: 'client', kind, id });
             const path = `/api/v1/${encodeURIComponent(kind)}/${encodeURIComponent(id)}/share`;
@@ -31,6 +32,7 @@ function share({ base, token, fetch } = {}) {
                 }),
                 remove: subject => updateMembers(members => members.filter(m => !v.equal(m.subject, subject))),
                 requestAccess: () => call(path + '/requests', { method: 'POST', json: {} }),
+                dismiss: request_id => call(path + '/requests/' + encodeURIComponent(request_id) + '/dismiss', { method: 'POST', json: {} }),
                 transfer: (to, { keep_access = false } = {}) => call(path + '/transfer', { method: 'POST', json: { to, keep_access } }),
                 accept: transfer_id => call(path + '/transfer/accept', { method: 'POST', json: { transfer_id } }),
                 decline: transfer_id => call(path + '/transfer/decline', { method: 'POST', json: { transfer_id } }),
