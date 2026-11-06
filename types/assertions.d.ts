@@ -23,8 +23,10 @@ export type SubjectAssertionResult = { ok: true; claims: SubjectAssertionClaims 
 export interface RequestSubjectAssertionOptions {
     /** The person's own Network access token (their session). Without it Network signs nothing. */
     userToken: string;
-    /** The service the assertion is for (openvibe.billing). */
-    audience: string;
+    /** The service the assertion is for (openvibe.billing), or a list when it travels a chain. */
+    audience: string | string[];
+    /** The services that may carry it (the minting service is always in it). */
+    for?: string | string[];
     /** Where Network lives (public URL). */
     network?: string;
     /** Where Network's /internal lives (loopback, same host). */
@@ -46,7 +48,7 @@ export interface SubjectAssertion {
     assertion: string;
     /** The person the assertion names. */
     subject: string | null;
-    audience: string;
+    audience: string | string[];
     jti: string | null;
     expires_at: string | null;
     expires_in: number;
@@ -60,8 +62,8 @@ export interface VerifySubjectAssertionOptions {
     /** The audience this service answers for (openvibe.billing). */
     audience?: string | string[];
     issuer?: string;
-    /** The calling service the assertion must have been minted for (svc:live). */
-    act?: string;
+    /** The service presenting the assertion (svc:live): it must be one the assertion names. */
+    caller?: string;
     clockSkewSec?: number;
     now?: number;
     /** A Map or Set of jtis already used: a replay is refused. */
@@ -71,7 +73,7 @@ export interface VerifySubjectAssertionOptions {
 /** Check a subject assertion: signature, audience, expiry, the service it was minted for, the jti. */
 export declare function verifySubjectAssertion(assertion: string, opts?: VerifySubjectAssertionOptions): Promise<SubjectAssertionResult>;
 export interface SubjectAssertionVerifier {
-    verify(assertion: string, opts?: { act?: string; seen?: Set<string> | Map<string, number> | { has(jti: string): boolean } }): Promise<SubjectAssertionResult>;
+    verify(assertion: string, opts?: { caller?: string; seen?: Set<string> | Map<string, number> | { has(jti: string): boolean } }): Promise<SubjectAssertionResult>;
     /** How many jtis are remembered (the replay window). */
     size(): number;
 }
