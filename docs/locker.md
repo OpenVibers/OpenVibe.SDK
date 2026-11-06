@@ -31,7 +31,7 @@ one-file bundle `browser/openvibe-sdk.mjs` (`sdk.locker`).
 
 ```js
 const person = await generatePersonKeys();
-// person.ecdhPublic, person.signingPublic, person.fingerprint ("four words")
+// person.ecdhPublic, person.signingPublic, person.fingerprint ("eight words")
 const subject = { type: 'user', id: 'usr_01JAB2C3D4E5F6G7H8J9K0MNPQ' };
 
 // For the people on the list.
@@ -69,6 +69,12 @@ content as bytes. A wrong key, a changed header, a changed chunk, chunks in the 
 missing last chunk all fail with a `LockerError` whose `code` says what went wrong
 (`locker.wrong_key`, `locker.truncated`, `locker.bad_envelope`, `locker.no_key`).
 
+The header holds the **padded size**, not the size: the content is padded with Padmé (PoPETs 2019), so
+a 200-byte note costs 256 bytes and not a whole megabyte, the expansion stays under about twelve per
+cent, and the padded size leaks only O(log log n) bits about the real one. `locker.padme(size)` gives the
+padded size of a content of that size; every chunk but the last is a whole chunk, and the last holds the
+rest.
+
 ## Files: the streams
 
 A large file never has to fit in memory, in either direction.
@@ -81,6 +87,11 @@ const plain = locker.openStream(await (await fetch(url)).body, { privateKey, sub
 `sealStream` needs the size of the content: the padded size is in the header, and the header is written
 first. The stream holds one chunk at a time (1 MiB), so sealing a 64 MiB file costs a few MiB of
 memory, not 64.
+
+`openStream` yields the chunks as it verifies them, so it gives you the earlier ones before it reaches the
+last one. **A stream that ends early throws at the end**, when the missing chunk shows up: discard what
+it yielded, because the content was never complete. The same goes for the whole-content `open`: it either
+returns everything or it fails.
 
 ## Sharing: wrapFor and rewrap
 
@@ -97,17 +108,31 @@ const again = await rewrap(sealed, {
 ```
 
 `rewrap` keeps the slots of the people who are already on it and gives the new ones one of their own;
-the chunks are the same bytes. Removing a member wants a fresh content key, not a slot that is gone: the
-person who is removed may still hold the key. So a removal is open the content and seal it again with a
-new key for the people who are left.
+the chunks are the same bytes.
+
+Removing a member wants a fresh content key, not a slot that is gone: the person who is removed may still
+hold the old key, and it would open the item again. So a removal opens the content and seals it again with
+a new content key and a new nonce base, for the people who are left. Their public keys are needed for that,
+so the caller gives them in `keys`:
+
+```js
+const without = await rewrap(sealed, {
+    remove: [other],
+    keys: [{ subject, publicKey: person.ecdhPublic }],
+    credentials: { privateKey: person.ecdh.privateKey, subject },
+});
+```
+
+The old content key opens nothing now, and the person who left has no slot at all.
 
 ## A person's keys
 
 A person has two key pairs: an **ECDH P-256** pair that receives content keys and an **ECDSA P-256**
-pair that signs the fingerprint. The **fingerprint** is four words (the first four bytes of SHA-256
-over both public keys, read from a list of 256 words): short enough to read out loud and compare once.
-The signature over both public keys proves the holder owns the signing key, so the pair is
-self-certifying, and a change of keys changes the four words.
+pair that signs the fingerprint. The **fingerprint** is eight words in two groups of four (the first eight
+bytes of SHA-256 over both public keys, read from a list of 256 words): short enough to read out loud and
+compare once, and sixty-four bits, so a server that swapped in its own key would need about 2^64 key
+generations to match it. The signature over both public keys proves the holder owns the signing key, so
+the pair is self-certifying, and a change of keys changes the eight words.
 
 ```js
 const person = await generatePersonKeys();

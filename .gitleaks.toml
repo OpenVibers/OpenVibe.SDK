@@ -5,10 +5,10 @@
 useDefault = true
 
 [[allowlists]]
-description = "The test vectors' wrapped content keys: made-up base64 in the file that exists to be checked"
+description = "The test vectors' wrapped content keys and the recipient key thumbprint: made-up base64 in the file that exists to be checked"
 condition = "AND"
 paths = ['''^src/locker/vectors\.js$''']
-regexes = ['''^(t9FBCQEiSb87EYFaqq9yjm45qITqW8p8qMoz49vKUhbbUznoz9T0iwJXSmBBaTLN|pnLvXu5bTR3lmWGT2GFfWc2v43dG67dM7lrStqWOPrL4f\+SI6YivVWwXK0BvVjiR)$''']
+regexes = ['''^(IpXVDIbStzw/kky7eKnrPQ7SOufRZ8zjU8iWB3c59OhfRjKLXuwDs4NQ4OlMAtGN|pnLvXu5bTR3lmWGT2GFfWc2v43dG67dM7lrStqWOPrL4f\+SI6YivVWwXK0BvVjiR|TCGh2gH6HIuT0-A9Ge0jOTrFmRXWQkdA6fZG8JxikTA)$''']
 
 [[allowlists]]
 description = "The name of the password key derivation, in a test that reads it from the header"

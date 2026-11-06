@@ -11,9 +11,9 @@ const {
 } = require('./bytes');
 const { fail } = require('./errors');
 const {
-    MAGIC, VERSION, SUITE, CHUNK_SIZE, TAG_SIZE, NONCE_BASE_SIZE, LENGTH_PREFIX, FINAL_FLAG,
-    coreOf, chunkAad, encodeHeader, encodeEnvelope, readHeader, chunkCount, paddedSize,
-    chunkNonce, encodeChunk, nonceBaseBytes,
+    MAGIC, VERSION, SUITE, CHUNK_SIZE, TAG_SIZE, NONCE_BASE_SIZE, LENGTH_PREFIX, MIN_PADDED_SIZE,
+    FINAL_FLAG, coreOf, chunkAad, encodeHeader, encodeEnvelope, readHeader, chunkCount,
+    lastChunkSize, paddedSize, chunkNonce, encodeChunk, nonceBaseBytes,
 } = require('./format');
 const {
     KEY_BYTES, PASSWORD_ITERATIONS, subtle, platformRandom, importContentKey,
@@ -65,9 +65,10 @@ class Chunker {
         return block;
     }
 
-    /** What is left, as one block: the bytes that are there, then zeros. */
-    rest() {
-        const block = new Uint8Array(this.size);
+    /** What is left, as one block of exactly this many bytes: the bytes that are there, then zeros. */
+    takeExactly(count) {
+        if (this.length > count) fail('locker.size_mismatch', 'The content is longer than the size it was given');
+        const block = new Uint8Array(count);
         let at = 0;
         for (const part of this.parts) { block.set(part, at); at += part.length; }
         this.parts = [];
@@ -145,30 +146,37 @@ async function sealBlock(key, header, nonceBase, counter, block, isFinal) {
 async function* sealPieces(source, options) {
     const size = options.size;
     const { contentKey, nonceBase, slots } = await prepare(options);
-    const header = makeHeader(options.lock, slots, paddedSize(size), nonceBase);
+    const padded = paddedSize(size);
+    const header = makeHeader(options.lock, slots, padded, nonceBase);
     const headerBytes = encodeHeader(header);
     yield { header, headerBytes, contentKey, bytes: concat(utf8(MAGIC), u32be(headerBytes.length), headerBytes) };
     const key = await importContentKey(contentKey, ['encrypt']);
-    const total = chunkCount(size);
+    const total = chunkCount(padded);
     const chunker = new Chunker(CHUNK_SIZE);
     let counter = 0;
     // The padded plaintext starts with the true length, so the server cannot read the size.
     chunker.push(u64be(size));
     for await (const part of source) {
         chunker.push(part);
+        // Every chunk but the last is a whole chunk.
         for (;;) {
+            if (counter >= total - 1) break;
             const block = chunker.take();
             if (!block) break;
-            yield { bytes: await sealBlock(key, header, nonceBase, counter, block, counter + 1 === total) };
+            yield { bytes: await sealBlock(key, header, nonceBase, counter, block, false) };
             counter++;
         }
     }
-    if (counter < total) {
-        // The last block: what is left, then zeros up to the chunk size.
-        yield { bytes: await sealBlock(key, header, nonceBase, counter, chunker.rest(), true) };
+    // The content is done; the padding fills the rest of the padded plaintext. (A content that
+    // is longer than the size it was given fails in takeExactly, below.)
+    while (counter < total - 1) {
+        const block = chunker.takeExactly(CHUNK_SIZE);
+        yield { bytes: await sealBlock(key, header, nonceBase, counter, block, false) };
         counter++;
     }
-    if (counter !== total) fail('locker.bad_envelope', 'The content did not fill the envelope');
+    // The last chunk: what is left of the plaintext, then zeros up to the padded size.
+    const tail = chunker.takeExactly(lastChunkSize(padded));
+    yield { bytes: await sealBlock(key, header, nonceBase, counter, tail, true) };
 }
 
 /**
@@ -210,9 +218,8 @@ function readCore(header) {
     if (header.version !== VERSION) fail('locker.bad_envelope', 'This envelope is another version');
     if (header.suite !== SUITE) fail('locker.bad_envelope', 'This envelope uses another suite');
     if (header.chunk_size !== CHUNK_SIZE) fail('locker.bad_envelope', 'This envelope uses another chunk size');
-    if (!Number.isInteger(header.padded_size) || header.padded_size <= 0
-        || header.padded_size % CHUNK_SIZE !== 0) {
-        fail('locker.bad_envelope', 'The padded size is not a whole number of chunks');
+    if (!Number.isInteger(header.padded_size) || header.padded_size < MIN_PADDED_SIZE) {
+        fail('locker.bad_envelope', 'The padded size is not a size we write');
     }
     if (!['people', 'password', 'link'].includes(header.lock)) {
         fail('locker.bad_envelope', 'The lock is not one we know');
@@ -323,7 +330,8 @@ function streamReader(iterator) {
  * stream; both are read the same way, so the same checks run on both.
  */
 async function* openPieces(reader, header, key) {
-    const expected = header.padded_size / CHUNK_SIZE;
+    const expected = chunkCount(header.padded_size);
+    const lastLength = lastChunkSize(header.padded_size);
     const nonceBase = nonceBaseBytes(header);
     let counter = 0;
     let length = null;
@@ -337,8 +345,10 @@ async function* openPieces(reader, header, key) {
         if (counter >= expected) fail('locker.bad_envelope', 'The envelope has more chunks than its size says');
         const cipherLength = readU32be(lengthBytes, 0);
         // The length is checked before it is used: a header that claims a huge chunk must not
-        // make the reader wait for it.
-        if (cipherLength !== CHUNK_SIZE + TAG_SIZE) {
+        // make the reader wait for it. Every chunk but the last is a whole chunk; the last holds
+        // what is left of the padded size.
+        const wantedLength = counter === expected - 1 ? lastLength : CHUNK_SIZE;
+        if (cipherLength !== wantedLength + TAG_SIZE) {
             fail('locker.bad_envelope', 'A chunk is not the size the envelope says');
         }
         const flags = (await reader.take(1))[0];
@@ -438,7 +448,13 @@ function sealStream(stream, options = {}) {
     });
 }
 
-/** Opens a stream: the content comes out piece by piece, and only one chunk is ever in memory. */
+/**
+ * Opens a stream: the content comes out piece by piece, and only one chunk is ever in memory.
+ *
+ * The chunks are yielded as they are verified, so a reader sees the earlier ones before the last
+ * one is reached. A stream that ends early throws at the end, when the missing chunk shows up:
+ * discard what it yielded, because the content was never complete.
+ */
 function openStream(stream, credentials = {}) {
     const iterator = (async function* openStreamPieces() {
         const reader = streamReader(readChunks(stream)[Symbol.asyncIterator]());
@@ -475,35 +491,59 @@ function openStream(stream, credentials = {}) {
  * their slots, and the new ones get one of their own.
  *
  * Removing a member wants a fresh content key, not just a slot that is gone: the person who is
- * removed may still hold the key. So a removal is open the content and seal it again with a new
- * key for the people who are left.
+ * removed may still hold the old key. So a removal opens the content and seals it again, with a
+ * new key and a new nonce base, for the people who are left. Their public keys are needed for
+ * that, so the caller gives them in `keys`.
  */
-async function rewrap(envelope, { add = [], remove = [], credentials = {}, random = platformRandom, ephemeral } = {}) {
+async function rewrap(envelope, {
+    add = [], remove = [], keys = [], credentials = {}, random = platformRandom, ephemeral,
+} = {}) {
     const bytes = envelopeBytes(envelope);
     const { header, chunkOffset } = readHeader(bytes);
     if (header.lock !== 'people') fail('locker.invalid', 'Only a people-locked envelope can be re-wrapped');
     readCore(header);
-    const contentKey = await openContentKey(header, credentials);
     const gone = new Set(remove.map(who => (typeof who === 'string' ? who : who.id)));
-    const people = (header.slots.people || []).filter(slot => !gone.has(slot.subject.id));
-    if (add.length) {
-        const pair = await resolveEphemeral(ephemeral);
-        for (const recipient of add) {
-            people.push(await wrapFor(contentKey, recipient.publicKey, {
-                subject: recipient.subject, ephemeral: pair, random,
-            }));
+    const staying = (header.slots.people || []).filter(slot => !gone.has(slot.subject.id));
+
+    if (!gone.size) {
+        // Adding: the content key and the chunks stay as they are.
+        const contentKey = await openContentKey(header, credentials);
+        const people = staying.slice();
+        if (add.length) {
+            const pair = await resolveEphemeral(ephemeral);
+            for (const recipient of add) {
+                people.push(await wrapFor(contentKey, recipient.publicKey, {
+                    subject: recipient.subject, ephemeral: pair, random,
+                }));
+            }
         }
+        if (!people.length) fail('locker.invalid', 'A people-locked envelope needs at least one slot');
+        const newHeader = { ...coreOf(header), slots: { people } };
+        const headerBytes = encodeHeader(newHeader);
+        return {
+            version: VERSION,
+            header: newHeader,
+            headerBytes,
+            bytes: encodeEnvelope(headerBytes, bytes.subarray(chunkOffset)),
+            chunkOffset: 8 + headerBytes.length,
+        };
     }
-    if (!people.length) fail('locker.invalid', 'A people-locked envelope needs at least one slot');
-    const newHeader = { ...coreOf(header), slots: { people } };
-    const headerBytes = encodeHeader(newHeader);
-    return {
-        version: VERSION,
-        header: newHeader,
-        headerBytes,
-        bytes: encodeEnvelope(headerBytes, bytes.subarray(chunkOffset)),
-        chunkOffset: 8 + headerBytes.length,
-    };
+
+    // Removing: the content is opened and sealed again under a new key, so the key the person
+    // who is leaving still holds opens nothing.
+    const contentKey = await openContentKey(header, credentials);
+    const plain = await open(bytes, credentials);
+    const recipients = [];
+    for (const slot of staying) {
+        const found = keys.find(key => (typeof key.subject === 'string' ? key.subject : key.subject.id) === slot.subject.id);
+        if (!found) {
+            fail('locker.invalid', `Removing a person needs the public key of ${slot.subject.id}, who stays`);
+        }
+        recipients.push({ subject: slot.subject, publicKey: found.publicKey });
+    }
+    for (const recipient of add) recipients.push({ subject: recipient.subject, publicKey: recipient.publicKey });
+    if (!recipients.length) fail('locker.invalid', 'A people-locked envelope needs at least one slot');
+    return seal(plain, { lock: 'people', keys: recipients, random, ephemeral });
 }
 
 module.exports = {

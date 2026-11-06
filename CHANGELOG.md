@@ -3,9 +3,12 @@
 ## 0.86.0 (2026-11-06)
 
 - Add `openvibe-sdk/locker`: the Locker envelope (`locker.envelope@1`), end-to-end encryption for anything on OpenVibe, in Node and in the browser. WebCrypto only (`globalThis.crypto.subtle`), no other crypto library and nothing hand-rolled.
-  - `seal` and `open` for text and bytes, and `sealStream` and `openStream` for files: a stream holds one 1 MiB chunk at a time, so a 64 MiB file costs a few MiB of memory.
+  - `seal` and `open` for text and bytes, and `sealStream` and `openStream` for files: a stream holds one 1 MiB chunk at a time, so a 64 MiB file costs a few MiB of memory. A stream that ends early throws at the end: discard what it yielded.
+  - The size is padded with Padmé (PoPETs 2019): at most about twelve per cent over the real size, never below 256 bytes, and O(log log n) bits of leakage. Every chunk but the last is a whole chunk; the last holds the rest.
+  - A people slot names the recipient's key by its RFC 7638 thumbprint, and the reader checks it before it derives anything.
+  - The PBKDF2 iteration count is bounded on both sides: 600000 to 10000000, so a hostile header cannot make a reader work for hours.
   - The three locks: `people` (the content key is wrapped for each recipient with ECDH P-256 and HKDF-SHA-256), `password` (PBKDF2-SHA-256, 600000 iterations, the parameters read from the header) and `link` (the key travels in the part of the link after the `#`).
-  - Person key pairs (ECDH P-256 for content keys, ECDSA P-256 for the fingerprint), the four-word fingerprint and the signature that proves a person owns their signing key.
+  - Person key pairs (ECDH P-256 for content keys, ECDSA P-256 for the fingerprint), the eight-word fingerprint (sixty-four bits, in two groups of four) and the signature that proves a person owns their signing key.
   - `wrapFor` and `rewrap`: adding a member to a people-locked item re-wraps the content key and leaves the content alone.
 - Add `openvibe-sdk/locker/server`: what a service needs to know about an envelope without opening it, the header's shape and the envelope's size, with no key and no decryption.
 - Add `openvibe-sdk/locker/vectors`: the shared test vectors, so the browser module (`openvibe-shared/ov-locker.js`) runs the same cases and gets the same bytes.

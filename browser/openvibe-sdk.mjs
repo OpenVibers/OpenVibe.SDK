@@ -16,24 +16,24 @@ module.exports = {
     ...core,
     auth: __load(8),
     locker: __load(9),
-    registry: __load(17),
-    modules: __load(18),
-    realtime: __load(19),
-    media: __load(20),
-    community: __load(22),
-    bot: __load(23),
-    search: __load(24),
-    bench: __load(25),
-    meme: __load(26),
-    vision: __load(27),
-    themes: __load(28),
-    redact: __load(29),
-    chat: __load(30),
-    ai: __load(31),
-    jobs: __load(32),
-    tools: __load(34),
-    projects: __load(35),
-    geo: __load(36),
+    registry: __load(18),
+    modules: __load(19),
+    realtime: __load(20),
+    media: __load(21),
+    community: __load(23),
+    bot: __load(24),
+    search: __load(25),
+    bench: __load(26),
+    meme: __load(27),
+    vision: __load(28),
+    themes: __load(29),
+    redact: __load(30),
+    chat: __load(31),
+    ai: __load(32),
+    jobs: __load(33),
+    tools: __load(35),
+    projects: __load(36),
+    geo: __load(37),
 };
 },
 // ── 1: src/core/index.js ───────────────────────────────────────────
@@ -863,8 +863,9 @@ function (module, exports) {
  *   const note = await open(sealed, { privateKey: person.ecdh.privateKey, subject });
  */
 const format = __load(11);
-const keys = __load(14);
-const seal = __load(16);
+const keys = __load(15);
+const seal = __load(17);
+const { padme } = __load(14);
 const { LockerError } = __load(13);
 
 module.exports = {
@@ -872,8 +873,11 @@ module.exports = {
     VERSION: format.VERSION,
     SUITE: format.SUITE,
     CHUNK_SIZE: format.CHUNK_SIZE,
+    MIN_PADDED_SIZE: format.MIN_PADDED_SIZE,
     MAX_HEADER_BYTES: format.MAX_HEADER_BYTES,
     PASSWORD_ITERATIONS: keys.PASSWORD_ITERATIONS,
+    PASSWORD_ITERATIONS_MIN: keys.PASSWORD_ITERATIONS_MIN,
+    PASSWORD_ITERATIONS_MAX: keys.PASSWORD_ITERATIONS_MAX,
 
     // The content.
     seal: seal.seal,
@@ -882,7 +886,10 @@ module.exports = {
     openStream: seal.openStream,
     rewrap: seal.rewrap,
 
-    // A person's keys, and the four words that say which keys they are.
+    // The padding: the padded size of a content of a given size.
+    padme,
+
+    // A person's keys, and the eight words that say which keys they are.
     generatePersonKeys: keys.generatePersonKeys,
     exportPersonKeys: keys.exportPersonKeys,
     exportPrivateKeys: keys.exportPrivateKeys,
@@ -890,6 +897,7 @@ module.exports = {
     verifyPersonKeys: keys.verifyPersonKeys,
     fingerprintOf: keys.fingerprintOf,
     fingerprintWords: keys.fingerprintWords,
+    jwkThumbprint: keys.jwkThumbprint,
 
     // The key slots: the content key, wrapped for one person or for one password.
     wrapFor: keys.wrapFor,
@@ -921,6 +929,7 @@ function (module, exports) {
  */
 const { utf8, fromUtf8, concat, base64, fromBase64, u32be, readU32be, canonicalJson } = __load(12);
 const { fail } = __load(13);
+const { padme } = __load(14);
 
 /** The four bytes that say "this is a Locker envelope". */
 const MAGIC = 'OVLK';
@@ -938,6 +947,12 @@ const NONCE_SIZE = 12;
 const NONCE_BASE_SIZE = 8;
 /** The padded plaintext starts with the true length, as eight bytes. */
 const LENGTH_PREFIX = 8;
+/**
+ * The smallest padded plaintext we write. A short note still costs 256 bytes: below that the
+ * padded length would say too much about the real one (Padmé's grid is coarse down there), and
+ * 256 bytes is nothing next to a chunk.
+ */
+const MIN_PADDED_SIZE = 256;
 /** A header is small. A bigger one is not a header we wrote, and a service must not read it. */
 const MAX_HEADER_BYTES = 65536;
 /** The bit that marks the last chunk of an envelope. */
@@ -1000,11 +1015,20 @@ function readHeader(bytes) {
     return { header: decodeHeader(headerBytes), headerBytes, chunkOffset: 8 + headerLength };
 }
 
-/** How many chunks a content of this size takes: the padded size, whole chunks. */
-function chunkCount(size) { return Math.max(1, Math.ceil((LENGTH_PREFIX + size) / CHUNK_SIZE)); }
+/**
+ * How many chunks a padded plaintext of this size takes. Every chunk but the last is a whole
+ * chunk; the last holds what is left of it.
+ */
+function chunkCount(padded) { return Math.max(1, Math.ceil(padded / CHUNK_SIZE)); }
 
-/** The padded size of a content of this size: a whole number of chunks, at least one. */
-function paddedSize(size) { return chunkCount(size) * CHUNK_SIZE; }
+/** How many bytes the last chunk of a padded plaintext of this size holds: more than zero. */
+function lastChunkSize(padded) { return padded - (chunkCount(padded) - 1) * CHUNK_SIZE; }
+
+/**
+ * The padded size of a content of this size: the length prefix plus the content, padded with
+ * Padmé up to the next size on its grid, and never below the floor.
+ */
+function paddedSize(size) { return Math.max(MIN_PADDED_SIZE, padme(LENGTH_PREFIX + size)); }
 
 /** The nonce of a chunk: the header's base, then the counter. No nonce repeats inside an envelope. */
 function chunkNonce(nonceBase, counter) {
@@ -1028,9 +1052,9 @@ function nonceBaseBytes(header) {
 
 module.exports = {
     MAGIC, VERSION, SUITE, CHUNK_SIZE, TAG_SIZE, NONCE_SIZE, NONCE_BASE_SIZE, LENGTH_PREFIX,
-    MAX_HEADER_BYTES, FINAL_FLAG,
+    MIN_PADDED_SIZE, MAX_HEADER_BYTES, FINAL_FLAG,
     coreOf, coreBytes, chunkAad, encodeHeader, decodeHeader, encodeEnvelope, readHeader,
-    chunkCount, paddedSize, chunkNonce, encodeChunk, nonceBaseBytes,
+    chunkCount, lastChunkSize, paddedSize, chunkNonce, encodeChunk, nonceBaseBytes,
 };
 },
 // ── 12: src/locker/bytes.js ─────────────────────────────────────────
@@ -1142,7 +1166,58 @@ function fail(code, message) { throw new LockerError(code, message); }
 
 module.exports = { LockerError, fail };
 },
-// ── 14: src/locker/keys.js ──────────────────────────────────────────
+// ── 14: src/locker/padme.js ─────────────────────────────────────────
+function (module, exports) {
+'use strict';
+/**
+ * Padmé padding (Nikitin et al., "Reducing Metadata Leakage from Encrypted Files and Network
+ * Traffic", PoPETs 2019).
+ *
+ * The point of padding a locked item: the server must not learn how big it is. Rounding the size
+ * up to a whole 1 MiB chunk says too much — a 200-byte note becomes a 1 MiB object, and every
+ * item under a megabyte looks the same, which is a leak of its own.
+ *
+ * Padmé rounds the length up to the next size on a grid that gets finer as the length grows:
+ *
+ *     E = floor(log2(n))          the band the length is in
+ *     S = floor(log2(E)) + 1      how many steps the band has
+ *     d = 2^(E - S)               the step of the band
+ *     P(n) = d * ceil(n / d)      the padded length
+ *
+ * The padded length is one of a small number of values per band, and the bands double, so the
+ * number of possible padded lengths up to n grows like log(n): knowing the padded length says
+ * O(log log n) bits about the real one. The expansion stays under 12% (the worst case is a
+ * length just above a band boundary, 129 bytes padded to 144).
+ *
+ * The arithmetic is exact above 2^31: there are no 32-bit bitwise operators here, only
+ * comparisons and division by a power of two, both exact on the doubles we have.
+ */
+
+/** The largest e with 2^e <= size: floor(log2(size)), without a logarithm. */
+function exponentOf(size) {
+    let e = 0;
+    let power = 1;
+    while (power * 2 <= size) { power *= 2; e++; }
+    return e;
+}
+
+/**
+ * The padded length of a content of this size: the smallest length on Padmé's grid that is not
+ * smaller than it. Zero for zero, which the caller handles.
+ */
+function padme(size) {
+    if (!Number.isInteger(size) || size <= 0) return 0;
+    if (size === 1) return 1;
+    const band = exponentOf(size);
+    const steps = exponentOf(band) + 1;
+    const step = Math.pow(2, band - steps);
+    // Dividing by a power of two is exact, so the ceiling is the ceiling and not nearly it.
+    return Math.ceil(size / step) * step;
+}
+
+module.exports = { padme, exponentOf };
+},
+// ── 15: src/locker/keys.js ──────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -1152,9 +1227,9 @@ function (module, exports) {
  * WebCrypto only: globalThis.crypto.subtle. No other crypto library, nothing hand-rolled: the
  * ECDH, the ECDSA, the HKDF, the PBKDF2 and the AES-GCM are all the browser's own.
  */
-const { utf8, concat, base64, fromBase64, canonicalJson } = __load(12);
+const { utf8, concat, base64, base64url, fromBase64, canonicalJson } = __load(12);
 const { fail } = __load(13);
-const { WORDS } = __load(15);
+const { WORDS } = __load(16);
 
 /** The suite of the key pairs: P-256, which every browser's WebCrypto has. */
 const CURVE = 'P-256';
@@ -1164,6 +1239,13 @@ const PEOPLE_ALGORITHM = 'ECDH-P256/HKDF-SHA256/AES-256-GCM';
 const PASSWORD_ALGORITHM = 'PBKDF2-SHA256/AES-256-GCM';
 /** The PBKDF2 floor for this version. The count may go up; it may not go down. */
 const PASSWORD_ITERATIONS = 600000;
+/** The smallest PBKDF2 count we accept, on both sides: the floor above. */
+const PASSWORD_ITERATIONS_MIN = 600000;
+/**
+ * The largest PBKDF2 count we accept. The count comes from the header, so a hostile header could
+ * ask for a derivation that takes hours; the ceiling keeps a browser honest.
+ */
+const PASSWORD_ITERATIONS_MAX = 10000000;
 /** The content key is 32 bytes: AES-256. */
 const KEY_BYTES = 32;
 /** The salt of a people slot (HKDF) and of a password slot (PBKDF2). */
@@ -1200,9 +1282,26 @@ function fingerprintMessage(ecdhPublic, signingPublic) {
     return utf8(canonicalJson({ ecdh: publicJwk(ecdhPublic), signing: publicJwk(signingPublic) }));
 }
 
-/** The four words of a fingerprint: the first four bytes of SHA-256, eight bits each. */
+/**
+ * The eight words of a fingerprint: the first eight bytes of SHA-256, eight bits each, in two
+ * groups of four. Sixty-four bits, not thirty-two: a server that swapped in its own key would
+ * need about 2^32 key generations to land on the same four words, which is not "verify a
+ * person"; with eight words it would need 2^64.
+ */
 function fingerprintWords(hash) {
-    return [hash[0], hash[1], hash[2], hash[3]].map(byte => WORDS[byte]).join(' ');
+    const words = [];
+    for (let i = 0; i < 8; i++) words.push(WORDS[hash[i]]);
+    return `${words.slice(0, 4).join(' ')}-${words.slice(4).join(' ')}`;
+}
+
+/**
+ * The RFC 7638 thumbprint of a public JWK: SHA-256 over the canonical JSON of its four
+ * required members, base64url. It names one key and nothing else, so a slot can be bound to
+ * the key of the person it is for.
+ */
+async function jwkThumbprint(jwk) {
+    const canonical = canonicalJson({ crv: jwk.crv, kty: jwk.kty, x: jwk.x, y: jwk.y });
+    return base64url(await sha256(utf8(canonical)));
 }
 
 /** The fingerprint of a pair of public keys. */
@@ -1317,6 +1416,11 @@ async function deriveWrappingKey(sharedSecret, salt, info) {
 /** The wrapping key for a password: PBKDF2-SHA-256, with the parameters the header names. */
 async function derivePasswordKey(password, salt, iterations) {
     if (typeof password !== 'string' || !password.length) fail('locker.invalid', 'A password lock needs a password');
+    // The count comes from the header, so it is checked before it is used: a hostile header must
+    // not be able to make a reader spend minutes (or hours) on the derivation.
+    if (!Number.isInteger(iterations) || iterations < PASSWORD_ITERATIONS_MIN || iterations > PASSWORD_ITERATIONS_MAX) {
+        fail('locker.bad_envelope', `The iteration count is not between ${PASSWORD_ITERATIONS_MIN} and ${PASSWORD_ITERATIONS_MAX}`);
+    }
     const s = subtle();
     const material = await s.importKey('raw', utf8(password), 'PBKDF2', false, ['deriveKey']);
     return s.deriveKey(
@@ -1328,10 +1432,13 @@ async function derivePasswordKey(password, salt, iterations) {
     );
 }
 
-/** The associated data of a people slot: it binds the slot to one person and one envelope. */
-function peopleSlotAad(subject, ephemeralPublic, salt) {
+/**
+ * The associated data of a people slot: it binds the slot to one person, to that person's key
+ * and to one envelope.
+ */
+function peopleSlotAad(subject, ephemeralPublic, salt, recipientKey) {
     const id = typeof subject === 'string' ? subject : `${subject.type}:${subject.id}`;
-    return utf8(`openvibe-locker people-slot v1|${id}|${canonicalJson(publicJwk(ephemeralPublic))}|${base64(salt)}`);
+    return utf8(`openvibe-locker people-slot v1|${id}|${recipientKey}|${canonicalJson(publicJwk(ephemeralPublic))}|${base64(salt)}`);
 }
 
 /** The associated data of a password slot: it binds the slot to its own parameters. */
@@ -1366,8 +1473,8 @@ async function resolveEphemeral(ephemeral) {
 /**
  * Wraps the content key for one person: the content key, sealed for their public key.
  * The envelope has one ephemeral ECDH key pair; the shared secret with each person goes through
- * HKDF-SHA-256, and the slot's tag covers the person, the ephemeral key and the salt, so a slot
- * cannot be moved to another person or replayed from another envelope.
+ * HKDF-SHA-256, and the slot's tag covers the person, their key, the ephemeral key and the
+ * salt, so a slot cannot be moved to another person or replayed from another envelope.
  */
 async function wrapFor(contentKey, publicKey, { subject, salt, random = platformRandom, ephemeral } = {}) {
     const s = subtle();
@@ -1375,18 +1482,21 @@ async function wrapFor(contentKey, publicKey, { subject, salt, random = platform
     const theirs = await importPublicKey(publicKey);
     const pair = await resolveEphemeral(ephemeral);
     const ephemeralPublic = publicJwk(await s.exportKey('jwk', pair.publicKey || pair.privateKey));
+    // The slot names the key it is for, so an opener can check it before deriving anything.
+    const recipientKey = await jwkThumbprint(publicJwk(publicKey));
     const shared = new Uint8Array(await s.deriveBits({ name: 'ECDH', public: theirs }, pair.privateKey, 256));
     const slotSalt = salt || random(SALT_BYTES);
-    const key = await deriveWrappingKey(shared, slotSalt, utf8(`openvibe-locker people-slot v1|${subject.type}:${subject.id}`));
+    const key = await deriveWrappingKey(shared, slotSalt, utf8(`openvibe-locker people-slot v1|${subject.type}:${subject.id}|${recipientKey}`));
     const nonce = random(12);
     const sealed = new Uint8Array(await s.encrypt(
-        { name: 'AES-GCM', iv: nonce, additionalData: peopleSlotAad(subject, ephemeralPublic, slotSalt) },
+        { name: 'AES-GCM', iv: nonce, additionalData: peopleSlotAad(subject, ephemeralPublic, slotSalt, recipientKey) },
         key,
         contentKey,
     ));
     return {
         subject,
         algorithm: PEOPLE_ALGORITHM,
+        recipient_key: recipientKey,
         ephemeral_public_key: ephemeralPublic,
         salt: base64(slotSalt),
         nonce: base64(nonce),
@@ -1397,13 +1507,21 @@ async function wrapFor(contentKey, publicKey, { subject, salt, random = platform
 /** The content key out of a people slot: the recipient's private key and the slot. */
 async function unwrapPeopleSlot(slot, privateKey) {
     const s = subtle();
+    // The slot names the key it was made for. If it is not this key, the slot is not this
+    // person's, and nothing is derived: the check comes before the work.
+    if (!slot.recipient_key) fail('locker.bad_envelope', 'The slot does not name the key it is for');
+    const theirPublic = publicJwk(await s.exportKey('jwk', privateKey));
+    const recipientKey = await jwkThumbprint(theirPublic);
+    if (slot.recipient_key !== recipientKey) {
+        fail('locker.wrong_key', 'This slot is for another key');
+    }
     const theirs = await s.importKey('jwk', publicJwk(slot.ephemeral_public_key), { name: 'ECDH', namedCurve: CURVE }, true, []);
     const shared = new Uint8Array(await s.deriveBits({ name: 'ECDH', public: theirs }, privateKey, 256));
     const salt = fromBase64(slot.salt);
-    const key = await deriveWrappingKey(shared, salt, utf8(`openvibe-locker people-slot v1|${slot.subject.type}:${slot.subject.id}`));
+    const key = await deriveWrappingKey(shared, salt, utf8(`openvibe-locker people-slot v1|${slot.subject.type}:${slot.subject.id}|${recipientKey}`));
     try {
         const plain = new Uint8Array(await s.decrypt(
-            { name: 'AES-GCM', iv: fromBase64(slot.nonce), additionalData: peopleSlotAad(slot.subject, slot.ephemeral_public_key, salt) },
+            { name: 'AES-GCM', iv: fromBase64(slot.nonce), additionalData: peopleSlotAad(slot.subject, slot.ephemeral_public_key, salt, recipientKey) },
             key,
             fromBase64(slot.wrapped_key),
         ));
@@ -1456,21 +1574,23 @@ async function unwrapPasswordSlot(slot, password) {
 }
 
 module.exports = {
-    CURVE, PEOPLE_ALGORITHM, PASSWORD_ALGORITHM, PASSWORD_ITERATIONS, KEY_BYTES, SALT_BYTES,
+    CURVE, PEOPLE_ALGORITHM, PASSWORD_ALGORITHM, PASSWORD_ITERATIONS,
+    PASSWORD_ITERATIONS_MIN, PASSWORD_ITERATIONS_MAX, KEY_BYTES, SALT_BYTES,
     subtle, platformRandom, sha256, publicJwk, fingerprintMessage, fingerprintWords, fingerprintOf,
-    generatePersonKeys, exportPersonKeys, exportPrivateKeys, importPersonKeys, verifyPersonKeys,
-    importContentKey, deriveWrappingKey, derivePasswordKey, resolveEphemeral,
+    jwkThumbprint, generatePersonKeys, exportPersonKeys, exportPrivateKeys, importPersonKeys,
+    verifyPersonKeys, importContentKey, deriveWrappingKey, derivePasswordKey, resolveEphemeral,
     peopleSlotAad, passwordSlotAad, wrapFor, unwrapPeopleSlot, wrapForPassword, unwrapPasswordSlot,
 };
 },
-// ── 15: src/locker/words.js ─────────────────────────────────────────
+// ── 16: src/locker/words.js ─────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
- * The 256 words of a fingerprint. A fingerprint is the first four bytes of SHA-256 over a
- * person's two public keys, read as four words: eight bits each, so the words say which of the
- * 256 they are. It is short enough to read out loud and compare once, which is the whole point:
- * a person checks that the four words on the screen are the four words the other person sees.
+ * The 256 words of a fingerprint. A fingerprint is the first eight bytes of SHA-256 over a
+ * person's two public keys, read as eight words in two groups of four: eight bits each, so the
+ * words say which of the 256 they are. It is short enough to read out loud and compare once,
+ * which is the whole point: a person checks that the eight words on the screen are the eight
+ * words the other person sees.
  *
  * The order is part of the format: word number n is the nth word here. Changing the list would
  * change every fingerprint, so it is frozen with the version.
@@ -1512,7 +1632,7 @@ const WORDS = [
 
 module.exports = { WORDS };
 },
-// ── 16: src/locker/seal.js ──────────────────────────────────────────
+// ── 17: src/locker/seal.js ──────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -1527,14 +1647,14 @@ const {
 } = __load(12);
 const { fail } = __load(13);
 const {
-    MAGIC, VERSION, SUITE, CHUNK_SIZE, TAG_SIZE, NONCE_BASE_SIZE, LENGTH_PREFIX, FINAL_FLAG,
-    coreOf, chunkAad, encodeHeader, encodeEnvelope, readHeader, chunkCount, paddedSize,
-    chunkNonce, encodeChunk, nonceBaseBytes,
+    MAGIC, VERSION, SUITE, CHUNK_SIZE, TAG_SIZE, NONCE_BASE_SIZE, LENGTH_PREFIX, MIN_PADDED_SIZE,
+    FINAL_FLAG, coreOf, chunkAad, encodeHeader, encodeEnvelope, readHeader, chunkCount,
+    lastChunkSize, paddedSize, chunkNonce, encodeChunk, nonceBaseBytes,
 } = __load(11);
 const {
     KEY_BYTES, PASSWORD_ITERATIONS, subtle, platformRandom, importContentKey,
     wrapFor, unwrapPeopleSlot, wrapForPassword, unwrapPasswordSlot, resolveEphemeral,
-} = __load(14);
+} = __load(15);
 
 /** The content as bytes: a string is UTF-8, anything else is taken as it is. */
 function toBytes(content) {
@@ -1581,9 +1701,10 @@ class Chunker {
         return block;
     }
 
-    /** What is left, as one block: the bytes that are there, then zeros. */
-    rest() {
-        const block = new Uint8Array(this.size);
+    /** What is left, as one block of exactly this many bytes: the bytes that are there, then zeros. */
+    takeExactly(count) {
+        if (this.length > count) fail('locker.size_mismatch', 'The content is longer than the size it was given');
+        const block = new Uint8Array(count);
         let at = 0;
         for (const part of this.parts) { block.set(part, at); at += part.length; }
         this.parts = [];
@@ -1661,30 +1782,37 @@ async function sealBlock(key, header, nonceBase, counter, block, isFinal) {
 async function* sealPieces(source, options) {
     const size = options.size;
     const { contentKey, nonceBase, slots } = await prepare(options);
-    const header = makeHeader(options.lock, slots, paddedSize(size), nonceBase);
+    const padded = paddedSize(size);
+    const header = makeHeader(options.lock, slots, padded, nonceBase);
     const headerBytes = encodeHeader(header);
     yield { header, headerBytes, contentKey, bytes: concat(utf8(MAGIC), u32be(headerBytes.length), headerBytes) };
     const key = await importContentKey(contentKey, ['encrypt']);
-    const total = chunkCount(size);
+    const total = chunkCount(padded);
     const chunker = new Chunker(CHUNK_SIZE);
     let counter = 0;
     // The padded plaintext starts with the true length, so the server cannot read the size.
     chunker.push(u64be(size));
     for await (const part of source) {
         chunker.push(part);
+        // Every chunk but the last is a whole chunk.
         for (;;) {
+            if (counter >= total - 1) break;
             const block = chunker.take();
             if (!block) break;
-            yield { bytes: await sealBlock(key, header, nonceBase, counter, block, counter + 1 === total) };
+            yield { bytes: await sealBlock(key, header, nonceBase, counter, block, false) };
             counter++;
         }
     }
-    if (counter < total) {
-        // The last block: what is left, then zeros up to the chunk size.
-        yield { bytes: await sealBlock(key, header, nonceBase, counter, chunker.rest(), true) };
+    // The content is done; the padding fills the rest of the padded plaintext. (A content that
+    // is longer than the size it was given fails in takeExactly, below.)
+    while (counter < total - 1) {
+        const block = chunker.takeExactly(CHUNK_SIZE);
+        yield { bytes: await sealBlock(key, header, nonceBase, counter, block, false) };
         counter++;
     }
-    if (counter !== total) fail('locker.bad_envelope', 'The content did not fill the envelope');
+    // The last chunk: what is left of the plaintext, then zeros up to the padded size.
+    const tail = chunker.takeExactly(lastChunkSize(padded));
+    yield { bytes: await sealBlock(key, header, nonceBase, counter, tail, true) };
 }
 
 /**
@@ -1726,9 +1854,8 @@ function readCore(header) {
     if (header.version !== VERSION) fail('locker.bad_envelope', 'This envelope is another version');
     if (header.suite !== SUITE) fail('locker.bad_envelope', 'This envelope uses another suite');
     if (header.chunk_size !== CHUNK_SIZE) fail('locker.bad_envelope', 'This envelope uses another chunk size');
-    if (!Number.isInteger(header.padded_size) || header.padded_size <= 0
-        || header.padded_size % CHUNK_SIZE !== 0) {
-        fail('locker.bad_envelope', 'The padded size is not a whole number of chunks');
+    if (!Number.isInteger(header.padded_size) || header.padded_size < MIN_PADDED_SIZE) {
+        fail('locker.bad_envelope', 'The padded size is not a size we write');
     }
     if (!['people', 'password', 'link'].includes(header.lock)) {
         fail('locker.bad_envelope', 'The lock is not one we know');
@@ -1839,7 +1966,8 @@ function streamReader(iterator) {
  * stream; both are read the same way, so the same checks run on both.
  */
 async function* openPieces(reader, header, key) {
-    const expected = header.padded_size / CHUNK_SIZE;
+    const expected = chunkCount(header.padded_size);
+    const lastLength = lastChunkSize(header.padded_size);
     const nonceBase = nonceBaseBytes(header);
     let counter = 0;
     let length = null;
@@ -1853,8 +1981,10 @@ async function* openPieces(reader, header, key) {
         if (counter >= expected) fail('locker.bad_envelope', 'The envelope has more chunks than its size says');
         const cipherLength = readU32be(lengthBytes, 0);
         // The length is checked before it is used: a header that claims a huge chunk must not
-        // make the reader wait for it.
-        if (cipherLength !== CHUNK_SIZE + TAG_SIZE) {
+        // make the reader wait for it. Every chunk but the last is a whole chunk; the last holds
+        // what is left of the padded size.
+        const wantedLength = counter === expected - 1 ? lastLength : CHUNK_SIZE;
+        if (cipherLength !== wantedLength + TAG_SIZE) {
             fail('locker.bad_envelope', 'A chunk is not the size the envelope says');
         }
         const flags = (await reader.take(1))[0];
@@ -1954,7 +2084,13 @@ function sealStream(stream, options = {}) {
     });
 }
 
-/** Opens a stream: the content comes out piece by piece, and only one chunk is ever in memory. */
+/**
+ * Opens a stream: the content comes out piece by piece, and only one chunk is ever in memory.
+ *
+ * The chunks are yielded as they are verified, so a reader sees the earlier ones before the last
+ * one is reached. A stream that ends early throws at the end, when the missing chunk shows up:
+ * discard what it yielded, because the content was never complete.
+ */
 function openStream(stream, credentials = {}) {
     const iterator = (async function* openStreamPieces() {
         const reader = streamReader(readChunks(stream)[Symbol.asyncIterator]());
@@ -1991,35 +2127,59 @@ function openStream(stream, credentials = {}) {
  * their slots, and the new ones get one of their own.
  *
  * Removing a member wants a fresh content key, not just a slot that is gone: the person who is
- * removed may still hold the key. So a removal is open the content and seal it again with a new
- * key for the people who are left.
+ * removed may still hold the old key. So a removal opens the content and seals it again, with a
+ * new key and a new nonce base, for the people who are left. Their public keys are needed for
+ * that, so the caller gives them in `keys`.
  */
-async function rewrap(envelope, { add = [], remove = [], credentials = {}, random = platformRandom, ephemeral } = {}) {
+async function rewrap(envelope, {
+    add = [], remove = [], keys = [], credentials = {}, random = platformRandom, ephemeral,
+} = {}) {
     const bytes = envelopeBytes(envelope);
     const { header, chunkOffset } = readHeader(bytes);
     if (header.lock !== 'people') fail('locker.invalid', 'Only a people-locked envelope can be re-wrapped');
     readCore(header);
-    const contentKey = await openContentKey(header, credentials);
     const gone = new Set(remove.map(who => (typeof who === 'string' ? who : who.id)));
-    const people = (header.slots.people || []).filter(slot => !gone.has(slot.subject.id));
-    if (add.length) {
-        const pair = await resolveEphemeral(ephemeral);
-        for (const recipient of add) {
-            people.push(await wrapFor(contentKey, recipient.publicKey, {
-                subject: recipient.subject, ephemeral: pair, random,
-            }));
+    const staying = (header.slots.people || []).filter(slot => !gone.has(slot.subject.id));
+
+    if (!gone.size) {
+        // Adding: the content key and the chunks stay as they are.
+        const contentKey = await openContentKey(header, credentials);
+        const people = staying.slice();
+        if (add.length) {
+            const pair = await resolveEphemeral(ephemeral);
+            for (const recipient of add) {
+                people.push(await wrapFor(contentKey, recipient.publicKey, {
+                    subject: recipient.subject, ephemeral: pair, random,
+                }));
+            }
         }
+        if (!people.length) fail('locker.invalid', 'A people-locked envelope needs at least one slot');
+        const newHeader = { ...coreOf(header), slots: { people } };
+        const headerBytes = encodeHeader(newHeader);
+        return {
+            version: VERSION,
+            header: newHeader,
+            headerBytes,
+            bytes: encodeEnvelope(headerBytes, bytes.subarray(chunkOffset)),
+            chunkOffset: 8 + headerBytes.length,
+        };
     }
-    if (!people.length) fail('locker.invalid', 'A people-locked envelope needs at least one slot');
-    const newHeader = { ...coreOf(header), slots: { people } };
-    const headerBytes = encodeHeader(newHeader);
-    return {
-        version: VERSION,
-        header: newHeader,
-        headerBytes,
-        bytes: encodeEnvelope(headerBytes, bytes.subarray(chunkOffset)),
-        chunkOffset: 8 + headerBytes.length,
-    };
+
+    // Removing: the content is opened and sealed again under a new key, so the key the person
+    // who is leaving still holds opens nothing.
+    const contentKey = await openContentKey(header, credentials);
+    const plain = await open(bytes, credentials);
+    const recipients = [];
+    for (const slot of staying) {
+        const found = keys.find(key => (typeof key.subject === 'string' ? key.subject : key.subject.id) === slot.subject.id);
+        if (!found) {
+            fail('locker.invalid', `Removing a person needs the public key of ${slot.subject.id}, who stays`);
+        }
+        recipients.push({ subject: slot.subject, publicKey: found.publicKey });
+    }
+    for (const recipient of add) recipients.push({ subject: recipient.subject, publicKey: recipient.publicKey });
+    if (!recipients.length) fail('locker.invalid', 'A people-locked envelope needs at least one slot');
+    return seal(plain, { lock: 'people', keys: recipients, random, ephemeral });
 }
 
 module.exports = {
@@ -2027,7 +2187,7 @@ module.exports = {
     envelopeBytes, toBytes, openContentKey, readCore, prepare, makeHeader, Chunker,
 };
 },
-// ── 17: src/registry.js ─────────────────────────────────────────────
+// ── 18: src/registry.js ─────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -2064,7 +2224,7 @@ function createRegistryClient(client, { baseUrl } = {}) {
 
 module.exports = { createRegistryClient };
 },
-// ── 18: src/modules.js ──────────────────────────────────────────────
+// ── 19: src/modules.js ──────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -2143,7 +2303,7 @@ function createModulesClient(client, { baseUrl, maxAttempts = 5 } = {}) {
 
 module.exports = { createModulesClient };
 },
-// ── 19: src/realtime.js ─────────────────────────────────────────────
+// ── 20: src/realtime.js ─────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -2396,7 +2556,7 @@ function createRealtimeClient(client, defaults = {}) {
 
 module.exports = { subscribe, createRealtimeClient, parseSSE, DEFAULT_ORIGIN };
 },
-// ── 20: src/media.js ────────────────────────────────────────────────
+// ── 21: src/media.js ────────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -2418,7 +2578,7 @@ function (module, exports) {
  */
 const { isOpenVibeError } = __load(3);
 const { paginate, offsetPager } = __load(7);
-const { createObjectsClient } = __load(21);
+const { createObjectsClient } = __load(22);
 
 const DEFAULT_PUBLIC_ORIGIN = 'https://openvibe.media';
 const enc = encodeURIComponent;
@@ -2510,7 +2670,7 @@ function createMediaClient(client, { app, apiKey, actingUserId, baseUrl, publicO
 
 module.exports = { createMediaClient, createObjectsClient, mediaUrls, DEFAULT_PUBLIC_ORIGIN };
 },
-// ── 21: src/objects.js ──────────────────────────────────────────────
+// ── 22: src/objects.js ──────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -2829,7 +2989,7 @@ function createObjectsClient({
 
 module.exports = { createObjectsClient };
 },
-// ── 22: src/community.js ────────────────────────────────────────────
+// ── 23: src/community.js ────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -2948,7 +3108,7 @@ function createCommunityClient(client, defaults = {}) {
 
 module.exports = { createCommunityClient, actingHeaders };
 },
-// ── 23: src/bot.js ──────────────────────────────────────────────────
+// ── 24: src/bot.js ──────────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -3170,7 +3330,7 @@ function createBotClient(client, defaults = {}) {
 
 module.exports = { createBotClient, actingHeaders };
 },
-// ── 24: src/search.js ───────────────────────────────────────────────
+// ── 25: src/search.js ───────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -3283,7 +3443,7 @@ function createSearchClient(client, defaults = {}) {
 
 module.exports = { createSearchClient, queryOf, fabricOf };
 },
-// ── 25: src/bench.js ────────────────────────────────────────────────
+// ── 26: src/bench.js ────────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /** openvibe-sdk/bench: OpenVibe.Bench's JSON API and streamed open dataset. Browser-safe. */
@@ -3384,7 +3544,7 @@ function createBenchClient(client, defaults = {}) {
 
 module.exports = { createBenchClient };
 },
-// ── 26: src/meme.js ─────────────────────────────────────────────────
+// ── 27: src/meme.js ─────────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -3452,7 +3612,7 @@ function createMemeClient(client, defaults = {}) {
 
 module.exports = { createMemeClient };
 },
-// ── 27: src/vision.js ───────────────────────────────────────────────
+// ── 28: src/vision.js ───────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -3610,7 +3770,7 @@ function pick(o, keys) {
 
 module.exports = { createVisionClient, DEFAULT_AUDIENCE };
 },
-// ── 28: src/themes.js ───────────────────────────────────────────────
+// ── 29: src/themes.js ───────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -3760,7 +3920,7 @@ function followTheme(fn, opts = {}) {
 
 module.exports = { createThemesClient, followTheme, readTheme, applyTheme, seasonOn, onColor, DISPLAY_OPTIONS, TOKENS };
 },
-// ── 29: src/redact.js ───────────────────────────────────────────────
+// ── 30: src/redact.js ───────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -4007,7 +4167,7 @@ function onlySecret(text) {
 
 module.exports = { redact, onlySecret };
 },
-// ── 30: src/chat.js ─────────────────────────────────────────────────
+// ── 31: src/chat.js ─────────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -4249,7 +4409,7 @@ function createFeedPublisher(client, { feed, key, baseUrl } = {}) {
 
 module.exports = { createChatClient, createInboxVisitor, createFeedPublisher };
 },
-// ── 31: src/ai.js ───────────────────────────────────────────────────
+// ── 32: src/ai.js ───────────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -4324,7 +4484,7 @@ function createAiClient(client, defaults = {}) {
 
 module.exports = { createAiClient, TERMINAL, OPS };
 },
-// ── 32: src/jobs.js ─────────────────────────────────────────────────
+// ── 33: src/jobs.js ─────────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -4362,8 +4522,8 @@ function (module, exports) {
  */
 const { OpenVibeError, isOpenVibeError } = __load(3);
 const { newIdempotencyKey } = __load(5);
-const { appendFiles } = __load(33);
-const { parseSSE } = __load(19);
+const { appendFiles } = __load(34);
+const { parseSSE } = __load(20);
 
 const TERMINAL = new Set(['succeeded', 'failed', 'cancelled']);
 const TERMINAL_EVENTS = new Set(['job.succeeded', 'job.failed', 'job.cancelled']);
@@ -4526,7 +4686,7 @@ function createJobsClient(client, { baseUrl, service = 'tools', audience = 'open
 
 module.exports = { createJobsClient, isTerminal, TERMINAL_STATES: [...TERMINAL] };
 },
-// ── 33: src/core/form.js ────────────────────────────────────────────
+// ── 34: src/core/form.js ────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -4560,7 +4720,7 @@ function appendFiles(form, list, where) {
 
 module.exports = { isBlob, isUpload, appendFiles };
 },
-// ── 34: src/tools.js ────────────────────────────────────────────────
+// ── 35: src/tools.js ────────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -4594,8 +4754,8 @@ function (module, exports) {
  */
 const { OpenVibeError, isOpenVibeError } = __load(3);
 const { newIdempotencyKey } = __load(5);
-const { isUpload, appendFiles } = __load(33);
-const { createJobsClient } = __load(32);
+const { isUpload, appendFiles } = __load(34);
+const { createJobsClient } = __load(33);
 
 const enc = encodeURIComponent;
 const ID_RE = /^[a-z][a-z0-9-]{0,39}$/;
@@ -4845,7 +5005,7 @@ function createToolsClient(client, { baseUrl, service = 'tools', audience = 'ope
 
 module.exports = { createToolsClient, ToolRunError, isToolRunError };
 },
-// ── 35: src/projects.js ─────────────────────────────────────────────
+// ── 36: src/projects.js ─────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -4961,7 +5121,7 @@ function createProjectsClient(client, { baseUrl } = {}) {
 
 module.exports = { createProjectsClient };
 },
-// ── 36: src/geo.js ──────────────────────────────────────────────────
+// ── 37: src/geo.js ──────────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**

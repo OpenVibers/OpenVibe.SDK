@@ -1,9 +1,10 @@
 'use strict';
 /**
- * The 256 words of a fingerprint. A fingerprint is the first four bytes of SHA-256 over a
- * person's two public keys, read as four words: eight bits each, so the words say which of the
- * 256 they are. It is short enough to read out loud and compare once, which is the whole point:
- * a person checks that the four words on the screen are the four words the other person sees.
+ * The 256 words of a fingerprint. A fingerprint is the first eight bytes of SHA-256 over a
+ * person's two public keys, read as eight words in two groups of four: eight bits each, so the
+ * words say which of the 256 they are. It is short enough to read out loud and compare once,
+ * which is the whole point: a person checks that the eight words on the screen are the eight
+ * words the other person sees.
  *
  * The order is part of the format: word number n is the nth word here. Changing the list would
  * change every fingerprint, so it is frozen with the version.

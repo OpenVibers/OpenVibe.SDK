@@ -6,7 +6,7 @@
  * WebCrypto only: globalThis.crypto.subtle. No other crypto library, nothing hand-rolled: the
  * ECDH, the ECDSA, the HKDF, the PBKDF2 and the AES-GCM are all the browser's own.
  */
-const { utf8, concat, base64, fromBase64, canonicalJson } = require('./bytes');
+const { utf8, concat, base64, base64url, fromBase64, canonicalJson } = require('./bytes');
 const { fail } = require('./errors');
 const { WORDS } = require('./words');
 
@@ -18,6 +18,13 @@ const PEOPLE_ALGORITHM = 'ECDH-P256/HKDF-SHA256/AES-256-GCM';
 const PASSWORD_ALGORITHM = 'PBKDF2-SHA256/AES-256-GCM';
 /** The PBKDF2 floor for this version. The count may go up; it may not go down. */
 const PASSWORD_ITERATIONS = 600000;
+/** The smallest PBKDF2 count we accept, on both sides: the floor above. */
+const PASSWORD_ITERATIONS_MIN = 600000;
+/**
+ * The largest PBKDF2 count we accept. The count comes from the header, so a hostile header could
+ * ask for a derivation that takes hours; the ceiling keeps a browser honest.
+ */
+const PASSWORD_ITERATIONS_MAX = 10000000;
 /** The content key is 32 bytes: AES-256. */
 const KEY_BYTES = 32;
 /** The salt of a people slot (HKDF) and of a password slot (PBKDF2). */
@@ -54,9 +61,26 @@ function fingerprintMessage(ecdhPublic, signingPublic) {
     return utf8(canonicalJson({ ecdh: publicJwk(ecdhPublic), signing: publicJwk(signingPublic) }));
 }
 
-/** The four words of a fingerprint: the first four bytes of SHA-256, eight bits each. */
+/**
+ * The eight words of a fingerprint: the first eight bytes of SHA-256, eight bits each, in two
+ * groups of four. Sixty-four bits, not thirty-two: a server that swapped in its own key would
+ * need about 2^32 key generations to land on the same four words, which is not "verify a
+ * person"; with eight words it would need 2^64.
+ */
 function fingerprintWords(hash) {
-    return [hash[0], hash[1], hash[2], hash[3]].map(byte => WORDS[byte]).join(' ');
+    const words = [];
+    for (let i = 0; i < 8; i++) words.push(WORDS[hash[i]]);
+    return `${words.slice(0, 4).join(' ')}-${words.slice(4).join(' ')}`;
+}
+
+/**
+ * The RFC 7638 thumbprint of a public JWK: SHA-256 over the canonical JSON of its four
+ * required members, base64url. It names one key and nothing else, so a slot can be bound to
+ * the key of the person it is for.
+ */
+async function jwkThumbprint(jwk) {
+    const canonical = canonicalJson({ crv: jwk.crv, kty: jwk.kty, x: jwk.x, y: jwk.y });
+    return base64url(await sha256(utf8(canonical)));
 }
 
 /** The fingerprint of a pair of public keys. */
@@ -171,6 +195,11 @@ async function deriveWrappingKey(sharedSecret, salt, info) {
 /** The wrapping key for a password: PBKDF2-SHA-256, with the parameters the header names. */
 async function derivePasswordKey(password, salt, iterations) {
     if (typeof password !== 'string' || !password.length) fail('locker.invalid', 'A password lock needs a password');
+    // The count comes from the header, so it is checked before it is used: a hostile header must
+    // not be able to make a reader spend minutes (or hours) on the derivation.
+    if (!Number.isInteger(iterations) || iterations < PASSWORD_ITERATIONS_MIN || iterations > PASSWORD_ITERATIONS_MAX) {
+        fail('locker.bad_envelope', `The iteration count is not between ${PASSWORD_ITERATIONS_MIN} and ${PASSWORD_ITERATIONS_MAX}`);
+    }
     const s = subtle();
     const material = await s.importKey('raw', utf8(password), 'PBKDF2', false, ['deriveKey']);
     return s.deriveKey(
@@ -182,10 +211,13 @@ async function derivePasswordKey(password, salt, iterations) {
     );
 }
 
-/** The associated data of a people slot: it binds the slot to one person and one envelope. */
-function peopleSlotAad(subject, ephemeralPublic, salt) {
+/**
+ * The associated data of a people slot: it binds the slot to one person, to that person's key
+ * and to one envelope.
+ */
+function peopleSlotAad(subject, ephemeralPublic, salt, recipientKey) {
     const id = typeof subject === 'string' ? subject : `${subject.type}:${subject.id}`;
-    return utf8(`openvibe-locker people-slot v1|${id}|${canonicalJson(publicJwk(ephemeralPublic))}|${base64(salt)}`);
+    return utf8(`openvibe-locker people-slot v1|${id}|${recipientKey}|${canonicalJson(publicJwk(ephemeralPublic))}|${base64(salt)}`);
 }
 
 /** The associated data of a password slot: it binds the slot to its own parameters. */
@@ -220,8 +252,8 @@ async function resolveEphemeral(ephemeral) {
 /**
  * Wraps the content key for one person: the content key, sealed for their public key.
  * The envelope has one ephemeral ECDH key pair; the shared secret with each person goes through
- * HKDF-SHA-256, and the slot's tag covers the person, the ephemeral key and the salt, so a slot
- * cannot be moved to another person or replayed from another envelope.
+ * HKDF-SHA-256, and the slot's tag covers the person, their key, the ephemeral key and the
+ * salt, so a slot cannot be moved to another person or replayed from another envelope.
  */
 async function wrapFor(contentKey, publicKey, { subject, salt, random = platformRandom, ephemeral } = {}) {
     const s = subtle();
@@ -229,18 +261,21 @@ async function wrapFor(contentKey, publicKey, { subject, salt, random = platform
     const theirs = await importPublicKey(publicKey);
     const pair = await resolveEphemeral(ephemeral);
     const ephemeralPublic = publicJwk(await s.exportKey('jwk', pair.publicKey || pair.privateKey));
+    // The slot names the key it is for, so an opener can check it before deriving anything.
+    const recipientKey = await jwkThumbprint(publicJwk(publicKey));
     const shared = new Uint8Array(await s.deriveBits({ name: 'ECDH', public: theirs }, pair.privateKey, 256));
     const slotSalt = salt || random(SALT_BYTES);
-    const key = await deriveWrappingKey(shared, slotSalt, utf8(`openvibe-locker people-slot v1|${subject.type}:${subject.id}`));
+    const key = await deriveWrappingKey(shared, slotSalt, utf8(`openvibe-locker people-slot v1|${subject.type}:${subject.id}|${recipientKey}`));
     const nonce = random(12);
     const sealed = new Uint8Array(await s.encrypt(
-        { name: 'AES-GCM', iv: nonce, additionalData: peopleSlotAad(subject, ephemeralPublic, slotSalt) },
+        { name: 'AES-GCM', iv: nonce, additionalData: peopleSlotAad(subject, ephemeralPublic, slotSalt, recipientKey) },
         key,
         contentKey,
     ));
     return {
         subject,
         algorithm: PEOPLE_ALGORITHM,
+        recipient_key: recipientKey,
         ephemeral_public_key: ephemeralPublic,
         salt: base64(slotSalt),
         nonce: base64(nonce),
@@ -251,13 +286,21 @@ async function wrapFor(contentKey, publicKey, { subject, salt, random = platform
 /** The content key out of a people slot: the recipient's private key and the slot. */
 async function unwrapPeopleSlot(slot, privateKey) {
     const s = subtle();
+    // The slot names the key it was made for. If it is not this key, the slot is not this
+    // person's, and nothing is derived: the check comes before the work.
+    if (!slot.recipient_key) fail('locker.bad_envelope', 'The slot does not name the key it is for');
+    const theirPublic = publicJwk(await s.exportKey('jwk', privateKey));
+    const recipientKey = await jwkThumbprint(theirPublic);
+    if (slot.recipient_key !== recipientKey) {
+        fail('locker.wrong_key', 'This slot is for another key');
+    }
     const theirs = await s.importKey('jwk', publicJwk(slot.ephemeral_public_key), { name: 'ECDH', namedCurve: CURVE }, true, []);
     const shared = new Uint8Array(await s.deriveBits({ name: 'ECDH', public: theirs }, privateKey, 256));
     const salt = fromBase64(slot.salt);
-    const key = await deriveWrappingKey(shared, salt, utf8(`openvibe-locker people-slot v1|${slot.subject.type}:${slot.subject.id}`));
+    const key = await deriveWrappingKey(shared, salt, utf8(`openvibe-locker people-slot v1|${slot.subject.type}:${slot.subject.id}|${recipientKey}`));
     try {
         const plain = new Uint8Array(await s.decrypt(
-            { name: 'AES-GCM', iv: fromBase64(slot.nonce), additionalData: peopleSlotAad(slot.subject, slot.ephemeral_public_key, salt) },
+            { name: 'AES-GCM', iv: fromBase64(slot.nonce), additionalData: peopleSlotAad(slot.subject, slot.ephemeral_public_key, salt, recipientKey) },
             key,
             fromBase64(slot.wrapped_key),
         ));
@@ -310,9 +353,10 @@ async function unwrapPasswordSlot(slot, password) {
 }
 
 module.exports = {
-    CURVE, PEOPLE_ALGORITHM, PASSWORD_ALGORITHM, PASSWORD_ITERATIONS, KEY_BYTES, SALT_BYTES,
+    CURVE, PEOPLE_ALGORITHM, PASSWORD_ALGORITHM, PASSWORD_ITERATIONS,
+    PASSWORD_ITERATIONS_MIN, PASSWORD_ITERATIONS_MAX, KEY_BYTES, SALT_BYTES,
     subtle, platformRandom, sha256, publicJwk, fingerprintMessage, fingerprintWords, fingerprintOf,
-    generatePersonKeys, exportPersonKeys, exportPrivateKeys, importPersonKeys, verifyPersonKeys,
-    importContentKey, deriveWrappingKey, derivePasswordKey, resolveEphemeral,
+    jwkThumbprint, generatePersonKeys, exportPersonKeys, exportPrivateKeys, importPersonKeys,
+    verifyPersonKeys, importContentKey, deriveWrappingKey, derivePasswordKey, resolveEphemeral,
     peopleSlotAad, passwordSlotAad, wrapFor, unwrapPeopleSlot, wrapForPassword, unwrapPasswordSlot,
 };

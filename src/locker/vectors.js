@@ -2,7 +2,7 @@
 /**
  * The shared test vectors. The browser module (openvibe-shared/ov-locker.js) runs the same cases,
  * so both runtimes must produce the same bytes for the same input: the same header, the same
- * envelope, the same four words.
+ * envelope, the same eight words.
  *
  * Everything here is fixed: the keys, the byte source and the content. The keys below are test
  * keys, made for this file and used for nothing else.
@@ -27,7 +27,7 @@ function fixedRandom(seed = 0x1a2b3c4d) {
 }
 
 /** The content of every case. */
-const CONTENT = 'The quick brown fox jumps over the lazy dog.';
+const CONTENT = "The quick brown fox jumps over the lazy dog.";
 
 /** A person's keys, made for these vectors. */
 const PERSON = {
@@ -65,7 +65,7 @@ const PERSON = {
         "x": "ytN7TbH08BDhIld7Tt-8R80FoRosnzgTxSn75z135Gk",
         "y": "D0axhLHKheyPLSc4GW0PpSfM48FPCLcC4OiRn-ZqN1w"
     },
-    "fingerprint": "lichen brick plateau yew"
+    "fingerprint": "lichen brick plateau yew-apple petal rabbit sand"
 };
 
 /** The subject the people case is for. */
@@ -78,12 +78,12 @@ const SUBJECT = {
 const CASES = [
     {
         "name": "people",
-        "envelope_sha256": "3f50740af8d47de374ba7858a104a76e0617c2d5efe35355fec09ad23279716d",
+        "envelope_sha256": "a07abdad22e7400831299bb6c363c50241c816bb49c361e555f90bd148690b47",
         "header": {
             "version": "locker.envelope.v1",
             "suite": "AES-256-GCM",
             "chunk_size": 1048576,
-            "padded_size": 1048576,
+            "padded_size": 256,
             "nonce_base": "ghT0ZBfkXps=",
             "lock": "people",
             "slots": {
@@ -94,6 +94,7 @@ const CASES = [
                             "id": "usr_01JAB2C3D4E5F6G7H8J9K0MNPQ"
                         },
                         "algorithm": "ECDH-P256/HKDF-SHA256/AES-256-GCM",
+                        "recipient_key": "TCGh2gH6HIuT0-A9Ge0jOTrFmRXWQkdA6fZG8JxikTA",
                         "ephemeral_public_key": {
                             "kty": "EC",
                             "crv": "P-256",
@@ -102,7 +103,7 @@ const CASES = [
                         },
                         "salt": "pGphaA6OCYR5+nzvUl/WQQ==",
                         "nonce": "0uLZzrvm1lBfW87O",
-                        "wrapped_key": "t9FBCQEiSb87EYFaqq9yjm45qITqW8p8qMoz49vKUhbbUznoz9T0iwJXSmBBaTLN"
+                        "wrapped_key": "IpXVDIbStzw/kky7eKnrPQ7SOufRZ8zjU8iWB3c59OhfRjKLXuwDs4NQ4OlMAtGN"
                     }
                 ]
             }
@@ -110,12 +111,12 @@ const CASES = [
     },
     {
         "name": "password",
-        "envelope_sha256": "a112ef1fb31bd7f1831cc00c877bc136cc859a140002c8d19f3b6bd873bbfa13",
+        "envelope_sha256": "61f9d8f4ad38c4f2e4303f5a48f697e0903b41462f9b54351bb839dcbdc42c1b",
         "header": {
             "version": "locker.envelope.v1",
             "suite": "AES-256-GCM",
             "chunk_size": 1048576,
-            "padded_size": 1048576,
+            "padded_size": 256,
             "nonce_base": "YXEf22DEcq8=",
             "lock": "password",
             "slots": {
@@ -132,12 +133,12 @@ const CASES = [
     },
     {
         "name": "link",
-        "envelope_sha256": "709d0e03da6b42ab379f4824aafd7ad41e0a2f74f348df879b9a0e03a154d38b",
+        "envelope_sha256": "63cd81542d4994c05e3add3c4fcc819ebebc2b917fb4219c6070ecbea2337b54",
         "header": {
             "version": "locker.envelope.v1",
             "suite": "AES-256-GCM",
             "chunk_size": 1048576,
-            "padded_size": 1048576,
+            "padded_size": 256,
             "nonce_base": "Rb2p0icJ0nY=",
             "lock": "link",
             "slots": {

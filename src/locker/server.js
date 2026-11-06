@@ -12,7 +12,8 @@
  */
 const { fromUtf8, fromBase64, readU32be } = require('./bytes');
 const {
-    MAGIC, VERSION, SUITE, CHUNK_SIZE, TAG_SIZE, NONCE_SIZE, NONCE_BASE_SIZE, MAX_HEADER_BYTES,
+    MAGIC, VERSION, SUITE, CHUNK_SIZE, TAG_SIZE, NONCE_SIZE, NONCE_BASE_SIZE, MIN_PADDED_SIZE,
+    MAX_HEADER_BYTES, chunkCount, lastChunkSize,
 } = require('./format');
 
 /** The bytes of a base64 field, or null when it is not base64 of that many bytes. */
@@ -37,11 +38,13 @@ function publicKeyOk(key) {
         && typeof key.y === 'string' && /^[A-Za-z0-9_-]{43}$/.test(key.y);
 }
 
-/** One people slot: whose it is, and the wrapped key with the bytes it must have. */
+/** One people slot: whose it is, which key it is for, and the wrapped key with the bytes it must have. */
 function peopleSlotOk(slot) {
     if (!slot || typeof slot !== 'object') return false;
     if (!subjectOk(slot.subject)) return false;
     if (slot.algorithm !== 'ECDH-P256/HKDF-SHA256/AES-256-GCM') return false;
+    // The thumbprint of the recipient's key: the slot names the key it is for.
+    if (typeof slot.recipient_key !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(slot.recipient_key)) return false;
     if (!publicKeyOk(slot.ephemeral_public_key)) return false;
     if (!bytesOf(slot.salt, 16)) return false;
     if (!bytesOf(slot.nonce, NONCE_SIZE)) return false;
@@ -71,9 +74,8 @@ function checkHeader(header) {
     if (header.version !== VERSION) errors.push(`the version is not ${VERSION}`);
     if (header.suite !== SUITE) errors.push(`the suite is not ${SUITE}`);
     if (header.chunk_size !== CHUNK_SIZE) errors.push(`the chunk size is not ${CHUNK_SIZE}`);
-    if (!Number.isInteger(header.padded_size) || header.padded_size < CHUNK_SIZE
-        || header.padded_size % CHUNK_SIZE !== 0) {
-        errors.push(`the padded size is not a whole number of ${CHUNK_SIZE} byte chunks`);
+    if (!Number.isInteger(header.padded_size) || header.padded_size < MIN_PADDED_SIZE) {
+        errors.push(`the padded size is not at least ${MIN_PADDED_SIZE} bytes`);
     }
     if (!bytesOf(header.nonce_base, NONCE_BASE_SIZE)) errors.push('the nonce base is not eight bytes');
     if (!['people', 'password', 'link'].includes(header.lock)) errors.push('the lock is not one we know');
@@ -127,10 +129,15 @@ function inspectEnvelope(bytes, { maxHeaderBytes = MAX_HEADER_BYTES } = {}) {
     errors.push(...checkHeader(header));
     const chunkOffset = 8 + headerLength;
     let expectedBytes = null;
-    if (Number.isInteger(header.padded_size) && header.padded_size > 0 && header.chunk_size === CHUNK_SIZE) {
-        const chunks = header.padded_size / CHUNK_SIZE;
-        // Every chunk: its length, its flags, its nonce, the ciphertext and the tag.
-        expectedBytes = chunkOffset + chunks * (4 + 1 + NONCE_SIZE + CHUNK_SIZE + TAG_SIZE);
+    if (Number.isInteger(header.padded_size) && header.padded_size >= MIN_PADDED_SIZE
+        && header.chunk_size === CHUNK_SIZE) {
+        const chunks = chunkCount(header.padded_size);
+        // Every chunk: its length, its flags, its nonce, the ciphertext and the tag. Every chunk
+        // but the last is a whole chunk; the last holds what is left of the padded size.
+        const frame = 4 + 1 + NONCE_SIZE;
+        const whole = (chunks - 1) * (frame + CHUNK_SIZE + TAG_SIZE);
+        const last = frame + lastChunkSize(header.padded_size) + TAG_SIZE;
+        expectedBytes = chunkOffset + whole + last;
         if (data.length < expectedBytes) errors.push('the envelope is shorter than its own header says');
     }
     return {
@@ -141,7 +148,7 @@ function inspectEnvelope(bytes, { maxHeaderBytes = MAX_HEADER_BYTES } = {}) {
         chunkOffset,
         lock: header.lock,
         paddedSize: header.padded_size,
-        chunkCount: Number.isInteger(header.padded_size) ? header.padded_size / CHUNK_SIZE : null,
+        chunkCount: Number.isInteger(header.padded_size) ? chunkCount(header.padded_size) : null,
         expectedBytes,
     };
 }

@@ -14,6 +14,8 @@ export interface PublicKeyJwk { kty: 'EC'; crv: 'P-256'; x: string; y: string; e
 export interface PeopleSlot {
     subject: SubjectRef;
     algorithm: 'ECDH-P256/HKDF-SHA256/AES-256-GCM';
+    /** The RFC 7638 thumbprint of the recipient's ECDH public key: the slot is bound to it. */
+    recipient_key: string;
     ephemeral_public_key: PublicKeyJwk;
     salt: string;
     nonce: string;
@@ -103,6 +105,8 @@ export interface OpenCredentials {
 export interface RewrapOptions {
     add?: Array<{ subject: SubjectRef; publicKey: PublicKeyJwk }>;
     remove?: Array<SubjectRef | string>;
+    /** The public keys of the people who stay: a removal re-seals, and that needs their keys. */
+    keys?: Array<{ subject: SubjectRef; publicKey: PublicKeyJwk }>;
     credentials?: OpenCredentials;
     random?: (length: number) => Uint8Array;
     ephemeral?: { private?: Record<string, unknown>; privateKey?: CryptoKey; publicKey?: CryptoKey };
@@ -118,7 +122,10 @@ export function seal(content: string | Uint8Array | ArrayBuffer, options: SealOp
 export function open(envelope: Envelope | Uint8Array, credentials?: OpenCredentials): Promise<Uint8Array>;
 /** Seals a stream: the envelope comes out piece by piece. The size of the content is needed. */
 export function sealStream(stream: ReadableStream<Uint8Array>, options: SealOptions & { size: number }): ReadableStream<Uint8Array>;
-/** Opens a stream: the content comes out piece by piece. */
+/**
+ * Opens a stream: the content comes out piece by piece, as the chunks are verified. A stream that
+ * ends early throws at the end, when the missing chunk shows up: discard what it yielded.
+ */
 export function openStream(stream: ReadableStream<Uint8Array>, credentials?: OpenCredentials): ReadableStream<Uint8Array>;
 /** Wraps the content key for other people, without touching the content. */
 export function rewrap(envelope: Envelope | Uint8Array, options?: RewrapOptions): Promise<Envelope>;
@@ -131,12 +138,16 @@ export function exportPersonKeys(person: PersonKeys): Promise<PublicKeys>;
 export function exportPrivateKeys(person: PersonKeys): Promise<{ ecdh: Record<string, unknown>; signing: Record<string, unknown> }>;
 /** A person's keys, ready to use. */
 export function importPersonKeys(data: { ecdh?: Record<string, unknown>; signing?: Record<string, unknown>; ecdhPrivateKey?: CryptoKey; signingPrivateKey?: CryptoKey }): Promise<{ ecdhPrivateKey: CryptoKey; signingPrivateKey: CryptoKey; ecdhPublic: PublicKeyJwk; signingPublic: PublicKeyJwk }>;
-/** Checks a published set of keys: the signature and the four words. */
+/** Checks a published set of keys: the signature and the eight words. */
 export function verifyPersonKeys(data: PublicKeys): Promise<boolean>;
-/** The four words of a pair of public keys. */
+/** The eight words of a pair of public keys. */
 export function fingerprintOf(ecdhPublic: PublicKeyJwk, signingPublic: PublicKeyJwk): Promise<string>;
-/** The four words of a hash. */
+/** The eight words of a hash. */
 export function fingerprintWords(hash: Uint8Array): string;
+/** The RFC 7638 thumbprint of a public key: SHA-256 over the canonical JSON of its members, base64url. */
+export function jwkThumbprint(jwk: PublicKeyJwk): Promise<string>;
+/** The padded size of a content of this size: Padme's grid, never below the floor. */
+export function padme(size: number): number;
 
 /** Wraps the content key for one person. */
 export function wrapFor(contentKey: Uint8Array, publicKey: PublicKeyJwk, options: { subject: SubjectRef; salt?: Uint8Array; random?: (length: number) => Uint8Array; ephemeral?: { private?: Record<string, unknown>; privateKey?: CryptoKey; publicKey?: CryptoKey } }): Promise<PeopleSlot>;
@@ -150,5 +161,8 @@ export function unwrapPasswordSlot(slot: PasswordSlot, password: string): Promis
 export const VERSION: string;
 export const SUITE: string;
 export const CHUNK_SIZE: number;
+export const MIN_PADDED_SIZE: number;
 export const MAX_HEADER_BYTES: number;
 export const PASSWORD_ITERATIONS: number;
+export const PASSWORD_ITERATIONS_MIN: number;
+export const PASSWORD_ITERATIONS_MAX: number;

@@ -25,6 +25,9 @@ const sha256 = (bytes) => crypto.createHash('sha256').update(Buffer.from(bytes))
 /** The bytes of a string, without Buffer (the library is browser-safe). */
 const text = (value) => new TextEncoder().encode(value);
 
+/** base64url without padding, for the thumbprints. */
+const base64url = (bytes) => Buffer.from(bytes).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
 /** A person with keys, made once for the whole file. */
 let alice = null;
 let bob = null;
@@ -56,20 +59,56 @@ const fails = async (fn, code) => {
     });
 };
 
+/** The envelope bytes with a changed header: the header is written again and its length fixed. */
+function withHeader(envelope, change) {
+    const headerBytes = text(JSON.stringify(change(envelope.header)));
+    const out = new Uint8Array(8 + headerBytes.length + envelope.bytes.length - envelope.chunkOffset);
+    out.set(text('OVLK'), 0);
+    new DataView(out.buffer).setUint32(4, headerBytes.length, false);
+    out.set(headerBytes, 8);
+    out.set(envelope.bytes.subarray(envelope.chunkOffset), 8 + headerBytes.length);
+    return out;
+}
+
+/** Decrypts the first chunk of an envelope with a content key: does that key open it? */
+async function decryptFirstChunk(envelope, contentKey) {
+    const subtle = globalThis.crypto.subtle;
+    const { header, bytes, chunkOffset } = envelope;
+    const length = new DataView(bytes.buffer, bytes.byteOffset + chunkOffset, 4).getUint32(0, false);
+    const flags = bytes[chunkOffset + 4];
+    const nonce = bytes.subarray(chunkOffset + 5, chunkOffset + 17);
+    const ciphertext = bytes.subarray(chunkOffset + 17, chunkOffset + 17 + length);
+    // The associated data: the core in canonical JSON, the counter and the flags.
+    const core = {
+        chunk_size: header.chunk_size, lock: header.lock, nonce_base: header.nonce_base,
+        padded_size: header.padded_size, suite: header.suite, version: header.version,
+    };
+    const aad = text(JSON.stringify(core));
+    const full = new Uint8Array(aad.length + 5);
+    full.set(aad, 0);
+    new DataView(full.buffer).setUint32(aad.length, 0, false);
+    full[aad.length + 4] = flags;
+    const key = await subtle.importKey('raw', contentKey, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+    return new Uint8Array(await subtle.decrypt({ name: 'AES-GCM', iv: nonce, additionalData: full }, key, ciphertext));
+}
+
 run([
-    ['a person has two key pairs and four words', async () => {
+    ['a person has two key pairs and eight words', async () => {
         alice = await locker.generatePersonKeys();
         bob = await locker.generatePersonKeys();
         assert.equal(alice.ecdhPublic.kty, 'EC');
         assert.equal(alice.ecdhPublic.crv, 'P-256');
         assert.equal(alice.signingPublic.kty, 'EC');
-        assert.match(alice.fingerprint, /^[a-z]+ [a-z]+ [a-z]+ [a-z]+$/);
+        // Eight words in two groups of four: sixty-four bits, not thirty-two.
+        assert.match(alice.fingerprint, /^[a-z]+ [a-z]+ [a-z]+ [a-z]+-[a-z]+ [a-z]+ [a-z]+ [a-z]+$/);
+        assert.equal(alice.fingerprint.split('-').length, 2);
+        assert.equal(alice.fingerprint.split('-')[0].split(' ').length, 4);
         assert.notEqual(alice.fingerprint, bob.fingerprint);
         const published = await locker.exportPersonKeys(alice);
         assert.equal(published.fingerprint, alice.fingerprint);
         assert.equal(await locker.verifyPersonKeys(published), true);
         // A fingerprint that does not belong to the keys is caught.
-        assert.equal(await locker.verifyPersonKeys({ ...published, fingerprint: 'wrong words here now' }), false);
+        assert.equal(await locker.verifyPersonKeys({ ...published, fingerprint: 'wrong words here now-bad bad bad bad' }), false);
         // A signature over other keys is caught.
         const other = await locker.exportPersonKeys(bob);
         assert.equal(await locker.verifyPersonKeys({ ...published, fingerprint_signature: other.fingerprint_signature }), false);
@@ -94,7 +133,6 @@ run([
             const content = new Uint8Array(size);
             for (let i = 0; i < size; i++) content[i] = (i * 7 + 13) % 251;
             const sealed = await locker.seal(content, { lock: 'password', password: 'x' });
-            assert.equal(sealed.header.padded_size % CHUNK, 0, `the padded size is a whole number of chunks (${size})`);
             assert.ok(sealed.header.padded_size >= size, 'the padded size covers the content');
             const opened = await locker.open(sealed, { password: 'x' });
             assert.equal(opened.length, size, `the content comes back whole (${size})`);
@@ -102,9 +140,47 @@ run([
         }
     }],
 
+    ['the padded size is Padmé\'s, and it hides the real size', async () => {
+        const sizes = [0, 1, 247, 248, 249, CHUNK - 9, CHUNK - 8, CHUNK, CHUNK + 1, 5 * 1024 * 1024 + 3];
+        for (const size of sizes) {
+            const content = new Uint8Array(size);
+            for (let i = 0; i < size; i++) content[i] = (i * 11 + 3) % 251;
+            const sealed = await locker.seal(content, { lock: 'password', password: 'x' });
+            const padded = sealed.header.padded_size;
+            // The padded size is the length prefix and the content, padded with Padmé.
+            assert.equal(padded, Math.max(256, locker.padme(size + 8)), `the padded size (${size})`);
+            assert.ok(padded >= size + 8, 'the padded size covers the length prefix and the content');
+            // Padmé's expansion stays under twelve per cent.
+            const expansion = (locker.padme(size + 8) - (size + 8)) / (size + 8);
+            assert.ok(expansion <= 0.12, `the padding of ${size} bytes is ${(expansion * 100).toFixed(2)}%`);
+            // Every chunk but the last is a whole chunk; the last holds the rest. (A frame is
+            // its length, its flags and its nonce, then the ciphertext with the tag.)
+            const list = frames(sealed.bytes, sealed.chunkOffset);
+            assert.equal(list.length, Math.ceil(padded / CHUNK), `the number of chunks (${size})`);
+            for (const frame of list.slice(0, -1)) assert.equal(frame.length - 17 - 16, CHUNK, 'a whole chunk');
+            assert.equal(
+                list[list.length - 1].length - 17 - 16,
+                padded - (list.length - 1) * CHUNK,
+                'the last chunk holds the rest',
+            );
+            // The content comes back whole.
+            const opened = await locker.open(sealed, { password: 'x' });
+            assert.equal(opened.length, size, `the content comes back whole (${size})`);
+            assert.equal(sha256(opened), sha256(content), `the content is the same (${size})`);
+        }
+        // And the expansion never goes over twelve per cent, over a wide range of sizes.
+        let worst = 0;
+        for (let n = 2; n <= 200000; n++) worst = Math.max(worst, (locker.padme(n) - n) / n);
+        assert.ok(worst <= 0.12, `the worst padding is ${(worst * 100).toFixed(2)}%`);
+        // The arithmetic is exact above 2^31: no 32-bit bitwise operators.
+        assert.equal(locker.padme(2 ** 31 + 1), 2 ** 31 + 2 ** 26);
+        assert.equal(locker.padme(2 ** 40), 2 ** 40);
+        assert.equal(locker.padme(3 * 2 ** 40), 3 * 2 ** 40);
+    }],
+
     ['the server sees the padded size, not the size', async () => {
         const sealed = await locker.seal('short', { lock: 'password', password: 'x' });
-        assert.equal(sealed.header.padded_size, CHUNK);
+        assert.equal(sealed.header.padded_size, 256);
         assert.ok(!JSON.stringify(sealed.header).includes('short'));
     }],
 
@@ -196,6 +272,59 @@ run([
         await fails(() => locker.open(bytes, { password: 'right' }), 'locker.wrong_key');
     }],
 
+    ['the iteration count is bounded on both sides', async () => {
+        const sealed = await locker.seal('a note', { lock: 'password', password: 'right', iterations: 700000 });
+        // A hostile header must not be able to make a reader spend minutes on the derivation.
+        for (const iterations of [0, 1, 599999, 10000001, 1000000000]) {
+            const bytes = withHeader(sealed, (header) => ({
+                ...header,
+                slots: { password: { ...header.slots.password, iterations } },
+            }));
+            await fails(() => locker.open(bytes, { password: 'right' }), 'locker.bad_envelope');
+        }
+        // And the writer refuses a count outside the range too.
+        await fails(() => locker.seal('a note', { lock: 'password', password: 'right', iterations: 599999 }), 'locker.bad_envelope');
+        await fails(() => locker.seal('a note', { lock: 'password', password: 'right', iterations: 10000001 }), 'locker.bad_envelope');
+        // The bounds are the ones the contract names.
+        assert.equal(locker.PASSWORD_ITERATIONS_MIN, 600000);
+        assert.equal(locker.PASSWORD_ITERATIONS_MAX, 10000000);
+        assert.equal(locker.PASSWORD_ITERATIONS, 600000);
+        // A count inside the range is fine.
+        const fine = await locker.seal('a note', { lock: 'password', password: 'right', iterations: 10000000 });
+        assert.equal(decoder.decode(await locker.open(fine, { password: 'right' })), 'a note');
+    }],
+
+    ['a people slot is bound to the key of its recipient', async () => {
+        const sealed = await sealFor('a note');
+        const slot = sealed.header.slots.people[0];
+        // The slot names the key it is for, by the RFC 7638 thumbprint of that key.
+        const canonical = `{"crv":"P-256","kty":"EC","x":"${alice.ecdhPublic.x}","y":"${alice.ecdhPublic.y}"}`;
+        const expected = base64url(crypto.createHash('sha256').update(canonical).digest());
+        assert.equal(slot.recipient_key, expected);
+        assert.equal(slot.recipient_key, await locker.jwkThumbprint(alice.ecdhPublic));
+        assert.notEqual(slot.recipient_key, await locker.jwkThumbprint(bob.ecdhPublic));
+        // A slot that names another key is refused before anything is derived.
+        const swapped = { ...slot, recipient_key: await locker.jwkThumbprint(bob.ecdhPublic) };
+        await assert.rejects(
+            () => locker.unwrapPeopleSlot(swapped, alice.ecdh.privateKey),
+            (err) => err.code === 'locker.wrong_key',
+        );
+        // And an envelope with that slot in it fails the same way.
+        const bobThumbprint = await locker.jwkThumbprint(bob.ecdhPublic);
+        const bytes = withHeader(sealed, (header) => ({
+            ...header,
+            slots: { people: [{ ...slot, recipient_key: bobThumbprint }] },
+        }));
+        await fails(() => locker.open(bytes, { privateKey: alice.ecdh.privateKey, subject: A }), 'locker.wrong_key');
+        // A slot with no key named at all is not one we wrote.
+        const nameless = { ...slot };
+        delete nameless.recipient_key;
+        await assert.rejects(
+            () => locker.unwrapPeopleSlot(nameless, alice.ecdh.privateKey),
+            (err) => err.code === 'locker.bad_envelope',
+        );
+    }],
+
     ['wrapFor wraps the content key for one person', async () => {
         const contentKey = new Uint8Array(32).fill(7);
         const slot = await locker.wrapFor(contentKey, bob.ecdhPublic, { subject: B });
@@ -222,6 +351,48 @@ run([
         // Everyone on the list can still open it.
         assert.equal(decoder.decode(await locker.open(again, { privateKey: alice.ecdh.privateKey, subject: A })), 'a note');
         assert.equal(decoder.decode(await locker.open(again, { privateKey: bob.ecdh.privateKey, subject: B })), 'a note');
+    }],
+
+    ['removing a person re-seals with a new content key', async () => {
+        const sealed = await sealFor('a note');
+        const oldKey = await locker.unwrapPeopleSlot(sealed.header.slots.people[0], alice.ecdh.privateKey);
+        const again = await locker.rewrap(sealed, {
+            remove: [B],
+            keys: [{ subject: A, publicKey: alice.ecdhPublic }],
+            credentials: { privateKey: alice.ecdh.privateKey, subject: A },
+        });
+        // Only the person who stays is on it now.
+        assert.equal(again.header.slots.people.length, 1);
+        assert.equal(again.header.slots.people[0].subject.id, A.id);
+        assert.equal(decoder.decode(await locker.open(again, { privateKey: alice.ecdh.privateKey, subject: A })), 'a note');
+        // The person who is gone has no slot.
+        await fails(() => locker.open(again, { privateKey: bob.ecdh.privateKey, subject: B }), 'locker.no_key');
+        // The content key is a new one, so the key the person who left still holds opens nothing.
+        const newKey = await locker.unwrapPeopleSlot(again.header.slots.people[0], alice.ecdh.privateKey);
+        assert.notEqual(sha256(oldKey), sha256(newKey));
+        await assert.rejects(() => decryptFirstChunk(again, oldKey), 'the old content key opens nothing');
+        // The nonce base is new too, so the envelope is not the old bytes with a header.
+        assert.notEqual(again.header.nonce_base, sealed.header.nonce_base);
+        assert.notEqual(sha256(again.bytes), sha256(sealed.bytes));
+        // A removal needs the public keys of the people who stay.
+        await fails(() => locker.rewrap(sealed, {
+            remove: [B],
+            credentials: { privateKey: alice.ecdh.privateKey, subject: A },
+        }), 'locker.invalid');
+    }],
+
+    ['every seal makes a new key and a new nonce base', async () => {
+        const one = await locker.seal('the same note', { lock: 'password', password: 'x' });
+        const two = await locker.seal('the same note', { lock: 'password', password: 'x' });
+        // The same bytes under the same password are two different envelopes.
+        assert.notEqual(one.header.nonce_base, two.header.nonce_base);
+        assert.notEqual(sha256(one.bytes), sha256(two.bytes));
+        const keyOne = await locker.unwrapPasswordSlot(one.header.slots.password, 'x');
+        const keyTwo = await locker.unwrapPasswordSlot(two.header.slots.password, 'x');
+        assert.notEqual(sha256(keyOne), sha256(keyTwo));
+        // And both open to the same note.
+        assert.equal(decoder.decode(await locker.open(one, { password: 'x' })), 'the same note');
+        assert.equal(decoder.decode(await locker.open(two, { password: 'x' })), 'the same note');
     }],
 
     ['the streams round trip', async () => {
@@ -263,6 +434,34 @@ run([
     ['a stream seal needs the size of the content', async () => {
         const source = new ReadableStream({ start(c) { c.close(); } });
         assert.throws(() => locker.sealStream(source, { lock: 'password', password: 'x' }), (err) => err.code === 'locker.invalid');
+    }],
+
+    ['a stream that ends early yields what it had, then throws', async () => {
+        const content = new Uint8Array(CHUNK * 2 + 11);
+        const sealed = await locker.seal(content, { lock: 'password', password: 'x' });
+        const list = frames(sealed.bytes, sealed.chunkOffset);
+        assert.equal(list.length, 3);
+        // The last chunk never arrives: the earlier ones come out, and then the stream throws.
+        const cut = sealed.bytes.subarray(0, list[list.length - 1].start);
+        const stream = locker.openStream(new ReadableStream({
+            start(controller) { controller.enqueue(cut); controller.close(); },
+        }), { password: 'x' });
+        const reader = stream.getReader();
+        const parts = [];
+        let error = null;
+        try {
+            for (;;) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                parts.push(value);
+            }
+        } catch (err) { error = err; }
+        assert.ok(error, 'the stream threw');
+        assert.equal(error.code, 'locker.truncated');
+        assert.equal(parts.length, 2, 'the two chunks that were there came out first');
+        // What came out is not the whole content: the item was never complete.
+        const got = parts.reduce((n, p) => n + p.length, 0);
+        assert.ok(got < content.length, 'the content was not complete');
     }],
 
     ['a 64 MiB stream is sealed in bounded memory', async () => {
@@ -315,12 +514,11 @@ run([
         const checked = server.inspectEnvelope(sealed.bytes);
         assert.equal(checked.valid, true, JSON.stringify(checked.errors));
         assert.equal(checked.lock, 'people');
-        assert.equal(checked.paddedSize, CHUNK);
+        assert.equal(checked.paddedSize, 256);
         assert.equal(checked.chunkCount, 1);
         assert.equal(checked.expectedBytes, sealed.bytes.length);
         // A header that says something else does not pass.
-        const bytes = sealed.bytes.slice();
-        bytes.set(text(decoder.decode(bytes.subarray(8, sealed.chunkOffset)).replace('"padded_size":1048576', '"padded_size":1000')), 8);
+        const bytes = withHeader(sealed, (header) => ({ ...header, padded_size: 100 }));
         const bad = server.inspectEnvelope(bytes);
         assert.equal(bad.valid, false);
         assert.ok(bad.errors.length > 0);
@@ -339,7 +537,7 @@ run([
         }
         // And the server's own checks agree with the contract.
         assert.equal(server.checkHeader(people.header).length, 0);
-        assert.equal(server.checkHeader({ ...people.header, padded_size: 1000 }).length > 0, true);
+        assert.equal(server.checkHeader({ ...people.header, padded_size: 100 }).length > 0, true);
     }],
 
     ['a service checks the header without a key', async () => {
