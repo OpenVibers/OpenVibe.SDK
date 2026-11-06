@@ -346,6 +346,77 @@ run([
         }
     }],
 
+    ['the seller registers a standalone endpoint on the Exchange, lists it and removes it', async () => {
+        const offer = {
+            id: 'ep_' + '0'.repeat(26), offer_id: 'endpoint:ep_' + '0'.repeat(26), name: 'my 3090',
+            base_url: 'https://my-server.example/v1', models: ['qwen3:32b', 'qwen3:8b'],
+            hours: { start: '00:00', end: '23:59', tz: 'Europe/Lisbon' }, concurrency: 2,
+            price: { in_per_million: 10, out_per_million: 30 }, audience: 'everyone', group: null,
+        };
+        const server = await stubServer(async (req, res, body) => {
+            assert.equal(req.headers.authorization, 'Bearer ' + KEY);
+            if (req.method === 'POST' && req.url === '/api/v1/exchange/seller/offers') {
+                const parsed = JSON.parse(String(body));
+                assert.deepEqual(parsed, {
+                    base_url: 'https://my-server.example/v1', models: ['qwen3:32b', 'qwen3:8b'],
+                    price: { in_per_million: 10, out_per_million: 30 },
+                    hours: { start: '00:00', end: '23:59', tz: 'Europe/Lisbon' },
+                    concurrency: 2, audience: 'everyone',
+                });
+                return send(res, 201, { offer });
+            }
+            if (req.method === 'GET' && req.url === '/api/v1/exchange/seller/offers') {
+                return send(res, 200, { owner: OWNER, offers: [offer] });
+            }
+            if (req.method === 'DELETE' && req.url === `/api/v1/exchange/seller/offers/${offer.id}`) {
+                return send(res, 200, { id: offer.id, removed: true });
+            }
+            return problem(res, 404, 'not_found', 'no route');
+        });
+        try {
+            const exchange = client(server);
+            const registered = await exchange.seller.offer({
+                endpoint: 'https://my-server.example/v1',
+                models: ['qwen3:32b', 'qwen3:8b'],
+                price: { in_per_million: 10, out_per_million: 30 },
+                hours: { start: '00:00', end: '23:59', tz: 'Europe/Lisbon' },
+                concurrency: 2,
+                probe: false,
+            });
+            assert.equal(registered.offer.id, offer.id);
+            assert.deepEqual(registered.endpoint, { url: 'https://my-server.example/v1', models: null });
+            const listed = await exchange.seller.endpointOffers();
+            assert.equal(listed.owner, OWNER);
+            assert.equal(listed.offers[0].id, offer.id);
+            const removed = await exchange.seller.removeEndpointOffer(offer.id);
+            assert.deepEqual(removed, { id: offer.id, removed: true });
+        } finally {
+            await server.close();
+        }
+    }],
+
+    ['the endpoint form is https only and is not sent when it is refused', async () => {
+        const server = await stubServer(async (req, res) => send(res, 200, {}));
+        try {
+            const exchange = client(server);
+            await assert.rejects(() => exchange.seller.offer({
+                endpoint: 'http://my-server.example/v1', models: ['qwen3:32b'], price: 0, hours: { start: '00:00', end: '23:59' },
+                concurrency: 1, probe: false,
+            }), /https/);
+            await assert.rejects(() => exchange.seller.offer({
+                endpoint: 'https://my-server.example/v1', models: ['qwen3:32b'], price: -1, hours: { start: '00:00', end: '23:59' },
+                concurrency: 1, probe: false,
+            }), /price/);
+            await assert.rejects(() => exchange.seller.offer({
+                endpoint: 'https://my-server.example/v1', models: ['qwen3:32b'], price: 0, hours: { start: '25:00', end: '23:59' },
+                concurrency: 1, probe: false,
+            }), /hours/);
+            assert.equal(server.requests.length, 0);
+        } finally {
+            await server.close();
+        }
+    }],
+
     ['a webhook signature is checked in constant time', async () => {
         const secret = 'webhook_secret';
         const body = JSON.stringify({ type: 'exchange.earnings', credits: 12 });

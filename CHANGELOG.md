@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.93.0 (2026-11-06)
+
+- `openvibe-sdk/exchange`: the seller side gains the **endpoint form**, so any OpenAI-compatible server can sell, not
+  only an OpenVibe Node machine. `seller.offer({ endpoint, models, price, hours, concurrency, audience, name })` — with
+  no `machineId` — registers the server on OpenVibe.Exchange's public seller API
+  (`POST /api/v1/exchange/seller/offers`) with the same developer key the buyer side uses. The owner is the person the
+  key acts for (a developer app's project owner), never a body field, and the SDK refuses an endpoint that is not https
+  before anything is sent.
+  - The platform reaches that address only through its egress guard (https, a public DNS answer checked inside the
+    connection, never an IP literal, redirects judged again, a timeout and a response byte cap, no buyer identity in a
+    header) and verifies it exactly as a Node machine (canaries, the model fingerprint, about 1% spot re-runs, the free
+    tier until verified, self-dealing earns 0). Its answers are labelled `community-endpoint:<id>` on the receipt.
+  - `seller.endpointOffers()` lists the caller's endpoint offers with their verification;
+    `seller.removeEndpointOffer(id)` removes one. `machineId` still selects the Network registry form.
+  - `seller.probe()` is unchanged, and `seller.offer` still probes the server's OpenAI model list first when `endpoint`
+    is given (`probe: false` turns that off).
+
 ## 0.92.0 (2026-11-06)
 
 - Add `openvibe-sdk/chat-apps`: the three chat apps (Telegram, Discord, Slack) in one place, so a service that answers

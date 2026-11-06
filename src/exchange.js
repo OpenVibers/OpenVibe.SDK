@@ -12,16 +12,24 @@
  *   // { id: 'chatcmpl-...', object: 'chat.completion', choices, usage, x_openvibe: { run_id, cost_usd, ... } }
  *   for await (const chunk of exchange.chat({ model: 'openvibe', messages, stream: true })) { ... }
  *
- * The seller side registers an offer in the Network's user-owned AI offers - the same registry OpenVibe.Node's
- * "Offer to the network" uses (POST /internal/ai/offers/report, the capability network.resource.report), so any
- * server that speaks the OpenAI API can be a provider and not only a Node. The offer document is the one that
- * registry validates: the offer id, the machine, the owner, the models, the hours, the concurrency, the credit
- * price, the audience, the ready flag and the health.
+ * The seller side registers an offer in one of two forms. With `machineId`, it reports a Node machine's offer to the
+ * Network's user-owned AI offers (POST /internal/ai/offers/report, the capability network.resource.report). With
+ * `endpoint` and no machine, it registers a standalone OpenAI-compatible server on the Exchange's public seller API
+ * (POST /api/v1/exchange/seller/offers) with the same developer key the buyer side uses; AI reaches that address only
+ * through its egress guard (https, a public DNS answer, never an IP literal, a timeout, a response cap, no buyer
+ * identity in a header) and verifies it exactly as a Node machine (canaries, fingerprint, spot re-runs, free tier only
+ * until verified, self-dealing earns 0).
  *
  *   const offer = await exchange.seller.offer({
- *       model: 'qwen3:32b', price: { in_per_million: 0, out_per_million: 0 },
+ *       endpoint: 'https://my-server.example/v1',
+ *       models: ['qwen3:32b'], price: { in_per_million: 0, out_per_million: 0 },
  *       hours: { start: '18:00', end: '23:30', tz: 'Europe/Lisbon' }, concurrency: 2,
- *       endpoint: 'https://my-server.example/v1', machineId: 'dev_...', owner: 'usr_...',
+ *   });
+ *   // { offer: { id: 'ep_…', offer_id: 'endpoint:ep_…', … }, endpoint: { url, models } }
+ *
+ *   const nodeOffer = await exchange.seller.offer({
+ *       model: 'qwen3:32b', price: 0, hours, concurrency: 2,
+ *       machineId: 'dev_…', owner: 'usr_…',
  *   });
  *   const { totals, offers } = await exchange.seller.earnings();
  *
@@ -57,6 +65,7 @@ const DEFAULT_PATHS = {
     usage: '/api/v1/exchange/usage',
     platformUsage: '/api/v1/usage',
     sell: '/api/v1/community/sell',
+    sellerOffers: '/api/v1/exchange/seller/offers',
     offerReport: '/internal/ai/offers/report',
     offerList: '/internal/ai/offers',
 };
@@ -245,6 +254,15 @@ function checkHours(hours) {
     return { start: String(h.start), end: String(h.end), tz };
 }
 
+/** A server address: http(s), no credentials, no trailing slash. The Exchange's endpoint form requires https. */
+function endpointUrl(raw) {
+    let u;
+    try { u = new URL(String(raw == null ? '' : raw)); } catch { throw new TypeError('offer.endpoint: an http(s) URL'); }
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') throw new TypeError('offer.endpoint: an http(s) URL');
+    if (u.username || u.password) throw new TypeError('offer.endpoint: no credentials in the URL');
+    return u.toString().replace(/\/+$/, '');
+}
+
 /** The credit price per million tokens: a number for both sides, or {in_per_million, out_per_million}. */
 function checkPrice(price) {
     const isAmount = (v) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1000000;
@@ -359,10 +377,14 @@ function createExchangeClient({
     const seller = {
         /**
          * Register a community offer: what is served, at what price, when, and how many answers at once.
-         * The offer is reported to the Network's user-owned AI offers - the registry OpenVibe.Node's
-         * "Offer to the network" uses - with the document that registry validates.
          *
+         * With `machineId`, the offer is reported to the Network's user-owned AI offers - the registry OpenVibe.Node's
+         * "Offer to the network" uses - with the document that registry validates.
          *   offer({ model, price, hours, concurrency, endpoint, machineId, owner, audience, group, ready, health })
+         *
+         * With `endpoint` and no machineId, it registers a standalone OpenAI-compatible server on the Exchange's public
+         * seller API. The server's address is all the platform needs; the developer key names the owner.
+         *   offer({ endpoint, models, price, hours, concurrency, audience, group, name })
          */
         async offer({
             model,
@@ -372,10 +394,11 @@ function createExchangeClient({
             concurrency,
             endpoint = null,
             endpointKey = null,
-            machineId,
+            machineId = null,
             owner: offerOwner = null,
             audience = 'everyone',
             group = null,
+            name = null,
             ready = true,
             health = null,
             source = 'sdk',
@@ -385,31 +408,40 @@ function createExchangeClient({
             if (!Array.isArray(listed) || !listed.length) throw new TypeError('offer.model: a model is required');
             if (listed.some((m) => typeof m !== 'string' || !m || m.length > 200)) throw new TypeError('offer.model: every model is a string of at most 200 characters');
             const machine = String(machineId == null ? '' : machineId).trim();
-            if (!/^dev_[0-9A-HJKMNP-TV-Z]{26}$/.test(machine)) throw new TypeError('offer.machineId: a machine id (dev_...) is required');
-            const subject = String(offerOwner || owner || '').trim();
-            if (!/^usr_[0-9A-HJKMNP-TV-Z]{26}$/.test(subject)) throw new TypeError('offer.owner: an owner (usr_...) is required');
             const cap = Number(concurrency);
             if (!Number.isInteger(cap) || cap < 1 || cap > 8) throw new TypeError('offer.concurrency: an integer from 1 to 8');
             if (!['everyone', 'followers', 'group'].includes(audience)) throw new TypeError('offer.audience: everyone, followers or group');
             if (audience === 'group' && !(typeof group === 'string' && group.trim())) throw new TypeError('offer.group: a group id is required for the group audience');
+            const address = endpoint == null ? null : endpointUrl(endpoint);
+            const priced = checkPrice(price);
+            const window = checkHours(hours);
+            // The endpoint form: a standalone server, registered with the developer key. The server is checked first:
+            // it must answer the OpenAI models list (probe: false turns that off).
+            if (address && !machine) {
+                if (!address.startsWith('https://')) throw new TypeError('offer.endpoint: an https URL is required to sell an endpoint');
+                const body = { base_url: address, models: listed, price: priced, hours: window, concurrency: cap, audience };
+                if (audience === 'group') body.group = String(group).trim();
+                if (name != null) body.name = String(name).trim();
+                let checked = null;
+                if (probe) checked = await seller.probe({ endpoint: address, key: endpointKey, signal });
+                // Each call registers a new offer, so it is never retried (a lost answer must not create two).
+                const out = await jsonCall('POST', paths.sellerOffers, { json: body, signal });
+                return { offer: out && out.offer ? out.offer : out, endpoint: { url: address, models: checked ? checked.models : null } };
+            }
+            if (!/^dev_[0-9A-HJKMNP-TV-Z]{26}$/.test(machine)) throw new TypeError('offer.machineId: a machine id (dev_...) is required, or register an endpoint with offer.endpoint');
+            const subject = String(offerOwner || owner || '').trim();
+            if (!/^usr_[0-9A-HJKMNP-TV-Z]{26}$/.test(subject)) throw new TypeError('offer.owner: an owner (usr_...) is required');
             const state = health || { status: 'up', checked_at: new Date().toISOString() };
             if (!['up', 'degraded', 'down'].includes(state.status)) throw new TypeError('offer.health: up, degraded or down');
-            let address = null;
-            if (endpoint != null) {
-                let url;
-                try { url = new URL(String(endpoint)); } catch { throw new TypeError('offer.endpoint: an http(s) URL'); }
-                if (url.protocol !== 'https:' && url.protocol !== 'http:') throw new TypeError('offer.endpoint: an http(s) URL');
-                address = String(endpoint).replace(/\/+$/, '');
-            }
             // The offer document is the one the registry validates: no field outside its shape is sent.
             const document = {
                 offer_id: `ai:${machine}`,
                 machine_id: machine,
                 owner: subject,
                 models: listed,
-                hours: checkHours(hours),
+                hours: window,
                 concurrency: cap,
-                price: checkPrice(price),
+                price: priced,
                 audience,
                 group: audience === 'group' ? String(group).trim() : (group == null ? undefined : String(group)),
                 ready: ready === true,
@@ -427,6 +459,18 @@ function createExchangeClient({
                 idempotent: true,
             });
             return { offer: document, report, endpoint: address ? { url: address, models: checked ? checked.models : null } : null };
+        },
+
+        /** The caller's own endpoint offers, with their verification (the developer key names the owner). */
+        async endpointOffers({ signal } = {}) {
+            return await jsonCall('GET', paths.sellerOffers, { signal });
+        },
+
+        /** Remove one of the caller's endpoint offers; only its owner's key may. */
+        async removeEndpointOffer(id, { signal } = {}) {
+            const offerId = String(id == null ? '' : id).trim();
+            if (!offerId) throw new TypeError('removeEndpointOffer: an id is required');
+            return await jsonCall('DELETE', `${paths.sellerOffers}/${encodeURIComponent(offerId)}`, { signal });
         },
 
         /** Ask a server what it serves: the OpenAI models list at its endpoint. → { models } */

@@ -20,6 +20,7 @@ export type ExchangePaths = {
     usage?: string;
     platformUsage?: string;
     sell?: string;
+    sellerOffers?: string;
     offerReport?: string;
     offerList?: string;
 };
@@ -170,7 +171,7 @@ export type ExchangeUsageAggregate = {
 export type ExchangeReceipt = {
     id: string;
     run_id?: string;
-    offer?: { provider: string; model: string | null; deployment?: string | null; access?: string };
+    offer?: { provider: string; model: string | null; deployment?: string | null; access?: string; provider_access?: string | null; local?: boolean; community?: 'machine' | 'endpoint' | null };
     price?: { in: number | null; out: number | null; cached?: number | null; source?: string | null };
     tokens?: { tokens_in: number; tokens_out: number; tokens_cached?: number; tokens_cache_write?: number; tokens_reasoning?: number };
     latency_ms?: number | null;
@@ -231,6 +232,54 @@ export type ExchangeOfferResult = {
     offer: ExchangeOfferDocument;
     report: { source: string; offers: number; marked_down: number; generated_at?: string };
     endpoint: { url: string; models: string[] | null } | null;
+};
+
+/** A standalone OpenAI-compatible server registered on the Exchange's public seller API. The key names the owner. */
+export type ExchangeEndpointOfferInput = {
+    /** The https base URL, e.g. https://my-server.example/v1; /chat/completions is appended. */
+    endpoint: string;
+    /** The model served; models may name several. */
+    model?: string;
+    models?: string[];
+    /** Credits per million tokens: a number for both sides, or {in_per_million, out_per_million}; 0 volunteers. */
+    price: number | { in_per_million: number; out_per_million: number };
+    /** The local window the offer is open: {start, end, tz}; start == end is all day. */
+    hours: { start: string; end: string; tz?: string };
+    /** How many answers may run at once, 1 to 8. */
+    concurrency: number;
+    audience?: 'everyone' | 'followers' | 'group';
+    /** The group id, required for the group audience. */
+    group?: string;
+    /** A label for the seller's own dashboard. */
+    name?: string;
+    /** The key the endpoint needs for the probe, when it needs one. AI sends no key. */
+    endpointKey?: string;
+    /** Whether the endpoint is asked for its model list first; default true. */
+    probe?: boolean;
+};
+
+export type ExchangeEndpointOffer = {
+    id: string;
+    offer_id: string;
+    name: string | null;
+    base_url: string;
+    models: string[];
+    hours: { start: string; end: string; tz: string };
+    concurrency: number;
+    price: { in_per_million: number; out_per_million: number };
+    audience: 'everyone' | 'followers' | 'group';
+    group: string | null;
+    created_at?: string;
+    updated_at?: string;
+    verification?: ExchangeSellerVerification | null;
+    reputation?: number;
+    free_only?: boolean;
+    verified?: boolean;
+};
+
+export type ExchangeEndpointOfferResult = {
+    offer: ExchangeEndpointOffer;
+    endpoint: { url: string; models: string[] | null };
 };
 
 export type ExchangeSellerVerification = {
@@ -304,8 +353,13 @@ export type ExchangeClient = {
     /** The receipt of one answered request. */
     receipt(id: string, opts?: { signal?: AbortSignal }): Promise<ExchangeReceipt>;
     seller: {
-        /** Register a community offer in the Network's user-owned AI offers. */
+        /** Register a Node machine's offer in the Network's user-owned AI offers, or an endpoint with the Exchange. */
         offer(input: ExchangeOfferInput, opts?: { signal?: AbortSignal }): Promise<ExchangeOfferResult>;
+        offer(input: ExchangeEndpointOfferInput, opts?: { signal?: AbortSignal }): Promise<ExchangeEndpointOfferResult>;
+        /** The caller's own endpoint offers, with their verification. */
+        endpointOffers(opts?: { signal?: AbortSignal }): Promise<{ owner: string; offers: ExchangeEndpointOffer[] }>;
+        /** Remove one of the caller's endpoint offers. */
+        removeEndpointOffer(id: string, opts?: { signal?: AbortSignal }): Promise<{ id: string; removed: boolean }>;
         /** The model list at an OpenAI-compatible endpoint. */
         probe(input: { endpoint: string; key?: string | null }, opts?: { signal?: AbortSignal }): Promise<{ models: string[] }>;
         /** The seller dashboard: the tokens served, the credits earned, the uptime and the verification. */
