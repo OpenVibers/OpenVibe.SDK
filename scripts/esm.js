@@ -28,6 +28,7 @@ const ENTRIES = {
     'events.mjs': '../src/events.js',
     'sso.mjs': '../src/sso/index.js',
     'app-signin.mjs': '../src/app-signin/index.js',
+    'cam.mjs': '../src/cam/index.js',
     'realtime.mjs': '../src/realtime.js',
     'media.mjs': '../src/media.js',
     'community.mjs': '../src/community.js',

@@ -479,6 +479,10 @@
   "openvibe-sdk/cache": {
     "createCache": "function"
   },
+  "openvibe-sdk/cam": {
+    "OV_CAMERA_SRC": "string",
+    "defineOvCamera": "function"
+  },
   "openvibe-sdk/chat": {
     "createChatClient": "function",
     "createFeedPublisher": "function",
