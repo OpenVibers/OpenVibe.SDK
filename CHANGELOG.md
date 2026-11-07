@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.97.1 (2026-11-07)
+
+- `types/menu.d.ts`: `MenuRequest` gives `url` and `method` the `| undefined` that `node:http`'s
+  `IncomingMessage` has, and `MenuResponse` no longer adds an index signature, so a plain
+  `IncomingMessage`/`ServerResponse` handler type-checks under `exactOptionalPropertyTypes`
+  (Games' `createMenuCardHandler`). No runtime change.
+
 ## 0.97.0 (2026-11-07)
 
 - Add `openvibe-sdk/menu`: `menuCard({ id, site, title, kind, items, more, origin, ttlSeconds, updatedAt })`
