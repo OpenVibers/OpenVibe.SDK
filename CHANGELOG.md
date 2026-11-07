@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.98.0 (2026-11-07)
+
+- `ai.runs.create` (and the direct operations) may ask for the class the caller may wait in:
+  `{ latency: 'interactive' | 'background' | 'batch' }`, and for a batch run `{ deadlineHours: 1..72 }`
+  (how long the answer may take). The request carries `options.latency` and `options.deadline_hours`.
+  The class belongs to the workflow: a caller may ask for a slower class and never for a faster one, and a
+  faster ask is clamped by the service, not refused — the run answers with the class it really ran in
+  (`run.latency_class`), the tier it was priced on (`run.service_tier`) and, when it was clamped,
+  `run.latency_clamped`.
+- `ai.runs.waitFor` learns that a batch run may take hours: when the wait is over and the run is a batch
+  run, the pending run is returned (its status says where it stands) instead of an error. The answer comes
+  later, with the run's completion event (`ai.run.succeeded`) or the webhook the run was made with.
+- Add `ai.batches`: `create(items, { model, deadlineHours, idempotencyKey })`, `get(id)`, `list()` and
+  `cancel(id)` for OpenVibe.AI's `/api/v1/batches` — many prompts answered later, at half the retail
+  price. A cancelled batch cancels the items that had not run; nothing is charged for them.
+- Add the types `LatencyClass`, `ServiceTier`, `AiBatch`, `AiBatchItem` and `AiBatches`, and
+  `CLASSES` (the three classes) next to `TERMINAL`.
+
+
 ## 0.97.1 (2026-11-07)
 
 - `types/menu.d.ts`: `MenuRequest` gives `url` and `method` the `| undefined` that `node:http`'s

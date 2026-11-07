@@ -11,6 +11,7 @@
     },
     "ai": {
       "object": [
+        "CLASSES",
         "OPS",
         "TERMINAL",
         "createAiClient"
@@ -414,6 +415,7 @@
     "createActorClient": "function"
   },
   "openvibe-sdk/ai": {
+    "CLASSES": "array",
     "OPS": "array",
     "TERMINAL": "object",
     "createAiClient": "function"
