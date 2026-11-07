@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.95.0 (2026-11-07)
+
+- Add `openvibe-sdk/cam`: `defineOvCamera({ src })` injects OpenVibe.Cam's framework-free `<ov-camera>` element
+  once (default `https://openvibe.cam/embed/ov-camera.js`) and resolves to the class. It is browser-only by nature:
+  calling it in Node rejects instead of touching `document`. `OV_CAMERA_SRC` is the default URL.
+- Type the element: `OvCameraElement` (`start()`, `stop()`, `capture()`, `flip()`), `OvCameraAttributes` (facing,
+  filters, timer, mode, upload), `OvCameraCaptureDetail` / `OvCameraErrorDetail`, the two event types and the
+  `HTMLElementTagNameMap` entry. `upload="off"` is still the default: a capture is a `Blob` in the page until the
+  site sends it somewhere.
+
 ## 0.94.0 (2026-11-07)
 
 - `openvibe-sdk/streams` gains S7: `schedule()`, `listSchedules()`, `cancelSchedule()` and `remindSchedule()` for

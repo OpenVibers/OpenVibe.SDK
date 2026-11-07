@@ -1,0 +1,117 @@
+/**
+ * openvibe-sdk/cam: the <ov-camera> element from OpenVibe.Cam.
+ *
+ * The element is defined by https://openvibe.cam/embed/ov-camera.js (or a self-hosted copy); this module
+ * injects it and gives the attributes, events and methods a type.
+ */
+
+/** The embed script the loader injects when no `src` is given. */
+export declare const OV_CAMERA_SRC: string;
+
+/** The front camera (`user`) or the back camera (`environment`). */
+export type OvCameraFacing = 'user' | 'environment';
+
+/** The filters the element knows; `filters` is a comma list of these names. */
+export type OvCameraFilter = 'none' | 'mono' | 'warm' | 'cool' | 'fade' | 'vivid' | 'blur';
+
+/** A countdown before the capture: off, three seconds or ten. */
+export type OvCameraTimer = 0 | 3 | 10;
+
+/** One photo, or a burst of three 450 ms apart. */
+export type OvCameraMode = 'photo' | 'burst';
+
+/** `off` keeps every picture in the page; `openvibe` posts to Cam, only on openvibe.cam and signed in. */
+export type OvCameraUpload = 'off' | 'openvibe';
+
+/** The attributes on the tag. Every one is optional; the defaults are in the comment. */
+export interface OvCameraAttributes {
+    /** `user` (the front camera, the default) or `environment` (the back camera). */
+    facing?: OvCameraFacing;
+    /** A comma list of {@link OvCameraFilter} names; unknown names are dropped and an empty list is `none`. */
+    filters?: string;
+    /** A countdown in seconds; anything other than 0, 3 or 10 is 0. Default 0. */
+    timer?: OvCameraTimer | '0' | '3' | '10';
+    /** Default `photo`. */
+    mode?: OvCameraMode;
+    /** Default `off`: the blob is only delivered as an event. */
+    upload?: OvCameraUpload;
+}
+
+/** The `detail` of `ov-camera:capture`, and what `capture()` resolves to. */
+export interface OvCameraCaptureDetail {
+    /** The encoded picture (`image/jpeg`, quality 0.92). */
+    blob: Blob;
+    width: number;
+    height: number;
+    /** The selected filter name ({@link OvCameraFilter}). */
+    filter: string;
+}
+
+export type OvCameraErrorCode =
+    | 'camera_unavailable'
+    | 'permission_denied'
+    | 'not_started'
+    | 'capture_failed'
+    | 'file_unreadable'
+    | 'upload_unavailable'
+    | 'upload_denied'
+    | 'upload_failed';
+
+/** The `detail` of `ov-camera:error`. */
+export interface OvCameraErrorDetail {
+    code: OvCameraErrorCode;
+    message: string;
+}
+
+export interface OvCameraCaptureEvent extends CustomEvent<OvCameraCaptureDetail> {
+    type: 'ov-camera:capture';
+}
+
+export interface OvCameraErrorEvent extends CustomEvent<OvCameraErrorDetail> {
+    type: 'ov-camera:error';
+}
+
+/** The events the element fires, both bubbling out of its shadow root. */
+export interface OvCameraEventMap {
+    'ov-camera:capture': OvCameraCaptureEvent;
+    'ov-camera:error': OvCameraErrorEvent;
+}
+
+/** The element itself, as `customElements.get('ov-camera')` returns it. */
+export interface OvCameraElement extends HTMLElement {
+    /** Ask for the camera. It is never called on connect; a click is the safe place to call it. */
+    start(): Promise<void>;
+    /** Stop every track and show the off card again. */
+    stop(): void;
+    /** Take a photo through the shutter path, honouring `timer` and `mode`; null when there is no camera. */
+    capture(): Promise<OvCameraCaptureDetail | OvCameraCaptureDetail[] | null>;
+    /** Switch front/back and restart the camera if it is on; resolves to the new facing. */
+    flip(): Promise<OvCameraFacing>;
+    addEventListener<K extends keyof OvCameraEventMap>(
+        type: K,
+        listener: (this: OvCameraElement, ev: OvCameraEventMap[K]) => void,
+        options?: boolean | AddEventListenerOptions,
+    ): void;
+    addEventListener(
+        type: string,
+        listener: EventListenerOrEventListenerObject,
+        options?: boolean | AddEventListenerOptions,
+    ): void;
+}
+
+export interface DefineOvCameraOptions {
+    /** The embed script to inject; defaults to {@link OV_CAMERA_SRC}. */
+    src?: string;
+}
+
+/**
+ * Inject the element's script once and resolve to its class. A second call reuses the load; a page that
+ * already defines <ov-camera> resolves without a new tag.
+ */
+export declare function defineOvCamera(options?: DefineOvCameraOptions): Promise<CustomElementConstructor>;
+
+declare global {
+    interface HTMLElementTagNameMap {
+        'ov-camera': OvCameraElement;
+    }
+}
