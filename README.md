@@ -2,16 +2,16 @@
 
 > Supported browser and server clients for the OpenVibe platform.
 
-**Status:** alpha, v0.96.0 (the five 1.0 core entries — `core`, `auth`, `events`, `db` and `media` — are frozen: their exported names change only with a major release; roadmap Wave 2; developer apps from Wave 20; Media objects v2 from Wave 4; the Tools platform API; Search, Chat, AI, Vision and consent clients; sign-in with recovery and a client health check). Every release is tagged (see [CHANGELOG.md](CHANGELOG.md)). Tested against local stub servers and the built-in mock platform only, never against the live platform. Services pin release tags; each repository's `STATUS.json` names the one it uses.
+**Status:** alpha, v0.97.0 (the five 1.0 core entries — `core`, `auth`, `events`, `db` and `media` — are frozen: their exported names change only with a major release; roadmap Wave 2; developer apps from Wave 20; Media objects v2 from Wave 4; the Tools platform API; Search, Chat, AI, Vision and consent clients; sign-in with recovery and a client health check). Every release is tagged (see [CHANGELOG.md](CHANGELOG.md)). Tested against local stub servers and the built-in mock platform only, never against the live platform. Services pin release tags; each repository's `STATUS.json` names the one it uses.
 **Plan:** OpenVibe End-to-End Realignment & Implementation Plan, revision 3 (20 Sep 2026), §3.2; roadmap §30.  
 **License:** MIT ([LICENSE](LICENSE)). This package is a library that apps outside the network embed, so it uses MIT. The OpenVibe services themselves stay AGPL-3.0.
 
 **If a capability is not in the SDK, it is not public.** Apps call services through `openvibe-sdk` and never build internal routes themselves. A route with no SDK wrapper is internal, even when you can reach it, and it can change without notice. To make a capability public, first define it in OpenVibe.Contracts, then wrap it here.
 
-After v0.96.0 is tagged:
+After v0.97.0 is tagged:
 
 ```bash
-npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.96.0
+npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.97.0
 ```
 
 It has no runtime dependencies. It needs Node ≥ 20, or any browser with `fetch`, Web Crypto and `TextDecoder`. There is no build step. The package is CommonJS with ESM entry points (`import` works). Each subpath has its own `.d.ts`. For a page with no bundler, `browser/openvibe-sdk.mjs` is one self-contained ES module of the browser-safe subpaths (see [Browser without a bundler](#browser-without-a-bundler)). It does not depend on `openvibe-contracts` at runtime: it copies the contract types it uses (from the temporary Contracts sharing branch, a devDependency the tests check them against).
@@ -214,6 +214,7 @@ Until OpenVibe.Tools serves the gateway facade (Tools S6), point the jobs client
 | `openvibe-sdk/food` | server | `createFoodClient(client)`: OpenVibe.Food. Public: `places({kind, q, lat, lon, radius})` (food banks, pantries, free meals from OpenStreetMap), `foods.list/get` (the food list with store prices). The caller's own: `plans.create({people, days, budget, title})/list/get` (deterministic meal plans with a shopping list and costs), `pantry.get/set(items)` (with "what can I make" matches), `recipes.suggest({ask, people})/list` (AI recipe ideas, 10 a day). Plans and recipe ideas are never retried on their own. Audience `openvibe.food` |
 | `openvibe-sdk/chat-apps` | server | The three chat apps (Telegram, Discord, Slack) in one place: `verifyTelegram()`, `verifySlack()`, `verifyDiscord()`, `verifyDelivery()` (the delivery's own proof), `signCallback()` / `verifyCallback()` (a button callback: signed once, used once, expiring), `parseTelegramUpdate()`, `parseDiscordInteraction()`, `parseSlackEvent()`, `parseSlackInteraction()` (each app's payload as the same shape: who said it, where, whether it was said to the bot) and `splitText()` (an answer split the app's way) |
 | `openvibe-sdk/actor` | server | `createActorClient(client)`: OpenVibe.Actor. `agents.list()` and `route({task, mode})` (a dry run) are public. `tasks.create({task, mode, budget, agent, idempotency_key, webhooks})` (retried only with an idempotency_key; `webhook_secret` comes back once), `tasks.list/get/cancel`, `tasks.events(id, {lastEventId})` (SSE until the task ends). A person's own agents: `me.agents.list/create/get/update/remove/run/runs` and `me.agents.memory.list/add/update/remove/clear`. Audience `openvibe.actor` |
+| `openvibe-sdk/menu` | server | `menuCard({id, site, title, kind, items, more, origin, ttlSeconds, updatedAt})`: one validated `frame.menu-card@1` — plain text cut to the contract's lengths, at most six items (the contract's cap), https links on the site's own origin or an `openvibe.*` host, an optional item `image` (`{src, w, h, alt}`, a picture from elsewhere is dropped), and `more` (`{label, url}`). `menuRoute(getCards, {maxAgeSeconds = 300, origin, log})`: the Express/node:http `GET /.well-known/openvibe-menu.json` handler, answering an array of at most three cards with `Cache-Control: public, max-age=…` and CORS `*`; a `getCards()` failure is `[]` (never a 500) and logs once. `MENU_PATH` |
 | `openvibe-sdk/run` | server | `createRunClient(client, {project?})`: OpenVibe.Run, jobs on worker nodes. `jobs.submit({class, artifact, args, limits, …})` (Idempotency-Key, so retried safely) → `{ created, job }`, `jobs.list({state, limit, cursor})`, `jobs.get/cancel`, `jobs.events(id, {lastEventId})` (SSE until `end`), `jobs.streamTicket(id)` (a one-use URL for a browser's EventSource); `forProject(prj_…)` sends X-OV-Project. Audience `openvibe.run` |
 | `openvibe-sdk/video` | server | `createVideoClient(client)`: OpenVibe.Video's playlists of recordings and clips. `playlists.list/create/get/update/remove`, `playlists.items.add/reorder/remove` (`{ kind: 'vod' \| 'clip', id }`), `users.playlists(username)` (public). Private playlists are 404 to everyone but their owner. Audience `openvibe.download` (the media hub's) |
 | `openvibe-sdk/work` | server | `createWorkClient(client)`: OpenVibe.Work. Public: `jobs.search({q, remote, type, location, cursor})`, `jobs.get`, `sources()`. A person's: `savedSearches.list/create/remove`, `applications.list/create/get/update/remove` (also an app with `work.application.manage`; tracking a listing twice answers the first), `applications.assist(id, {ask})` (their Actor agent helps). Audience `openvibe.work` |
@@ -512,6 +513,33 @@ await camera.start();                         // or let the person click the ele
 `upload="off"` (the default) keeps the picture in the page. `upload="openvibe"` posts it to `POST /api/v1/photos` as
 the signed-in person, and only on openvibe.cam. `defineOvCamera({ src })` loads a self-hosted copy of the same file.
 The full attribute, event and method reference is at [openvibe.cam/developers](https://openvibe.cam/developers).
+
+### Put your content in the OpenVibe menu
+
+Every open site can put its own cards in the network menu every site shares. Build the card with
+`menuCard` (it applies the house rules and validates against `frame.menu-card@1`), then mount the
+route — Express or plain `node:http`:
+
+```js
+const { menuCard, menuRoute } = require('openvibe-sdk/menu');
+
+const cards = async () => [menuCard({
+    id: 'new-worlds', site: 'games', title: 'New worlds', kind: 'rows',
+    origin: 'https://openvibe.games',
+    items: worlds.slice(0, 6).map((w) => ({ title: w.title, meta: `by ${w.ownerName}`, url: `https://openvibe.games/worlds/${w.id}` })),
+    more: { label: 'All worlds', url: 'https://openvibe.games/worlds' },
+})];
+
+app.get('/.well-known/openvibe-menu.json', menuRoute(cards, { maxAgeSeconds: 300 }));
+```
+
+`items` may be empty (the card is valid and Network skips it until something is there). `origin` is
+the site's own https origin for the link rule; without it, the host of `more.url` is used, and with
+neither only `openvibe.*` links pass. A bad field throws a `TypeError` naming it. `menuRoute` calls
+`getCards()` on every request, validates each card, and caps the file at three cards; it answers `[]`
+and logs once rather than a 500 when the build fails or a card does not validate, so a transient
+error cannot take the site's file down. `OpenVibe.Network` fetches this file every five minutes and
+shows the cards in `GET /api/frame`.
 
 ## Versioning
 

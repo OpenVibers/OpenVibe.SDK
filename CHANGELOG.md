@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.97.0 (2026-11-07)
+
+- Add `openvibe-sdk/menu`: `menuCard({ id, site, title, kind, items, more, origin, ttlSeconds, updatedAt })`
+  builds one validated `frame.menu-card@1` with the house rules applied — plain text (markup and control
+  characters stripped) cut to the contract's lengths, at most six items (the contract's cap), https links on
+  the site's own origin or an `openvibe.*` host, and an optional item image (`{ src, w, h, alt }`) with the same
+  rule. A bad field throws a `TypeError` naming it; an empty `items` array is valid and Network skips the card.
+- Add `menuRoute(getCards, { maxAgeSeconds = 300, origin, log })`: the Express/node:http handler for
+  `GET /.well-known/openvibe-menu.json`. It calls `getCards()`, validates and caps the file at three cards, and
+  answers `Cache-Control: public, max-age=…` with CORS `*`; a build failure or an invalid card answers `[]`
+  (never a 500) and logs once. `MENU_PATH` is the route.
+- TypeScript types, README ("Put your content in the OpenVibe menu"), the API surface and the pack test follow;
+  the devDependency moves to openvibe-contracts v0.324.0, whose `frame.menu-card@1` tests validate every card
+  this module builds.
+
 ## 0.96.0 (2026-11-07)
 
 - `openvibe-sdk/actor` gains `contacts`: `list()`, `presets()`, `get()`, `create()` (optionally from a preset),
