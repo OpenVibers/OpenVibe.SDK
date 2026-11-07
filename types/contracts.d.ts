@@ -78,6 +78,29 @@ export type ServiceTokenClaims = {
    */
   on_behalf_of?: string;
   /**
+   * App tokens from the authorization-code flow (0.310.0): the purposes the person (on_behalf_of) granted this app at sign-in and that are still active when the token is issued, the claim network.consent-claim@1 defines. Present when the sign-in asked for consent:<purpose> scopes, [] when none is granted, absent otherwise.
+   *
+   * @maxItems 4
+   */
+  consent?:
+    | []
+    | ["ai.train" | "data.public" | "face.recognize" | "app.data"]
+    | [
+        "ai.train" | "data.public" | "face.recognize" | "app.data",
+        "ai.train" | "data.public" | "face.recognize" | "app.data"
+      ]
+    | [
+        "ai.train" | "data.public" | "face.recognize" | "app.data",
+        "ai.train" | "data.public" | "face.recognize" | "app.data",
+        "ai.train" | "data.public" | "face.recognize" | "app.data"
+      ]
+    | [
+        "ai.train" | "data.public" | "face.recognize" | "app.data",
+        "ai.train" | "data.public" | "face.recognize" | "app.data",
+        "ai.train" | "data.public" | "face.recognize" | "app.data",
+        "ai.train" | "data.public" | "face.recognize" | "app.data"
+      ];
+  /**
    * Agent tokens: the host that runs the agent and the token was minted for (RFC 8693 actor claim), a service or an app.
    */
   act?: {
