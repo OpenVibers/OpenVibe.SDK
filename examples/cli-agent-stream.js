@@ -25,7 +25,8 @@ if (!command.length) { console.error('usage: cli-agent-stream.js --title "…" [
 
 (async () => {
     if (!process.env.OPENVIBE_TOKEN) { console.error('set OPENVIBE_TOKEN to the person\'s OpenVibe token'); process.exit(2); }
-    const streams = createStreamsClient(createClient({ token: process.env.OPENVIBE_TOKEN }));
+    const baseUrl = String(process.env.OPENVIBE_LIVE_URL || '').trim();
+    const streams = createStreamsClient(createClient({ token: process.env.OPENVIBE_TOKEN, ...(baseUrl ? { baseUrls: { live: baseUrl } } : {}) }));
     const { stream, publish } = await streams.startAgentStream({
         title, visibility,
         task: { source: 'node', ref: `cli_${Date.now()}`, title: command.join(' ') },
