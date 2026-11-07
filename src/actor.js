@@ -5,18 +5,23 @@
  * https://openvibe.actor/api/v1; tokens for audience openvibe.actor.
  *
  *   const actor = createActorClient(createClient({ tokenProvider }));
- *   const { agents } = await actor.agents.list();                                          // the agent systems (public)
+ *   const { agents } = await actor.agents.catalog();                                        // the agent systems (public)
  *   const plan = await actor.route({ task: 'Summarize this repo', mode: 'cheapest' });     // dry run: which agent, what cost
  *   const task = await actor.tasks.create({ task: 'Summarize …', idempotency_key: 'job-42' });
  *   for await (const e of actor.tasks.events(task.id)) console.log(e.event, e.data);      // until the task ends
+ *   const contacts = await actor.contacts.list();                                           // your agents, Vibe first
+ *   await actor.contacts.setLevel(contacts.agents[0].id, 'auto-edits');
  *   const mine = await actor.me.agents.create({ name: 'Morning brief', instructions: '…' });
  *   await actor.me.agents.run(mine.id, { input: 'today' });
  *   await actor.me.agents.memory.add(mine.id, 'I live in Portland');
  *
- * A task is its requester's own (actor.task-create-request@1: task, mode, budget, agent, idempotency_key, webhooks).
- * When it names webhooks, the answer that creates it carries webhook_secret, once. tasks.create is retried only when
- * the body has an idempotency_key (Actor answers a repeat with the first task); the other writes are never retried on
- * their own. A person's agents need the person's own token (an app's or another person's is 404).
+ * A task is its requester's own (actor.task-create-request@1: task, mode, budget, agent, agent_id, level,
+ * idempotency_key, webhooks). agent_id names one of the person's contacts (absent: Vibe) and level is the thread's own
+ * level; the effective level is the higher of the agent's and the person's own thread line, with an always-ask floor
+ * for money, passwords, deletions and sending to a new recipient. When a task names webhooks, the answer that creates
+ * it carries webhook_secret, once. tasks.create is retried only when the body has an idempotency_key (Actor answers a
+ * repeat with the first task); the other writes are never retried on their own. A person's agents and contacts need
+ * the person's own token (an app's or another person's is 404).
  * Errors are OpenVibeError: actor.task.invalid, actor.budget.over_tier, actor.idempotency.conflict (409),
  * actor.webhook.refused, actor.agent.invalid, actor.agent.limit (429), actor.agent.not_found, actor.task.not_found, …
  */
@@ -39,6 +44,7 @@ function createActorClient(client, { baseUrl } = {}) {
         return enc(String(v));
     };
     const agentPath = (agent, rest = '') => `/api/v1/me/agents/${id('agent', agent)}${rest}`;
+    const contactPath = (agent, rest = '') => `/api/v1/agents/${id('agent', agent)}${rest}`;
 
     /**
      * A task's events as they happen (SSE: { id, event, data }), the backlog after lastEventId first; it ends when
@@ -60,7 +66,24 @@ function createActorClient(client, { baseUrl } = {}) {
     return {
         agents: {
             /** The agent systems a task can go to, with what they are good at and cost (public). */
+            catalog: ({ signal } = {}) => call({ path: '/api/v1/agent-systems', signal }),
+            /** Alias of catalog: the public catalog, never the caller's own contacts. */
+            list: ({ signal } = {}) => call({ path: '/api/v1/agent-systems', signal }),
+        },
+        /** The person's own agents as contacts (actor.agent@1) and their approval levels (plan §12 A-1). */
+        contacts: {
+            /** Their contacts, Vibe first; Vibe is created on this first read. */
             list: ({ signal } = {}) => call({ path: '/api/v1/agents', signal }),
+            /** The four presets the UI can show (Researcher, Inbox, Studio editor, Party host). */
+            presets: ({ signal } = {}) => call({ path: '/api/v1/agents/presets', signal }),
+            get: (agent, { signal } = {}) => call({ path: contactPath(agent), signal }),
+            /** Create one, optionally from a preset: { preset, name?, face?, voice?, model?, computer?, apps?, memory?, level? }. */
+            create: (agent, { signal } = {}) => once({ method: 'POST', path: '/api/v1/agents', json: agent, signal }),
+            update: (agent, patch, { signal } = {}) => call({ method: 'PATCH', path: contactPath(agent), json: patch, idempotent: true, signal }),
+            /** Vibe is not deletable (Actor answers 409 actor.agent.vibe). */
+            remove: (agent, { signal } = {}) => call({ method: 'DELETE', path: contactPath(agent), signal }),
+            /** actor.level-change@1: { level } (ask | auto-edits | approve-for-me | full). */
+            setLevel: (agent, level, extra = {}, { signal } = {}) => call({ method: 'PUT', path: contactPath(agent, '/level'), json: { level, ...extra }, idempotent: true, signal }),
         },
         /** A dry run (public): the task's class and the agent and budget Actor would pick, nothing started. */
         route: ({ task, mode, agent } = {}, { signal } = {}) => call({ method: 'POST', path: '/api/v1/route', json: { task, mode, agent }, idempotent: true, signal }),

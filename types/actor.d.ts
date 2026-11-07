@@ -2,13 +2,33 @@
 type Opts = { signal?: AbortSignal };
 type ActorJson = Record<string, any>;
 export type ActorMode = 'cheapest' | 'balanced' | 'best' | 'fastest' | 'private';
+export type ActorLevel = 'ask' | 'auto-edits' | 'approve-for-me' | 'full';
+export interface ActorAgentModel { engine: 'runtime' | 'own-keys' | 'open-gpu' | 'link'; model: string }
+export interface ActorAgentComputer { kind: 'browser' | 'kept-browser' | 'desktop' | 'gpu-desktop' | 'always-on' | 'your-computer' | 'throwaway'; placement: 'auto' | 'link' | 'home' | 'ovh' }
+export interface ActorAgent {
+    id: string; owner: string; name: string; face: string; voice: string | null; model: ActorAgentModel;
+    computer: ActorAgentComputer | null; apps: string[]; memory: string | null; level: ActorLevel; created_at: string;
+}
+export interface ActorAgentWrite {
+    preset?: 'researcher' | 'inbox' | 'studio-editor' | 'party-host'; name?: string; face?: string; voice?: string | null;
+    model?: ActorAgentModel; computer?: ActorAgentComputer | null; apps?: string[]; memory?: string | null; level?: ActorLevel;
+}
 export interface TaskRequest {
-    task: string; mode?: ActorMode; budget?: { per_task_usd?: number; per_day_usd?: number }; agent?: string; idempotency_key?: string;
+    task: string; mode?: ActorMode; budget?: { per_task_usd?: number; per_day_usd?: number }; agent?: string; agent_id?: string; level?: ActorLevel; idempotency_key?: string;
     webhooks?: Array<{ url: string; events?: string[]; secret_ref?: string }>; [k: string]: unknown;
 }
 export interface TaskEvent { id: number | null; event: string; data: any }
 export interface ActorClient {
-    agents: { list(opts?: Opts): Promise<{ agents: ActorJson[] }> };
+    agents: { catalog(opts?: Opts): Promise<{ agents: ActorJson[] }>; list(opts?: Opts): Promise<{ agents: ActorJson[] }> };
+    contacts: {
+        list(opts?: Opts): Promise<{ agents: ActorAgent[] }>;
+        presets(opts?: Opts): Promise<{ presets: ActorJson[] }>;
+        get(id: string, opts?: Opts): Promise<ActorAgent>;
+        create(agent: ActorAgentWrite, opts?: Opts): Promise<ActorAgent>;
+        update(id: string, patch: ActorAgentWrite, opts?: Opts): Promise<ActorAgent>;
+        remove(id: string, opts?: Opts): Promise<ActorJson>;
+        setLevel(id: string, level: ActorLevel, extra?: { agent_id?: string; thread_id?: string; reason?: string }, opts?: Opts): Promise<ActorAgent>;
+    };
     route(req: { task: string; mode?: ActorMode; agent?: string }, opts?: Opts): Promise<ActorJson>;
     tasks: {
         create(req: TaskRequest, opts?: Opts): Promise<ActorJson & { id: string; webhook_secret?: string }>;
