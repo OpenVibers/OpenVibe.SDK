@@ -2,6 +2,6 @@
 import cjs from '../src/ai.js';
 
 export const {
-    createAiClient, TERMINAL, OPS,
+    createAiClient, TERMINAL, OPS, CLASSES,
 } = cjs;
 export default cjs;
