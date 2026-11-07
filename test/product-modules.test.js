@@ -114,7 +114,7 @@ const ids = { plan: `pln_${ULID}`, task: `tsk_${ULID}`, agent: `agt_${ULID}`, me
         await actor.me.agents.memory.clear(ids.agent);
         const a = mark();
         assert.deepStrictEqual(a.map((r) => `${r.method} ${r.url}`), [
-            'GET /api/v1/agents', 'POST /api/v1/route', 'POST /api/v1/tasks', 'POST /api/v1/tasks', 'POST /api/v1/tasks',
+            'GET /api/v1/agent-systems', 'POST /api/v1/route', 'POST /api/v1/tasks', 'POST /api/v1/tasks', 'POST /api/v1/tasks',
             'GET /api/v1/tasks?limit=10', `GET /api/v1/tasks/${ids.task}`, `POST /api/v1/tasks/${ids.task}/cancel`, `POST /api/v1/tasks/${ids.task}/cancel`,
             `GET /api/v1/tasks/${ids.task}/events`, 'GET /api/v1/me/agents', 'POST /api/v1/me/agents', `GET /api/v1/me/agents/${ids.agent}`,
             `PATCH /api/v1/me/agents/${ids.agent}`, `PATCH /api/v1/me/agents/${ids.agent}`, `DELETE /api/v1/me/agents/${ids.agent}`, `DELETE /api/v1/me/agents/${ids.agent}`,

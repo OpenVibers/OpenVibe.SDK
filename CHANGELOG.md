@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.96.0 (2026-11-07)
+
+- `openvibe-sdk/actor` gains `contacts`: `list()`, `presets()`, `get()`, `create()` (optionally from a preset),
+  `update()`, `remove()` and `setLevel()`, for a person's agents as contacts and their approval levels (plan §12
+  A-1). `contacts.list()` is `GET /api/v1/agents` with the person's own token, which now answers their contacts
+  (Vibe first), so `agents.list()` and the new `agents.catalog()` call the explicit public catalog
+  `GET /api/v1/agent-systems` and keep their old meaning. `tasks.create` types `agent_id` and `level`.
 ## 0.95.0 (2026-11-07)
 
 - Add `openvibe-sdk/cam`: `defineOvCamera({ src })` injects OpenVibe.Cam's framework-free `<ov-camera>` element
