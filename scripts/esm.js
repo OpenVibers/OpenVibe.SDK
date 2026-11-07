@@ -97,6 +97,7 @@ const ENTRIES = {
     'zone.mjs': '../src/zone.js',
     'vip.mjs': '../src/vip.js',
     'frame.mjs': '../src/frame.js',
+    'menu.mjs': '../src/menu/index.js',
     'service.mjs': '../src/service/index.js',
     'testing.mjs': '../src/testing/index.js',
 };

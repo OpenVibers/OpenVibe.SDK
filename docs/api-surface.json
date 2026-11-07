@@ -804,6 +804,11 @@
   "openvibe-sdk/meme": {
     "createMemeClient": "function"
   },
+  "openvibe-sdk/menu": {
+    "MENU_PATH": "string",
+    "menuCard": "function",
+    "menuRoute": "function"
+  },
   "openvibe-sdk/modules": {
     "createModulesClient": "function"
   },

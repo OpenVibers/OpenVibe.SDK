@@ -24,7 +24,7 @@ run([
             const out = execFileSync(npm, ['pack', '--json', '--pack-destination', tmp], { cwd: ROOT, env, encoding: 'utf8', shell });
             const info = JSON.parse(out)[0];
             const files = info.files.map((f) => f.path);
-            for (const must of ['package.json', 'index.js', 'browser.js', 'LICENSE', 'README.md', 'CHANGELOG.md', 'src/core/client.js', 'src/jobs.js', 'src/tools.js', 'src/core/form.js', 'src/projects.js', 'src/vip.js', 'esm/vip.mjs', 'types/vip.d.ts', 'src/vibes.js', 'esm/vibes.mjs', 'types/vibes.d.ts', 'src/exchange.js', 'esm/exchange.mjs', 'types/exchange.d.ts', 'docs/exchange.md', 'src/bot.js', 'esm/bot.mjs', 'types/bot.d.ts', 'src/frame.js', 'esm/frame.mjs', 'types/frame.d.ts', 'src/cam/index.js', 'esm/cam.mjs', 'types/cam.d.ts', 'src/service/index.js', 'esm/service.mjs', 'types/service.d.ts', 'docs/service.md', 'esm/core.mjs', 'esm/jobs.mjs', 'esm/tools.mjs', 'types/tools.d.ts', 'types/core.d.ts', 'types/contracts.d.ts', 'types/bundle.d.ts', 'src/resources.js', 'esm/resources.mjs', 'types/resources.d.ts', 'src/vision.js', 'esm/vision.mjs', 'types/vision.d.ts', 'src/redact.js', 'esm/redact.mjs', 'types/redact.d.ts', 'docs/redact.md', 'src/share.js', 'src/share/store.js', 'esm/share.mjs', 'types/share.d.ts', 'docs/share.md', 'src/locker.js', 'src/locker/seal.js', 'src/locker/server.js', 'esm/locker.mjs', 'esm/locker-server.mjs', 'types/locker.d.ts', 'types/locker-server.d.ts', 'types/locker-vectors.d.ts', 'esm/locker-vectors.mjs', 'docs/locker.md', 'src/streams.js', 'esm/streams.mjs', 'types/streams.d.ts', 'docs/streams.md', 'browser/openvibe-sdk.mjs']) {
+            for (const must of ['package.json', 'index.js', 'browser.js', 'LICENSE', 'README.md', 'CHANGELOG.md', 'src/core/client.js', 'src/jobs.js', 'src/tools.js', 'src/core/form.js', 'src/projects.js', 'src/vip.js', 'esm/vip.mjs', 'types/vip.d.ts', 'src/vibes.js', 'esm/vibes.mjs', 'types/vibes.d.ts', 'src/exchange.js', 'esm/exchange.mjs', 'types/exchange.d.ts', 'docs/exchange.md', 'src/bot.js', 'esm/bot.mjs', 'types/bot.d.ts', 'src/frame.js', 'esm/frame.mjs', 'types/frame.d.ts', 'src/cam/index.js', 'esm/cam.mjs', 'types/cam.d.ts', 'src/menu/index.js', 'esm/menu.mjs', 'types/menu.d.ts', 'src/service/index.js', 'esm/service.mjs', 'types/service.d.ts', 'docs/service.md', 'esm/core.mjs', 'esm/jobs.mjs', 'esm/tools.mjs', 'types/tools.d.ts', 'types/core.d.ts', 'types/contracts.d.ts', 'types/bundle.d.ts', 'src/resources.js', 'esm/resources.mjs', 'types/resources.d.ts', 'src/vision.js', 'esm/vision.mjs', 'types/vision.d.ts', 'src/redact.js', 'esm/redact.mjs', 'types/redact.d.ts', 'docs/redact.md', 'src/share.js', 'src/share/store.js', 'esm/share.mjs', 'types/share.d.ts', 'docs/share.md', 'src/locker.js', 'src/locker/seal.js', 'src/locker/server.js', 'esm/locker.mjs', 'esm/locker-server.mjs', 'types/locker.d.ts', 'types/locker-server.d.ts', 'types/locker-vectors.d.ts', 'esm/locker-vectors.mjs', 'docs/locker.md', 'src/streams.js', 'esm/streams.mjs', 'types/streams.d.ts', 'docs/streams.md', 'browser/openvibe-sdk.mjs']) {
                 assert.ok(files.includes(must), `tarball contains ${must}`);
             }
             assert.ok(!files.some((f) => f.startsWith('test/') || f.startsWith('scripts/') || f.startsWith('.github/')), 'no tests or tooling in the tarball');
@@ -59,8 +59,12 @@ run([
                     assert.equal(bundle.SDK_VERSION, ${JSON.stringify(pkg.version)});
                     assert.equal(typeof bundle.jobs.createJobsClient, 'function');
                     assert.equal(typeof bundle.tools.createToolsClient, 'function');
+                    const { menuCard } = require('openvibe-sdk/menu');
                     const { createToolsClient } = require('openvibe-sdk/tools');
                     const tp = createMockPlatform({ tools: true });
+                    const card = menuCard({ id: 'pack-card', site: 'pack', title: 'Pack', origin: 'https://pack.test', items: [] });
+                    assert.equal(card.ttl_s, 300);
+                    assert.equal(card.items.length, 0);
                     const ran = await createToolsClient(createClient({ fetch: tp.fetch })).run('jsonminify', { text: '{ "a": 1 }' });
                     assert.equal(ran.result.text, '{"a":1}');
                     assert.equal(typeof require.resolve('openvibe-sdk/browser/openvibe-sdk.mjs'), 'string');
@@ -68,7 +72,7 @@ run([
                 })().catch((err) => { console.error(err); process.exit(1); });`;
             const res = execFileSync(process.execPath, ['-e', script], { cwd: app, encoding: 'utf8' });
             assert.match(res, new RegExp(`consumer ok: ${subpaths.length} subpaths \\+ the browser bundle`));
-            assert.equal(subpaths.length, 87);   // 0.90.0 assertions, 0.91.0 streams, 0.92.0 chat-apps, 0.94.0 reports, 0.95.0 cam
+            assert.equal(subpaths.length, 88);   // 0.90.0 assertions, 0.91.0 streams, 0.92.0 chat-apps, 0.94.0 reports, 0.95.0 cam, 0.97.0 menu
             assert.ok(!fs.existsSync(path.join(app, 'node_modules/openvibe-contracts')), 'the optional peer is not installed');
         } finally {
             fs.rmSync(tmp, { recursive: true, force: true });
