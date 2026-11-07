@@ -84,12 +84,11 @@ export interface MenuRouteOptions {
 }
 
 /** Express's response shape and node:http's, both accepted by the handler. */
-export type MenuRequest = IncomingMessage & { url?: string; method?: string };
+export type MenuRequest = IncomingMessage & { url?: string | undefined; method?: string | undefined };
 export type MenuResponse = ServerResponse & {
     status?: (code: number) => MenuResponse;
     set?: (name: string, value: string) => MenuResponse;
     json?: (body: unknown) => unknown;
-    [key: string]: unknown;
 };
 
 /** The handler answers true when it handled the request, false for another path. */
