@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.94.0 (2026-11-07)
+
+- `openvibe-sdk/streams` gains S7: `schedule()`, `listSchedules()`, `cancelSchedule()` and `remindSchedule()` for
+  scheduled public agent streams; `steps.post()` and `postStep()` for any harness; `digest.read()` and `poll.open()` /
+  `poll.result()` for a Co-pilot's service token; and `onControl()` to honour pause, curtain, mute and end by polling
+  the stream's control log. The guards run before anything leaves the process (an `scd_…` id, a step's title and
+  status, two to four poll options, a 10–300 second poll).
+- Add `openvibe-sdk/reports`: `write()` posts a session report with the person's own token (private by default,
+  idempotent per source and task ref) and `read()` gets one the caller may see. The Report service redacts every text
+  field; the client never sends a raw transcript.
+- Add `examples/cli-agent-stream.js`: about 40 lines that start a stream, spawn any CLI command, post its steps and end
+  the stream with the command's result, using the same ticket path a Node desk uses.
+
 ## 0.93.0 (2026-11-06)
 
 - `openvibe-sdk/exchange`: the seller side gains the **endpoint form**, so any OpenAI-compatible server can sell, not

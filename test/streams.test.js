@@ -8,6 +8,7 @@ const { createStreamsClient } = require('../src/streams');
 const { stubServer, send, run } = require('./helpers');
 
 const AGS = 'ags_01JAB2C3D4E5F6G7H8J9K0MNPQ';
+const SCD = 'scd_01JAB2C3D4E5F6G7H8J9K0MNPQ';
 const TICKET = 'wpt_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 
 (async () => {
@@ -33,9 +34,20 @@ const TICKET = 'wpt_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
         if (req.method === 'POST' && path === `/api/streams/agent/${AGS}/view-ticket`) {
             return send(res, 201, { ticket: 'wvt_0123456789abcdefghijklmnop', expires_at: '2026-11-06T12:10:00.000Z' });
         }
+        if (req.method === 'POST' && path === '/api/streams/agent/schedules') {
+            return send(res, 201, { schedule: { id: SCD, owner: 'usr_01JAB2C3D4E5F6G7H8J9K0MNPQ', channel: 'mira', title: 'Nightly', task: { source: 'codes', ref: 'tsk_1', title: 'Nightly' }, mode: 'watch', visibility: 'public', starts_at: '2026-11-08T19:00:00.000Z', state: 'scheduled', agent_stream_id: null, missed_reason: null, waits_for_go: false, started_at: null, ended_at: null, reminders: 0, page_url: 'https://openvibe.live/@mira/agents', created_at: '2026-11-07T02:00:00.000Z' } });
+        }
+        if (req.method === 'GET' && path === '/api/streams/agent/schedules') return send(res, 200, { schedules: [] });
+        if (req.method === 'DELETE' && path === `/api/streams/agent/schedules/${SCD}`) return send(res, 200, { schedule: { id: SCD, state: 'cancelled' } });
+        if (req.method === 'POST' && path === `/api/streams/agent/schedules/${SCD}/remind`) return send(res, 200, { reminders: 2, reminded: true });
+        if (req.method === 'POST' && path === `/api/streams/agent/${AGS}/steps`) return send(res, 201, { step: { id: 7, title: 'Run the tests', status: 'started', at: '2026-11-07T02:00:00.000Z' } });
+        if (req.method === 'GET' && path === `/api/v1/rooms/agent:${AGS}/digest`) return send(res, 200, { items: [], total: 0 });
+        if (req.method === 'POST' && path === `/api/v1/rooms/agent:${AGS}/poll`) return send(res, 201, { poll_id: 'pol_1', state: 'open' });
+        if (req.method === 'GET' && path === `/api/v1/rooms/agent:${AGS}/poll`) return send(res, 200, { poll_id: 'pol_1', state: 'closed' });
+        if (req.method === 'GET' && path === `/api/streams/agent/${AGS}/controls`) return send(res, 200, { controls: [], live: { paused: false } });
         return send(res, 404, { error: 'not found', code: 'live.not_found' });
     });
-    const client = createClient({ baseUrls: { live: server.url }, token: 'person-token', retries: 0 });
+    const client = createClient({ baseUrls: { live: server.url, chat: server.url }, token: 'person-token', retries: 0 });
     const streams = createStreamsClient(client);
     const last = () => server.requests[server.requests.length - 1];
 
@@ -109,6 +121,63 @@ const TICKET = 'wpt_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
             assert.deepStrictEqual([...last().body], [...jpeg]);
             await streams.postFrame(AGS, jpeg, { contentType: 'image/webp' });
             assert.strictEqual(last().headers['content-type'], 'image/webp');
+        }],
+
+        ['S7: a schedule is written, listed, cancelled and reminded', async () => {
+            const made = await streams.schedule({
+                title: 'Nightly dependency update',
+                task: { source: 'codes', ref: 'tsk_1', title: 'Update the dependencies' },
+                mode: 'narrated',
+                startsAt: '2026-11-08T19:00:00Z',
+            });
+            assert.deepStrictEqual([last().method, last().url], ['POST', '/api/streams/agent/schedules']);
+            assert.deepStrictEqual(JSON.parse(String(last().body)), {
+                title: 'Nightly dependency update',
+                task: { source: 'codes', ref: 'tsk_1', title: 'Update the dependencies' },
+                mode: 'narrated', visibility: 'public', starts_at: '2026-11-08T19:00:00.000Z',
+            });
+            assert.strictEqual(made.schedule.id, SCD);
+            await streams.listSchedules({ channel: 'mira' });
+            assert.strictEqual(last().url, '/api/streams/agent/schedules?channel=mira');
+            await streams.listSchedules({ mine: true });
+            assert.strictEqual(last().url, '/api/streams/agent/schedules?mine=1');
+            await streams.cancelSchedule(SCD);
+            assert.deepStrictEqual([last().method, last().url], ['DELETE', `/api/streams/agent/schedules/${SCD}`]);
+            const reminder = await streams.remindSchedule(SCD);
+            assert.deepStrictEqual(reminder, { reminders: 2, reminded: true }, 'the answer is a count');
+            await assert.rejects(() => streams.cancelSchedule('ags_01JAB2C3D4E5F6G7H8J9K0MNPQ'), /schedule id/);
+        }],
+
+        ['S7: a step is posted by the desk or in the person\'s session', async () => {
+            await streams.postStep(AGS, { title: 'Run the tests', status: 'started' }, { ticket: TICKET });
+            assert.deepStrictEqual([last().method, last().url], ['POST', `/api/streams/agent/${AGS}/steps`]);
+            assert.strictEqual(last().headers.authorization, `Bearer ${TICKET}`);
+            assert.deepStrictEqual(JSON.parse(String(last().body)), { title: 'Run the tests', status: 'started' });
+            await streams.steps.post(AGS, { title: 'Tests passed', status: 'passed', tests: { passed: 12, failed: 0 } });
+            assert.deepStrictEqual(JSON.parse(String(last().body)), { title: 'Tests passed', status: 'passed', tests: { passed: 12, failed: 0 } });
+            assert.strictEqual(last().headers.authorization, 'Bearer person-token');
+            await assert.rejects(() => streams.steps.post(AGS, { title: 'x', status: 'done' }), /step status/);
+            await assert.rejects(() => streams.steps.post(AGS, { title: 'x', status: 'passed', tests: { passed: -1, failed: 0 } }), /tests/);
+        }],
+
+        ['S7: the digest and the poll are a Chat service token\'s calls', async () => {
+            await streams.digest.read(AGS, { since: '2026-11-07T01:00:00Z' });
+            assert.strictEqual(last().url, `/api/v1/rooms/agent:${AGS}/digest?since=2026-11-07T01%3A00%3A00Z`);
+            await streams.poll.open(AGS, { question: 'Which fix first?', options: ['A', 'B'], seconds: 60 });
+            assert.deepStrictEqual([last().method, last().url], ['POST', `/api/v1/rooms/agent:${AGS}/poll`]);
+            assert.deepStrictEqual(JSON.parse(String(last().body)), { question: 'Which fix first?', options: ['A', 'B'], seconds: 60 });
+            await streams.poll.result(AGS);
+            assert.deepStrictEqual([last().method, last().url], ['GET', `/api/v1/rooms/agent:${AGS}/poll`]);
+            await assert.rejects(() => streams.poll.open(AGS, { question: 'x', options: ['A'] }), /two to four/);
+        }],
+
+        ['S7: onControl polls the log and stops', async () => {
+            const seen = [];
+            const stop = streams.onControl(AGS, (c) => seen.push(c), { intervalMs: 1000 });
+            await new Promise((r) => setTimeout(r, 20));
+            assert.deepStrictEqual(seen, [], 'nothing new yet');
+            stop();
+            assert.strictEqual(typeof stop, 'function');
         }],
 
         ['visibility, end and the view ticket', async () => {
