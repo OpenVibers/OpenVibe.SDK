@@ -888,6 +888,10 @@
   "openvibe-sdk/registry": {
     "createRegistryClient": "function"
   },
+  "openvibe-sdk/reports": {
+    "cleanReport": "function",
+    "createReportsClient": "function"
+  },
   "openvibe-sdk/resources": {
     "RESOURCE_KINDS": "array",
     "createResourceClient": "function",

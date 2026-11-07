@@ -27,6 +27,9 @@ const VISIBILITIES = ['private', 'unlisted', 'public'];
 const TASK_SOURCES = ['codes', 'actor', 'desk', 'node'];
 const CURTAIN_REASONS = ['password_field', 'secret_file', 'env_print', 'manual', 'site', 'detector'];
 const FRAME_TYPES = ['image/jpeg', 'image/webp'];
+const MODES = ['watch', 'narrated', 'copilot', 'chatplays'];
+const STEP_STATUSES = ['started', 'passed', 'failed', 'skipped'];
+const SCHEDULE_ID = /^scd_[0-9A-HJKMNP-TV-Z]{26}$/;
 const MAX_FRAME_BYTES = 200 * 1024;
 
 /** The frame's bytes, whatever the caller has: a Uint8Array, a Buffer or an ArrayBuffer. */
@@ -64,6 +67,37 @@ function createStreamsClient(client, { baseUrl } = {}) {
         try { new URL(v); } catch { throw new TypeError(`streams: ${what} is a URI`); }
         return v;
     };
+
+    const scheduleId = (v) => {
+        const id = String(v || '');
+        if (!SCHEDULE_ID.test(id)) throw new TypeError('streams: a schedule id is scd_…');
+        return id;
+    };
+    const cleanStep = (step = {}) => {
+        const r = step || {};
+        const body = {
+            title: text(r.title, 120, 'a step title'),
+            status: oneOf(r.status, STEP_STATUSES, 'the step status'),
+        };
+        if (r.at) body.at = new Date(r.at).toISOString();
+        if (r.detail !== undefined) body.detail = text(r.detail, 500, 'the step detail');
+        if (r.tests !== undefined) {
+            if (!r.tests || !Number.isInteger(r.tests.passed) || !Number.isInteger(r.tests.failed) || r.tests.passed < 0 || r.tests.failed < 0) {
+                throw new TypeError('streams: tests is { passed, failed }, whole numbers');
+            }
+            body.tests = { passed: r.tests.passed, failed: r.tests.failed };
+        }
+        if (r.cost_usd !== undefined) {
+            const n = Number(r.cost_usd);
+            if (!Number.isFinite(n) || n < 0) throw new TypeError('streams: cost_usd is a number, zero or more');
+            body.cost_usd = n;
+        }
+        return body;
+    };
+    const chatCall = ({ method = 'GET', ...opts }) => client.json({
+        service: 'chat', audience: 'openvibe.chat', method,
+        ...(method === 'GET' ? {} : { idempotencyKey: false }), ...opts,
+    });
 
     return {
         /**
@@ -184,6 +218,149 @@ function createStreamsClient(client, { baseUrl } = {}) {
          */
         async end(id, { signal } = {}) {
             return call({ method: 'POST', path: `/api/streams/agent/${streamId(id)}/end`, signal });
+        },
+
+        /**
+         * Schedule a public agent stream (live.agent-stream-schedule@1): a time, a task template and the mode. The
+         * owner's online desk claims it at the time, which starts the stream; a desk that is offline leaves
+         * "didn't start: the desk was offline" and nothing runs. A chatplays schedule always waits for Go.
+         *
+         * @param {{ title: string, task: object, mode?: 'watch'|'narrated'|'copilot'|'chatplays',
+         *           visibility?: 'private'|'unlisted'|'public', startsAt: string|Date }} request
+         * @param {{ signal?: AbortSignal }} [options]
+         */
+        async schedule(request = {}, { signal } = {}) {
+            const r = request || {};
+            const starts = r.startsAt instanceof Date ? r.startsAt : new Date(String(r.startsAt || ''));
+            if (Number.isNaN(starts.getTime())) throw new TypeError('streams: startsAt is a date-time');
+            return call({
+                method: 'POST', path: '/api/streams/agent/schedules',
+                json: {
+                    title: text(r.title, 200, 'a title'),
+                    task: r.task,
+                    mode: oneOf(r.mode || 'watch', MODES, 'the mode'),
+                    visibility: oneOf(r.visibility || 'public', VISIBILITIES, 'the visibility'),
+                    starts_at: starts.toISOString(),
+                }, signal,
+            });
+        },
+
+        /** The caller's own schedules (`mine: true`) or a channel's public 24-hour window. */
+        async listSchedules({ channel = null, mine = false } = {}, { signal } = {}) {
+            const q = mine ? '?mine=1' : `?channel=${encodeURIComponent(String(channel || ''))}`;
+            if (!mine && !channel) throw new TypeError('streams: listSchedules needs a channel or mine: true');
+            return call({ method: 'GET', path: `/api/streams/agent/schedules${q}`, signal });
+        },
+
+        /** Cancel a schedule that has not started. */
+        async cancelSchedule(id, { signal } = {}) {
+            return call({ method: 'DELETE', path: `/api/streams/agent/schedules/${scheduleId(id)}`, signal });
+        },
+
+        /** Opt in to a schedule's reminder. The answer is the count, never the people. */
+        async remindSchedule(id, { signal } = {}) {
+            return call({ method: 'POST', path: `/api/streams/agent/schedules/${scheduleId(id)}/remind`, signal });
+        },
+
+        /**
+         * Post one step (live.agent-stream-step@1) from any agent harness: the overlay and the VOD's chapters read it.
+         * With a publish ticket the desk posts it; a first-party service token holding live.agent_stream.publish may
+         * post for its owner.
+         *
+         * @param {string} id the agent stream id (ags_…)
+         * @param {{ title: string, status: 'started'|'passed'|'failed'|'skipped', detail?: string,
+         *           tests?: { passed: number, failed: number }, cost_usd?: number, at?: string|Date }} step
+         * @param {{ ticket?: string, signal?: AbortSignal }} [options]
+         */
+        async postStep(id, step, { ticket, signal } = {}) {
+            return call({
+                method: 'POST', path: `/api/streams/agent/${streamId(id)}/steps`, json: cleanStep(step),
+                ...(ticket ? { token: ticket } : {}), signal,
+            });
+        },
+
+        /** steps.post() — the design's spelling of postStep. */
+        steps: {
+            async post(id, step, { ticket, signal } = {}) {
+                return call({
+                    method: 'POST', path: `/api/streams/agent/${streamId(id)}/steps`, json: cleanStep(step),
+                    ...(ticket ? { token: ticket } : {}), signal,
+                });
+            },
+        },
+
+        /**
+         * The Co-pilot digest (S5): what the room said between two steps. Behind the token's chat.agent_digest.read
+         * capability; a person's token never holds it, so this is a service token's call.
+         *
+         * @param {string} id the agent stream id (ags_…)
+         * @param {{ since?: string, signal?: AbortSignal }} [options]
+         */
+        digest: {
+            async read(id, { since, signal } = {}) {
+                const q = since ? `?since=${encodeURIComponent(since)}` : '';
+                return chatCall({ method: 'GET', path: `/api/v1/rooms/agent:${streamId(id)}/digest${q}`, signal });
+            },
+        },
+
+        /**
+         * A poll the Co-pilot asks the room to run (S5), and its result. Behind chat.agent_poll.write.
+         *
+         * @param {string} id the agent stream id (ags_…)
+         * @param {{ question: string, options: string[], seconds?: number }} poll
+         * @param {{ signal?: AbortSignal }} [options]
+         */
+        poll: {
+            async open(id, { question, options, seconds = 60 } = {}, { signal } = {}) {
+                if (typeof question !== 'string' || !question.trim()) throw new TypeError('streams: a poll question is required');
+                if (!Array.isArray(options) || options.length < 2 || options.length > 4) throw new TypeError('streams: a poll has two to four options');
+                const n = Number(seconds);
+                if (!Number.isInteger(n) || n < 10 || n > 300) throw new TypeError('streams: a poll lasts 10–300 seconds');
+                return chatCall({
+                    method: 'POST', path: `/api/v1/rooms/agent:${streamId(id)}/poll`,
+                    json: { question: question.trim(), options: options.map((o) => String(o)), seconds: n }, signal,
+                });
+            },
+            async result(id, { signal } = {}) {
+                return chatCall({ method: 'GET', path: `/api/v1/rooms/agent:${streamId(id)}/poll`, signal });
+            },
+        },
+
+        /**
+         * Honour pause, curtain, mute and end: poll the stream's control log and call `handler(control)` for each new
+         * one. Returns a stop function; `signal` stops it too. The first poll only marks what is already there, so a
+         * harness that starts late does not replay yesterday's End.
+         *
+         * @param {string} id the agent stream id (ags_…)
+         * @param {(control: object) => void} handler
+         * @param {{ intervalMs?: number, signal?: AbortSignal }} [options]
+         */
+        onControl(id, handler, { intervalMs = 5000, signal } = {}) {
+            const stream = streamId(id);
+            if (typeof handler !== 'function') throw new TypeError('streams: onControl needs a handler');
+            let stopped = false;
+            let timer = null;
+            let seen = null;
+            const key = (c) => `${c.at}|${c.control}|${(c.by && c.by.handle) || ''}`;
+            const tick = async () => {
+                if (stopped) return;
+                try {
+                    const out = await call({ method: 'GET', path: `/api/streams/agent/${stream}/controls`, signal });
+                    const list = (out && out.controls) || [];
+                    if (seen === null) { seen = new Set(list.map(key)); }
+                    else {
+                        for (const c of [...list].reverse()) {
+                            if (seen.has(key(c))) continue;
+                            seen.add(key(c));
+                            try { handler(c); } catch { /* the harness's own error */ }
+                        }
+                    }
+                } catch { /* a poll failure is retried next time */ }
+                if (!stopped) { timer = setTimeout(tick, Math.max(1000, Number(intervalMs) || 5000)); if (timer.unref) timer.unref(); }
+            };
+            tick();
+            if (signal) signal.addEventListener('abort', () => { stopped = true; if (timer) clearTimeout(timer); }, { once: true });
+            return () => { stopped = true; if (timer) clearTimeout(timer); };
         },
 
         /**
