@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.103.0 (2026-11-08)
+
+- Add `openvibe-sdk/credentials`: `createCredentialsClient` for a person's own provider credentials on OpenVibe.AI:
+  `list()` (metadata only: kind, provider, label, created, last used, expired), `add()` for an API key or a browser
+  session cookie, `remove()`, and `balance()` (that credential's fixed read-only balance readers: Anthropic Console
+  prepaid credits and current spend, OpenAI credit grants). A secret never comes back from any call.
+
+## 0.102.0 (2026-11-08)
+
+- Add `openvibe-sdk/trust`: `createTrustClient({ networkUrl, getToken })` with `.me()` (the caller's own signals, a
+  person's or a guest's token) and `.of(subject)` (a service token with `identity.trust.read`), the typed
+  `identity.trust@1` result for accounts and guests, and pure helpers (`isNew`, `atLeast`, the age-band order) for Node
+  and the browser bundle. Signals are age bands and aggregate counts only: never an IP, email or last-seen time.
+
 ## 0.101.0 (2026-11-08)
 
 - Add bounded `locker/server.inspectEnvelopePrefix` validation against an actual stored ciphertext byte count.
