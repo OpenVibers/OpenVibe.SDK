@@ -9,6 +9,7 @@ function choose(request, machines, pool = {}, { now = Date.now(), current = null
     const strategy = request.strategy || pool.strategy || 'automatic';
     if (!STRATEGIES.includes(strategy)) throw new TypeError('unknown compute strategy');
     const ram = Math.max(request.kind === 'desktop' ? 2048 : 300, Number(request.ram_mb) || 0);
+    const ceiling = Math.min(...[request.max_hourly, pool.max_hourly].filter(finite), Infinity);
     const rejected = [];
     const eligible = machines.filter((m) => {
         let why;
@@ -24,7 +25,7 @@ function choose(request, machines, pool = {}, { now = Date.now(), current = null
         else if (m.tier === 'home' && request.public_egress && m.egress !== 'ovh-tunnel') why = 'home egress is not protected';
         else if (!finite(m.hourly)) why = 'unknown hourly cost';
         else if (m.currency !== (pool.currency || 'USD')) why = 'different currency';
-        else if (finite(request.max_hourly ?? pool.max_hourly) && m.hourly > (request.max_hourly ?? pool.max_hourly)) why = 'over hourly ceiling';
+        else if (m.hourly > ceiling) why = 'over hourly ceiling';
         else if (strategy === 'automatic' && (m.queue_ms || 0) > (pool.target_wait_ms ?? 30000)) why = 'queue exceeds target';
         if (why) { rejected.push({ id: m.id, reason: why }); return false; }
         return true;

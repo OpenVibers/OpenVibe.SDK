@@ -23,6 +23,7 @@ assert.equal(scale({},[{...a,draining:true}],[],{now:700000}).actions[0].action,
 assert.equal(scale({},[{...a,draining:true,sessions:1}],[],{now:700000}).actions.length,0);
 assert.equal(scale({min_warm:1},[a],[],{now:700000}).actions.length,0);
 assert.equal(scale({min_warm:1},[{...a,state:'provisioning',health:'starting'}],[],{now:700000}).actions.length,0);
+assert.equal(choose({max_hourly:100},[machine('expensive','dedicated',10)],{max_hourly:1}).selected,null);
 assert.equal(micros('1.000001'),1000001n);
 assert.throws(()=>micros('NaN'));
 assert.throws(()=>micros('-1'));
