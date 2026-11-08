@@ -82,7 +82,14 @@ function createIdentityClient(client, { baseUrl } = {}) {
         return results;
     }
 
-    return { resolve, resolveBatch };
+    /** True only when the supplied email is verified for the supplied Network user subject. */
+    async function isEmailVerified({ subject, email } = {}) {
+        if (typeof subject !== 'string' || !subject || typeof email !== 'string' || !email) throw new TypeError('isEmailVerified: subject and email are required');
+        const result = await call({ method: 'POST', path: '/api/v1/identity/emails/verified-check', json: { subject, email }, idempotent: true });
+        return result?.verified === true;
+    }
+
+    return { resolve, resolveBatch, isEmailVerified };
 }
 
 module.exports = { createIdentityClient, createAccountEmailsClient };

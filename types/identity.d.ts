@@ -16,6 +16,7 @@ export type ResolveBatchInput = { subjectIds: string[] } | { system: string; typ
 export interface IdentityClient {
     resolve(input: ResolveInput): Promise<SubjectProjection | null>;
     resolveBatch(input: ResolveBatchInput): Promise<Record<string, SubjectProjection | null>>;
+    isEmailVerified(input: { subject: string; email: string }): Promise<boolean>;
 }
 export declare function createIdentityClient(client: OpenVibeClient, opts?: { baseUrl?: string }): IdentityClient;
 

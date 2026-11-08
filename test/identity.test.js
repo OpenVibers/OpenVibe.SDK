@@ -43,6 +43,19 @@ run([
         await srv.close();
     }],
 
+    ['verified email check asks Network for one subject and address only', async () => {
+        const srv = await stubServer((req, res, body) => {
+            assert.equal(req.method, 'POST');
+            assert.equal(req.url, '/api/v1/identity/emails/verified-check');
+            assert.deepEqual(JSON.parse(body.toString()), { subject: 'usr_01JAB2C3D4E5F6G7H8J9K0MNPQ', email: 'ana@example.test' });
+            send(res, 200, { verified: true });
+        });
+        const identity = createIdentityClient(createClient({ baseUrls: { network: srv.url }, token: 'svc' }));
+        assert.equal(await identity.isEmailVerified({ subject: 'usr_01JAB2C3D4E5F6G7H8J9K0MNPQ', email: 'ana@example.test' }), true);
+        await assert.rejects(identity.isEmailVerified({ email: 'ana@example.test' }), TypeError);
+        await srv.close();
+    }],
+
     ["account email helpers use the signed-in person's Network API", async () => {
         const srv = await stubServer((req, res) => send(res, 200, { ok: true, emails: [] }));
         const emails = createAccountEmailsClient({ networkUrl: srv.url, getToken: () => 'person-token' });
