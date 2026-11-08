@@ -527,6 +527,15 @@
     "actingHeaders": "function",
     "createCommunityClient": "function"
   },
+  "openvibe-sdk/compute": {
+    "STRATEGIES": "array",
+    "TIERS": "array",
+    "charge": "function",
+    "choose": "function",
+    "createProviders": "function",
+    "micros": "function",
+    "scale": "function"
+  },
   "openvibe-sdk/consent": {
     "DEFAULT_TIMEOUT_MS": "number",
     "DEFAULT_TTL_MS": "number",

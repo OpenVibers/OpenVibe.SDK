@@ -24,7 +24,7 @@ const files = fs.readdirSync(__dirname)
     .filter((f) => f.endsWith('.test.js'))
     .filter((f) => !filters.length || filters.some((w) => f.includes(w)))
     .sort();
-const TIMEOUT_MS = 120000;
+const TIMEOUT_MS = 240000; // PGlite test files may exceed two minutes on the shared worker.
 
 /** `<label>: skipped (<why>)` on a line of its own (SKIP_RE from openvibe-shared/test-runner). */
 const SKIP_RE = /^[ \t]*[\w .,'()/+#-]{1,120}: skipped \((.+)\)[ \t]*$/gm;
