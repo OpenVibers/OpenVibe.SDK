@@ -20,7 +20,7 @@ export interface Machine {
     os?: string;
     /** When the machine was last seen. */
     last_seen_at?: string;
-    /** The OpenVibe Node version the machine reports. */
+    /** The OpenVibe Link version the machine reports. */
     node_version?: string;
 }
 

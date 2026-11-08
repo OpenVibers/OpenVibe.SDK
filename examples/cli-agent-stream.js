@@ -5,7 +5,7 @@
  *
  *   OPENVIBE_TOKEN=… node examples/cli-agent-stream.js --title "Fix the login page" -- npm test
  *
- * The same path a Node desk uses: startAgentStream gives the stream and its publish ticket, every line the command
+ * The same path a Link desk uses: startAgentStream gives the stream and its publish ticket, every line the command
  * writes is a step, and the stream ends with the command's result. Private by default; pass --public to list it.
  */
 const { spawn } = require('node:child_process');

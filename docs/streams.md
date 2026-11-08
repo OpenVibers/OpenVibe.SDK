@@ -21,7 +21,7 @@ const { stream, publish } = await streams.startAgentStream({
 
 ## The desk's loop
 
-The desk (OpenVibe.Node) polls Live every ten seconds and keeps publishing while Live wants video:
+The desk (OpenVibe Link) polls Live every ten seconds and keeps publishing while Live wants video:
 
 ```js
 const s = await streams.state(stream.id, { ticket: publish.ticket });
@@ -65,7 +65,7 @@ await streams.end(stream.id);                          // the card stays, with t
 
 ## Who may call
 
-The person's own session token, or a first-party service token acting for that person: a Node principal acting for its
+The person's own session token, or a first-party service token acting for that person: a Link principal acting for its
 owner (Network issues the node token with `live.agent_stream.publish` for the audience `openvibe.live` and names its
 owner in `on_behalf_of`), Codes or Actor. Never a developer-app token, never another person's stream.
 

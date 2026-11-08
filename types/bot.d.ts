@@ -82,7 +82,7 @@ export interface PairInput {
     name?: string;
 }
 export interface MachineCommandInput { id?: string; kind: 'exec' | 'fs' | 'screen' | 'input' | 'browser' | 'probe' | 'desk' | 'ai'; value: Record<string, unknown>; ms?: number; }
-/** A machine's own models (OpenVibe.Node's ai plugin): what it offers and how fast its last model answered there. */
+/** A machine's own models (OpenVibe Link's ai plugin): what it offers and how fast its last model answered there. */
 export interface MachineAi { models: string[]; ready: boolean; max_tokens?: number; }
 export interface MachineAiSpeed { model: string; tokens_per_s: number; }
 export interface Machine {

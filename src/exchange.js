@@ -12,12 +12,12 @@
  *   // { id: 'chatcmpl-...', object: 'chat.completion', choices, usage, x_openvibe: { run_id, cost_usd, ... } }
  *   for await (const chunk of exchange.chat({ model: 'openvibe', messages, stream: true })) { ... }
  *
- * The seller side registers an offer in one of two forms. With `machineId`, it reports a Node machine's offer to the
+ * The seller side registers an offer in one of two forms. With `machineId`, it reports a Link machine's offer to the
  * Network's user-owned AI offers (POST /internal/ai/offers/report, the capability network.resource.report). With
  * `endpoint` and no machine, it registers a standalone OpenAI-compatible server on the Exchange's public seller API
  * (POST /api/v1/exchange/seller/offers) with the same developer key the buyer side uses; AI reaches that address only
  * through its egress guard (https, a public DNS answer, never an IP literal, a timeout, a response cap, no buyer
- * identity in a header) and verifies it exactly as a Node machine (canaries, fingerprint, spot re-runs, free tier only
+ * identity in a header) and verifies it exactly as a machine running Link (canaries, fingerprint, spot re-runs, free tier only
  * until verified, self-dealing earns 0).
  *
  *   const offer = await exchange.seller.offer({
@@ -378,7 +378,7 @@ function createExchangeClient({
         /**
          * Register a community offer: what is served, at what price, when, and how many answers at once.
          *
-         * With `machineId`, the offer is reported to the Network's user-owned AI offers - the registry OpenVibe.Node's
+         * With `machineId`, the offer is reported to the Network's user-owned AI offers - the registry OpenVibe Link's
          * "Offer to the network" uses - with the document that registry validates.
          *   offer({ model, price, hours, concurrency, endpoint, machineId, owner, audience, group, ready, health })
          *
