@@ -65,6 +65,10 @@ export interface ShareOptions {
      * A service that allows people locks must pass it; otherwise a removal answers 409 share.reseal_unavailable.
      */
     onReseal?(ref: ResourceRef, envelope: Uint8Array, tx: Tx): Promise<unknown>;
+    /** Resolve a fully received ciphertext upload, bound to this resource and authenticated viewer. Count actual bytes, not a client declaration. */
+    resolveReseal?(ref: ResourceRef, viewer: Viewer, reference: string): Promise<{ prefix: Uint8Array; byteLength: number }>;
+    /** Atomically attach that upload and consume its reference. Recheck owner, resource, expiry and revision through tx. Never external I/O. */
+    onResealReference?(ref: ResourceRef, reference: string, tx: Tx): Promise<unknown>;
     now?(): number;
     nameLimit?: number;
     nameWindowMs?: number;
@@ -80,7 +84,7 @@ export interface Shares {
     present(viewer: Viewer, ref: ResourceRef, share: Share): Promise<ShareView>;
     /** Exact @name → person (null when unknown, banned or deleted), on the same rate-limit budget as resolve(). */
     lookup(viewer: Viewer, name: string): Promise<PeopleLookup>;
-    update(viewer: Viewer, ref: ResourceRef, input: { audience?: Audience; members?: MemberInput[]; notify?: boolean; lock?: Lock; envelope?: string }, options?: { ifMatch?: string }): Promise<Share>;
+    update(viewer: Viewer, ref: ResourceRef, input: { audience?: Audience; members?: MemberInput[]; notify?: boolean; lock?: Lock; envelope?: string; envelope_ref?: string }, options?: { ifMatch?: string }): Promise<Share>;
     setAudience(viewer: Viewer, ref: ResourceRef, audience: Audience): Promise<Share>;
     addMembers(viewer: Viewer, ref: ResourceRef, members: Array<MemberInput | SubjectRef | string>): Promise<Share>;
     /** On a people-locked item, `envelope` is required: the content re-sealed for those who stay. */
@@ -102,7 +106,7 @@ export function migrateShares(db: Db): Promise<void>;
 export class ShareError extends Error { status: number; code: string; constructor(status: number, code: string, message: string) }
 export interface ShareResourceClient {
     get(): Promise<ShareResponse>;
-    update(input: { audience?: Audience; members?: MemberInput[]; notify?: boolean; lock?: Lock; envelope?: string }, options?: { ifMatch?: string }): Promise<ShareResponse>;
+    update(input: { audience?: Audience; members?: MemberInput[]; notify?: boolean; lock?: Lock; envelope?: string; envelope_ref?: string }, options?: { ifMatch?: string }): Promise<ShareResponse>;
     setAudience(audience: Audience): Promise<ShareResponse>;
     add(target: string | SubjectRef, options?: { role?: Role; expires_at?: string }): Promise<ShareResponse>;
     remove(subject: SubjectRef): Promise<ShareResponse>;

@@ -121,7 +121,7 @@ async function exportPersonKeys(person) {
     const signingPublic = publicJwk(person.signingPublic || await subtle().exportKey('jwk', person.signing.publicKey));
     const message = fingerprintMessage(ecdhPublic, signingPublic);
     const signature = person.fingerprintSignature
-        || new Uint8Array(await subtle().sign({ name: 'ECDSA', hash: 'SHA-256' }, person.signing.privateKey, message));
+        || new Uint8Array(await subtle().sign({ name: 'ECDSA', hash: 'SHA-256' }, (person.signing?.privateKey || person.signingPrivateKey), message));
     return {
         ecdh: ecdhPublic,
         signing: signingPublic,
@@ -134,8 +134,8 @@ async function exportPersonKeys(person) {
  * The private half of a person's keys, as it is stored: the two private keys as JWKs.
  */
 async function exportPrivateKeys(person) {
-    const ecdh = await subtle().exportKey('jwk', person.ecdh.privateKey);
-    const signing = await subtle().exportKey('jwk', person.signing.privateKey);
+    const ecdh = await subtle().exportKey('jwk', person.ecdh?.privateKey || person.ecdhPrivateKey);
+    const signing = await subtle().exportKey('jwk', person.signing?.privateKey || person.signingPrivateKey);
     return { ecdh, signing };
 }
 

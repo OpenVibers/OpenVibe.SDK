@@ -27,6 +27,9 @@ export interface EnvelopeInfo {
 /** Reads an envelope's header and checks its shape and its size. Nothing is decrypted. */
 export function inspectEnvelope(bytes: Uint8Array, options?: { maxHeaderBytes?: number }): EnvelopeInfo;
 
+/** Check a bounded header prefix against the actual complete stored ciphertext size. */
+export function inspectEnvelopePrefix(prefix: Uint8Array, totalBytes: number, options?: { maxHeaderBytes?: number }): EnvelopeInfo;
+
 /** The header's shape: what it says, and whether the slots match the lock it names. */
 export function checkHeader(header: unknown): string[];
 
