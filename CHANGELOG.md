@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.101.0 (2026-11-08)
 
 - Add bounded `locker/server.inspectEnvelopePrefix` validation against an actual stored ciphertext byte count.
 - Allow service-bound staged envelope receipts in share updates, with the existing recipient, nonce and atomic reseal checks.
