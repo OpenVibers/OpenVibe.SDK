@@ -2,7 +2,7 @@
 
 > Supported browser and server clients for the OpenVibe platform.
 
-**Status:** alpha, v0.101.0 (the five 1.0 core entries — `core`, `auth`, `events`, `db` and `media` — are frozen: their exported names change only with a major release; roadmap Wave 2; developer apps from Wave 20; Media objects v2 from Wave 4; the Tools platform API; Search, Chat, AI, Vision and consent clients; sign-in with recovery and a client health check). Every release is tagged (see [CHANGELOG.md](CHANGELOG.md)). Tested against local stub servers and the built-in mock platform only, never against the live platform. Services pin release tags; each repository's `STATUS.json` names the one it uses.
+**Status:** alpha, v0.102.0 (the five 1.0 core entries — `core`, `auth`, `events`, `db` and `media` — are frozen: their exported names change only with a major release; roadmap Wave 2; developer apps from Wave 20; Media objects v2 from Wave 4; the Tools platform API; Search, Chat, AI, Vision and consent clients; sign-in with recovery and a client health check). Every release is tagged (see [CHANGELOG.md](CHANGELOG.md)). Tested against local stub servers and the built-in mock platform only, never against the live platform. Services pin release tags; each repository's `STATUS.json` names the one it uses.
 **Plan:** OpenVibe End-to-End Realignment & Implementation Plan, revision 3 (20 Sep 2026), §3.2; roadmap §30.  
 **License:** MIT ([LICENSE](LICENSE)). This package is a library that apps outside the network embed, so it uses MIT. The OpenVibe services themselves stay AGPL-3.0.
 
@@ -11,7 +11,7 @@
 After v0.97.1 is tagged:
 
 ```bash
-npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.101.0
+npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.102.0
 ```
 
 It has no runtime dependencies. It needs Node ≥ 20, or any browser with `fetch`, Web Crypto and `TextDecoder`. There is no build step. The package is CommonJS with ESM entry points (`import` works). Each subpath has its own `.d.ts`. For a page with no bundler, `browser/openvibe-sdk.mjs` is one self-contained ES module of the browser-safe subpaths (see [Browser without a bundler](#browser-without-a-bundler)). It does not depend on `openvibe-contracts` at runtime: it copies the contract types it uses (from the temporary Contracts sharing branch, a devDependency the tests check them against).
@@ -167,6 +167,7 @@ Until OpenVibe.Tools serves the gateway facade (Tools S6), point the jobs client
 | `openvibe-sdk/auth` | server (browser build: PKCE only) | `createServiceTokenClient()` (+ `getTokenInfo()`), `createNetworkKeys()`, `verifyUserToken()`, `verifyAppToken()`, `verifyServiceToken()`, `exchangeCode()`, `refreshUserToken()`; `startAuthorization()`, `buildAuthorizeUrl()`, `createPkcePair()`, `readCallback()`, `decodeUnverified()`, `unverifiedClaims()` |
 | `openvibe-sdk/registry` | both | `createRegistryClient(client)`: `services({status})`, `service(id)`, `capabilities({owner})`, `capability(id)`, `namespaces()`, `contracts()`, `topics()`, `domain(host)`, `descriptor()` |
 | `openvibe-sdk/identity` | server | `createIdentityClient(client)`: `resolve({subjectId} \| {system,type,id})`, `resolveBatch({subjectIds} \| {system,type,ids})` |
+| `openvibe-sdk/trust` | both | `createTrustClient({networkUrl, getToken})`: `me()` reads the caller's own account or guest signals; `of(subject)` reads an account or guest with `identity.trust.read`; `isNew(signals, {hours})`, `atLeast(signals, band)`, `AGE_BANDS` |
 | `openvibe-sdk/notifications` | server | `createNotificationsClient(client)`: `push({subjectId \| userId, type, title, message, url, category, priority, …})` through Network (`network.notifications.push`); `{ sent, skipped }` or `{ sent: false, reason: 'unknown_subject' }`; attempted once, the caller retries |
 | `openvibe-sdk/modules` | both | `createModulesClient(client)`: `get`, `put(ns, data, {revision})`, `delete`, `list`, `update(ns, fn)`, `publicGet`; `forSubject.get/put/update` for services |
 | `openvibe-sdk/events` | server | `createEventsClient(client, {source})`: `publish`, `prepare`, `pull`, `iterate`, `get`, `get/setCheckpoint`, `subscriptions.create/list/get/disable/enable` (`subscribe`), `deliveries`, `replay`; `parseDelivery` (v1 and v2, `requireV2`), `verifyDeliveryV2`, `signDeliveryV2`, `signDeliveryHeaders`, `verifyDelivery`, `signDelivery`; developer apps: `createAppEvents(client, {projectId, appId, onBehalfOf?})` (same calls, scoped to `app.<project_key>.*`), `projectKey`, `appSource`; `createOutbox`, `createInbox`, `createPgOutbox`, `createPgInbox`; `createServiceOutbox({db, source, eventsUrl, clientId, clientSecret, eventTypes?, validate?})` (a service's outbox in one call: `emit`/`emitIn` inside the change's transaction, `moderationAction`, `start`/`stop`/`kick`/`status`) |

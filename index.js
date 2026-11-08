@@ -13,6 +13,7 @@ module.exports = {
     auth: require('./src/auth'),
     registry: require('./src/registry'),
     identity: require('./src/identity'),
+    trust: require('./src/trust'),
     modules: require('./src/modules'),
     events: require('./src/events'),
     realtime: require('./src/realtime'),
