@@ -117,3 +117,20 @@ await recipientItem.accept(offer.transfer.id);
 The client also has `get`, `update`, `remove(subject)`, `requestAccess`, `dismiss(requestId)`, `decline(id)`, `cancel(id)`, and service-level `sharedWithMe` and `people('@name')`. Member additions/removals read the ETag and send a conditional PUT, so they fail visibly on concurrent ACL changes. Network failures on mutations are not automatically retried. Read again to determine the result before retrying. Server CJS, ESM and TypeScript are exported from `openvibe-sdk/share`; the browser export is disabled.
 
 Run `node test/share.test.js` for the database and HTTP security suite. It covers all audience/role combinations, hidden 404s, expiration, audited staff access, exact-name resolution/rate limits, owner notification, all transfer answers, keep_access, forwarded offers, concurrency, hook rollback, immutable audit, durable retry, schemas and the agent client against a real local HTTP server.
+
+## Streamed file reseals
+
+A service that stores large ciphertext uploads can support `envelope_ref` on `update` instead of embedding an
+`envelope` in JSON. Existing callers are unchanged. Supply `resolveReseal(ref, viewer, reference)`, returning
+`{ prefix, byteLength }` from a **complete, validated upload bound to that resource and authenticated owner**.
+`prefix` contains the eight-byte envelope preamble and complete header (at most 65544 bytes); `byteLength` is
+the actual counted ciphertext size. Never resolve arbitrary URLs or trust a client-declared size.
+
+The store checks the header, exact expected size, lock kind, fresh nonce and the departing people's slots with
+the same checks as inline reseals. `onResealReference(ref, reference, tx)` then attaches that stored object and
+consumes its receipt in the ACL transaction. The hook must recheck ownership, expiry, resource revision and
+quota in that transaction. Failed ACL writes must leave the old content and ACL intact; abandoned uploads
+must expire. A service without these hooks refuses receipts. The same request cannot carry both forms.
+
+`openvibe-sdk/locker/server.inspectEnvelopePrefix(prefix, actualByteLength)` exposes the bounded header and
+size check for streaming storage adapters. It never authenticates ciphertext; only the client can do that.

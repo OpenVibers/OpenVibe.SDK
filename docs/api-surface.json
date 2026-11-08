@@ -766,6 +766,7 @@
   "openvibe-sdk/locker/server": {
     "checkHeader": "function",
     "inspectEnvelope": "function",
+    "inspectEnvelopePrefix": "function",
     "peopleSlotOk": "function"
   },
   "openvibe-sdk/locker/vectors": {
