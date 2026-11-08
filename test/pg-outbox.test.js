@@ -56,6 +56,17 @@ function cases(label, open) {
                 assert.equal(counts, 5, 'without countsCacheMs (and outside production) every call counts');
             } finally { await done(); }
         }],
+        [`${label}: the schema indexes the rejected rows rejected() counts`, async () => {
+            const { db, done } = await open();
+            try {
+                assert.match(outboxSchema('event_outbox'), /CREATE INDEX IF NOT EXISTS event_outbox_rejected ON event_outbox \(rejected_at\) WHERE rejected_at IS NOT NULL/);
+                await db.query(`INSERT INTO event_outbox (event_id, envelope, created_at, rejected_at) VALUES
+                    ('evt_rejected', '{}'::jsonb, 1, 2), ('evt_live', '{}'::jsonb, 1, NULL)`);
+                await db.query('SET enable_seqscan = off');
+                const plan = (await db.many('EXPLAIN SELECT count(*) FROM event_outbox WHERE rejected_at IS NOT NULL')).map((r) => Object.values(r)[0]).join('\n');
+                assert.match(plan, /event_outbox_rejected/, 'the rejected count is an index-only scan of the partial index');
+            } finally { await done(); }
+        }],
         [`${label}: a kick() from inside a transaction never hands the relay that transaction`, async () => {
             const { db, done } = await open();
             try {

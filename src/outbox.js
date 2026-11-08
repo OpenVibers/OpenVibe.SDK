@@ -68,7 +68,8 @@ function outboxSchema(table = 'event_outbox') {
     last_error      text
 );
 CREATE INDEX IF NOT EXISTS ${table}_due ON ${table} (next_attempt_at, id) WHERE sent_at IS NULL AND rejected_at IS NULL;
-CREATE INDEX IF NOT EXISTS ${table}_sent ON ${table} (sent_at) WHERE sent_at IS NOT NULL;`;
+CREATE INDEX IF NOT EXISTS ${table}_sent ON ${table} (sent_at) WHERE sent_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS ${table}_rejected ON ${table} (rejected_at) WHERE rejected_at IS NOT NULL;`;
 }
 
 /** The inbox table's DDL, for a service migration. */

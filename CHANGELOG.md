@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.99.0 (2026-11-08)
+
+- **`openvibe-sdk/events`: `outboxSchema()` indexes the rejected rows `rejected()` counts.** Every outbox made with the
+  helper now also gets `<table>_rejected` on `(rejected_at) WHERE rejected_at IS NOT NULL`. Before it, the count read
+  the whole outbox every time it was not cached (523 ms and 112 M buffers a day on Deals, 2026-11-08), because the
+  product had no index on `rejected_at`. A service that already has its outbox table must add the same statement in an
+  expand migration: the DDL is a migration helper, never run at boot, so `CREATE INDEX IF NOT EXISTS` in this helper
+  only reaches tables created after it.
+
 ## 0.98.1 (2026-11-07)
 
 - `ai.batches.cancel` says what cancelling does: only the prompts that never had a run are cancelled, and
