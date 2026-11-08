@@ -159,9 +159,9 @@ export function rewrap(envelope: Envelope | Uint8Array, options?: RewrapOptions)
 /** A person's two key pairs, made in the browser. */
 export function generatePersonKeys(): Promise<PersonKeys>;
 /** The public half of a person's keys, as it is published. */
-export function exportPersonKeys(person: PersonKeys): Promise<PublicKeys>;
+export function exportPersonKeys(person: PersonKeys | Awaited<ReturnType<typeof importPersonKeys>>): Promise<PublicKeys>;
 /** The private half of a person's keys, as it is stored. */
-export function exportPrivateKeys(person: PersonKeys): Promise<{ ecdh: Record<string, unknown>; signing: Record<string, unknown> }>;
+export function exportPrivateKeys(person: PersonKeys | Awaited<ReturnType<typeof importPersonKeys>>): Promise<{ ecdh: Record<string, unknown>; signing: Record<string, unknown> }>;
 /** A person's keys, ready to use. */
 export function importPersonKeys(data: { ecdh?: Record<string, unknown>; signing?: Record<string, unknown>; ecdhPrivateKey?: CryptoKey; signingPrivateKey?: CryptoKey }): Promise<{ ecdhPrivateKey: CryptoKey; signingPrivateKey: CryptoKey; ecdhPublic: PublicKeyJwk; signingPublic: PublicKeyJwk }>;
 /** Checks a published set of keys: the signature and the eight words. */

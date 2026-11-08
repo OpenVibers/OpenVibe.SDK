@@ -2,6 +2,6 @@
 import cjs from '../src/locker/server.js';
 
 export const {
-    inspectEnvelope, checkHeader, peopleSlotOk,
+    inspectEnvelope, inspectEnvelopePrefix, checkHeader, peopleSlotOk,
 } = cjs;
 export default cjs;

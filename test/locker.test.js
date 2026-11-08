@@ -107,6 +107,12 @@ run([
         const published = await locker.exportPersonKeys(alice);
         assert.equal(published.fingerprint, alice.fingerprint);
         assert.equal(await locker.verifyPersonKeys(published), true);
+        const privateBackup = await locker.exportPrivateKeys(alice);
+        const restored = await locker.importPersonKeys(privateBackup);
+        const restoredPublic = await locker.exportPersonKeys(restored);
+        assert.equal(restoredPublic.fingerprint, published.fingerprint, 'an unlocked backup can publish its own public keys');
+        assert.equal(await locker.verifyPersonKeys(restoredPublic), true);
+        assert.deepEqual(await locker.exportPrivateKeys(restored), privateBackup);
         // And the published keys are the contract.
         const checked = contracts.validate('locker.public-keys', {
             subject: { type: 'user', id: 'usr_01JAB2C3D4E5F6G7H8J9K0MNPQ' },

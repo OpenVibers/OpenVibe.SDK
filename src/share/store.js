@@ -1,7 +1,7 @@
 'use strict';
 const { randomUUID } = require('node:crypto');
 const { newEventId } = require('../core/ids');
-const { inspectEnvelope } = require('../locker/server');
+const { inspectEnvelope, inspectEnvelopePrefix } = require('../locker/server');
 const { jwkThumbprint } = require('../locker/keys');
 const v = require('./validation');
 const { migrateShares } = require('./schema');
@@ -21,7 +21,7 @@ const memberShape = row => ({ subject: row.subject, role: row.role, ...(row.expi
 const usableKey = jwk => !!jwk && jwk.kty === 'EC' && jwk.crv === 'P-256'
     && typeof jwk.x === 'string' && typeof jwk.y === 'string';
 
-function createShares({ db, network, events, notify, onOwnerChange, onAudienceChange, onReseal, now = Date.now, nameLimit = 30, nameWindowMs = 60000 } = {}) {
+function createShares({ db, network, events, notify, onOwnerChange, onAudienceChange, onReseal, resolveReseal, onResealReference, now = Date.now, nameLimit = 30, nameWindowMs = 60000 } = {}) {
     if (!db || !db.tx || !network || !network.json || !events || !events.publish || typeof notify !== 'function') {
         throw new TypeError('createShares requires db, network.json, events.publish and notify');
     }
@@ -193,11 +193,21 @@ function createShares({ db, network, events, notify, onOwnerChange, onAudienceCh
         if (!read.valid || read.lock !== 'people') v.fail(400, 'share.reseal_invalid', 'A re-seal is a valid people-locked envelope');
         return bytes;
     }
+    async function preparedEnvelope(ref, viewer, reference) {
+        if (typeof reference !== 'string' || !/^[A-Za-z0-9_-]{1,160}$/.test(reference)) v.invalid();
+        if (typeof resolveReseal !== 'function' || typeof onResealReference !== 'function') v.fail(409, 'share.reseal_unavailable', 'This service cannot attach a staged envelope');
+        // This hook is trusted service code. It binds a stored, complete upload to this resource and actor.
+        const stored = await resolveReseal(ref, viewer, reference);
+        if (!stored || !(stored.prefix instanceof Uint8Array) || stored.prefix.length > 65544) v.fail(400, 'share.reseal_invalid', 'The staged header is invalid');
+        const info = inspectEnvelopePrefix(stored.prefix, stored.byteLength);
+        if (!info.valid || info.lock !== 'people') v.fail(400, 'share.reseal_invalid', 'The staged upload is not a complete people-locked envelope');
+        return { prepared: true, reference, info, length: stored.byteLength };
+    }
     /** Stores a re-seal through the service's hook, inside the transaction and before the member goes. */
     async function reseal(t, ref, s, bytes, actor, gone) {
         if (s.lock !== 'people') v.fail(400, 'share.reseal_invalid', 'Only a people-locked item is re-sealed');
-        if (typeof onReseal !== 'function') v.fail(409, 'share.reseal_unavailable', 'This service cannot store a re-sealed envelope');
-        const read = inspectEnvelope(bytes);
+        if (bytes.prepared ? typeof onResealReference !== 'function' : typeof onReseal !== 'function') v.fail(409, 'share.reseal_unavailable', 'This service cannot store a re-sealed envelope');
+        const read = bytes.prepared ? bytes.info : inspectEnvelope(bytes);
         // Every seal writes a new nonce base, and a re-seal wraps a new content key. The nonce base the
         // envelope already stored is the one to beat: the same value is that envelope sent again, and the
         // member who is leaving could still open what is served next.
@@ -224,7 +234,8 @@ function createShares({ db, network, events, notify, onOwnerChange, onAudienceCh
             const left = slotKey(m.key_slot);
             if (left && recipients.has(left)) v.fail(400, 'share.reseal_invalid', 'The re-sealed envelope still holds the slot of the member who is leaving');
         }
-        await onReseal(ref, bytes, t);
+        if (bytes.prepared) await onResealReference(ref, bytes.reference, t);
+        else await onReseal(ref, bytes, t);
         await t.exec(`UPDATE shares SET reseal_nonce_base=$4 WHERE ${where}`, [...key(ref), read.header.nonce_base]);
         s.reseal_nonce_base = read.header.nonce_base;
         await log(t, ref, actor, 'lock.resealed', { removed: gone.map(m => m.subject), bytes: bytes.length });
@@ -314,7 +325,7 @@ function createShares({ db, network, events, notify, onOwnerChange, onAudienceCh
         });
     }
     async function update(viewer, input, body, { ifMatch } = {}) {
-        const ref = v.ref(input); v.object(body, ['audience', 'members', 'notify', 'lock', 'envelope']);
+        const ref = v.ref(input); v.object(body, ['audience', 'members', 'notify', 'lock', 'envelope', 'envelope_ref']);
         if (!Object.keys(body).length) v.invalid();
         if (body.audience !== undefined) v.audience(body.audience);
         if (body.notify !== undefined && typeof body.notify !== 'boolean') v.invalid();
@@ -325,7 +336,9 @@ function createShares({ db, network, events, notify, onOwnerChange, onAudienceCh
         if (body.lock !== undefined && body.lock !== lock) v.fail(409, 'share.lock_fixed', 'How an item is sealed is set when it is created');
         if (body.audience === 'public' && lock !== 'none') v.fail(400, 'share.lock_public', 'A locked item cannot be public');
         const list = body.members === undefined ? undefined : await inputs(viewer, body.members, lock);
-        const resealed = body.envelope === undefined ? null : sealed(body.envelope);
+        if (body.envelope !== undefined && body.envelope_ref !== undefined) v.invalid();
+        const resealed = body.envelope_ref !== undefined ? await preparedEnvelope(ref, viewer, body.envelope_ref)
+            : body.envelope === undefined ? null : sealed(body.envelope);
         const notify = body.notify !== false;
         return mutate(viewer, ref, async (t, ref, s, actor, staff) => {
             if (ifMatch !== undefined && ifMatch !== `"${s.revision}"`) v.fail(412, 'share.changed', 'Sharing changed; reload and try again');

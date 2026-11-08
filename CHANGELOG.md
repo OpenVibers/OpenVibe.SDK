@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.101.0 (2026-11-08)
+
+- Add bounded `locker/server.inspectEnvelopePrefix` validation against an actual stored ciphertext byte count.
+- Allow service-bound staged envelope receipts in share updates, with the existing recipient, nonce and atomic reseal checks.
+- Allow Locker public/private key export after `importPersonKeys`, so a recovered locker can upload and share using the same WebCrypto operations.
+
 ## 0.100.0 (2026-11-08)
 
 - Add `openvibe-sdk/compute`: shared compute strategies, hard placement constraints, RAM-aware pool scaling, exact billing arithmetic and provider quote/lifecycle adapters. See `docs/compute.md` for gates and unsupported purchase paths.

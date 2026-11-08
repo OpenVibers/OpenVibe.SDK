@@ -108,7 +108,7 @@ function checkHeader(header) {
  * Reads an envelope's header and checks its shape and its size. Nothing is decrypted and no key
  * is needed: this is what a service runs on bytes it may never be able to read.
  */
-function inspectEnvelope(bytes, { maxHeaderBytes = MAX_HEADER_BYTES } = {}) {
+function inspectBytes(bytes, { maxHeaderBytes = MAX_HEADER_BYTES } = {}, totalBytes = bytes && bytes.length) {
     const errors = [];
     const data = bytes instanceof Uint8Array ? bytes : null;
     if (!data) return { valid: false, errors: ['the envelope is not bytes'], header: null };
@@ -126,7 +126,8 @@ function inspectEnvelope(bytes, { maxHeaderBytes = MAX_HEADER_BYTES } = {}) {
     let header = null;
     try { header = JSON.parse(fromUtf8(data.subarray(8, 8 + headerLength))); }
     catch { return { valid: false, errors: ['the envelope header is not JSON'], header: null }; }
-    errors.push(...checkHeader(header));
+    if (!header || typeof header !== 'object' || Array.isArray(header)) return { valid: false, errors: ['the header is not an object'], header: null };
+    try { errors.push(...checkHeader(header)); } catch { errors.push('the slots are not an object'); }
     const chunkOffset = 8 + headerLength;
     let expectedBytes = null;
     if (Number.isInteger(header.padded_size) && header.padded_size >= MIN_PADDED_SIZE
@@ -138,7 +139,7 @@ function inspectEnvelope(bytes, { maxHeaderBytes = MAX_HEADER_BYTES } = {}) {
         const whole = (chunks - 1) * (frame + CHUNK_SIZE + TAG_SIZE);
         const last = frame + lastChunkSize(header.padded_size) + TAG_SIZE;
         expectedBytes = chunkOffset + whole + last;
-        if (data.length < expectedBytes) errors.push('the envelope is shorter than its own header says');
+        if (totalBytes < expectedBytes) errors.push('the envelope is shorter than its own header says');
     }
     return {
         valid: errors.length === 0,
@@ -153,4 +154,19 @@ function inspectEnvelope(bytes, { maxHeaderBytes = MAX_HEADER_BYTES } = {}) {
     };
 }
 
-module.exports = { inspectEnvelope, checkHeader, peopleSlotOk };
+function inspectEnvelope(bytes, options) { return inspectBytes(bytes, options); }
+
+/** A streamed upload: inspect just its bounded header against the ACTUAL stored byte count.
+ * The caller must have counted and bounded the complete ciphertext first, not trust Content-Length.
+ * No chunks are read or authenticated here; as with inspectEnvelope, only a client can do that.
+ */
+function inspectEnvelopePrefix(prefix, totalBytes, options) {
+    const info = inspectBytes(prefix, options, totalBytes);
+    if (!Number.isSafeInteger(totalBytes) || !Number.isSafeInteger(info.expectedBytes) || totalBytes !== info.expectedBytes) {
+        info.errors.push('the stored byte count does not match the envelope');
+    }
+    if (info.header && !Number.isSafeInteger(info.header.padded_size)) info.errors.push('the padded size is not a safe integer');
+    info.valid = info.errors.length === 0;
+    return info;
+}
+module.exports = { inspectEnvelope, inspectEnvelopePrefix, checkHeader, peopleSlotOk };
