@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.103.0 (2026-11-08)
+
+- Add `openvibe-sdk/credentials`: `createCredentialsClient` for a person's own provider credentials on OpenVibe.AI:
+  `list()` (metadata only: kind, provider, label, created, last used, expired), `add()` for an API key or a browser
+  session cookie, `remove()`, and `balance()` (that credential's fixed read-only balance readers: Anthropic Console
+  prepaid credits and current spend, OpenAI credit grants). A secret never comes back from any call.
+
 ## 0.102.0 (2026-11-08)
 
 - Add `openvibe-sdk/trust`: `createTrustClient({ networkUrl, getToken })` with `.me()` (the caller's own signals, a

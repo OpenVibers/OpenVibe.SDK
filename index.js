@@ -29,6 +29,7 @@ module.exports = {
     chat: require('./src/chat'),
     chatApps: require('./src/chat-apps'),
     ai: require('./src/ai'),
+    credentials: require('./src/credentials'),
     jobs: require('./src/jobs'),
     tools: require('./src/tools'),
     projects: require('./src/projects'),

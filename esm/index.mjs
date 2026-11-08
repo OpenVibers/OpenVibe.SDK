@@ -8,11 +8,11 @@ export const {
     locker, auth, registry, identity, trust, modules,
     events, realtime, media, community, bot, search,
     bench, meme, vision, themes, redact, chat,
-    chatApps, ai, jobs, tools, projects, resources,
-    vip, quest, live, inventory, tips, blog,
-    reviews, wiki, coupons, deals, trade, space,
-    host, news, food, actor, run, video,
-    work, zone, play, download, openre, geo,
-    usage, commerce, telemetry,
+    chatApps, ai, credentials, jobs, tools, projects,
+    resources, vip, quest, live, inventory, tips,
+    blog, reviews, wiki, coupons, deals, trade,
+    space, host, news, food, actor, run,
+    video, work, zone, play, download, openre,
+    geo, usage, commerce, telemetry,
 } = cjs;
 export default cjs;

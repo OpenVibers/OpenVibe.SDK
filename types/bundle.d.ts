@@ -14,6 +14,7 @@ import * as themes from './themes';
 import * as redact from './redact';
 import * as chat from './chat';
 import * as ai from './ai';
+import * as credentials from './credentials';
 import * as jobs from './jobs';
 import * as tools from './tools';
 import * as projects from './projects';
@@ -38,6 +39,7 @@ export * as themes from './themes';
 export * as redact from './redact';
 export * as chat from './chat';
 export * as ai from './ai';
+export * as credentials from './credentials';
 export * as jobs from './jobs';
 export * as tools from './tools';
 export * as projects from './projects';
@@ -47,6 +49,6 @@ export * as trust from './trust';
 
 declare const sdk: typeof core & {
     auth: typeof auth; registry: typeof registry; modules: typeof modules; realtime: typeof realtime;
-    media: typeof media; community: typeof community; bot: typeof bot; search: typeof search; bench: typeof bench; meme: typeof meme; vision: typeof vision; themes: typeof themes; redact: typeof redact; chat: typeof chat; ai: typeof ai; jobs: typeof jobs; tools: typeof tools; projects: typeof projects; geo: typeof geo; locker: typeof locker; trust: typeof trust;
+    media: typeof media; community: typeof community; bot: typeof bot; search: typeof search; bench: typeof bench; meme: typeof meme; vision: typeof vision; themes: typeof themes; redact: typeof redact; chat: typeof chat; ai: typeof ai; credentials: typeof credentials; jobs: typeof jobs; tools: typeof tools; projects: typeof projects; geo: typeof geo; locker: typeof locker; trust: typeof trust;
 };
 export default sdk;
