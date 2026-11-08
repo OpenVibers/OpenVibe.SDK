@@ -2,7 +2,7 @@
 
 OpenVibe.Exchange, the buyer and the seller side of the model exchange (the plan of 2026-11-06, "For builders",
 item 7). The buyer side speaks the Exchange's v1 API with a Network developer key; the seller side registers an
-offer in the Network's user-owned AI offers, the same registry OpenVibe.Node's "Offer to the network" uses.
+offer in the Network's user-owned AI offers, the same registry OpenVibe Link's "Offer to the network" uses.
 
 ```js
 const { createExchangeClient } = require('openvibe-sdk/exchange');
@@ -59,8 +59,8 @@ adult gate. A request names one as `model: '@preset/<name>'`.
 
 ## The seller side
 
-An offer has two forms. A **Node machine** reports its offer to the Network's user-owned AI offers — the same registry
-OpenVibe.Node's "Offer to the network" writes to (`POST /internal/ai/offers/report`, the capability
+An offer has two forms. A **Link machine** reports its offer to the Network's user-owned AI offers — the same registry
+OpenVibe Link's "Offer to the network" writes to (`POST /internal/ai/offers/report`, the capability
 `network.resource.report`). A **standalone server** registers itself on the Exchange's public seller API with the
 developer key, so it needs no Node at all. The SDK validates both before anything is sent.
 
@@ -88,7 +88,7 @@ the OpenAI API is caught before the offer is registered (`probe: false` turns th
 
 ### A standalone server: the endpoint form
 
-A server that speaks the OpenAI Chat Completions API can sell without an OpenVibe Node. Give `endpoint` and no
+A server that speaks the OpenAI Chat Completions API can sell without an OpenVibe Link. Give `endpoint` and no
 `machineId`; the offer is registered on the Exchange's public seller API
 (`POST /api/v1/exchange/seller/offers`) with the same developer key as the buyer side.
 
@@ -113,7 +113,7 @@ The owner is the person the developer key acts for (a developer app's project ow
 the address only through its egress guard: https, a public DNS answer checked inside the connection (never an IP
 literal), redirects judged again, a timeout, a response byte cap, and no buyer identity in any header. No bearer token
 is sent, so the endpoint must accept the POST as it is (`endpointKey` only authenticates the SDK's own probe). The
-endpoint is verified exactly as a Node machine (the canaries, the model fingerprint, about 1% spot re-runs), serves the
+endpoint is verified exactly as a machine running Link (the canaries, the model fingerprint, about 1% spot re-runs), serves the
 free tier only until verified, and earns 0 on the owner's own requests. An answer from it is labelled a community
 endpoint on the receipt (`provider: community-endpoint:<id>`, `provider_access: COMMUNITY_ENDPOINT`). It sees the
 prompt: only requests that opt in to community capacity reach it.

@@ -3,7 +3,7 @@
  * openvibe-sdk/streams — the Agent Streams plan (S1): an agent's own stream on OpenVibe.Live.
  *
  * An agent stream is a Live stream of kind 'agent' (id ags_…): it has no stream key and takes no slot, and it is
- * published with a ticket (wpt_…) instead of one. The desk (OpenVibe.Node) or a person's browser (a Codes task page)
+ * published with a ticket (wpt_…) instead of one. The desk (OpenVibe Link) or a person's browser (a Codes task page)
  * creates it, keeps the ticket and publishes through it; the owner watches the stream on the page Live answers with.
  *
  *   const streams = createStreamsClient(createClient({ tokenProvider }));

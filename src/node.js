@@ -1,6 +1,6 @@
 'use strict';
 /**
- * openvibe-sdk/node — platform.node-capabilities@1, plus nodeOffers() that maps a Node descriptor to a
+ * openvibe-sdk/node — platform.node-capabilities@1, plus nodeOffers() that maps a node descriptor to a
  * platform.resource-offer@1 (kind "node") and a platform.runtime-offer@1.
  * Pure construction and validation, no I/O and no dependency at require time.
  *
@@ -32,7 +32,7 @@ function nodeCapabilities(fields) {
 }
 
 /**
- * Map a Node descriptor (platform.node-capabilities@1) to two offers:
+ * Map a node descriptor (platform.node-capabilities@1) to two offers:
  *  - resource: a platform.resource-offer@1 with kind "node", capabilities including every advertised
  *    worker capability prefixed "worker:<name>", trust from opts.trust or "first-party";
  *  - runtime: a platform.runtime-offer@1 with kind "container" (the default runtime a node offers),

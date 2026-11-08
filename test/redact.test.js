@@ -1,7 +1,7 @@
 'use strict';
 /**
- * openvibe-sdk/redact: the shared corpus of secret shapes (Memory M2). It is the same file OpenVibe.Node copies into
- * its internal/memory/testdata, so the Node's Go scrubber and this port cannot drift: every case says what must be
+ * openvibe-sdk/redact: the shared corpus of secret shapes (Memory M2). It is the same file OpenVibe Link copies into
+ * its internal/memory/testdata, so Link's Go scrubber and this port cannot drift: every case says what must be
  * gone and what must stay.
  */
 const assert = require('node:assert/strict');

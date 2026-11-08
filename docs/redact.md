@@ -1,7 +1,7 @@
 # openvibe-sdk/redact
 
-The shared secret scrubber for memory (Memory M2). It is the JavaScript port of OpenVibe.Node's
-`internal/memory/redact.go` (Node #87), so the Node and OpenVibe.AI run one shape list against one corpus.
+The shared secret scrubber for memory (Memory M2). It is the JavaScript port of OpenVibe Link's
+`internal/memory/redact.go` (Node #87), so Link and OpenVibe.AI run one shape list against one corpus.
 
 ```js
 const { redact, onlySecret } = require('openvibe-sdk/redact');
@@ -32,13 +32,13 @@ A text that was already redacted is left alone. The count is the number of secre
 
 ## Why the whole-text pass exists
 
-The Node scrubs a whole file with a sentinel before it splits the file into items, then scrubs each item. A key block
+Link scrubs a whole file with a sentinel before it splits the file into items, then scrubs each item. A key block
 or an `.env` block that spans two items is only seen whole. `redact()` runs the same two passes on one string: the
 sentinel keeps the place of each secret until the text is resolved to `[redacted]`. This is also why AI runs the
-scrubber again before sealing an item: the Node is not the only writer.
+scrubber again before sealing an item: Link is not the only writer.
 
 ## Corpus
 
 `test/redact-corpus.json` is the shared list: every shape, the split and unterminated key blocks, the `.env` block and
-the harmless texts that must not change. `test/redact.test.js` runs it here; OpenVibe.Node copies the file into
+the harmless texts that must not change. `test/redact.test.js` runs it here; OpenVibe Link copies the file into
 `internal/memory/testdata/` and runs the same cases against its Go `Redact`.

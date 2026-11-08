@@ -353,7 +353,7 @@ export type ExchangeClient = {
     /** The receipt of one answered request. */
     receipt(id: string, opts?: { signal?: AbortSignal }): Promise<ExchangeReceipt>;
     seller: {
-        /** Register a Node machine's offer in the Network's user-owned AI offers, or an endpoint with the Exchange. */
+        /** Register a Link machine's offer in the Network's user-owned AI offers, or an endpoint with the Exchange. */
         offer(input: ExchangeOfferInput, opts?: { signal?: AbortSignal }): Promise<ExchangeOfferResult>;
         offer(input: ExchangeEndpointOfferInput, opts?: { signal?: AbortSignal }): Promise<ExchangeEndpointOfferResult>;
         /** The caller's own endpoint offers, with their verification. */

@@ -2663,7 +2663,7 @@ function subscribe(topics, onEvent, opts = {}) {
  *   for await (const { event, data, id } of parseSSE(res.body)) { … }
  *
  * `body` is a ReadableStream<Uint8Array> (fetch), or any async iterable of Uint8Array/string chunks
- * (a Node stream). `event` defaults to 'message'; `id` is the id field of that event (undefined when
+ * (a Link stream). `event` defaults to 'message'; `id` is the id field of that event (undefined when
  * it had none); comments are skipped; `retry: <ms>` is passed to onRetry. A line split across chunks,
  * including a \r\n pair, is reassembled. Breaking out of the loop releases the stream.
  */
@@ -3300,13 +3300,13 @@ function (module, exports) {
  * and the call is never retried (a code is one-time, so a lost answer cannot be safely repeated).
  * Every other POST carries an Idempotency-Key (the client generates one when retries are on).
  *
- * Machines (the OpenVibe Node's computer plugin): `machines.list`, `machines.computer`, `machines.command` (bot.command@1's
+ * Machines (the OpenVibe Link's computer plugin): `machines.list`, `machines.computer`, `machines.command` (bot.command@1's
  * computer kinds) and `machines.deskTurn`; `machines.desk(id, { name?, kind?, profile? })` is a desk of your own on a
  * machine (the Desks plan: its own screen or browser, files and sign-ins), with start/stop/status and browser, screen,
  * input and exec on it. A desk command that the machine does not do throws an OpenVibeError with code `bot.desk_nack`
  * (the machine's own fault code is `fault`), so a desk reads as plain awaits.
  *
- * A machine's own models (AI on your own machines, contracts 0.219.0, OpenVibe.Node v0.27.0's ai plugin):
+ * A machine's own models (AI on your own machines, contracts 0.219.0, OpenVibe Link v0.27.0's ai plugin):
  * `machines.chat(id, { model, messages, max_tokens?, temperature? })` asks one of them for one reply (kind ai) and answers
  * `{ model, message: { role, content }, usage?, ms? }`; a machine that does not answer throws `bot.ai_nack`.
  * `machines.aiModels(id, on)` is the owner's "Let my AI use this computer's models".
@@ -3401,7 +3401,7 @@ function createBotClient(client, defaults = {}) {
         },
     };
 
-    // ── Machines (the OpenVibe Node's computer plugin) and desks of your own on them ──
+    // ── Machines (the OpenVibe Link's computer plugin) and desks of your own on them ──
     const machines = {
         /** { machines } — the person's machines with their computer capabilities (a service sees the ones opened to it). */
         list: (o = {}) => call({ path: '/api/v1/machines' }, o),
@@ -4097,13 +4097,13 @@ module.exports = { createThemesClient, followTheme, readTheme, applyTheme, seaso
 function (module, exports) {
 'use strict';
 /**
- * openvibe-sdk/redact: the shared secret scrubber (Memory M2). It is the JavaScript port of OpenVibe.Node's
- * internal/memory/redact.go (Node #87), so the Node and OpenVibe.AI run one list of shapes against one corpus
- * (test/redact-corpus.json). The Node scrubs a memory file before it uploads it; AI scrubs every item again before it
+ * openvibe-sdk/redact: the shared secret scrubber (Memory M2). It is the JavaScript port of OpenVibe Link's
+ * internal/memory/redact.go (Node #87), so Link and OpenVibe.AI run one list of shapes against one corpus
+ * (test/redact-corpus.json). Link scrubs a memory file before it uploads it; AI scrubs every item again before it
  * seals it, and refuses an item that was nothing but a secret.
  *
  * - redact(text) -> { text, count }: every secret shape is replaced with [redacted], and the count says how many were
- *   removed. The whole-text pass uses an internal sentinel first, the way the Node scrubs a file before it splits it
+ *   removed. The whole-text pass uses an internal sentinel first, the way Link scrubs a file before it splits it
  *   into items; the sentinel is resolved to [redacted] before the result is returned. A text that is already redacted
  *   is left alone.
  * - onlySecret(text): true when nothing but redacted secrets is left ("the item was only a secret").
@@ -4315,7 +4315,7 @@ function redactWith(text, marker) {
 
 /**
  * The whole-text pass with the sentinel, then the per-item pass. A secret that spans two items (a key block in a
- * fence, an .env block) is only seen whole, which is why the Node scrubs a file before it splits it. The sentinel is
+ * fence, an .env block) is only seen whole, which is why Link scrubs a file before it splits it. The sentinel is
  * resolved to [redacted] before the per-item pass, which catches anything only visible once the text is on its own.
  */
 function redactDocument(text) {

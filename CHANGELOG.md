@@ -87,19 +87,19 @@
   idempotent per source and task ref) and `read()` gets one the caller may see. The Report service redacts every text
   field; the client never sends a raw transcript.
 - Add `examples/cli-agent-stream.js`: about 40 lines that start a stream, spawn any CLI command, post its steps and end
-  the stream with the command's result, using the same ticket path a Node desk uses.
+  the stream with the command's result, using the same ticket path a Link desk uses.
 
 ## 0.93.0 (2026-11-06)
 
 - `openvibe-sdk/exchange`: the seller side gains the **endpoint form**, so any OpenAI-compatible server can sell, not
-  only an OpenVibe Node machine. `seller.offer({ endpoint, models, price, hours, concurrency, audience, name })` — with
+  only an OpenVibe Link machine. `seller.offer({ endpoint, models, price, hours, concurrency, audience, name })` — with
   no `machineId` — registers the server on OpenVibe.Exchange's public seller API
   (`POST /api/v1/exchange/seller/offers`) with the same developer key the buyer side uses. The owner is the person the
   key acts for (a developer app's project owner), never a body field, and the SDK refuses an endpoint that is not https
   before anything is sent.
   - The platform reaches that address only through its egress guard (https, a public DNS answer checked inside the
     connection, never an IP literal, redirects judged again, a timeout and a response byte cap, no buyer identity in a
-    header) and verifies it exactly as a Node machine (canaries, the model fingerprint, about 1% spot re-runs, the free
+    header) and verifies it exactly as a machine running Link (canaries, the model fingerprint, about 1% spot re-runs, the free
     tier until verified, self-dealing earns 0). Its answers are labelled `community-endpoint:<id>` on the receipt.
   - `seller.endpointOffers()` lists the caller's endpoint offers with their verification;
     `seller.removeEndpointOffer(id)` removes one. `machineId` still selects the Network registry form.
@@ -133,7 +133,7 @@
   - `state(id, { ticket })` is what the desk polls every ten seconds: `{ viewers, encode, curtain, ends_at }`. While `encode` is false the desk stops encoding and sends a snapshot every five seconds with `postFrame(id, bytes, { ticket, contentType })` (JPEG or WebP, at most 200 KB).
   - `setCurtain(id, up, reason)` raises the desk's privacy screen (while it is up Live pauses every viewer's consumer, so a viewer sees "Private screen" and never why), `setVisibility(id, v)` switches who may watch, `end(id)` ends the stream (the card stays, with the last frame and the VOD) and `viewTicket(id)` mints the player's view ticket (ten minutes).
   - The publish ticket is a bearer of its own: on the desk's routes (`state`, `postFrame`) the desk sends the ticket, never the person's token. Every body is checked in the module before it leaves, and a bad id, visibility, curtain reason or an oversized frame is refused with a TypeError.
-  - The capability behind it is `live.agent_stream.publish` for the audience `openvibe.live` (Contracts 0.298.0): a Node principal acting for its owner, Codes or Actor. Never a developer-app token, never another person's stream.
+  - The capability behind it is `live.agent_stream.publish` for the audience `openvibe.live` (Contracts 0.298.0): a Link principal acting for its owner, Codes or Actor. Never a developer-app token, never another person's stream.
 
 ## 0.90.0 (2026-11-06)
 
@@ -154,7 +154,7 @@
 
 - Add `openvibe-sdk/exchange`: OpenVibe.Exchange, the buyer and the seller side of the model exchange (the plan of 2026-11-06, "For builders", item 7).
   - The buyer side speaks the Exchange’s v1 API with a Network developer key: `chat()` (streaming and not, the OpenAI shape), `models()`, `offers(model)`, `catalog()`, `presets()` (list, create, update, delete), `usage()` and `receipt(id)`. Every call takes an `AbortSignal`, and a 429 or a 5xx is retried with a jittered backoff: a safe method always, a write only when it is idempotent, so a completion is never run twice.
-  - The seller side registers an offer in the Network’s user-owned AI offers — the same registry OpenVibe.Node’s "Offer to the network" writes to (`POST /internal/ai/offers/report`, the capability `network.resource.report`), so any server that speaks the OpenAI API can be a provider and not only a Node. The SDK sends the document that registry validates, field for field, and refuses an offer the registry would refuse before anything is sent; `earnings()` and `verification()` read the seller dashboard (the tokens served, the credits earned, the canaries, the spot re-runs, the reputation, the uptime).
+  - The seller side registers an offer in the Network’s user-owned AI offers — the same registry OpenVibe Link’s "Offer to the network" writes to (`POST /internal/ai/offers/report`, the capability `network.resource.report`), so any server that speaks the OpenAI API can be a provider and not only a Node. The SDK sends the document that registry validates, field for field, and refuses an offer the registry would refuse before anything is sent; `earnings()` and `verification()` read the seller dashboard (the tokens served, the credits earned, the canaries, the spot re-runs, the reputation, the uptime).
   - The webhooks (usage, earnings, an offer going down) carry `X-OpenVibe-Signature-V2`; `webhooks.verify` checks the raw body in constant time and refuses a timestamp more than 300 s either way.
 
 ## 0.88.0 (2026-11-06)
@@ -377,8 +377,8 @@
     of the step.
   - **Streaming machines.** A step that asks for a GPU or 2 or more cores excludes an offer whose
     `health.streaming` is `true`, with the reason "it is streaming". The field is not in
-    `platform.resource-offer@1` yet (Node reports `screen.state` in its own status, Bot's offer does not carry it),
-    so this release fixes the name the Node can start sending; a top-level `offer.streaming` is tolerated too.
+    `platform.resource-offer@1` yet (Link reports `screen.state` in its own status, Bot's offer does not carry it),
+    so this release fixes the name Link can start sending; a top-level `offer.streaming` is tolerated too.
   - README and [docs/placement.md](docs/placement.md): the API, the rules, the estimate, escalation and the line
     templates.
 
@@ -387,8 +387,8 @@ release may change an API and says so here.
 
 ## 0.75.0 (2026-10-30)
 
-- **`openvibe-sdk/redact`: one secret scrubber for the Node and AI (Memory M2).**
-  - `redact(text)` → `{ text, count }` ports OpenVibe.Node's `internal/memory/redact.go` (Node #87): the same shapes,
+- **`openvibe-sdk/redact`: one secret scrubber for Link and AI (Memory M2).**
+  - `redact(text)` → `{ text, count }` ports OpenVibe Link's `internal/memory/redact.go` (Node #87): the same shapes,
     the whole-text pass with a sentinel before the per-item pass, the unterminated private key block, Luhn card
     numbers, and the deliberately wide environment-assignment rule. `onlySecret(text)` says an item was nothing but a
     secret, so AI refuses it.
@@ -481,13 +481,13 @@ release may change an API and says so here.
 
 ## 0.67.0 (2026-10-27)
 
-- **`openvibe-sdk/bot`: a machine's own models** (AI on your own machines; OpenVibe.Node v0.27.0's ai plugin).
+- **`openvibe-sdk/bot`: a machine's own models** (AI on your own machines; OpenVibe Link v0.27.0's ai plugin).
   - `bot.machines.chat(id, { model, messages, max_tokens?, temperature? })` asks one of them for one reply (bot.command@1
     kind `ai`) and answers `{ model, message, usage?, ms? }`. A machine that does not answer throws an `OpenVibeError`
     with code `bot.ai_nack`.
   - `bot.machines.aiModels(id, on)` is the owner's "Let my AI use this computer's models".
 - Types: `Machine` for `machines.list()`, with `computer.ai` (the models and whether a server answers) and
-  `computer.ai_speed` (how fast the last model answered there, Node v0.29.0); `MachineChatInput` and `MachineChatResult`;
+  `computer.ai_speed` (how fast the last model answered there, Link v0.29.0); `MachineChatInput` and `MachineChatResult`;
   `MachineCommandInput.kind` takes `ai`.
 
 ## 0.66.0 (2026-10-27)
@@ -495,7 +495,7 @@ release may change an API and says so here.
 - **`openvibe-sdk/bot`: machines and desks** (the Desks plan; the roadmap's SDK section). `bot.machines.list()`,
   `.computer(id)`, `.command(id, { kind, value })` (bot.command@1's computer kinds) and `.deskTurn(id, desk)`.
 - **`bot.machines.desk(id, { name?, kind?, profile? })`** is a desk of your own on a machine: a browser alone or a whole
-  screen, with its own files and sign-ins (OpenVibe.Node v0.19.0 to v0.26.0).
+  screen, with its own files and sign-ins (OpenVibe Link v0.19.0 to v0.26.0).
   - `start`, `stop` and `status`.
   - `browser`, `screen`, `input` and `exec` on that desk only, never on the person's own screen. `exec` takes
     `detach` for an app that keeps running until the desk stops.

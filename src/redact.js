@@ -1,12 +1,12 @@
 'use strict';
 /**
- * openvibe-sdk/redact: the shared secret scrubber (Memory M2). It is the JavaScript port of OpenVibe.Node's
- * internal/memory/redact.go (Node #87), so the Node and OpenVibe.AI run one list of shapes against one corpus
- * (test/redact-corpus.json). The Node scrubs a memory file before it uploads it; AI scrubs every item again before it
+ * openvibe-sdk/redact: the shared secret scrubber (Memory M2). It is the JavaScript port of OpenVibe Link's
+ * internal/memory/redact.go (Node #87), so Link and OpenVibe.AI run one list of shapes against one corpus
+ * (test/redact-corpus.json). Link scrubs a memory file before it uploads it; AI scrubs every item again before it
  * seals it, and refuses an item that was nothing but a secret.
  *
  * - redact(text) -> { text, count }: every secret shape is replaced with [redacted], and the count says how many were
- *   removed. The whole-text pass uses an internal sentinel first, the way the Node scrubs a file before it splits it
+ *   removed. The whole-text pass uses an internal sentinel first, the way Link scrubs a file before it splits it
  *   into items; the sentinel is resolved to [redacted] before the result is returned. A text that is already redacted
  *   is left alone.
  * - onlySecret(text): true when nothing but redacted secrets is left ("the item was only a secret").
@@ -218,7 +218,7 @@ function redactWith(text, marker) {
 
 /**
  * The whole-text pass with the sentinel, then the per-item pass. A secret that spans two items (a key block in a
- * fence, an .env block) is only seen whole, which is why the Node scrubs a file before it splits it. The sentinel is
+ * fence, an .env block) is only seen whole, which is why Link scrubs a file before it splits it. The sentinel is
  * resolved to [redacted] before the per-item pass, which catches anything only visible once the text is on its own.
  */
 function redactDocument(text) {

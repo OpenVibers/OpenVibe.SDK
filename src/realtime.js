@@ -183,7 +183,7 @@ function subscribe(topics, onEvent, opts = {}) {
  *   for await (const { event, data, id } of parseSSE(res.body)) { … }
  *
  * `body` is a ReadableStream<Uint8Array> (fetch), or any async iterable of Uint8Array/string chunks
- * (a Node stream). `event` defaults to 'message'; `id` is the id field of that event (undefined when
+ * (a Link stream). `event` defaults to 'message'; `id` is the id field of that event (undefined when
  * it had none); comments are skipped; `retry: <ms>` is passed to onRetry. A line split across chunks,
  * including a \r\n pair, is reassembled. Breaking out of the loop releases the stream.
  */
