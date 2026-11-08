@@ -510,6 +510,10 @@
       "browser": null,
       "import": "./esm/reports.mjs",
       "default": "./src/reports.js"
+    },
+    "./compute": {
+      "types": "./types/compute.d.ts",
+      "default": "./src/compute/index.js"
     }
   },
   "bin": {
