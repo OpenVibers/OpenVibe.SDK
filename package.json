@@ -513,6 +513,8 @@
     },
     "./compute": {
       "types": "./types/compute.d.ts",
+      "browser": null,
+      "import": "./esm/compute.mjs",
       "default": "./src/compute/index.js"
     }
   },

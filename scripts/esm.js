@@ -12,6 +12,7 @@ const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
 const ENTRIES = {
+    'compute.mjs': '../src/compute/index.js',
     'share.mjs': '../src/share.js',
     'locker.mjs': '../src/locker.js',
     'locker-server.mjs': '../src/locker/server.js',

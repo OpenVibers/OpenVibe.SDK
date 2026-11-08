@@ -50,10 +50,10 @@ function createProviders({ fetch: fetchImpl = globalThis.fetch, config = {}, now
         },
         'hetzner-auction': {
             async quote() {
-                const url = 'https://www.hetzner.com/_resources/app/data/app/live_data_sb_EUR.json';
+                const url = 'https://www.hetzner.com/_resources/app/data/app/live_data_sb.json';
                 const r = await call(url);
-                return (r.server || []).map((s) => quote('hetzner-auction', s.id, s.datacenter, s.price / 730, 'EUR', s.ram_size * 1024,
-                    { tier: 'dedicated', monthly: s.price, source: url, provisionable: false, reason: 'dedicated purchase requires reviewed cancellation and setup terms' }));
+                return (r.server || []).map((s) => quote('hetzner-auction', s.Id, s.Details?.Datacenter?.Name, s.Prices?.hourly?.EUR, 'EUR', (s.Hardware?.RAM?.Size || 0) * 1024,
+                    { tier: 'dedicated', monthly: s.Prices?.monthly?.EUR, setup: s.Prices?.setup?.EUR ?? null, source: url, provisionable: false, reason: 'dedicated purchase requires reviewed cancellation and setup terms' }));
             },
             async provision() { throw new Error('auction: quote only; dedicated purchase and cancellation terms require review'); },
             async health() { return { state: 'quote-only' }; },
@@ -61,17 +61,24 @@ function createProviders({ fetch: fetchImpl = globalThis.fetch, config = {}, now
         },
         ovh: {
             async quote() {
-                const url = ovh + '/order/catalog/public/cloud?ovhSubsidiary=US';
+                const url = ovh + '/order/catalog/public/cloud?ovhSubsidiary=IE';
                 const catalog = await call(url);
-                // Pricing is a public catalogue. Resource/region fit requires the account's flavor catalogue.
-                if (!c('ovh').project || !c('ovh').key) return [];
+                const plans = (catalog.addons || []).filter(p => p.product === 'publiccloud-instance');
+                const priced = (p) => p.pricings?.find(v => v.interval === 1 && v.intervalUnit === 'hour' && v.mode === 'default' && v.type === 'consumption');
+                const cost = (v) => (v.price + (v.tax || 0)) / 1e8;
+                // Public prices can be compared without credentials; a project flavor is needed to rent.
+                if (!c('ovh').project || !c('ovh').key) return plans.flatMap(p => {
+                    const v = priced(p); if (!v) return [];
+                    return [quote('ovh', p.planCode, 'catalogue', cost(v), catalog.locale.currencyCode, (p.blobs?.technical?.memory?.size || 0) * 1024,
+                        { tier: 'dedicated', source: url, provisionable: false, reason: 'project credentials required to resolve region and availability' })];
+                });
                 const flavors = await ovhCall('/cloud/project/' + enc(c('ovh').project) + '/flavor');
                 return flavors.flatMap((f) => {
-                    const plan = (catalog.plans || []).find((p) => p.planCode === f.planCodes?.hourly);
-                    const price = plan?.pricings?.find((p) => p.interval === 1 && p.mode === 'default');
-                    if (!price) return [];
-                    return [quote('ovh', f.id, f.region, price.price / 1e8, catalog.locale?.currencyCode || 'USD', f.ram * 1024,
-                        { tier: 'dedicated', cpu: f.vcpus, source: url })];
+                    const plan = plans.find(p => p.planCode === f.planCodes?.hourly);
+                    const price = plan && priced(plan);
+                    if (!price || !f.available) return [];
+                    return [quote('ovh', f.id, f.region, cost(price), catalog.locale.currencyCode, f.ram * 1024,
+                        { tier: 'dedicated', cpu: f.vcpus, source: url, billing_seconds: 3600 })];
                 });
             },
             async provision(q, spec) {
@@ -120,6 +127,7 @@ function createProviders({ fetch: fetchImpl = globalThis.fetch, config = {}, now
             async quote() {
                 const url = 'https://ai.openvibe.services/api/v1/community/offers';
                 const r = await call(url);
+                if (!r) throw new Error('community: offers endpoint unavailable');
                 return (r.offers || []).map((s) => quote('community', s.id || s.offer_id, s.region || 'unknown', s.price_per_hour, 'USD', s.ram_mb,
                     { tier: 'community', gpu_mb: s.gpu_ram_mb || 0, source: url, provisionable: false, reason: 'inference offers are token-priced; not a machine rental' }));
             },
