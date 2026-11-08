@@ -23,6 +23,7 @@ module.exports = {
     redact: require('./src/redact'),
     chat: require('./src/chat'),
     ai: require('./src/ai'),
+    credentials: require('./src/credentials'),
     jobs: require('./src/jobs'),
     tools: require('./src/tools'),
     projects: require('./src/projects'),

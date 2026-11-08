@@ -16,6 +16,7 @@ export * as redact from './redact';
 export * as chat from './chat';
 export * as chatApps from './chat-apps';
 export * as ai from './ai';
+export * as credentials from './credentials';
 export * as jobs from './jobs';
 export * as tools from './tools';
 export * as projects from './projects';

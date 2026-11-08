@@ -110,6 +110,11 @@
       ]
     },
     "createClient": "function",
+    "credentials": {
+      "object": [
+        "createCredentialsClient"
+      ]
+    },
     "deals": {
       "object": [
         "createDealsClient"
@@ -590,6 +595,9 @@
   },
   "openvibe-sdk/coupons": {
     "createCouponsClient": "function"
+  },
+  "openvibe-sdk/credentials": {
+    "createCredentialsClient": "function"
   },
   "openvibe-sdk/db": {
     "DbError": "class",

@@ -250,6 +250,12 @@
       "import": "./esm/ai.mjs",
       "default": "./src/ai.js"
     },
+    "./credentials": {
+      "types": "./types/credentials.d.ts",
+      "browser": "./src/credentials.js",
+      "import": "./esm/credentials.mjs",
+      "default": "./src/credentials.js"
+    },
     "./jobs": {
       "types": "./types/jobs.d.ts",
       "import": "./esm/jobs.mjs",
