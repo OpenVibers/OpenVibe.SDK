@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.100.0 (2026-11-08)
 
 - Add `openvibe-sdk/compute`: shared compute strategies, hard placement constraints, RAM-aware pool scaling, exact billing arithmetic and provider quote/lifecycle adapters. See `docs/compute.md` for gates and unsupported purchase paths.
 
