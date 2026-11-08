@@ -162,6 +162,7 @@
     },
     "identity": {
       "object": [
+        "createAccountEmailsClient",
         "createIdentityClient"
       ]
     },
@@ -720,6 +721,7 @@
     "createHostClient": "function"
   },
   "openvibe-sdk/identity": {
+    "createAccountEmailsClient": "function",
     "createIdentityClient": "function"
   },
   "openvibe-sdk/inventory": {
