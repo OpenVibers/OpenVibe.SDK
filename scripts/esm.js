@@ -24,6 +24,7 @@ const ENTRIES = {
     'assertions.mjs': '../src/assertions.js',
     'registry.mjs': '../src/registry.js',
     'identity.mjs': '../src/identity.js',
+    'trust.mjs': '../src/trust.js',
     'notifications.mjs': '../src/notifications.js',
     'modules.mjs': '../src/modules.js',
     'events.mjs': '../src/events.js',

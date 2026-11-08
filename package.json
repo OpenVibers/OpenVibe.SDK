@@ -45,6 +45,12 @@
       "import": "./esm/identity.mjs",
       "default": "./src/identity.js"
     },
+    "./trust": {
+      "types": "./types/trust.d.ts",
+      "browser": "./src/trust.js",
+      "import": "./esm/trust.mjs",
+      "default": "./src/trust.js"
+    },
     "./notifications": {
       "types": "./types/notifications.d.ts",
       "browser": null,

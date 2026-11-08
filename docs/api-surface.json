@@ -360,6 +360,14 @@
         "createTradeClient"
       ]
     },
+    "trust": {
+      "object": [
+        "AGE_BANDS",
+        "atLeast",
+        "createTrustClient",
+        "isNew"
+      ]
+    },
     "ulid": "function",
     "usage": {
       "object": [
@@ -1085,6 +1093,12 @@
   },
   "openvibe-sdk/trade": {
     "createTradeClient": "function"
+  },
+  "openvibe-sdk/trust": {
+    "AGE_BANDS": "array",
+    "atLeast": "function",
+    "createTrustClient": "function",
+    "isNew": "function"
   },
   "openvibe-sdk/usage": {
     "createUsageReporter": "function",
