@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.98.1 (2026-11-07)
+
+- `ai.batches.cancel` says what cancelling does: only the prompts that never had a run are cancelled, and
+  nothing is charged for them. A prompt that already has a run (the provider is working on it) goes on and
+  settles on its own path: it keeps its status, the answer says so, and nobody is told it was not charged.
+  The batch itself is cancelled only when nothing is left in flight. The same note is on `AiBatchItem.reason`.
+  No runtime change.
+
+
 ## 0.98.0 (2026-11-07)
 
 - `ai.runs.create` (and the direct operations) may ask for the class the caller may wait in:

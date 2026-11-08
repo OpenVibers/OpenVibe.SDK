@@ -106,7 +106,13 @@ function createAiClient(client, defaults = {}) {
         list: (query = {}, o = {}) => call({ path: '/api/v1/batches', query }, o),
         /** One batch with its items → { batch } (null when there is no such batch) */
         get: (id, o = {}) => orNull(call({ path: `/api/v1/batches/${enc(id)}` }, o)),
-        /** Cancel a batch: the items that had not run are cancelled and nothing is charged for them → { batch } */
+        /**
+         * Cancel a batch → { batch }
+         *
+         * Only the prompts that never had a run are cancelled, and nothing is charged for them. A prompt
+         * that already has a run (the provider is working on it) goes on and settles on its own path: it
+         * keeps its status, the answer says so, and nobody is told it was not charged.
+         */
         cancel: (id, o = {}) => call({ method: 'POST', path: `/api/v1/batches/${enc(id)}/cancel`, idempotencyKey: false }, o),
     };
 

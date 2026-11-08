@@ -22,7 +22,9 @@ export interface AiBatchItem {
     idx: number;
     status: 'queued' | 'waiting' | 'running' | 'succeeded' | 'failed' | 'expired' | 'cancelled' | string;
     model?: string | null; run_id?: string | null; answer?: string | null;
-    error_code?: string | null; error_detail?: string | null; reason?: string | null; capacity?: string | null;
+    error_code?: string | null; error_detail?: string | null;
+    /** The plain note about the prompt: it expired (it was not charged), it was cancelled before it ran (it was not charged), or it was already sent to the provider (it finishes and is charged). */
+    reason?: string | null; capacity?: string | null;
     route_provider?: string | null; route_model?: string | null;
     cost_nano_usd?: string | null; absorbed_nano_usd?: string | null; charged_nano_usd?: string | null;
     deadline_at?: string; created_at?: string; updated_at?: string;
@@ -42,6 +44,7 @@ export interface AiBatches {
     create(items: Array<string | { prompt: string; model?: string }>, opts?: { model?: string; deadlineHours?: number; idempotencyKey?: string; signal?: AbortSignal }): Promise<{ batch: AiBatch }>;
     list(query?: Record<string, string | number>, opts?: { signal?: AbortSignal }): Promise<{ batches: AiBatch[]; [field: string]: unknown }>;
     get(id: string, opts?: { signal?: AbortSignal }): Promise<{ batch: AiBatch } | null>;
+    /** Cancels a batch: only the prompts that never had a run are cancelled, and nothing is charged for them; a prompt that already has a run goes on and settles on its own path. */
     cancel(id: string, opts?: { signal?: AbortSignal }): Promise<{ batch: AiBatch }>;
 }
 type Op = (input?: Record<string, unknown>, opts?: Omit<RunOptions, 'version' | 'onBehalfOf'>) => Promise<RunResponse>;
