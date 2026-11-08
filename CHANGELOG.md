@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.104.0 (2026-11-08)
+
+- Add `createAccountEmailsClient` to `openvibe-sdk/identity` for managing the signed-in person's verified Network email addresses.
+
 ## 0.103.0 (2026-11-08)
 
 - Add `openvibe-sdk/credentials`: `createCredentialsClient` for a person's own provider credentials on OpenVibe.AI:

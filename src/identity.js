@@ -10,6 +10,38 @@
  */
 const { isOpenVibeError } = require('./core/errors');
 
+/** Manage the authenticated person's private, verified email addresses on Network. */
+function createAccountEmailsClient({ networkUrl = 'https://openvibe.network', getToken, fetchImpl = globalThis.fetch } = {}) {
+    if (typeof getToken !== 'function') throw new TypeError('createAccountEmailsClient: getToken must be a function');
+    if (typeof fetchImpl !== 'function') throw new TypeError('createAccountEmailsClient: fetch is not available');
+    const base = String(networkUrl || '').replace(/\/+$/, '');
+    if (!base) throw new TypeError('createAccountEmailsClient: networkUrl is required');
+    async function request(path, { method = 'GET', body } = {}) {
+        const token = await getToken();
+        if (!token) throw new TypeError('createAccountEmailsClient: getToken returned no token');
+        const response = await fetchImpl(`${base}/api/v1/me/emails${path}`, {
+            method,
+            headers: { Accept: 'application/json', Authorization: `Bearer ${token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+            ...(body ? { body: JSON.stringify(body) } : {}),
+        });
+        const data = await response.json().catch(() => null);
+        if (!response.ok) {
+            const error = new Error(data && (data.detail || data.error) || `Network email request failed (${response.status})`);
+            error.status = response.status;
+            error.code = data && (data.code || data.error);
+            throw error;
+        }
+        return data;
+    }
+    return {
+        list: () => request(''),
+        add: (email) => request('', { method: 'POST', body: { email } }),
+        verify: (id) => request(`/${encodeURIComponent(String(id))}/verify`, { method: 'POST' }),
+        remove: (id) => request(`/${encodeURIComponent(String(id))}`, { method: 'DELETE' }),
+        makePrimary: (id) => request(`/${encodeURIComponent(String(id))}/primary`, { method: 'POST' }),
+    };
+}
+
 const BATCH = 500;
 
 function createIdentityClient(client, { baseUrl } = {}) {
@@ -53,4 +85,4 @@ function createIdentityClient(client, { baseUrl } = {}) {
     return { resolve, resolveBatch };
 }
 
-module.exports = { createIdentityClient };
+module.exports = { createIdentityClient, createAccountEmailsClient };

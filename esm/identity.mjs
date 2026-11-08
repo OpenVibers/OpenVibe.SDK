@@ -2,6 +2,6 @@
 import cjs from '../src/identity.js';
 
 export const {
-    createIdentityClient,
+    createIdentityClient, createAccountEmailsClient,
 } = cjs;
 export default cjs;

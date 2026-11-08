@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const { stubServer, send, run } = require('./helpers');
 const { createClient } = require('../src/core');
 const { createServiceTokenClient } = require('../src/auth');
-const { createIdentityClient } = require('../src/identity');
+const { createIdentityClient, createAccountEmailsClient } = require('../src/identity');
 const { createMockPlatform } = require('../src/testing');
 
 run([
@@ -40,6 +40,23 @@ run([
         assert.deepEqual(srv.requests.map((r) => JSON.parse(r.body.toString()).subject_ids.length), [500, 500, 201]);
         assert.ok(srv.requests.every((r) => r.url === '/internal/identity/resolve-batch' && r.headers.authorization === 'Bearer svc'));
         await assert.rejects(identity.resolveBatch({ ids: [1] }), TypeError);
+        await srv.close();
+    }],
+
+    ["account email helpers use the signed-in person's Network API", async () => {
+        const srv = await stubServer((req, res) => send(res, 200, { ok: true, emails: [] }));
+        const emails = createAccountEmailsClient({ networkUrl: srv.url, getToken: () => 'person-token' });
+        await emails.list();
+        await emails.add('person@example.test');
+        await emails.verify('email-id');
+        await emails.makePrimary('email-id');
+        await emails.remove('email-id');
+        assert.deepEqual(srv.requests.map((r) => [r.method, r.url]), [
+            ['GET', '/api/v1/me/emails'], ['POST', '/api/v1/me/emails'], ['POST', '/api/v1/me/emails/email-id/verify'],
+            ['POST', '/api/v1/me/emails/email-id/primary'], ['DELETE', '/api/v1/me/emails/email-id'],
+        ]);
+        assert.ok(srv.requests.every((r) => r.headers.authorization === 'Bearer person-token'));
+        assert.deepEqual(JSON.parse(srv.requests[1].body.toString()), { email: 'person@example.test' });
         await srv.close();
     }],
 ]);
