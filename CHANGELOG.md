@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.126.0 (2026-11-09)
+
+- Add `openvibe-sdk/pics`: the public gallery and picture reads, private uploads with resumable chunks, publication, likes and albums on OpenVibe.Pics.
+
 ## 0.125.0 (2026-11-09)
 
 - openvibe-sdk/blog: posts are written and read as Markdown or as blocks (publishing.block@1), ?format=blocks

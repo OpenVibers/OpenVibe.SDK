@@ -60,6 +60,7 @@ module.exports = {
     actor: require('./src/actor'),
     run: require('./src/run'),
     video: require('./src/video'),
+    pics: require('./src/pics'),
     work: require('./src/work'),
     zone: require('./src/zone'),
     play: require('./src/play'),

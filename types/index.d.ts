@@ -50,6 +50,7 @@ export * as food from './food';
 export * as actor from './actor';
 export * as run from './run';
 export * as video from './video';
+export * as pics from './pics';
 export * as work from './work';
 export * as zone from './zone';
 export * as play from './play';
