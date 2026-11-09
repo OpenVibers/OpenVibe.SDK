@@ -34,7 +34,7 @@ run([
     ['the entry resolves by name and names the loader and the default script', async () => {
         assert.deepEqual(Object.keys(cam).sort(), ['CAM_KIT_SRC', 'CAM_KIT_SRI', 'OV_CAMERA_SRC', 'defineOvCamera', 'loadCamKit', 'open', 'settings']);
         assert.equal(cam.OV_CAMERA_SRC, 'https://openvibe.cam/embed/ov-camera.js');
-        assert.equal(cam.CAM_KIT_SRC, 'https://openvibe.cam/embed/cam-kit.js');
+        assert.equal(cam.CAM_KIT_SRC, 'https://openvibe.cam/embed/cam-kit.js?v=yqqjh1FiP7a4');
         assert.match(cam.CAM_KIT_SRI, /^sha384-/);
         assert.equal(require('openvibe-sdk/cam'), cam);
         assert.deepEqual(pkg.exports['./cam'], {

@@ -11,6 +11,7 @@ const crypto = require('node:crypto');
 const { stubServer, send, problem, run } = require('./helpers');
 const { createClient } = require('../src/core');
 const { createObjectsClient } = require('../src/media');
+const { createUploadClient } = require('../src/media-upload');
 
 const sha = (b) => crypto.createHash('sha256').update(b).digest('hex');
 
@@ -188,10 +189,15 @@ run([
         const m = await mockMedia();
         const objects = createObjectsClient({ app: 'demo', baseUrl: m.srv.url, tokenClient: tokenClient(), multipartThreshold: 10000, partSize: 4096, concurrency: 3 });
         const bytes = crypto.randomBytes(4096 * 4 + 100);
-        const obj = await objects.upload(new Blob([bytes], { type: 'video/webm' }), { kind: 'vod' });
+        let ref;
+        const obj = await objects.upload(new Blob([bytes], { type: 'video/webm' }), { kind: 'vod', onSession: (value) => {
+            ref = value;
+            assert.equal(m.srv.requests.filter((r) => r.method === 'PUT').length, 0, 'session is offered for persistence before bytes leave');
+        } });
         const init = JSON.parse(m.srv.requests.find((r) => r.url === '/api/v2/demo/objects').body);
         assert.deepEqual([init.multipart, init.part_size, init.mime_type, init.content_hash], [true, 4096, 'video/webm', sha(bytes)]);
         const s = [...m.state.sessions.values()][0];
+        assert.deepEqual(ref, { objectId: obj.id, uploadId: s.upload_id });
         assert.equal(s.parts_expected, 5);
         const puts = m.srv.requests.filter((r) => r.method === 'PUT');
         assert.equal(puts.length, 5);
@@ -200,6 +206,18 @@ run([
         assert.equal(s.completeBody.content_hash, sha(bytes));
         assert.deepEqual(m.state.objects.get(obj.id).bytes, bytes);
         assert.equal(obj.lifecycle_status, 'ready');
+        await m.srv.close();
+    }],
+
+    ['the upload facade uses Media multipart and reports progress', async () => {
+        const m = await mockMedia();
+        const media = createUploadClient({ app: 'demo', baseUrl: m.srv.url, tokenClient: tokenClient(), multipartThreshold: 100, partSize: 1024 });
+        const bytes = crypto.randomBytes(2500);
+        const progress = [];
+        const obj = await media.upload(bytes, { onProgress: (p) => progress.push(p.uploadedBytes) });
+        assert.equal(obj.lifecycle_status, 'ready');
+        assert.equal(progress.at(-1), bytes.length);
+        assert.equal(JSON.parse(m.srv.requests.find((r) => r.url === '/api/v2/demo/objects').body).part_size, 1024);
         await m.srv.close();
     }],
 

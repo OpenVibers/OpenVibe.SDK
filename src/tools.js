@@ -276,7 +276,17 @@ function createToolsClient(client, { baseUrl, service = 'tools', audience = 'ope
         async lists({ limit, signal } = {}) { return read('/api/v1/domains', { limit }, signal); },
     };
 
-    return { list, get, schema, run, jobs, domains };
+    /** Public successful-run rankings, cached by Tools for one minute. */
+    async function trending({ window = 'week', limit = 12, signal } = {}) {
+        if (!['hour', 'week'].includes(window)) throw new TypeError('tools.trending: window must be hour or week');
+        if (!Number.isInteger(limit) || limit < 1 || limit > 50) throw new TypeError('tools.trending: limit must be 1–50');
+        return read('/api/v1/tools/trending', { window, limit }, signal);
+    }
+    async function popular({ limit = 12, signal } = {}) {
+        if (!Number.isInteger(limit) || limit < 1 || limit > 50) throw new TypeError('tools.popular: limit must be 1–50');
+        return read('/api/v1/tools/popular', { limit }, signal);
+    }
+    return { list, get, schema, run, jobs, domains, trending, popular };
 }
 
 module.exports = { createToolsClient, ToolRunError, isToolRunError };
