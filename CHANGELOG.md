@@ -1,8 +1,79 @@
 # Changelog
 
-## 0.109.0 — 2026-11-09
+## 0.124.0 (2026-11-09)
 
 - `openvibe-sdk/blog`: `posts.create(handle, { title, markdown | blocks })` writes a body of Markdown or of blocks (the Markdown is what the post keeps), and `posts.blocks(id)` reads the blocks of a post, parsed.
+
+## 0.123.0 (2026-11-09)
+
+- ov.exchange: keys (list, create, revoke), private usage, deployments, and web, image and icon search with fetch (the Exchange API platform)
+
+## 0.122.0 (2026-11-09)
+
+- dms.viewPreference() and setViewPreference(): a conversation's saved view, bubbles or room
+
+## 0.121.0 (2026-11-09)
+
+- ov.cam.settings.get/put: a person's saved camera choices (Cam #116)
+
+## 0.120.0 (2026-11-09)
+
+- createUploadClient(): resumable Media uploads in 8 MiB parts, three at a time, with a session reference to resume; ov.ui.progress(el)
+
+## 0.119.0 (2026-11-09)
+
+- openvibe-sdk/wallet: the wallet, Vibes, the store and items, through Billing and Inventory with the person's bearer and idempotency keys
+
+## 0.118.0 (2026-11-09)
+
+- openvibe-sdk/design: `components()` and `component(name)` read OpenVibe.Design's public design.component@1 registry
+  (a missing name is null, a bad one is refused before a request). They are on the same `createDesignClient` as the
+  icons; `accessToken` is now optional and only the icon API needs it.
+
+## 0.117.0 (2026-11-09)
+
+- ov.cam loads Cam's kit at its versioned URL and its new hash (Cam #116 changed the kit)
+
+## 0.116.0 (2026-11-09)
+
+- npm metadata (keywords, homepage, funding), the README's first screen and CITATION.cff
+
+## 0.115.0 (2026-11-09)
+
+- Tools discovery: ov.tools.popular() and ov.tools.trending()
+
+## 0.114.0 (2026-11-09)
+
+- Dock v2: Vibe conversations (ov.chat.vibe.conversations) and Actor skill runs (ov.actor.skills.run)
+
+## 0.113.0 — 2026-11-09
+
+- Add the Feed and status posts to `openvibe-sdk/community`: `feed({ kind, site, q, following, cursor, limit })` reads
+  Community's `GET /api/v1/feed` (one stream over Pulse from every OpenVibe site) and `posts.create({ text, pictures })`
+  posts up to four Media pictures with required alt text, in the Feed at once.
+
+## 0.112.0 — 2026-11-09
+
+- Add the person's stats to `openvibe-sdk/report`: `report.me({ days })` (GET `/api/v1/me/stats`, the signed-in person's own numbers), `report.person(username)` (GET `/api/v1/u/:name/stats`, only the sections they published) and `report.publish({ sites, activity, made, ai, money }, { days })` (PUT `/api/v1/me/stats/published`, all five switches named). The answers are `report.me-stats@1`; a source that does not answer leaves its section out, never a zero. `me` and `publish` need the person's own session token; `person` is public and is a 404 when nothing is published.
+
+## 0.111.0 — 2026-11-09
+
+- **`openvibe-sdk/shoes`: the Open.Shoes catalogue and sizing tools.**
+  - `createShoesClient(client)` (server-side; `./shoes` is browser-blocked) exposes public reads only:
+    `products.list({ kind, q, size })`, `products.get(id)`, `products.offers(id)`, `tools.laceLength({...})`
+    and `sizes.convert({ system, size, brand })`.
+
+## 0.110.0 — 2026-11-09
+
+- **`openvibe-sdk/design`: a typed client for the Design glyph API.**
+  - `createDesignClient({ accessToken, baseUrl })` returns `icons.search(q)`, `icons.draft({ name, sentence, styles, sourceSvg })`
+    and `icons.get(name, { style })` for the authenticated glyph draft, get and search calls. It is server-side only
+    (the `./design` subpath is browser-blocked) and takes a signed-in access token rather than a service token.
+  - Styles are checked against the set the API accepts (`thin`, `light`, `regular`, `bold`, `solid`, `duotone`).
+
+## 0.109.0 — 2026-11-09
+
+- Add Vibe compare methods to `openvibe-sdk/chat` for submitting answers and recording a user's preferred model.
 
 ## 0.108.0 — 2026-11-09
 

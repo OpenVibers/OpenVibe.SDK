@@ -175,3 +175,25 @@ createExchangeClient({
     agent,
 })
 ```
+
+### Keys, search and deployments
+
+```js
+const ov = { exchange: createExchangeClient({ developerKey: process.env.OPENVIBE_TOKEN }) };
+// Manage keys using your Network user token, not an Exchange inference key.
+const { key, secret } = await ov.exchange.keys.create({
+  name: 'My app', monthly_cap_usd: 10, allowed_models: ['deepseek/deepseek-chat'],
+}); // Save secret now: lists never return it.
+await ov.exchange.keyUsage(); // private usage by key, model and UTC day
+await ov.exchange.keys.revoke(key.id);
+await ov.exchange.deployments.list();
+await ov.exchange.search('open models', { engine: 'openvibe' });
+await ov.exchange.images('mountains', { engine: 'openverse', license: 'cc0' });
+await ov.exchange.search.icons('home');
+await ov.exchange.fetch('https://example.org');
+```
+
+Search responses carry the selected engine, USD cost and elapsed milliseconds. Image results retain
+licence, author, original source page and attribution; keep that attribution when using an image.
+`usage()` and `keyUsage()` read the signed-in dashboard. Passing `days` or `scope: "public"` selects the public aggregate.
+SearXNG requires an operator-configured instance. Paid engines are not enabled by this release.

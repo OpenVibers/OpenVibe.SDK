@@ -1,0 +1,22 @@
+'use strict';
+const assert = require('node:assert/strict');
+const { createToolsClient } = require('../src/tools');
+(async () => {
+    const calls = [];
+    const result = { metric: 'successful_api_runs', window: 'hour', updated_at: '2026-11-09T10:00:00Z', uses_today: 3, tools: [], count: 0 };
+    const tools = createToolsClient({ request: async opts => { calls.push(opts); return { data: result }; } }, { baseUrl: 'https://openvibe.tools' });
+    const signal = new AbortController().signal;
+    assert.equal(await tools.trending({ window: 'hour', limit: 4, signal }), result);
+    assert.equal(calls[0].path, '/api/v1/tools/trending');
+    assert.deepEqual(calls[0].query, { window: 'hour', limit: 4 });
+    assert.equal(calls[0].auth, false);
+    assert.equal(calls[0].signal, signal);
+    await tools.popular();
+    assert.equal(calls[1].path, '/api/v1/tools/popular');
+    assert.deepEqual(calls[1].query, { limit: 12 });
+    await assert.rejects(tools.trending({ window: 'day' }), TypeError);
+    await assert.rejects(tools.popular({ limit: 51 }), TypeError);
+    const broken = createToolsClient({ request: async () => { throw new Error('unavailable'); } });
+    await assert.rejects(broken.trending(), /unavailable/);
+    console.log('tools discovery: all checks passed');
+})().catch(e => { console.error(e); process.exit(1); });

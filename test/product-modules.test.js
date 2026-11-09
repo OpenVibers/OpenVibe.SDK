@@ -16,6 +16,7 @@ const { createReviewsClient } = require('../src/reviews');
 const { createWikiClient } = require('../src/wiki');
 const { createCouponsClient } = require('../src/coupons');
 const { createDealsClient } = require('../src/deals');
+const { createShoesClient } = require('../src/shoes');
 const { createTradeClient } = require('../src/trade');
 const { createSpaceClient } = require('../src/space');
 const { createHostClient } = require('../src/host');
@@ -54,7 +55,7 @@ const ids = { plan: `pln_${ULID}`, task: `tsk_${ULID}`, agent: `agt_${ULID}`, me
     const base = `http://127.0.0.1:${server.address().port}`;
     const audiences = [];
     const client = createClient({
-        baseUrls: { food: `${base}/food`, actor: `${base}/actor`, run: `${base}/run`, 'media-hub': `${base}/video`, work: `${base}/work`, zone: `${base}/zone`, blog: `${base}/blog`, reviews: `${base}/reviews`, wiki: `${base}/wiki`, coupons: `${base}/coupons`, deals: `${base}/deals`, trade: `${base}/trade`, space: `${base}/space`, host: `${base}/host`, news: `${base}/news` },
+        baseUrls: { food: `${base}/food`, actor: `${base}/actor`, run: `${base}/run`, 'media-hub': `${base}/video`, work: `${base}/work`, zone: `${base}/zone`, blog: `${base}/blog`, reviews: `${base}/reviews`, wiki: `${base}/wiki`, coupons: `${base}/coupons`, deals: `${base}/deals`, shoes: `${base}/shoes`, trade: `${base}/trade`, space: `${base}/space`, host: `${base}/host`, news: `${base}/news` },
         getToken: ({ audience }) => { audiences.push(audience); return `tok-${audience}`; },
         retries: 2, retryDelayMs: 1, maxRetryDelayMs: 2,
     });
@@ -352,6 +353,21 @@ const ids = { plan: `pln_${ULID}`, task: `tsk_${ULID}`, agent: `agt_${ULID}`, me
         assert.throws(() => deals.offers.flag('off_2', { kind: 'meh' }), /kind is one of/);
         assert.throws(() => deals.offers.list({ sort: 'top' }), /hot/);
 
+        // ── Shoes ─────────────────────────────────────────────
+        const shoes = createShoesClient(client);
+        mark = since();
+        await shoes.products.list({ kind: 'kids', q: 'sneaker', size: '2' });
+        await shoes.products.get('stride-rite-runner');
+        await shoes.products.offers('stride-rite-runner');
+        await shoes.tools.laceLength({ eyelet_pairs: 6, method: 'criss-cross' });
+        await shoes.sizes.convert({ brand: 'darn-tough', system: 'women', size: '8' });
+        const shoesCalls = mark();
+        assert.deepStrictEqual(shoesCalls.map((x) => `${x.method} ${x.url}`), [
+            'GET /api/v1/products?kind=kids&q=sneaker&size=2', 'GET /api/v1/products/stride-rite-runner',
+            'GET /api/v1/products/stride-rite-runner/offers', 'GET /api/v1/tools/lace-length?eyelet_pairs=6&method=criss-cross',
+            'GET /api/v1/sizes/convert?system=women&size=8&brand=darn-tough',
+        ]);
+
         // ── Trade ─────────────────────────────────────────────
         const trade = createTradeClient(client);
         mark = since();
@@ -458,11 +474,11 @@ const ids = { plan: `pln_${ULID}`, task: `tsk_${ULID}`, agent: `agt_${ULID}`, me
         assert.throws(() => news.stories.get(''), /story/);
 
         // Each product's token is for its own audience (Video's is the media hub's, openvibe.download).
-        assert.deepStrictEqual([...new Set(audiences)].sort(), ['openvibe.actor', 'openvibe.blog', 'openvibe.coupons', 'openvibe.deals', 'openvibe.download', 'openvibe.food', 'openvibe.reviews', 'openvibe.run', 'openvibe.space', 'openvibe.trade', 'openvibe.wiki', 'openvibe.work', 'openvibe.zone']);
-        assert.ok(seen.filter((x) => x.svc !== 'host' && x.svc !== 'news').every((x) => x.auth === `Bearer tok-${{ food: 'openvibe.food', actor: 'openvibe.actor', run: 'openvibe.run', video: 'openvibe.download', work: 'openvibe.work', zone: 'openvibe.zone', blog: 'openvibe.blog', reviews: 'openvibe.reviews', wiki: 'openvibe.wiki', coupons: 'openvibe.coupons', deals: 'openvibe.deals', trade: 'openvibe.trade', space: 'openvibe.space' }[x.svc]}`));
+        assert.deepStrictEqual([...new Set(audiences)].sort(), ['open.shoes', 'openvibe.actor', 'openvibe.blog', 'openvibe.coupons', 'openvibe.deals', 'openvibe.download', 'openvibe.food', 'openvibe.reviews', 'openvibe.run', 'openvibe.space', 'openvibe.trade', 'openvibe.wiki', 'openvibe.work', 'openvibe.zone']);
+        assert.ok(seen.filter((x) => x.svc !== 'host' && x.svc !== 'news').every((x) => x.auth === `Bearer tok-${{ food: 'openvibe.food', actor: 'openvibe.actor', run: 'openvibe.run', video: 'openvibe.download', work: 'openvibe.work', zone: 'openvibe.zone', blog: 'openvibe.blog', reviews: 'openvibe.reviews', wiki: 'openvibe.wiki', coupons: 'openvibe.coupons', deals: 'openvibe.deals', shoes: 'open.shoes', trade: 'openvibe.trade', space: 'openvibe.space' }[x.svc]}`));
 
         // Each client needs a core client.
-        for (const make of [createFoodClient, createActorClient, createRunClient, createVideoClient, createWorkClient, createZoneClient, createBlogClient, createReviewsClient, createWikiClient, createCouponsClient, createDealsClient, createTradeClient, createSpaceClient, createHostClient, createNewsClient]) assert.throws(() => make({}), /core client/);
+        for (const make of [createFoodClient, createActorClient, createRunClient, createVideoClient, createWorkClient, createZoneClient, createBlogClient, createReviewsClient, createWikiClient, createCouponsClient, createDealsClient, createShoesClient, createTradeClient, createSpaceClient, createHostClient, createNewsClient]) assert.throws(() => make({}), /core client/);
         console.log('product modules (food, actor, run, video, work, zone, blog, reviews, wiki, coupons, deals, trade, space, host, news): all checks passed');
     } finally {
         server.close();

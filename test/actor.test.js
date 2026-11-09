@@ -22,6 +22,8 @@ const agent = (over = {}) => ({
             seen.push({ method: req.method, url: req.url, auth: req.headers.authorization || null, body });
             const json = (status, obj) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); };
             if (req.url === '/api/v1/agent-systems') return json(200, { agents: [{ id: 'openvibe-runtime' }] });
+            if (req.url === '/api/v1/skills') return json(200, { listings: [{ id: 'skl_example' }] });
+            if (req.url === '/api/v1/runs' && req.method === 'POST') return json(201, { run: { id: 'tsk_example' } });
             if (req.url === '/api/v1/agents/presets') return json(200, { presets: [{ id: 'researcher', name: 'Researcher' }] });
             if (req.url === '/api/v1/agents' && req.method === 'GET') return json(200, { agents: [agent()] });
             if (req.url === '/api/v1/agents' && req.method === 'POST') return json(201, agent({ name: 'Researcher' }));
@@ -46,11 +48,13 @@ const agent = (over = {}) => ({
         await actor.contacts.remove(AGENT);
         assert.deepStrictEqual(await actor.agents.catalog(), { agents: [{ id: 'openvibe-runtime' }] });
         assert.deepStrictEqual(await actor.agents.list(), { agents: [{ id: 'openvibe-runtime' }] });
+        assert.deepStrictEqual(await actor.skills(), { listings: [{ id: 'skl_example' }] });
+        assert.deepStrictEqual(await actor.run('skl_example'), { run: { id: 'tsk_example' } });
 
         assert.deepStrictEqual(seen.map((s) => `${s.method} ${s.url}`), [
             'GET /api/v1/agents', 'GET /api/v1/agents/presets', `GET /api/v1/agents/${AGENT}`,
             'POST /api/v1/agents', `PATCH /api/v1/agents/${AGENT}`, `PUT /api/v1/agents/${AGENT}/level`,
-            `DELETE /api/v1/agents/${AGENT}`, 'GET /api/v1/agent-systems', 'GET /api/v1/agent-systems',
+            `DELETE /api/v1/agents/${AGENT}`, 'GET /api/v1/agent-systems', 'GET /api/v1/agent-systems', 'GET /api/v1/skills', 'POST /api/v1/runs',
         ]);
         assert.ok(seen.every((s) => s.auth === 'Bearer person-token'), 'the person token rides every call');
         assert.strictEqual(JSON.parse(seen[3].body).preset, 'researcher');
