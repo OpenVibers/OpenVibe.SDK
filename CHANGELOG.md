@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.123.0 (2026-11-09)
+
+- ov.exchange: keys (list, create, revoke), private usage, deployments, and web, image and icon search with fetch (the Exchange API platform)
+
 ## 0.122.0 (2026-11-09)
 
 - dms.viewPreference() and setViewPreference(): a conversation's saved view, bubbles or room
