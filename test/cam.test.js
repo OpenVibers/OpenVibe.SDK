@@ -15,8 +15,10 @@ const pkg = require('../package.json');
 
 run([
     ['the entry resolves by name and names the loader and the default script', async () => {
-        assert.deepEqual(Object.keys(cam).sort(), ['OV_CAMERA_SRC', 'defineOvCamera']);
+        assert.deepEqual(Object.keys(cam).sort(), ['CAM_KIT_SRC', 'CAM_KIT_SRI', 'OV_CAMERA_SRC', 'defineOvCamera', 'loadCamKit', 'open']);
         assert.equal(cam.OV_CAMERA_SRC, 'https://openvibe.cam/embed/ov-camera.js');
+        assert.equal(cam.CAM_KIT_SRC, 'https://openvibe.cam/embed/cam-kit.js?v=yqqjh1FiP7a4');
+        assert.match(cam.CAM_KIT_SRI, /^sha384-/);
         assert.equal(require('openvibe-sdk/cam'), cam);
         assert.deepEqual(pkg.exports['./cam'], {
             types: './types/cam.d.ts',
@@ -27,12 +29,41 @@ run([
         assert.equal(esm.default, cam);
         assert.equal(esm.OV_CAMERA_SRC, cam.OV_CAMERA_SRC);
         assert.equal(typeof esm.defineOvCamera, 'function');
+        assert.equal(typeof esm.open, 'function');
     }],
 
     ['in Node it rejects instead of touching a document', async () => {
         assert.equal(typeof global.window, 'undefined');
         await assert.rejects(cam.defineOvCamera(), /needs a browser/);
         await assert.rejects(cam.defineOvCamera({ src: 'https://example.test/ov-camera.js' }), /needs a browser/);
+        await assert.rejects(cam.open({ mode: 'video' }), /needs a browser/);
+    }],
+
+    ['the recorder loader pins one script and forwards the result', async () => {
+        const oldWindow = global.window;
+        const oldDocument = global.document;
+        const tags = [];
+        let kit = null;
+        global.window = {};
+        global.document = { createElement: () => {
+            const listeners = {};
+            return { addEventListener: (name, fn) => { listeners[name] = fn; }, remove() {}, listeners };
+        }, head: { appendChild: (tag) => {
+            tags.push(tag);
+            kit = { open: async (options) => ({ mode: options.mode, file: { name: 'clip.webm' } }) };
+            global.window.OpenVibeCam = kit;
+            queueMicrotask(() => tag.listeners.load());
+        } } };
+        try {
+            const [a, b] = await Promise.all([cam.open({ mode: 'video' }), cam.open({ mode: 'photo' })]);
+            assert.equal(tags.length, 1);
+            assert.equal(tags[0].src, cam.CAM_KIT_SRC);
+            assert.equal(tags[0].integrity, cam.CAM_KIT_SRI);
+            assert.equal(tags[0].crossOrigin, 'anonymous');
+            assert.equal(a.mode, 'video');
+            assert.equal(b.mode, 'photo');
+            assert.equal(await cam.loadCamKit(), kit);
+        } finally { if (oldWindow === undefined) delete global.window; else global.window = oldWindow; if (oldDocument === undefined) delete global.document; else global.document = oldDocument; }
     }],
 
     ['a browser gets one <script> per load and the class; a defined element resolves without another', async () => {
@@ -86,7 +117,7 @@ run([
     ['the types file names the runtime exports and the element surface', async () => {
         const dts = fs.readFileSync(path.join(ROOT, 'types/cam.d.ts'), 'utf8');
         for (const name of [
-            'OV_CAMERA_SRC', 'defineOvCamera', 'DefineOvCameraOptions',
+            'OV_CAMERA_SRC', 'defineOvCamera', 'DefineOvCameraOptions', 'CAM_KIT_SRC', 'CAM_KIT_SRI', 'CamKitResult', 'CamKitOptions', 'loadCamKit', 'open(options?',
             'OvCameraAttributes', 'OvCameraFacing', 'OvCameraFilter', 'OvCameraTimer', 'OvCameraMode', 'OvCameraUpload',
             'OvCameraElement', 'OvCameraCaptureDetail', 'OvCameraErrorCode', 'OvCameraErrorDetail',
             'OvCameraCaptureEvent', 'OvCameraErrorEvent', 'OvCameraEventMap', 'HTMLElementTagNameMap',

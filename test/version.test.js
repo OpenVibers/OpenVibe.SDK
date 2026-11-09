@@ -19,8 +19,15 @@ run([
         const lock = require('../package-lock.json');
         assert.equal(lock.version, pkg.version);
         assert.equal(lock.packages[''].version, pkg.version);
-        assert.match(fs.readFileSync(path.join(ROOT, 'CHANGELOG.md'), 'utf8'), new RegExp(`^## ${pkg.version.replace(/\./g, '\\.')} \\(`, 'm'));
+        const changelog = fs.readFileSync(path.join(ROOT, 'CHANGELOG.md'), 'utf8');
+        const versionPattern = pkg.version.replace(/\./g, '\\.');
+        assert.match(changelog, new RegExp(`^## ${versionPattern} (?:\\(|— )`, 'm'));
         assert.match(fs.readFileSync(path.join(ROOT, 'browser/openvibe-sdk.mjs'), 'utf8'), new RegExp(`openvibe-sdk ${pkg.version.replace(/\./g, '\\.')},`));
+        const browserBundle = await import('../browser/openvibe-sdk.mjs');
+        assert.equal(browserBundle.default.SDK_VERSION, pkg.version);
+        assert.equal(typeof browserBundle.default.cam.open, 'function');
+        const camEsm = await import('../esm/cam.mjs');
+        assert.equal(typeof camEsm.open, 'function');
     }],
 
     ['the README installs and names this release (it said v0.35.2 and v0.37.0 at 0.51.1)', async () => {
