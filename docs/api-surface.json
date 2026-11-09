@@ -130,6 +130,12 @@
         "createDealsClient"
       ]
     },
+    "design": {
+      "object": [
+        "DEFAULT_DESIGN_URL",
+        "createDesignClient"
+      ]
+    },
     "download": {
       "object": [
         "contentTypeOf",
@@ -307,7 +313,9 @@
     },
     "report": {
       "object": [
+        "DAYS",
         "REPORT_URL",
+        "SECTIONS",
         "createReportClient"
       ]
     },
@@ -341,6 +349,11 @@
       ]
     },
     "share": "function",
+    "shoes": {
+      "object": [
+        "createShoesClient"
+      ]
+    },
     "space": {
       "object": [
         "createSpaceClient"
@@ -664,6 +677,10 @@
     "deliveryOffer": "function",
     "validateDeliveryOffer": "function"
   },
+  "openvibe-sdk/design": {
+    "DEFAULT_DESIGN_URL": "string",
+    "createDesignClient": "function"
+  },
   "openvibe-sdk/download": {
     "contentTypeOf": "function",
     "createDownloadClient": "function"
@@ -956,7 +973,9 @@
     "createRegistryClient": "function"
   },
   "openvibe-sdk/report": {
+    "DAYS": "array",
     "REPORT_URL": "string",
+    "SECTIONS": "array",
     "createReportClient": "function"
   },
   "openvibe-sdk/reports": {
@@ -1054,6 +1073,9 @@
     "share": "function",
     "shareOpenApi": "function",
     "sharesSchema": "function"
+  },
+  "openvibe-sdk/shoes": {
+    "createShoesClient": "function"
   },
   "openvibe-sdk/space": {
     "createSpaceClient": "function"

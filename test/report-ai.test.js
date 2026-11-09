@@ -12,10 +12,22 @@ const { createExchangeClient } = require('../src/exchange');
     await report.ai.providers();
     await report.ai.compare(['a', 'b']);
     await report.ai.picks();
-    assert.equal(calls.length, 5);
+    await report.me({ days: 30 });
+    await report.person('goosely');
+    await report.publish({ sites: true, activity: true, made: false, ai: false, money: false }, { days: 7 });
+    assert.equal(calls.length, 8);
     assert.equal(calls[0].path, '/api/v1/ai/leaderboard');
     assert.deepEqual(calls[3].query, { models: 'a,b' });
+    assert.equal(calls[5].path, '/api/v1/me/stats');
+    assert.deepEqual(calls[5].query, { days: 30 });
+    assert.equal(calls[6].path, '/api/v1/u/goosely/stats');
+    assert.equal(calls[7].path, '/api/v1/me/stats/published');
+    assert.equal(calls[7].method, 'PUT');
+    assert.deepEqual(calls[7].json, { published: { sites: true, activity: true, made: false, ai: false, money: false }, days: 7 });
     assert.throws(() => report.ai.model(''), /id is required/);
+    assert.throws(() => report.me({ days: 14 }), /days is one of 7, 30, 90/);
+    assert.throws(() => report.person('not a name'), /username/);
+    assert.throws(() => report.publish({ sites: true }), /activity must be true or false/);
 
     const requests = [];
     const exchange = createExchangeClient({ developerKey: 'test-key', baseUrl: 'https://exchange.test', fetchImpl: async (url, options) => {

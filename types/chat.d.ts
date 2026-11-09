@@ -42,6 +42,7 @@ export interface ChatClient {
     exportMine(opts?: Opts): Promise<{ username: string; exported_at: string; total: number; truncated: boolean; messages: Json[] }>;
     vibe: {
         list(opts?: Opts): Promise<{ chats: Json[]; allowance?: Json }>;
+        conversations(opts?: Opts): Promise<{ conversations: Array<{ slug: string; name: string; last_message_at: string; created_at: string; last_line: string | null; last_answer_at: string | null; site: string | null }>; count: number }>;
         start(message: string, opts?: Opts): Promise<{ room: Json; message: Json }>;
         rename(slug: string, name: string, opts?: Opts): Promise<Json>;
         remove(slug: string, opts?: Opts): Promise<Json>;

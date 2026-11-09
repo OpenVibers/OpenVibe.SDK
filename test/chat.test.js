@@ -77,6 +77,7 @@ run([
         await chat.feeds.view('fed_Z', { limit: 5 });
         await chat.feeds.onLive({ slot: [77, 78] });
         await chat.vibe.start('hello');
+        await chat.vibe.conversations();
         await chat.inboxes.saveReply('inb_X', 'refund', 'Five days.');
         await chat.inboxes.addWebhook('inb_X', 'https://hooks.slack.com/services/x');
         await chat.inboxes.assign('inb_X', 'cnv_Y', 7);
@@ -93,6 +94,7 @@ run([
             ['GET', '/api/chat/feeds/fed_Z?limit=5', null],
             ['GET', '/api/chat/feeds?slot=77%2C78', null],
             ['POST', '/api/chat/vibe', { message: 'hello' }],
+            ['GET', '/api/vibe/conversations', null],
             ['POST', '/api/chat/inboxes/inb_X/replies', { shortcut: 'refund', body: 'Five days.' }],
             ['POST', '/api/chat/inboxes/inb_X/webhooks', { url: 'https://hooks.slack.com/services/x' }],
             ['PATCH', '/api/chat/inboxes/inb_X/conversations/cnv_Y', { assignee_id: 7 }],

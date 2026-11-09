@@ -117,4 +117,27 @@ run([
         assert.deepEqual(slugs, ['s1', 's2', 's3', 's4', 's5']);
         await srv.close();
     }],
+
+    ['the Feed and a status post: query, alt pictures in the body, acting subject, never retried', async () => {
+        const srv = await echo();
+        const community = createCommunityClient(createClient({ baseUrls: { community: srv.url } }), { actingSubject: USR });
+        const body = await community.feed({ kind: 'wiki', site: 'wiki', q: 'cats', following: true, cursor: 'abc', limit: 10 });
+        assert.deepEqual(body, { ok: true });
+        let r = srv.requests[0];
+        assert.equal(r.method, 'GET');
+        const url = new URL(r.url, 'http://x');
+        assert.equal(url.pathname, '/api/v1/feed');
+        assert.deepEqual(Object.fromEntries(url.searchParams), { kind: 'wiki', site: 'wiki', q: 'cats', cursor: 'abc', limit: '10', following: '1' });
+        assert.equal(hdr(r, 'X-OV-Subject'), USR);
+        const media = 'med_01JAB2C3D4E5F6G7H8J9K0MNPQ';
+        await community.posts.create({ text: 'Look', pictures: [{ media_id: media, alt: 'A white cat' }] });
+        r = srv.requests[1];
+        assert.equal(r.method, 'POST');
+        assert.equal(r.url, '/api/v1/posts');
+        assert.deepEqual(JSON.parse(r.body), { text: 'Look', pictures: [{ media_id: media, alt: 'A white cat' }] });
+        assert.equal(hdr(r, 'idempotency-key'), undefined, 'a post is a write Community does not dedupe');
+        await community.posts.create({ text: 'Plain' });
+        assert.deepEqual(JSON.parse(srv.requests[2].body), { text: 'Plain' });
+        await srv.close();
+    }],
 ]);

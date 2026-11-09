@@ -47,6 +47,7 @@ module.exports = {
     wiki: require('./src/wiki'),
     coupons: require('./src/coupons'),
     deals: require('./src/deals'),
+    shoes: require('./src/shoes'),
     trade: require('./src/trade'),
     space: require('./src/space'),
     host: require('./src/host'),
@@ -64,4 +65,5 @@ module.exports = {
     usage: require('./src/usage'),
     commerce: require('./src/commerce'),
     telemetry: require('./src/telemetry'),
+    design: require('./src/design'),
 };
