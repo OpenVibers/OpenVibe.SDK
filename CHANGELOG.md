@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.132.0 (2026-11-09)
+
+- ov.blog.changelog({ service, kind, area, q, limit, before }): the network changelog's blog.changelog-entry@2 rows, newest first
+
 ## 0.128.0 (2026-11-09)
 
 - ov.ai: tasks(), choices.get/set, run(task, input, {choice}) and admin.defaults(); runs.create accepts `task` and `choice`
