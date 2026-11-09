@@ -63,6 +63,7 @@ module.exports = {
     pics: require('./src/pics'),
     work: require('./src/work'),
     zone: require('./src/zone'),
+    git: require('./src/git'),
     play: require('./src/play'),
     download: require('./src/download'),
     openre: require('./src/openre'),

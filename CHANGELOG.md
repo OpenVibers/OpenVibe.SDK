@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.127.0 — 2026-11-09
+
+- `openvibe-sdk/git` (`ov.git`): repositories, trees, blobs, commits, branches, tags, releases, contributors,
+  insights and stars; `commits.create()` writes a branch and files without a clone; `tokens.create()` makes a
+  short-lived clone token; `clone(repo, { to: 'link' })` hands a clone to Link.
+
 ## 0.126.0 (2026-11-09)
 
 - Add `openvibe-sdk/pics`: the public gallery and picture reads, private uploads with resumable chunks, publication, likes and albums on OpenVibe.Pics.
