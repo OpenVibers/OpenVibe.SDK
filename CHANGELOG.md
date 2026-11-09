@@ -1,10 +1,29 @@
 # Changelog
 
-## 0.110.0 — 2026-11-09
+## 0.113.0 — 2026-11-09
 
 - Add the Feed and status posts to `openvibe-sdk/community`: `feed({ kind, site, q, following, cursor, limit })` reads
   Community's `GET /api/v1/feed` (one stream over Pulse from every OpenVibe site) and `posts.create({ text, pictures })`
   posts up to four Media pictures with required alt text, in the Feed at once.
+
+## 0.112.0 — 2026-11-09
+
+- Add the person's stats to `openvibe-sdk/report`: `report.me({ days })` (GET `/api/v1/me/stats`, the signed-in person's own numbers), `report.person(username)` (GET `/api/v1/u/:name/stats`, only the sections they published) and `report.publish({ sites, activity, made, ai, money }, { days })` (PUT `/api/v1/me/stats/published`, all five switches named). The answers are `report.me-stats@1`; a source that does not answer leaves its section out, never a zero. `me` and `publish` need the person's own session token; `person` is public and is a 404 when nothing is published.
+
+## 0.111.0 — 2026-11-09
+
+- **`openvibe-sdk/shoes`: the Open.Shoes catalogue and sizing tools.**
+  - `createShoesClient(client)` (server-side; `./shoes` is browser-blocked) exposes public reads only:
+    `products.list({ kind, q, size })`, `products.get(id)`, `products.offers(id)`, `tools.laceLength({...})`
+    and `sizes.convert({ system, size, brand })`.
+
+## 0.110.0 — 2026-11-09
+
+- **`openvibe-sdk/design`: a typed client for the Design glyph API.**
+  - `createDesignClient({ accessToken, baseUrl })` returns `icons.search(q)`, `icons.draft({ name, sentence, styles, sourceSvg })`
+    and `icons.get(name, { style })` for the authenticated glyph draft, get and search calls. It is server-side only
+    (the `./design` subpath is browser-blocked) and takes a signed-in access token rather than a service token.
+  - Styles are checked against the set the API accepts (`thin`, `light`, `regular`, `bold`, `solid`, `duotone`).
 
 ## 0.109.0 — 2026-11-09
 

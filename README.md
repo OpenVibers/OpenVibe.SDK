@@ -2,7 +2,7 @@
 
 > Supported browser and server clients for the OpenVibe platform.
 
-**Status:** alpha, v0.110.0 (the five 1.0 core entries — `core`, `auth`, `events`, `db` and `media` — are frozen: their exported names change only with a major release; roadmap Wave 2; developer apps from Wave 20; Media objects v2 from Wave 4; the Tools platform API; Search, Chat, AI, Vision and consent clients; sign-in with recovery and a client health check). Every release is tagged (see [CHANGELOG.md](CHANGELOG.md)). Tested against local stub servers and the built-in mock platform only, never against the live platform. Services pin release tags; each repository's `STATUS.json` names the one it uses.
+**Status:** alpha, v0.112.0 (the five 1.0 core entries — `core`, `auth`, `events`, `db` and `media` — are frozen: their exported names change only with a major release; roadmap Wave 2; developer apps from Wave 20; Media objects v2 from Wave 4; the Tools platform API; Search, Chat, AI, Vision and consent clients; sign-in with recovery and a client health check). Every release is tagged (see [CHANGELOG.md](CHANGELOG.md)). Tested against local stub servers and the built-in mock platform only, never against the live platform. Services pin release tags; each repository's `STATUS.json` names the one it uses.
 **Plan:** OpenVibe End-to-End Realignment & Implementation Plan, revision 3 (20 Sep 2026), §3.2; roadmap §30.  
 **License:** MIT ([LICENSE](LICENSE)). This package is a library that apps outside the network embed, so it uses MIT. The OpenVibe services themselves stay AGPL-3.0.
 
@@ -11,7 +11,7 @@
 After v0.97.1 is tagged:
 
 ```bash
-npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.110.0
+npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.112.0
 ```
 
 It has no runtime dependencies. It needs Node ≥ 20, or any browser with `fetch`, Web Crypto and `TextDecoder`. There is no build step. The package is CommonJS with ESM entry points (`import` works). Each subpath has its own `.d.ts`. For a page with no bundler, `browser/openvibe-sdk.mjs` is one self-contained ES module of the browser-safe subpaths (see [Browser without a bundler](#browser-without-a-bundler)). It does not depend on `openvibe-contracts` at runtime: it copies the contract types it uses (from the temporary Contracts sharing branch, a devDependency the tests check them against).
@@ -174,7 +174,7 @@ Until OpenVibe.Tools serves the gateway facade (Tools S6), point the jobs client
 | `openvibe-sdk/sso` | server | `createSsoClient({site, baseUrl, clientId, clientSecret, networkUrl, networkInternalUrl, secureCookies})`: a product site's sign-in with OpenVibe.Network: `router(express)` (`/login` with state + PKCE S256, `/callback`, `/fedcm`, `/logout`, `/me`, `/refresh`), `optionalAuth()`, `requireAuth()`, `verify(token)` (offline, shared JWKS), `extractToken(req)`; `sanitizeNext`, `COOKIES` |
 | `openvibe-sdk/realtime` | both | `subscribe(topics, onEvent, {lastEventId, onGap, …})`, `createRealtimeClient(client)`, `parseSSE(body)` |
 | `openvibe-sdk/media` | both (credentials: server) | `createMediaClient(client, {app, apiKey?, actingUserId?})`: `files.upload/list/iterate/get/delete`; `mediaUrls(origin)` public URL helpers; `createObjectsClient({app, baseUrl?, tokenClient \| apiKey \| client})`: object API v2 `upload` (single or multipart by size, resumable), `resume`, `get`, `signedUrl`, `delete`, `list`, `iterate`, and `jobs.create/get/list/approve/cancel/wait`; Media's origin from the platform descriptor when `baseUrl` is omitted |
-| `openvibe-sdk/community` | both | `createCommunityClient(client, {actingSubject?, origin?, sourceRef?, staff?})`: `pastes.list/iterate/get/create/update/delete/fork/like/copy/versions/byUser/config`, `pastes.comments.list/create/delete`, `feed({kind, site, q, following, cursor, limit})`, `posts.create({text, pictures})`, `as(subject)` |
+| `openvibe-sdk/community` | both | `createCommunityClient(client, {actingSubject?, origin?, sourceRef?, staff?})`: `pastes.list/iterate/get/create/update/delete/fork/like/copy/versions/byUser/config`, `pastes.comments.list/create/delete`, `as(subject)` |
 | `openvibe-sdk/home-feed` | both | `createHomeFeedClient(client)` gives `ov.home.get()/set(layout)`, `ov.network.today()`, `ov.feed.list({ for: 'me', cursor })`, `ov.feed.post(text)`, and `ov.feed.contribute({ id, text, url })`. Personal calls need a user Bearer token; contribution needs an app token granted `community.pulse.contribute`. Today is public and cached by Network for five minutes. |
 | `openvibe-sdk/bot` | both | `createBotClient(client, {actingSubject?})`: OpenVibe.Bot robots. `robots.list/get/create/update/delete/pairingCode`, `robots.operators.list/add/remove`, `robots.devices`, `robots.streaming.get/set`, `robots.audit`/`iterateAudit`, `robots.estop`/`clearEstop`, `robots.command` (`bot.command@1`), `devices.rotate/revoke`, public `profiles.list/get` and `kits.list/get`, `pair` (the agent's one-time code, never retried), `as(subject)`; a service acts for a person with `X-OV-Subject` (capabilities `bot.robot.read`/`manage`/`control`, `bot.device.connect`) |
 | `openvibe-sdk/themes` | both | `createThemesClient(client)`: `catalog({mode, search, sort, limit})` (seasonal themes carry `season`), `get(idOrSlug)` (null when missing), `export(idOrSlug)`, `active()` (`{theme_id, custom_variables, display}`), `set(themeId, {custom})`, `setDisplay({motion, text, seasonal})`, `seasons({date})`, `submissions()`, `submit(theme)`, `import(file)`. In the browser: `followTheme(fn)` calls back now and on every theme, display or season change with `readTheme()` (`{id, mode, tokens, display: {motion, text, textScale, seasonal, calm}, season, seasonMark}`) and returns `stop()`, for a canvas or game to keep up; `applyTheme(vars, {root})`, `seasonOn(date, seasons)`, `onColor(hex)`, `DISPLAY_OPTIONS`, `TOKENS` |
@@ -184,7 +184,7 @@ Until OpenVibe.Tools serves the gateway facade (Tools S6), point the jobs client
 | `openvibe-sdk/search` | both | `createSearchClient(client, {actingSubject?})`: `query(text, {owner, type, lang, filter, facets, limit, cursor})`, `iterate(text, {…, max})`, `suggest(text, {owner, type, limit})`, `document(owner, type, id)` (null when missing or not visible) |
 | `openvibe-sdk/limits` | node | `createActorLimiter({limits: {minute, hour, day}, actor?, maxActors?, onLimited?})` → `limits(name, {minute?, hour?, day?})` Express middleware: per-actor fixed windows at a capability boundary (service principal, else the signed-in person, else `ip:`), 429 problem+json `rate_limited` with Retry-After before the handler; `defaultActor(req)`, `.stats()` |
 | `openvibe-sdk/account-data` | node | `createAccountData({db, service, tables: [{table, subject, value?, file?, columns?, erase?}], extraExport?, extraErase?})` → `.apply(event, {send})`, `.consumer({secrets, send, onEvent?})` (a POST /internal/events handler), `.exportPart(subject)`, `.erase(subjects)`, `.ensureSchema()`; `createNetworkSender({networkInternalUrl, clientId, clientSecret})`; `startSubscriptions({eventsUrl, endpoint, secret, networkInternalUrl, clientId, clientSecret})` (the two Events subscriptions, created at boot when missing): a service's share of account export and deletion (ADR-033), idempotent per export/deletion id; telemetry is covered once here (the person's `telemetry_samples` exported as `telemetry.json`, its `subject` set to NULL and the sample kept) unless the table is listed; `uncovered(db, {tables, taskKeyed?, exempt?})` lists the tables with a person column (`subject`, `owner`, `created_by`, `user_id`, `person`) that nothing covers, for a service test to assert is empty |
-| `openvibe-sdk/chat` | both | `createChatClient(client)`: `ask({ message, models })`, `pick(messageId, model)`, `prefer(messageId, model)`, `global.send/history/search`, `rooms.*` (list, create, get, update, messages, send, deleteMessage, join, leave, read, members, setMember), `dms.*` (list, create, get, messages, send, deleteMessage, read, unread, blocks, block, unblock), `exportMine()`, `vibe.*` (list, start, rename, remove: chats with Vibe), `inboxes.*` (list, create, get, update, remove, addMember, removeMember, conversations, messages, reply, setStatus, read, identity, replies, saveReply, deleteReply, webhooks, addWebhook, testWebhook, removeWebhook: a support inbox's team), `support.*` (list, messages, send: their own conversations with sites' chats), `feeds.*` (mine, create, update, rotateKey, remove, view, onLive). With no account: `createInboxVisitor(client, { inbox, token, user, account })` (visit, send, messages, handoff, rate: your own panel for an inbox, from any site) and `createFeedPublisher(client, { feed, key })` (hello, publish, claudeCode: vibe coding events with the feed's key) |
+| `openvibe-sdk/chat` | both | `createChatClient(client)`: `global.send/history/search`, `rooms.*` (list, create, get, update, messages, send, deleteMessage, join, leave, read, members, setMember), `dms.*` (list, create, get, messages, send, deleteMessage, read, unread, blocks, block, unblock), `exportMine()`, `vibe.*` (list, start, rename, remove: chats with Vibe), `inboxes.*` (list, create, get, update, remove, addMember, removeMember, conversations, messages, reply, setStatus, read, identity, replies, saveReply, deleteReply, webhooks, addWebhook, testWebhook, removeWebhook: a support inbox's team), `support.*` (list, messages, send: their own conversations with sites' chats), `feeds.*` (mine, create, update, rotateKey, remove, view, onLive). With no account: `createInboxVisitor(client, { inbox, token, user, account })` (visit, send, messages, handoff, rate: your own panel for an inbox, from any site) and `createFeedPublisher(client, { feed, key })` (hello, publish, claudeCode: vibe coding events with the feed's key) |
 | `openvibe-sdk/ai` | both | `createAiClient(client)`: `runs.create(workflow, input, {wait, idempotencyKey, latency, deadlineHours, …})`, `runs.get/list/cancel/retry/citations/addCitations/waitFor`, `batches.create/get/list/cancel`, `chat/generate/summarize/classify/extract/enrich/embed`. A run may ask for the class it may wait in (`latency`: `interactive`, `background`, `batch`; `deadlineHours`: 1–72 for a batch run); `waitFor` gives a batch run back pending rather than throwing when the wait is over — the answer comes with the run's completion event or webhook. |
 | `openvibe-sdk/jobs` | both | `createJobsClient(client, {baseUrl?})`: `submit` (Idempotency-Key), `get`, `cancel`, `retry`, `reference`, `unreference`, `events` (SSE, reattaches), `wait`, `file` (raw Response); `isTerminal()`. Default origin: the Tools gateway's jobs facade |
 | `openvibe-sdk/tools` | both | `createToolsClient(client, {baseUrl?, anonymousReads?})`: `list({family, q, execution, api, status})`, `get(id)`, `schema(id)`, `run(id, input, {files, waitMs, idempotencyKey, signal, timeoutMs})` (+ `.wait()`), `jobs`; `ToolRunError`, `isToolRunError()` |
@@ -565,7 +565,7 @@ shows the cards in `GET /api/frame`.
 
 ## Not wrapped yet (intentionally)
 
-- **Community comments on other content and the rest of the forum** are being built in Community right now. Paste comments, the Feed and status posts are wrapped; the rest is a TODO in `src/community.js` until those APIs settle.
+- **Community comments on other content, the forum and Pulse** are being built in Community right now. Only paste comments are wrapped. The rest is a TODO in `src/community.js` until those APIs settle.
 - **Media:** the v1 files API, the object API v2 (`createObjectsClient`) and the public URL helpers are wrapped. Retention holds on v2 objects are not (app keys only). VOD, clip, thumbnail and admin-storage routes are not wrapped because apps reach them only through Live and Media's own servers. Media's own paste API is not wrapped because pastes moved to Community (ADR-011). The mock platform (`openvibe-sdk/testing`) models Media's v1 files only, not v2 objects.
 - **Media from the browser:** Media refuses user JWTs on `/api/v1/:app/files`, so a browser uploads through its own app server. That server holds the app key and names the user with `actingUserId`.
 - **Network coins, notifications and legacy-map writes** are internal service-to-service routes with no public capability, so they are not wrapped. Staff-only paste routes are also internal: admin stats, bulk, censor and the AI pass.
@@ -645,16 +645,6 @@ Part of the [OpenVibe network](https://openvibe.network). Built in the open by [
 ### Locker: end-to-end encryption (Node and the browser)
 
 `openvibe-sdk/locker` seals anything and opens it again: the Locker envelope (`locker.envelope@1`), the three locks (people, password, link), streams for files, person key pairs and the eight-word fingerprint, `wrapFor` and `rewrap` for sharing, `recoveryWords` for the phrase to write down, `inspect` for what an envelope says about itself, and opening a people lock by key. `openvibe-sdk/locker/server` gives a service the header checks without a key. WebCrypto only, in Node and the browser. See [the locker module](docs/locker.md).
-
-### Compare answers in Chat
-
-```js
-const ov = createChatClient(client);
-const { chat, message } = await ov.ask({ message: "Explain this tradeoff", models: ["deepseek/deepseek-chat", "qwen/qwen3-32b"] });
-// Read /api/vibe/chat?slug=<chat.slug> to show each model answer and its receipt.
-await ov.pick(message.id, "qwen/qwen3-32b");
-```
-
 # AI comparison and Arena
 
 Read Report's public AI data and create or vote on Exchange Arena rounds:
@@ -665,9 +655,11 @@ const client = ov.createClient();
 const report = ov.report.createReportClient(client);
 const leaders = await report.ai.leaderboard({ kind: 'code', limit: 25 });
 const headToHead = await report.ai.compare(['openai/gpt-4o', 'anthropic/claude-sonnet']);
+const mine = await report.me({ days: 30 });                 // private by default; the switches say what is public
+await report.publish({ sites: true, activity: true, made: false, ai: false, money: false });
+const theirs = await report.person('goosely');              // only the sections they published
 
 const exchange = require('openvibe-sdk/exchange').createExchangeClient({ developerKey });
 const round = await exchange.arena.start({ prompt: 'Explain a binary search.', category: 'code', entries });
 await exchange.arena.vote(round.id, 'left');
-```
 ```
