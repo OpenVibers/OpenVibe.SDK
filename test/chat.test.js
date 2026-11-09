@@ -29,6 +29,8 @@ run([
         await chat.dms.create([42], { name: 'pair' });
         await chat.dms.send(7, 'hi');
         await chat.dms.messages(7, { limit: 20 });
+        await chat.dms.viewPreference(7);
+        await chat.dms.setViewPreference(7, 'bubbles');
         await chat.global.history({ after_id: 5 });
         const got = srv.requests.map((r) => [r.method, r.url, r.body && String(r.body).length ? JSON.parse(String(r.body)) : null]);
         assert.deepEqual(got, [
@@ -39,6 +41,8 @@ run([
             ['POST', '/api/dm/conversations', { user_ids: [42], name: 'pair' }],
             ['POST', '/api/dm/conversations/7/messages', { message: 'hi' }],
             ['GET', '/api/dm/conversations/7/messages?limit=20', null],
+            ['GET', '/api/dm/conversations/7/view', null],
+            ['PUT', '/api/dm/conversations/7/view', { view: 'bubbles' }],
             ['GET', '/api/chat/global/history?after_id=5', null],
         ]);
         assert.equal(srv.requests[0].headers.authorization, 'Bearer user-jwt');
