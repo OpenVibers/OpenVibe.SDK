@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.114.0 (2026-11-09)
+
+- Dock v2: Vibe conversations (ov.chat.vibe.conversations) and Actor skill runs (ov.actor.skills.run)
+
 ## 0.113.0 — 2026-11-09
 
 - Add the Feed and status posts to `openvibe-sdk/community`: `feed({ kind, site, q, following, cursor, limit })` reads
