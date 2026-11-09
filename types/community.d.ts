@@ -33,7 +33,7 @@ export interface PastesApi {
         delete(slug: string, commentId: string | number, opts?: CallOptions): Promise<unknown>;
     };
 }
-export type FeedKind = 'live' | 'clip' | 'video' | 'pic' | 'post' | 'meme' | 'game' | 'update' | 'wiki' | 'quest' | 'chat' | 'event' | 'member';
+export type FeedKind = 'live' | 'stream' | 'clip' | 'video' | 'pic' | 'post' | 'meme' | 'game' | 'update' | 'wiki' | 'quest' | 'chat' | 'event' | 'member';
 export interface FeedQuery { kind?: FeedKind; site?: string; q?: string; following?: boolean | 1; cursor?: string; limit?: number; }
 export interface FeedItem {
     id: string;
