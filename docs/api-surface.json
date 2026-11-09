@@ -313,7 +313,9 @@
     },
     "report": {
       "object": [
+        "DAYS",
         "REPORT_URL",
+        "SECTIONS",
         "createReportClient"
       ]
     },
@@ -971,7 +973,9 @@
     "createRegistryClient": "function"
   },
   "openvibe-sdk/report": {
+    "DAYS": "array",
     "REPORT_URL": "string",
+    "SECTIONS": "array",
     "createReportClient": "function"
   },
   "openvibe-sdk/reports": {
