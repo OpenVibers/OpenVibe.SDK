@@ -251,6 +251,11 @@
         "mediaUrls"
       ]
     },
+    "mediaUpload": {
+      "object": [
+        "createUploadClient"
+      ]
+    },
     "meme": {
       "object": [
         "createMemeClient"
@@ -407,6 +412,11 @@
         "atLeast",
         "createTrustClient",
         "isNew"
+      ]
+    },
+    "ui": {
+      "object": [
+        "progress"
       ]
     },
     "ulid": "function",
@@ -877,6 +887,9 @@
     "createObjectsClient": "function",
     "mediaUrls": "function"
   },
+  "openvibe-sdk/media-upload": {
+    "createUploadClient": "function"
+  },
   "openvibe-sdk/meme": {
     "createMemeClient": "function"
   },
@@ -1165,6 +1178,9 @@
     "atLeast": "function",
     "createTrustClient": "function",
     "isNew": "function"
+  },
+  "openvibe-sdk/ui": {
+    "progress": "function"
   },
   "openvibe-sdk/usage": {
     "createUsageReporter": "function",

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.120.0 (2026-11-09)
+
+- createUploadClient(): resumable Media uploads in 8 MiB parts, three at a time, with a session reference to resume; ov.ui.progress(el)
+
 ## 0.119.0 (2026-11-09)
 
 - openvibe-sdk/wallet: the wallet, Vibes, the store and items, through Billing and Inventory with the person's bearer and idempotency keys

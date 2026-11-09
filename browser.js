@@ -16,6 +16,8 @@ module.exports = {
     realtime: require('./src/realtime'),
     media: require('./src/media'),
     cam: require('./src/cam'),
+    mediaUpload: require('./src/media-upload'),
+    ui: require('./src/ui'),
     community: require('./src/community'),
     homeFeed: require('./src/home-feed'),
     bot: require('./src/bot'),
