@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.111.0 — 2026-11-09
+
+- **`openvibe-sdk/shoes`: the Open.Shoes catalogue and sizing tools.**
+  - `createShoesClient(client)` (server-side; `./shoes` is browser-blocked) exposes public reads only:
+    `products.list({ kind, q, size })`, `products.get(id)`, `products.offers(id)`, `tools.laceLength({...})`
+    and `sizes.convert({ system, size, brand })`.
+
 ## 0.110.0 — 2026-11-09
 
 - **`openvibe-sdk/design`: a typed client for the Design glyph API.**
