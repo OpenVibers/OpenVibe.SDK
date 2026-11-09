@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.109.0 — 2026-11-09
+
+- `openvibe-sdk/blog`: `posts.create(handle, { title, markdown | blocks })` writes a body of Markdown or of blocks (the Markdown is what the post keeps), and `posts.blocks(id)` reads the blocks of a post, parsed.
+
 ## 0.108.0 — 2026-11-09
 
 - Add daily quest reads, progress, step type listings and reviewable step contributions to `openvibe-sdk/quest`.

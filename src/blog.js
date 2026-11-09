@@ -8,6 +8,7 @@
  *   const blog = createBlogClient(createClient({ tokenProvider }));
  *   const { posts, total } = await blog.blogs.posts('goosely', { limit: 10 });             // published, public
  *   const { post } = await blog.posts.create('goosely', { title: 'Tonight on stream', body: '…', visibility: 'public' });
+ *   const { post } = await blog.posts.create('goosely', { title: 'With blocks', blocks: { type: 'root', children: [] } });
  *   await blog.posts.update(post.id, { body: '… (edited)', expected_revision: 1 });         // a new revision
  *   await blog.posts.publish(post.id);                                                     // the latest revision
  *   await blog.posts.schedule(post.id, { at: '2026-10-21T18:00:00Z' });
@@ -48,12 +49,22 @@ function createBlogClient(client, { baseUrl } = {}) {
             feed: (h, { signal } = {}) => call({ path: `${handle(h)}/feed`, signal }),
         },
         posts: {
-            /** A draft on a blog the person belongs to (blog.post-create-request@1: title required) → { post, revision }. */
+            /**
+             * A draft on a blog the person belongs to (blog.post-create-request@1: title required) → { post, revision }.
+             * The body is Markdown, or the blocks of a body: posts.create(handle, { title, markdown }) or
+             * posts.create(handle, { title, blocks }). The Markdown is what the post keeps, so blocks are
+             * written back as the Markdown they parse from.
+             */
             create: (h, fields, { signal } = {}) => {
                 if (!fields || typeof fields.title !== 'string' || !fields.title.trim()) throw new TypeError('blog.posts.create: a title');
+                if (fields.blocks !== undefined && fields.blocks !== null && fields.body === undefined && fields.markdown === undefined) {
+                    if (typeof fields.blocks !== 'object') throw new TypeError('blog.posts.create: blocks is a block tree');
+                }
                 return call({ method: 'POST', path: `${handle(h)}/posts`, json: fields, idempotencyKey: false, signal });
             },
             get: (id, { signal } = {}) => call({ path: post(id), signal }),
+            /** The blocks of a post, parsed (GET /posts/:id?format=blocks). */
+            blocks: (id, { signal } = {}) => call({ path: post(id, '?format=blocks'), signal }),
             /** Edit: a new revision unless nothing changed ({ post, revision, created }); expected_revision guards a race. */
             update: (id, fields, { signal } = {}) => call({ method: 'PATCH', path: post(id), json: fields, idempotent: true, signal }),
             /** Publish a revision (the latest when omitted). */
