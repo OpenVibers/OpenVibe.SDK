@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.109.0 — 2026-11-09
+
+- Add Vibe compare methods to `openvibe-sdk/chat` for submitting answers and recording a user's preferred model.
+
+## 0.108.0 — 2026-11-09
+
+- Add daily quest reads, progress, step type listings and reviewable step contributions to `openvibe-sdk/quest`.
+
 ## 0.107.0 — 2026-11-09
 
 - Add `ov.cam.open()` for the Cam recorder, with typed modes, options and file results across Node and browser exports.
