@@ -10,6 +10,18 @@ export declare const OV_CAMERA_SRC: string;
 /** The pinned in-page recorder script and its SHA-384 integrity value. */
 export declare const CAM_KIT_SRC: string;
 export declare const CAM_KIT_SRI: string;
+export interface CamSettings {
+    facing: 'user' | 'environment';
+    lens: string;
+    mic: string;
+    resolution: '480' | '720' | '1080';
+    mirror: boolean;
+    updated_at: string | null;
+}
+export declare const settings: {
+    get(options: { token: string }): Promise<CamSettings>;
+    put(options: { token: string; values: Partial<Omit<CamSettings, 'updated_at'>> }): Promise<CamSettings>;
+};
 
 export type CamKitMode = 'video' | 'photo' | 'screen';
 export interface CamKitResult {

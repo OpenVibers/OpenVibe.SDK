@@ -33,8 +33,33 @@ export interface PastesApi {
         delete(slug: string, commentId: string | number, opts?: CallOptions): Promise<unknown>;
     };
 }
+export type FeedKind = 'live' | 'stream' | 'clip' | 'video' | 'pic' | 'post' | 'meme' | 'game' | 'update' | 'wiki' | 'quest' | 'chat' | 'event' | 'member';
+export interface FeedQuery { kind?: FeedKind; site?: string; q?: string; following?: boolean | 1; cursor?: string; limit?: number; }
+export interface FeedItem {
+    id: string;
+    kind: FeedKind;
+    url: string;
+    title: string;
+    text: string;
+    at: string | null;
+    site: string;
+    site_name: string;
+    actor: { name: string | null; avatar: string | null } | null;
+    media: { thumb: string; ratio: number; length?: number } | null;
+    counts: { views?: number; likes?: number; comments?: number };
+    label?: 'Trending' | 'AI' | 'System';
+}
+export interface CreatePostInput {
+    text: string;
+    pictures?: Array<{ media_id: string; alt: string }>;
+}
+export interface PostsApi {
+    create(input: CreatePostInput, opts?: CallOptions): Promise<{ id: number; post_id: number; text: string; url: string; pictures: Array<{ media_id: string; alt: string | null; url?: string }>; created_at: string }>;
+}
 export interface CommunityClient {
     pastes: PastesApi;
+    feed(query?: FeedQuery, opts?: CallOptions): Promise<{ items: FeedItem[]; next_cursor: string | null }>;
+    posts: PostsApi;
     as(who: string | ActingOptions): CommunityClient;
     headers(): Record<string, string>;
 }

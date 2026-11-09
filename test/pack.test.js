@@ -72,7 +72,7 @@ run([
                 })().catch((err) => { console.error(err); process.exit(1); });`;
             const res = execFileSync(process.execPath, ['-e', script], { cwd: app, encoding: 'utf8' });
             assert.match(res, new RegExp(`consumer ok: ${subpaths.length} subpaths \\+ the browser bundle`));
-            assert.equal(subpaths.length, 94);   // Pics adds one subpath (0.109.0); daily quest methods extended the existing quest subpath.
+            assert.equal(subpaths.length, 99);   // Pics adds one subpath (0.124.0); the upload client and UI entry came in 0.123.0.
             assert.ok(!fs.existsSync(path.join(app, 'node_modules/openvibe-contracts')), 'the optional peer is not installed');
         } finally {
             fs.rmSync(tmp, { recursive: true, force: true });
