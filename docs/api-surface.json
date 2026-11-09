@@ -269,6 +269,11 @@
     },
     "paginate": "function",
     "parseTraceparent": "function",
+    "pics": {
+      "object": [
+        "createPicsClient"
+      ]
+    },
     "play": {
       "object": [
         "createPlayClient"
@@ -890,6 +895,9 @@
   },
   "openvibe-sdk/openre": {
     "createOpenReClient": "function"
+  },
+  "openvibe-sdk/pics": {
+    "createPicsClient": "function"
   },
   "openvibe-sdk/placement": {
     "DEFAULT_P_FLOOR": "number",

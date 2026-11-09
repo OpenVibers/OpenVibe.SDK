@@ -96,6 +96,7 @@ const ENTRIES = {
     'actor.mjs': '../src/actor.js',
     'run.mjs': '../src/run.js',
     'video.mjs': '../src/video.js',
+    'pics.mjs': '../src/pics.js',
     'work.mjs': '../src/work.js',
     'zone.mjs': '../src/zone.js',
     'vip.mjs': '../src/vip.js',

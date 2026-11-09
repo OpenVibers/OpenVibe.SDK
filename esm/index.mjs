@@ -12,8 +12,8 @@ export const {
     jobs, tools, projects, resources, vip, quest,
     live, inventory, tips, blog, reviews, wiki,
     coupons, deals, trade, space, host, news,
-    food, actor, run, video, work, zone,
-    play, download, openre, geo, usage, commerce,
-    telemetry,
+    food, actor, run, video, pics, work,
+    zone, play, download, openre, geo, usage,
+    commerce, telemetry,
 } = cjs;
 export default cjs;

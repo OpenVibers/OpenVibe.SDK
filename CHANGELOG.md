@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.109.0 — 2026-11-09
+
+- Add `openvibe-sdk/pics`: the public gallery and picture reads, private uploads with resumable chunks, publication, likes and albums on OpenVibe.Pics.
+
 ## 0.108.0 — 2026-11-09
 
 - Add daily quest reads, progress, step type listings and reviewable step contributions to `openvibe-sdk/quest`.
