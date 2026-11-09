@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.113.0 — 2026-11-09
+
+- Add the Feed and status posts to `openvibe-sdk/community`: `feed({ kind, site, q, following, cursor, limit })` reads
+  Community's `GET /api/v1/feed` (one stream over Pulse from every OpenVibe site) and `posts.create({ text, pictures })`
+  posts up to four Media pictures with required alt text, in the Feed at once.
+
 ## 0.112.0 — 2026-11-09
 
 - Add the person's stats to `openvibe-sdk/report`: `report.me({ days })` (GET `/api/v1/me/stats`, the signed-in person's own numbers), `report.person(username)` (GET `/api/v1/u/:name/stats`, only the sections they published) and `report.publish({ sites, activity, made, ai, money }, { days })` (PUT `/api/v1/me/stats/published`, all five switches named). The answers are `report.me-stats@1`; a source that does not answer leaves its section out, never a zero. `me` and `publish` need the person's own session token; `person` is public and is a 404 when nothing is published.

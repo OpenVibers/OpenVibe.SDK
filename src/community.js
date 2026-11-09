@@ -13,8 +13,9 @@
  *   staff: true                        -> X-OV-Staff: 1 (the acting person is staff; needs .moderate)
  * Community ignores X-OV-* headers from browsers.
  *
- * TODO: comments on other content, the forum and Pulse APIs are being added to Community now and
- * are not wrapped yet; paste comments are.
+ * The Feed and status posts are here too: feed() reads GET /api/v1/feed (one stream from Pulse across every
+ * OpenVibe site) and posts.create() posts text with up to four pictures. Comments on other content, the rest of
+ * the forum and Pulse's service API are not wrapped yet; paste comments are.
  */
 const { isOpenVibeError } = require('./core/errors');
 const { isActingSubjectId } = require('./core/ids');
@@ -102,8 +103,23 @@ function createCommunityClient(client, defaults = {}) {
         },
     };
 
+    const feed = (query = {}, o = {}) => call({
+        path: '/api/v1/feed',
+        query: { kind: query.kind, site: query.site, q: query.q, cursor: query.cursor, limit: query.limit,
+            following: query.following === true || query.following === 1 ? '1' : undefined },
+    }, o);
+    const posts = {
+        /**
+         * A status post in the Feed at once: { text, pictures?: [{ media_id, alt }] } (at most four, alt required,
+         * each media_id a Media object the person owns). -> { id, post_id, text, url, pictures, created_at }
+         */
+        create: (input = {}, o = {}) => call({ method: 'POST', path: '/api/v1/posts', json: input, ...once }, o),
+    };
+
     return {
         pastes,
+        feed,
+        posts,
         /** The same client acting for someone else: as('usr_…') or as({ actingSubject, origin, sourceRef, staff }). */
         as(who) {
             const next = typeof who === 'string' ? { actingSubject: who } : { ...who };
