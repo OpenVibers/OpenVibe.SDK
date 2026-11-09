@@ -58,6 +58,16 @@
         "createBotClient"
       ]
     },
+    "cam": {
+      "object": [
+        "CAM_KIT_SRC",
+        "CAM_KIT_SRI",
+        "OV_CAMERA_SRC",
+        "defineOvCamera",
+        "loadCamKit",
+        "open"
+      ]
+    },
     "chat": {
       "object": [
         "createChatClient",
@@ -118,6 +128,12 @@
     "deals": {
       "object": [
         "createDealsClient"
+      ]
+    },
+    "design": {
+      "object": [
+        "DEFAULT_DESIGN_URL",
+        "createDesignClient"
       ]
     },
     "download": {
@@ -507,8 +523,12 @@
     "createCache": "function"
   },
   "openvibe-sdk/cam": {
+    "CAM_KIT_SRC": "string",
+    "CAM_KIT_SRI": "string",
     "OV_CAMERA_SRC": "string",
-    "defineOvCamera": "function"
+    "defineOvCamera": "function",
+    "loadCamKit": "function",
+    "open": "function"
   },
   "openvibe-sdk/chat": {
     "createChatClient": "function",
@@ -649,6 +669,10 @@
   "openvibe-sdk/delivery": {
     "deliveryOffer": "function",
     "validateDeliveryOffer": "function"
+  },
+  "openvibe-sdk/design": {
+    "DEFAULT_DESIGN_URL": "string",
+    "createDesignClient": "function"
   },
   "openvibe-sdk/download": {
     "contentTypeOf": "function",

@@ -19,6 +19,19 @@ async function chatStub() {
 }
 
 run([
+    ['Vibe comparison sends models and records a pick and preference', async () => {
+        const srv = await chatStub();
+        const chat = createChatClient(createClient({ baseUrls: { chat: srv.url }, token: 'person-token' }));
+        await chat.ask({ message: 'Explain this', models: ['maker/one', 'maker/two'] });
+        await chat.pick(42, 'maker/two');
+        await chat.prefer(42, 'maker/two');
+        assert.deepEqual(srv.requests.map((r) => [r.method, r.url, JSON.parse(String(r.body))]), [
+            ['POST', '/api/vibe/ask', { message: 'Explain this', models: ['maker/one', 'maker/two'] }],
+            ['POST', '/api/vibe/pick', { message_id: 42, model: 'maker/two' }],
+            ['POST', '/api/vibe/prefer', { message_id: 42, model: 'maker/two' }],
+        ]);
+        await srv.close();
+    }],
     ['global, rooms and DMs go to the right paths with the right bodies', async () => {
         const srv = await chatStub();
         const chat = createChatClient(createClient({ baseUrls: { chat: srv.url }, token: 'user-jwt', retries: 2 }));

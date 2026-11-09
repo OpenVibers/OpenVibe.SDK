@@ -19,6 +19,7 @@ module.exports = {
     events: require('./src/events'),
     realtime: require('./src/realtime'),
     media: require('./src/media'),
+    cam: require('./src/cam'),
     community: require('./src/community'),
     homeFeed: require('./src/home-feed'),
     bot: require('./src/bot'),
@@ -64,4 +65,5 @@ module.exports = {
     usage: require('./src/usage'),
     commerce: require('./src/commerce'),
     telemetry: require('./src/telemetry'),
+    design: require('./src/design'),
 };
