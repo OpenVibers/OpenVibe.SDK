@@ -294,14 +294,29 @@ const ids = { plan: `pln_${ULID}`, task: `tsk_${ULID}`, agent: `agt_${ULID}`, me
         await wiki.pages.revision(ids.page, 4);
         await wiki.pages.diff(ids.page, { from: 3, to: 4, mode: 'words' });
         await wiki.pages.citations(ids.page, 4);
+        await wiki.pages.blocks(ids.page, { revision: 4 });
+        await busyOnce(() => wiki.articles.create('openvibe', { title: 'Restreaming', blocks: { type: 'root', children: [] } }));
+        await wiki.articles.create('openvibe', { title: 'Restreaming', blocks: { type: 'root', children: [] } });
+        await busyOnce(() => wiki.articles.update(ids.page, { expected_revision: 4, blocks: { type: 'root', children: [] } }));
+        await wiki.articles.update(ids.page, { expected_revision: 4, blocks: { type: 'root', children: [] } });
+        await busyOnce(() => wiki.images.suggest(ids.page, { query: 'Restreaming', count: 4 }));
+        await wiki.images.suggest(ids.page, { query: 'Restreaming', count: 4 });
+        await busyOnce(() => wiki.articles.draft(ids.page, { instruction: 'Add the setup section' }));
+        await wiki.articles.draft(ids.page, { instruction: 'Add the setup section' });
         const W = `/api/v1/pages/${ids.page}`;
         assert.deepStrictEqual(mark().map((x) => `${x.method} ${x.url}`), [
             'GET /api/v1/search?q=restreaming&space=openvibe&limit=5', 'GET /api/v1/spaces', 'GET /api/v1/spaces/openvibe', `GET ${W}?revision=4`,
             `GET ${W}/revisions?limit=10`, `GET ${W}/revisions/4`, `GET ${W}/diff?from=3&to=4&mode=words`, `GET ${W}/revisions/4/citations`,
+            `GET ${W}?format=blocks&revision=4`,
+            'POST /api/v1/spaces/openvibe/pages', 'POST /api/v1/spaces/openvibe/pages', `POST ${W}/revisions`, `POST ${W}/revisions`,
+            `POST ${W}/images/suggest`, `POST ${W}/images/suggest`, `POST ${W}/draft`, `POST ${W}/draft`,
         ]);
         assert.throws(() => wiki.search(''), /search for/);
         assert.throws(() => wiki.pages.get('page_1'), /pg_/);
         assert.throws(() => wiki.pages.diff(ids.page, { from: 0, to: 2 }), /revision number/);
+        assert.throws(() => wiki.articles.create('openvibe', { blocks: { type: 'root' } }), /title/);
+        assert.throws(() => wiki.articles.create('openvibe', { title: 'X', blocks: 'root' }), /block tree/);
+        assert.throws(() => wiki.articles.update(ids.page, null), /fields/);
 
         // ── Coupons ───────────────────────────────────────────
         const coupons = createCouponsClient(client);
