@@ -10,6 +10,8 @@
  * delete, media.object.read to list and get. Media refuses a user JWT here: a browser uploads
  * through its own app server, which names the user with X-OV-User-Id (the `actingUserId` option).
  * Browser-safe code (FormData/Blob), but the credentials it needs belong on a server.
+ * createUploadClient() configures object uploads for 8 MiB parts and three concurrent requests;
+ * upload's onSession callback gives apps a reference to persist before the first part is sent.
  *
  * Sandbox app tokens land in the project's sandbox tenant (`<prj_…>-sandbox`, shown as `app_id`),
  * whose files are never served publicly: Media answers them with `sandbox: true`, a signed,
@@ -21,6 +23,7 @@ const { paginate, offsetPager } = require('./core/paginate');
 const { createObjectsClient } = require('./objects');
 
 const DEFAULT_PUBLIC_ORIGIN = 'https://openvibe.media';
+const MIB = 1024 * 1024;
 const enc = encodeURIComponent;
 
 /** Absolute public URLs for Media objects (no auth unless the item is private). */
@@ -108,4 +111,16 @@ function createMediaClient(client, { app, apiKey, actingUserId, baseUrl, publicO
     return { app, files, urls, upload: files.upload };
 }
 
-module.exports = { createMediaClient, createObjectsClient, mediaUrls, DEFAULT_PUBLIC_ORIGIN };
+/** Media's resumable multipart transport, configured for 8 MiB parts and three in flight. */
+function createUploadClient(config) {
+    const objects = createObjectsClient({ partSize: 8 * MIB, concurrency: 3, ...config });
+    return {
+        upload(file, options = {}) {
+            return objects.upload(file, { kind: 'file', filename: file && file.name, ...options });
+        },
+        resume(ref, file, options) { return objects.resume(ref, file, options); },
+        objects,
+    };
+}
+
+module.exports = { createMediaClient, createObjectsClient, createUploadClient, mediaUrls, DEFAULT_PUBLIC_ORIGIN };

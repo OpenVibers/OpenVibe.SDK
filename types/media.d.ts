@@ -124,6 +124,8 @@ export interface ObjectUploadOptions {
     uploadTtl?: number;
     signal?: AbortSignal;
     onProgress?(p: { uploadedBytes: number; totalBytes: number; part?: number }): void;
+    /** Called as soon as Media creates a multipart session; persist this reference for reload resume. */
+    onSession?(ref: ObjectUploadRef): void | Promise<void>;
 }
 
 /** err.resume of an sdk.upload_incomplete error. */
@@ -150,6 +152,13 @@ export interface ObjectsClient {
     };
     client: OpenVibeClient;
 }
+
+/** A ready-to-use multipart client with 8 MiB parts and three concurrent uploads. */
+export declare function createUploadClient(opts: Parameters<typeof createObjectsClient>[0]): {
+    upload(file: UploadBody, options?: ObjectUploadOptions): Promise<MediaObject>;
+    resume(ref: ObjectUploadRef, file: UploadBody, options?: { signal?: AbortSignal; onProgress?: ObjectUploadOptions['onProgress']; contentHash?: string | false }): Promise<MediaObject>;
+    objects: ObjectsClient;
+};
 
 /**
  * Media's object API v2. Credentials: tokenClient (createServiceTokenClient; media.object.upload and

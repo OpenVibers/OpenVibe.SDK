@@ -84,6 +84,11 @@
       "import": "./esm/media.mjs",
       "default": "./src/media.js"
     },
+    "./ui": {
+      "types": "./types/ui.d.ts",
+      "import": "./esm/ui.mjs",
+      "default": "./src/ui.js"
+    },
     "./meme": {
       "types": "./types/meme.d.ts",
       "browser": "./src/meme.js",
