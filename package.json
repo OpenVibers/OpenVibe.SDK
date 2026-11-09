@@ -200,7 +200,6 @@
     },
     "./report": {
       "types": "./types/report.d.ts",
-      "browser": null,
       "import": "./esm/report.mjs",
       "default": "./src/report.js"
     },
@@ -579,7 +578,7 @@
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
     "iovalkey": "^0.4.0",
-    "openvibe-contracts": "https://codeload.github.com/OpenVibers/OpenVibe.Contracts/tar.gz/refs/heads/report-ai-contracts",
+    "openvibe-contracts": "https://codeload.github.com/OpenVibers/OpenVibe.Contracts/tar.gz/refs/tags/v0.351.0",
     "pg": "^8.23.0"
   },
   "peerDependencies": {
