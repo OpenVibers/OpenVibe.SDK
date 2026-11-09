@@ -4,6 +4,9 @@
 
 **Open source JavaScript/TypeScript SDK and API clients for the OpenVibe network** — docs at [openvibe.services](https://openvibe.services).
 
+**Docs:** https://openvibe.services · **For AI:** https://openvibe.services/llms.txt
+**Install and test:** `npm ci && npm test` (Node 20 or newer)
+
 ```bash
 npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.108.0
 ```
