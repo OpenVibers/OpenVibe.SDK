@@ -10,16 +10,16 @@ npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags
 
 > Supported browser and server clients for the OpenVibe platform.
 
-**Status:** alpha, v0.128.0 (the five 1.0 core entries — `core`, `auth`, `events`, `db` and `media` — are frozen: their exported names change only with a major release; roadmap Wave 2; developer apps from Wave 20; Media objects v2 from Wave 4; the Tools platform API; Search, Chat, AI, Vision and consent clients; sign-in with recovery and a client health check). Every release is tagged (see [CHANGELOG.md](CHANGELOG.md)). Tested against local stub servers and the built-in mock platform only, never against the live platform. Services pin release tags; each repository's `STATUS.json` names the one it uses.
+**Status:** alpha, v0.131.0 (the five 1.0 core entries — `core`, `auth`, `events`, `db` and `media` — are frozen: their exported names change only with a major release; roadmap Wave 2; developer apps from Wave 20; Media objects v2 from Wave 4; the Tools platform API; Search, Chat, AI, Vision and consent clients; sign-in with recovery and a client health check). Every release is tagged (see [CHANGELOG.md](CHANGELOG.md)). Tested against local stub servers and the built-in mock platform only, never against the live platform. Services pin release tags; each repository's `STATUS.json` names the one it uses.
 **Plan:** OpenVibe End-to-End Realignment & Implementation Plan, revision 3 (20 Sep 2026), §3.2; roadmap §30.  
 **License:** MIT ([LICENSE](LICENSE)). This package is a library that apps outside the network embed, so it uses MIT. The OpenVibe services themselves stay AGPL-3.0.
 
 **If a capability is not in the SDK, it is not public.** Apps call services through `openvibe-sdk` and never build internal routes themselves. A route with no SDK wrapper is internal, even when you can reach it, and it can change without notice. To make a capability public, first define it in OpenVibe.Contracts, then wrap it here.
 
-After v0.128.0 is tagged:
+After v0.97.1 is tagged:
 
 ```bash
-npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.128.0
+npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.131.0
 ```
 
 It has no runtime dependencies. It needs Node ≥ 20, or any browser with `fetch`, Web Crypto and `TextDecoder`. There is no build step. The package is CommonJS with ESM entry points (`import` works). Each subpath has its own `.d.ts`. For a page with no bundler, `browser/openvibe-sdk.mjs` is one self-contained ES module of the browser-safe subpaths (see [Browser without a bundler](#browser-without-a-bundler)). It does not depend on `openvibe-contracts` at runtime: it copies the contract types it uses (from the temporary Contracts sharing branch, a devDependency the tests check them against).
@@ -199,7 +199,7 @@ Until OpenVibe.Tools serves the gateway facade (Tools S6), point the jobs client
 | `openvibe-sdk/sso` | server | `createSsoClient({site, baseUrl, clientId, clientSecret, networkUrl, networkInternalUrl, secureCookies})`: a product site's sign-in with OpenVibe.Network: `router(express)` (`/login` with state + PKCE S256, `/callback`, `/fedcm`, `/logout`, `/me`, `/refresh`), `optionalAuth()`, `requireAuth()`, `verify(token)` (offline, shared JWKS), `extractToken(req)`; `sanitizeNext`, `COOKIES` |
 | `openvibe-sdk/realtime` | both | `subscribe(topics, onEvent, {lastEventId, onGap, …})`, `createRealtimeClient(client)`, `parseSSE(body)` |
 | `openvibe-sdk/media` | both (credentials: server) | `createMediaClient(client, {app, apiKey?, actingUserId?})`: `files.upload/list/iterate/get/delete`; `mediaUrls(origin)` public URL helpers; `createObjectsClient({app, baseUrl?, tokenClient \| apiKey \| client})`: object API v2 `upload` (single or multipart by size, resumable), `resume`, `get`, `signedUrl`, `delete`, `list`, `iterate`, and `jobs.create/get/list/approve/cancel/wait`; Media's origin from the platform descriptor when `baseUrl` is omitted |
-| `openvibe-sdk/community` | both | `createCommunityClient(client, {actingSubject?, origin?, sourceRef?, staff?})`: `pastes.list/iterate/get/create/update/delete/fork/like/copy/versions/byUser/config`, `pastes.comments.list/create/delete`, `feed({kind, site, q, following, cursor, limit})`, `posts.create({text, pictures})`, `as(subject)` |
+| `openvibe-sdk/community` | both | `createCommunityClient(client, {actingSubject?, origin?, sourceRef?, staff?})`: `pastes.list/iterate/get/create/update/delete/fork/like/copy/versions/byUser/config`, `pastes.comments.list/create/delete`, `as(subject)` |
 | `openvibe-sdk/home-feed` | both | `createHomeFeedClient(client)` gives `ov.home.get()/set(layout)`, `ov.network.today()`, `ov.feed.list({ for: 'me', cursor })`, `ov.feed.post(text)`, and `ov.feed.contribute({ id, text, url })`. Personal calls need a user Bearer token; contribution needs an app token granted `community.pulse.contribute`. Today is public and cached by Network for five minutes. |
 | `openvibe-sdk/bot` | both | `createBotClient(client, {actingSubject?})`: OpenVibe.Bot robots. `robots.list/get/create/update/delete/pairingCode`, `robots.operators.list/add/remove`, `robots.devices`, `robots.streaming.get/set`, `robots.audit`/`iterateAudit`, `robots.estop`/`clearEstop`, `robots.command` (`bot.command@1`), `devices.rotate/revoke`, public `profiles.list/get` and `kits.list/get`, `pair` (the agent's one-time code, never retried), `as(subject)`; a service acts for a person with `X-OV-Subject` (capabilities `bot.robot.read`/`manage`/`control`, `bot.device.connect`) |
 | `openvibe-sdk/themes` | both | `createThemesClient(client)`: `catalog({mode, search, sort, limit})` (seasonal themes carry `season`), `get(idOrSlug)` (null when missing), `export(idOrSlug)`, `active()` (`{theme_id, custom_variables, display}`), `set(themeId, {custom})`, `setDisplay({motion, text, seasonal})`, `seasons({date})`, `submissions()`, `submit(theme)`, `import(file)`. In the browser: `followTheme(fn)` calls back now and on every theme, display or season change with `readTheme()` (`{id, mode, tokens, display: {motion, text, textScale, seasonal, calm}, season, seasonMark}`) and returns `stop()`, for a canvas or game to keep up; `applyTheme(vars, {root})`, `seasonOn(date, seasons)`, `onColor(hex)`, `DISPLAY_OPTIONS`, `TOKENS` |
@@ -256,7 +256,7 @@ Until OpenVibe.Tools serves the gateway facade (Tools S6), point the jobs client
 | `openvibe-sdk/runtime` | server | Build and validate `platform.runtime-offer@1` records with `runtimeOffer()` and `validateRuntimeOffer()`; `runtimeClass()`, `RUNTIME_CLASSES`, and `validateRuntimeClass()` handle known runtime classes |
 | `openvibe-sdk/storage` | server | `storageOffer()` and `validateStorageOffer()` for `platform.storage-offer@1` |
 | `openvibe-sdk/delivery` | server | `deliveryOffer()` and `validateDeliveryOffer()` for `platform.delivery-offer@1` |
-| `openvibe-sdk/node` | server | `nodeCapabilities()` and `validateNodeCapabilities()` for `platform.node-capabilities@1`; `nodeOffers()` derives resource and runtime offers from a node descriptor |
+| `openvibe-sdk/link` | server | `linkCapabilities()` and `validateLinkCapabilities()` for `platform.link-capabilities@1`; `linkOffers()` derives resource and runtime offers from a node descriptor |
 | `openvibe-sdk/service` | server | the service kit: `gracefulStop({name, server, stop, close, drainMs, deadlineMs, deadlineExitCode, beforeDrain, handles})` → `{stop, stopping}`, `within(ms, p)`; `createServiceError(name)`, `ServiceError`, `asServiceError`, `run`, `wrap`, `sendError`, `jsonBody({limit})`, `privateNoStore`, `jsonErrors()`; the HTTP telemetry kit: `createHttpTelemetry({service, sink, intervalMs?, routeLabel?, skipPrefixes?, …})` → `{middleware(), record, gauge, count, requestStarted, requestFinished, flush, stop}`, `createTelemetryMiddleware`, `telemetrySkipped`, `defaultRouteLabel`, `registerSignals`, `telemetrySample`, `validateTelemetrySample`, and the singleton `telemetry.{init, record, gauge, count, requestStarted, requestFinished, flush, stop}` + `telemetryMiddleware` (a request is aggregated per `route\|method\|status_class` per flush into one `platform.telemetry-sample@1` `http.request` sample, plus active-requests/p95/event-loop-lag gauges once per flush); re-exports (loaded on first use) of openvibe-shared `createReadiness`, `skip`, `safeReason`, `createRegistry`, `instrument`, `metricsHandler`, `isLoopbackDirect`, `releaseInfo`, `createRelease` and openvibe-contracts `problem`, `sendProblem` |
 | `openvibe-sdk/testing` | Node | `createMockPlatform()`: fake Network (incl. developer apps and projects), Events, Media, Tools jobs and the Tools platform API on an in-process `fetch` |
 | `openvibe-sdk/browser/openvibe-sdk.mjs` | browser | one self-contained ES module: core + auth (browser), registry, modules, realtime, media, community, bot, jobs, tools, projects |
@@ -588,13 +588,9 @@ shows the cards in `GET /api/frame`.
 - Each release states the openvibe-contracts range it was tested against (`CONTRACTS_RANGE`), and `discover()` checks it at runtime. Contract types are copied into `types/contracts.d.ts`. `test/types.test.js` fails if they differ from the pinned Contracts release, the `openvibe-contracts` devDependency (temporarily the sharing branch), which the tools tests also use to validate requests and answers. It is never a runtime or peer dependency.
 - A new public capability ships as a minor release: first the contract, then the wrapper here, then the service's route. Removing a wrapper is a major release, after the capability's deprecation window in Contracts has passed.
 
-## Community Feed and posts
-
-`createCommunityClient(client)` exposes `feed({ kind, site, q, following, cursor, limit })` and `posts.create({ text, pictures })`. Feed cards carry text, a thumbnail, and Community's counts when known. `live_now` is true on current live broadcasts and false on ended `stream` cards. Keep filters unchanged when following `next_cursor`, including after an empty filtered page. `following: true` (or `1`) requires a signed-in person's token. Posts accept up to four owned Media pictures with required alt text.
-
 ## Not wrapped yet (intentionally)
 
-- **Community:** other forum and comment APIs remain unwrapped.
+- **Community comments on other content, the forum and Pulse** are being built in Community right now. Only paste comments are wrapped. The rest is a TODO in `src/community.js` until those APIs settle.
 - **Media:** the v1 files API, the object API v2 (`createObjectsClient`) and the public URL helpers are wrapped. Retention holds on v2 objects are not (app keys only). VOD, clip, thumbnail and admin-storage routes are not wrapped because apps reach them only through Live and Media's own servers. Media's own paste API is not wrapped because pastes moved to Community (ADR-011). The mock platform (`openvibe-sdk/testing`) models Media's v1 files only, not v2 objects.
 - **Media from the browser:** Media refuses user JWTs on the v1 files and v2 objects APIs, so a browser uploads through its own app server. That server holds the app credential and names the user with `actingUserId` or a subject.
 - **Network coins, notifications and legacy-map writes** are internal service-to-service routes with no public capability, so they are not wrapped. Staff-only paste routes are also internal: admin stats, bulk, censor and the AI pass.
@@ -692,6 +688,22 @@ const exchange = require('openvibe-sdk/exchange').createExchangeClient({ develop
 const round = await exchange.arena.start({ prompt: 'Explain a binary search.', category: 'code', entries });
 await exchange.arena.vote(round.id, 'left');
 ```
+## Meme encyclopedia and renderer
+
+Search cited meme entries, read source and remix timelines, list reusable templates, and render a caption to raw image/video bytes:
+
+```js
+const ov = require('openvibe-sdk');
+const client = ov.createClient();
+const memes = ov.meme.createMemeClient(client);
+const { entries } = await memes.search({ scope: 'internet', q: 'Doge' });
+const { templates } = await memes.templates();
+const png = await memes.render({ template_id: templates[0].id, lines: ['Much quality', 'such tiny SDK'] });
+// png.bytes is an ArrayBuffer; png.contentType is image/png (or image/gif / video/mp4).
+```
+
+See [the Meme client](docs/meme.md) for the render options and response details.
+
 ## Camera settings
 
 Camera choices can be read or saved on behalf of a signed-in person with `ov.cam.settings.get({ token })` and

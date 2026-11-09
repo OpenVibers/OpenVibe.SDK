@@ -54,6 +54,8 @@ function createAiClient(client, defaults = {}) {
         /** workflow key (e.g. 'wiki.generate_page'), its input; o: { wait (ms), version, idempotencyKey, target, attribution, onBehalfOf, latency, deadlineHours, options } */
         create(workflow, input = {}, o = {}) {
             const body = { workflow, input };
+            if (o.choice !== undefined) body.choice = o.choice;
+            if (o.task !== undefined) body.task = o.task;
             if (o.version != null) body.version = o.version;
             if (o.target !== undefined) body.target = o.target;
             if (o.attribution !== undefined) body.attribution = o.attribution;
@@ -94,6 +96,17 @@ function createAiClient(client, defaults = {}) {
         },
     };
 
+    const tasks = (o = {}) => call({ path: '/api/v1/tasks' }, o);
+    const choices = {
+        get: (task, o = {}) => call({ path: '/api/v1/choices', query: { task } }, o),
+        set: (task, choice, o = {}) => call({ method: 'PUT', path: `/api/v1/me/choices/${enc(task)}`, json: choice, idempotencyKey: false }, o),
+    };
+    const run = (task, input = {}, o = {}) => {
+        const body = { task, input, ...(o.choice ? { choice: o.choice } : {}), ...(o.onBehalfOf ? { on_behalf_of: o.onBehalfOf } : {}), ...(runOptions(o) ? { options: runOptions(o) } : {}) };
+        return call({ method: 'POST', path: '/api/v1/runs', query: waitQuery(o), json: body, ...writeOpts(o) }, o);
+    };
+    const admin = { defaults: (value, o = {}) => call({ path: '/api/v1/admin/task-defaults', ...(value === undefined ? {} : { method: 'PUT', json: value, idempotencyKey: false }) }, o) };
+
     const batches = {
         /** The prompts of a batch (a string, or { prompt, model }); o: { model, deadlineHours, idempotencyKey } → { batch } */
         create(items, o = {}) {
@@ -116,7 +129,7 @@ function createAiClient(client, defaults = {}) {
         cancel: (id, o = {}) => call({ method: 'POST', path: `/api/v1/batches/${enc(id)}/cancel`, idempotencyKey: false }, o),
     };
 
-    const api = { runs, batches, TERMINAL, CLASSES };
+    const api = { tasks, choices, run, admin, runs, batches, TERMINAL, CLASSES };
     // Direct operations: a run of workflow ai.<op> with the input as the body, waited for by AI.
     for (const op of OPS) {
         api[op] = (input = {}, o = {}) => call({ method: 'POST', path: `/api/v1/${op}`, query: waitQuery(o),

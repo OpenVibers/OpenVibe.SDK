@@ -1,8 +1,28 @@
 # Changelog
 
+## 0.131.0 (2026-11-09)
+
+- openvibe-sdk/community: the Feed's types complete, with pagination guidance
+
+## 0.130.0 (2026-11-09)
+
+- openvibe-sdk/meme: ov.meme.templates(), .render() (PNG, GIF or MP4) and .get()
+
+## 0.129.0 — 2026-11-09
+
+- `openvibe-sdk/git` (G2): changes and review — `changes.list/get/create/comment/approve/merge/close/summary`,
+  `issues.list/get/create/labels/close`, `compare()`, `blame()`, `search()` and `reviewModel()`. Review requests
+  carry the expected head SHA, merge methods are checked, and mutations are POSTs with retries disabled.
+
 ## 0.128.0 (2026-11-09)
 
-- Complete the Community Feed types with `live_now` for live and ended streams, document filtered cursor pagination, and verify feed responses and cursors through `ov.community.feed`.
+- ov.ai: tasks(), choices.get/set, run(task, input, {choice}) and admin.defaults(); runs.create accepts `task` and `choice`
+
+## 0.127.0 — 2026-11-09
+
+- `openvibe-sdk/git` (`ov.git`): repositories, trees, blobs, commits, branches, tags, releases, contributors,
+  insights and stars; `commits.create()` writes a branch and files without a clone; `tokens.create()` makes a
+  short-lived clone token; `clone(repo, { to: 'link' })` hands a clone to Link.
 
 ## 0.126.0 (2026-11-09)
 

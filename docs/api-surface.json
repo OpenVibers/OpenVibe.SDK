@@ -173,6 +173,14 @@
         "createGeoClient"
       ]
     },
+    "git": {
+      "object": [
+        "SCOPES",
+        "SORTS",
+        "STARTERS",
+        "createGitClient"
+      ]
+    },
     "homeFeed": {
       "object": [
         "createHomeFeedClient"
@@ -769,6 +777,12 @@
   },
   "openvibe-sdk/geo": {
     "createGeoClient": "function"
+  },
+  "openvibe-sdk/git": {
+    "SCOPES": "array",
+    "SORTS": "array",
+    "STARTERS": "array",
+    "createGitClient": "function"
   },
   "openvibe-sdk/govern": {
     "UNITS": "array",
