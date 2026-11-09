@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.121.0 (2026-11-09)
+
+- ov.cam.settings.get/put: a person's saved camera choices (Cam #116)
+
 ## 0.120.0 (2026-11-09)
 
 - createUploadClient(): resumable Media uploads in 8 MiB parts, three at a time, with a session reference to resume; ov.ui.progress(el)

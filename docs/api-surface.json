@@ -65,7 +65,8 @@
         "OV_CAMERA_SRC",
         "defineOvCamera",
         "loadCamKit",
-        "open"
+        "open",
+        "settings"
       ]
     },
     "chat": {
@@ -546,7 +547,13 @@
     "OV_CAMERA_SRC": "string",
     "defineOvCamera": "function",
     "loadCamKit": "function",
-    "open": "function"
+    "open": "function",
+    "settings": {
+      "object": [
+        "get",
+        "put"
+      ]
+    }
   },
   "openvibe-sdk/chat": {
     "createChatClient": "function",
