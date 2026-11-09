@@ -8,6 +8,7 @@ export interface PostFields {
     citations?: unknown[]; message?: string | null; expected_revision?: number; [k: string]: unknown;
 }
 export interface BlogClient {
+    changelog(filters?: { service?: string; kind?: 'new' | 'better' | 'fixed' | 'internal'; area?: string; q?: string; limit?: number; before?: string }, opts?: Opts): Promise<BlogJson>;
     blogs: {
         get(handle: string, opts?: Opts): Promise<BlogJson>;
         posts(handle: string, opts?: Opts & { limit?: number; offset?: number; all?: boolean }): Promise<{ total?: number; posts: BlogJson[] }>;
