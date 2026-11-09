@@ -688,6 +688,22 @@ const exchange = require('openvibe-sdk/exchange').createExchangeClient({ develop
 const round = await exchange.arena.start({ prompt: 'Explain a binary search.', category: 'code', entries });
 await exchange.arena.vote(round.id, 'left');
 ```
+## Meme encyclopedia and renderer
+
+Search cited meme entries, read source and remix timelines, list reusable templates, and render a caption to raw image/video bytes:
+
+```js
+const ov = require('openvibe-sdk');
+const client = ov.createClient();
+const memes = ov.meme.createMemeClient(client);
+const { entries } = await memes.search({ scope: 'internet', q: 'Doge' });
+const { templates } = await memes.templates();
+const png = await memes.render({ template_id: templates[0].id, lines: ['Much quality', 'such tiny SDK'] });
+// png.bytes is an ArrayBuffer; png.contentType is image/png (or image/gif / video/mp4).
+```
+
+See [the Meme client](docs/meme.md) for the render options and response details.
+
 ## Camera settings
 
 Camera choices can be read or saved on behalf of a signed-in person with `ov.cam.settings.get({ token })` and

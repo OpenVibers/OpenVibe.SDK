@@ -13,6 +13,8 @@ async function memeServer() {
         if (u.pathname === '/api/v1/entries/doge/revisions') return send(res, 200, { slug: 'doge', count: 0, revisions: [] });
         if (u.pathname === '/api/v1/entries/missing') return problem(res, 404, 'meme.not_found', 'No such meme.');
         if (u.pathname === '/api/v1/trends') return send(res, 200, { window: 'week', rising: [], templates: [], entries: [], subreddits: [] });
+        if (u.pathname === '/api/v1/templates') return send(res, 200, { count: 1, templates: [{ id: 'tpl_classic', name: 'Classic', license: 'OpenVibe' }] });
+        if (u.pathname === '/api/v1/render' && req.method === 'POST') { res.statusCode = 200; res.setHeader('content-type', 'image/png'); res.end(Buffer.from('fake-png')); return; }
         if (u.pathname === '/api/v1/analyze') return send(res, 200, { id: 'anl_1', template: { name: 'Doge' }, labels: ['language'] });
         if (u.pathname === '/api/v1/research' && req.method === 'POST') return send(res, 202, { id: 'rsc_1', topic: 'Doge', status: 'queued' });
         if (u.pathname === '/api/v1/research/rsc_1' && req.method === 'GET') return send(res, 200, { id: 'rsc_1', status: 'succeeded', sources: [] });
@@ -41,8 +43,14 @@ run([
             assert.equal(searchReq.searchParams.get('limit'), '5');
 
             assert.equal((await meme.entry('doge')).origin.url, 'https://example.com/doge');
+            assert.equal((await meme.get('doge')).origin.url, 'https://example.com/doge');
             assert.equal((await meme.revisions('doge')).count, 0);
             assert.equal((await meme.trends({ window: 'week' })).window, 'week');
+            assert.equal((await meme.templates()).templates[0].id, 'tpl_classic');
+            const rendered = await meme.render({ template_id: 'tpl_classic', lines: ['hello'], format: 'png', editor: { font_style: 'modern' } });
+            assert.equal(rendered.contentType, 'image/png');
+            assert.equal(Buffer.from(rendered.bytes).toString(), 'fake-png');
+            assert.deepEqual(JSON.parse(srv.requests.at(-1).body.toString('utf8')), { template_id: 'tpl_classic', lines: ['hello'], format: 'png', editor: { font_style: 'modern' } });
             assert.equal((await meme.analyze({ url: 'https://example.com/doge.png' })).id, 'anl_1');
             assert.equal((await meme.analyze({ mediaId: 'med_1' })).id, 'anl_1');
             const analyzeBody = JSON.parse(srv.requests.at(-1).body.toString('utf8'));
@@ -66,6 +74,7 @@ run([
             assert.throws(() => meme.analyze({}), TypeError);
             assert.throws(() => meme.analyze({ url: 'https://x.test/a.png', media_id: 'med_1' }), TypeError);
             assert.throws(() => meme.generate({}), TypeError);
+            await assert.rejects(() => meme.render({ template_id: 'tpl_classic', lines: [] }), TypeError);
             assert.equal(srv.requests.length, 0, 'no request left the client for a bad input');
             await assert.rejects(() => meme.entry('missing'), (err) => err instanceof OpenVibeError && err.status === 404 && err.code === 'meme.not_found');
         } finally { await srv.close(); }

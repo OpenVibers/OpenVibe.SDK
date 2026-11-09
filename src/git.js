@@ -36,8 +36,39 @@ function createGitClient(client, { baseUrl } = {}) {
     const call = (opts) => client.json({ ...at, ...opts });
     const repo = (full, where) => `/api/v1/repos/${fullName(full, where).split('/').map(enc).join('/')}`;
     const repoAt = (full, tail, where) => `${repo(full, where)}/${tail}`;
+    const number = (n) => {
+        if (!/^[1-9][0-9]{0,14}$/.test(String(n))) throw new TypeError('Invalid change number');
+        return String(n);
+    };
+    const entry = (full, kind, n) => repoAt(full, `${kind}/${number(n)}`, `git.${kind}`);
+    const mutate = (path, json, o = {}) => call({ method: 'POST', path, json, signal: o.signal, retries: 0, idempotencyKey: false });
 
     return {
+        changes: {
+            list: (full, { signal } = {}) => call({ path: repoAt(full, 'changes', 'git.changes.list'), signal }),
+            get: (full, n, { signal } = {}) => call({ path: entry(full, 'changes', n), signal }),
+            create: (full, input, o = {}) => mutate(repoAt(full, 'changes', 'git.changes.create'), input, o),
+            comment: (full, n, input, o = {}) => mutate(`${entry(full, 'changes', n)}/comments`, input, o),
+            approve: (full, n, headSha, o = {}) => mutate(`${entry(full, 'changes', n)}/approve`, { head_sha: headSha }, o),
+            merge: (full, n, { head_sha, method = 'merge' } = {}, o = {}) => {
+                if (!['merge', 'squash', 'rebase'].includes(method)) throw new TypeError('Invalid merge method');
+                return mutate(`${entry(full, 'changes', n)}/merge`, { head_sha, method }, o);
+            },
+            close: (full, n, o = {}) => mutate(`${entry(full, 'changes', n)}/close`, {}, o),
+            summary: (full, n, headSha, o = {}) => mutate(`${entry(full, 'changes', n)}/summary`, { head_sha: headSha }, o),
+        },
+        issues: {
+            list: (full, { signal } = {}) => call({ path: repoAt(full, 'issues', 'git.issues.list'), signal }),
+            get: (full, n, { signal } = {}) => call({ path: entry(full, 'issues', n), signal }),
+            create: (full, input, o = {}) => mutate(repoAt(full, 'issues', 'git.issues.create'), input, o),
+            labels: (full, n, labels, o = {}) => mutate(`${entry(full, 'issues', n)}/labels`, { labels }, o),
+            close: (full, n, o = {}) => mutate(`${entry(full, 'issues', n)}/close`, {}, o),
+        },
+        compare: (full, base, head, { signal } = {}) => call({ path: repoAt(full, `compare/${enc(base)}...${enc(head)}`, 'git.compare'), signal }),
+        blame: (full, ref, path, { signal } = {}) => call({ path: repoAt(full, 'blame', 'git.blame'), query: { ref, path }, signal }),
+        search: (full, q, { signal } = {}) => call({ path: repoAt(full, 'search', 'git.search'), query: { q }, signal }),
+        reviewModel: (full, model, o = {}) => mutate(repoAt(full, 'review-model', 'git.reviewModel'), { model }, o),
+
         repos: {
             /** Search and filter: q, language, official, mirror, mine, starred; sort trending|pushed|stars|new. */
             list: ({ q, language, official, mirror, mine, starred, sort, limit, cursor, signal } = {}) => {

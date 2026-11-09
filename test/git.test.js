@@ -58,5 +58,38 @@ function fake() {
     ok(raw === 'raw text' && client.calls.at(-1).responseType === 'text', 'raw text');
     assert.throws(() => git.repos.get('Not A Repo'), /owner\/name/); n += 1;
 
+    await git.changes.list('openvibers/openvibe.sdk');
+    ok(client.calls.at(-1).path === '/api/v1/repos/openvibers/openvibe.sdk/changes', 'changes list path');
+    await git.changes.get('openvibers/openvibe.sdk', 7);
+    ok(client.calls.at(-1).path.endsWith('/changes/7'), 'change path');
+    await git.changes.create('openvibers/openvibe.sdk', { title: 'Title', base_ref: 'main', head_ref: 'feature' });
+    ok(client.calls.at(-1).method === 'POST' && client.calls.at(-1).retries === 0 && client.calls.at(-1).idempotencyKey === false, 'a change is a no-retry POST');
+    await git.changes.comment('openvibers/openvibe.sdk', 7, { head_sha: 'a'.repeat(40), path: 'src/x.js', line: 3, side: 'new', message: 'hello' });
+    ok(client.calls.at(-1).path.endsWith('/changes/7/comments') && client.calls.at(-1).json.line === 3, 'line comment');
+    await git.changes.approve('openvibers/openvibe.sdk', 7, 'a'.repeat(40));
+    ok(client.calls.at(-1).path.endsWith('/changes/7/approve') && client.calls.at(-1).json.head_sha === 'a'.repeat(40), 'approval pins the head');
+    await git.changes.merge('openvibers/openvibe.sdk', 7, { head_sha: 'a'.repeat(40), method: 'rebase' });
+    ok(client.calls.at(-1).json.method === 'rebase', 'merge method');
+    await git.changes.summary('openvibers/openvibe.sdk', 7, 'a'.repeat(40));
+    ok(client.calls.at(-1).path.endsWith('/changes/7/summary') && client.calls.at(-1).json.head_sha === 'a'.repeat(40), 'summary pins the head');
+    await git.changes.close('openvibers/openvibe.sdk', 7);
+    ok(client.calls.at(-1).path.endsWith('/changes/7/close'), 'close');
+    await git.issues.create('openvibers/openvibe.sdk', { title: 'Bug' });
+    ok(client.calls.at(-1).path.endsWith('/issues') && client.calls.at(-1).json.title === 'Bug', 'issue create');
+    await git.issues.labels('openvibers/openvibe.sdk', 2, ['bug']);
+    ok(JSON.stringify(client.calls.at(-1).json) === JSON.stringify({ labels: ['bug'] }), 'issue labels');
+    await git.issues.close('openvibers/openvibe.sdk', 2);
+    ok(client.calls.at(-1).path.endsWith('/issues/2/close'), 'issue close');
+    await git.compare('openvibers/openvibe.sdk', 'main', 'agent/run');
+    ok(client.calls.at(-1).path === '/api/v1/repos/openvibers/openvibe.sdk/compare/main...agent%2Frun', 'comparison path');
+    await git.blame('openvibers/openvibe.sdk', 'main', 'README.md');
+    ok(client.calls.at(-1).query.path === 'README.md' && client.calls.at(-1).query.ref === 'main', 'blame query');
+    await git.search('openvibers/openvibe.sdk', 'two words');
+    ok(client.calls.at(-1).query.q === 'two words', 'search query');
+    await git.reviewModel('openvibers/openvibe.sdk', 'local/review');
+    ok(client.calls.at(-1).json.model === 'local/review', 'review model');
+    assert.throws(() => git.changes.get('openvibers/openvibe.sdk', '../x'), /Invalid change number/); n += 1;
+    assert.throws(() => git.changes.merge('openvibers/openvibe.sdk', 7, { method: 'shell' }), /merge method/); n += 1;
+
     console.log(`git: ${n} checks passed`);
 })().catch((err) => { console.error(err); process.exit(1); });
