@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.124.0 (2026-11-09)
+
+- ov.ai: tasks(), choices.get/set, run(task, input, {choice}) and admin.defaults(); runs.create accepts `task` and `choice`
+
 ## 0.123.0 (2026-11-09)
 
 - ov.exchange: keys (list, create, revoke), private usage, deployments, and web, image and icon search with fetch (the Exchange API platform)
