@@ -493,6 +493,18 @@ Install the drivers the service uses: `pg` and `iovalkey` (production), `@electr
 
 ### The OpenVibe camera element
 
+The browser bundle also offers `ov.cam.open()` for video, photo or screen capture in place. It loads Cam's
+SRI-pinned recorder once, then gives your page a `File` and metadata after the person reviews and chooses Use this:
+
+```js
+import ov from 'openvibe-sdk';
+const result = await ov.cam.open({ mode: 'video', maxSeconds: 60 });
+if (result) await upload(result.file);
+```
+
+Closing Cam resolves to `null`. The calling site owns the file and upload. `openvibe-sdk/cam` also exports
+`open`, `loadCamKit`, `CAM_KIT_SRC` and `CAM_KIT_SRI` for direct use.
+
 `openvibe-sdk/cam` loads the camera app's framework-free `<ov-camera>` element from OpenVibe.Cam and types its
 attributes, events and methods. It injects the embed script once and resolves to the element class:
 
