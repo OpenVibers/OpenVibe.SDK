@@ -198,6 +198,12 @@
       "import": "./esm/exchange.mjs",
       "default": "./src/exchange.js"
     },
+    "./design": {
+      "types": "./types/design.d.ts",
+      "browser": null,
+      "import": "./esm/design.mjs",
+      "default": "./src/design.js"
+    },
     "./report": {
       "types": "./types/report.d.ts",
       "import": "./esm/report.mjs",

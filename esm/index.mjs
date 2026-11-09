@@ -14,5 +14,6 @@ export const {
     deals, trade, space, host, news, food,
     actor, run, video, work, zone, play,
     download, openre, geo, usage, commerce, telemetry,
+    design,
 } = cjs;
 export default cjs;
