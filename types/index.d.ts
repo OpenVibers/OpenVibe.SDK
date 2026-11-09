@@ -10,6 +10,7 @@ export * as modules from './modules';
 export * as events from './events';
 export * as realtime from './realtime';
 export * as media from './media';
+export * as cam from './cam';
 export * as community from './community';
 export * as homeFeed from './home-feed';
 export * as bot from './bot';

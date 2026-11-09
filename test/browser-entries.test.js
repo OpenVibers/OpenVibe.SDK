@@ -97,5 +97,7 @@ run([
     ['server entries really are server-only (sanity)', async () => {
         assert.match(fs.readFileSync(path.join(ROOT, 'src/auth/tokens.js'), 'utf8'), /client_secret/);
         assert.equal(browserTarget(pkg.exports['./auth']), './src/auth/browser.js');
+        assert.equal(typeof require('../browser').cam.open, 'function', 'the browser entry exposes ov.cam.open');
+        assert.match(fs.readFileSync(path.join(ROOT, 'esm/index.mjs'), 'utf8'), /\bcam\b/, 'the ESM root exports cam');
     }],
 ]);

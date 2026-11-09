@@ -7,6 +7,30 @@
 
 /** The embed script the loader injects when no `src` is given. */
 export declare const OV_CAMERA_SRC: string;
+/** The pinned in-page recorder script and its SHA-384 integrity value. */
+export declare const CAM_KIT_SRC: string;
+export declare const CAM_KIT_SRI: string;
+
+export type CamKitMode = 'video' | 'photo' | 'screen';
+export interface CamKitResult {
+    file: File;
+    mode: CamKitMode;
+    mimeType: string;
+    duration: number;
+    width: number;
+    height: number;
+    maxSeconds: number;
+}
+export interface CamKitOptions {
+    mode?: CamKitMode;
+    maxSeconds?: number;
+    timer?: 0 | 3 | 10;
+    onDone?: (result: CamKitResult) => void | Promise<void>;
+}
+/** Load OpenVibeCam once and return its browser API. */
+export declare function loadCamKit(): Promise<{ open(options?: CamKitOptions): Promise<CamKitResult | null> }>;
+/** Open Cam on this page and return a file after Use this; cancellation resolves to null. */
+export declare function open(options?: CamKitOptions): Promise<CamKitResult | null>;
 
 /** The front camera (`user`) or the back camera (`environment`). */
 export type OvCameraFacing = 'user' | 'environment';
