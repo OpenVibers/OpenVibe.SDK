@@ -1,8 +1,16 @@
+![openvibe-sdk](https://openvibe.services/shared/social/services.jpg)
+
 # OpenVibe.SDK
+
+**Open source JavaScript/TypeScript SDK and API clients for the OpenVibe network** — docs at [openvibe.services](https://openvibe.services).
+
+```bash
+npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.108.0
+```
 
 > Supported browser and server clients for the OpenVibe platform.
 
-**Status:** alpha, v0.106.0 (the five 1.0 core entries — `core`, `auth`, `events`, `db` and `media` — are frozen: their exported names change only with a major release; roadmap Wave 2; developer apps from Wave 20; Media objects v2 from Wave 4; the Tools platform API; Search, Chat, AI, Vision and consent clients; sign-in with recovery and a client health check). Every release is tagged (see [CHANGELOG.md](CHANGELOG.md)). Tested against local stub servers and the built-in mock platform only, never against the live platform. Services pin release tags; each repository's `STATUS.json` names the one it uses.
+**Status:** alpha, v0.117.0 (the five 1.0 core entries — `core`, `auth`, `events`, `db` and `media` — are frozen: their exported names change only with a major release; roadmap Wave 2; developer apps from Wave 20; Media objects v2 from Wave 4; the Tools platform API; Search, Chat, AI, Vision and consent clients; sign-in with recovery and a client health check). Every release is tagged (see [CHANGELOG.md](CHANGELOG.md)). Tested against local stub servers and the built-in mock platform only, never against the live platform. Services pin release tags; each repository's `STATUS.json` names the one it uses.
 **Plan:** OpenVibe End-to-End Realignment & Implementation Plan, revision 3 (20 Sep 2026), §3.2; roadmap §30.  
 **License:** MIT ([LICENSE](LICENSE)). This package is a library that apps outside the network embed, so it uses MIT. The OpenVibe services themselves stay AGPL-3.0.
 
@@ -11,7 +19,7 @@
 After v0.97.1 is tagged:
 
 ```bash
-npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.106.0
+npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.117.0
 ```
 
 It has no runtime dependencies. It needs Link ≥ 20, or any browser with `fetch`, Web Crypto and `TextDecoder`. There is no build step. The package is CommonJS with ESM entry points (`import` works). Each subpath has its own `.d.ts`. For a page with no bundler, `browser/openvibe-sdk.mjs` is one self-contained ES module of the browser-safe subpaths (see [Browser without a bundler](#browser-without-a-bundler)). It does not depend on `openvibe-contracts` at runtime: it copies the contract types it uses (from the temporary Contracts sharing branch, a devDependency the tests check them against).
@@ -195,7 +203,7 @@ Until OpenVibe.Tools serves the gateway facade (Tools S6), point the jobs client
 | `openvibe-sdk/placement` | server | `plan(requirements, offers, {rateCards, states, now, current, minGain, weights, success})` → `platform.placement-result@1`; `place(requirements, offers, {…plan, person, step, floor, priors, outcomes, rules, names})` → `{result, line, ranked, rejected, fallback}`: the person's rules and ownership, the quality bar, cost per success and one sentence saying why; `optionKey`, `learn`, `successOf`, `escalate`, `lineFor`; `TRUST_CLASSES`, `TRUST_ORDER`, `DEFAULT_TRUST`; `planAi(requirements, deployments, {enabled, usage, evidence, rates, current})` → `{chosen, rejected, objective, estimate, explain}`: the AI Exchange face of the same planner (hard gates, the cost per success in nano-USD, sparse evidence marked), off by default ([details](docs/placement.md)) |
 | `openvibe-sdk/play` | server | `createPlayClient(client)`: OpenVibe.Play's achievements and leaderboards for any game — `titles.define(title, {name, url?, summary?, achievements, boards})`, `scores.post(title, {board, ref, entries})`, `achievements.unlock(title, {player, achievements})`, `players.adopt(title, guest, person)`, `players.achievements(title, player)`; public `titles.list/get` and `boards.get(title, board, {period, page})` need no token |
 | `openvibe-sdk/download` | server | `createDownloadClient({ key })`: OpenVibe.Download, a person's drive — `files.list/all/get/remove`, `folders.list/create/ensurePath(path)`, `upload({ path \| data, name, folderId })` in parts, `usage()`, and `sync(dir, { to, delete, dryRun, exclude })` backups. The `openvibe-download` command: `sync <folder> --to <drive/path>`, `ls`, `usage` (`OPENVIBE_DOWNLOAD_KEY`, a sync key from openvibe.download/sync) |
-| `openvibe-sdk/quest` | server | `createQuestClient(client)`: `appQuests.define(slug, {title, why?, steps: [{event_type, count, label}], badge: {name}, url?})`, `appQuests.list()`, `appQuests.retire(slug)` with an app token (audience `openvibe.quest`, `quest.app_quest.manage`); `eventType(projectId, name)` gives the `app.<project_key>.<name>` type to publish at Events. Badges only, never OpenCoins; production events count |
+| `openvibe-sdk/quest` | server | `createQuestClient(client)`: `daily()`, `myDaily()`, `stepTypes()`, `contributeStepType(step)` for the shared daily quest and reviewable event-backed steps (`quest.steps.contribute`); `appQuests.define/list/retire` for an app's own badge quests (`quest.app_quest.manage`); `eventType(projectId, name)` builds an app event topic. App quests pay badges only; production events count |
 | `openvibe-sdk/live` | server | `createLiveClient(client)`: OpenVibe.Live's documented routes. `streams.list/get/recentlyOnline/mine/update/end/heartbeat/endpoint`, `slots.list/create/update/remove/regenerateKey` (a slot is a saved setup with its own stream key), `goLive(slotId, {title, category, tags})` → `{ stream, endpoint }`, `channels.get/mine/update/toggleFollow/url`, `content.feed/moments({type, sort, window, cursor, limit})`; WHIP: `whip.url(streamKey)`, `whip.publish(url, offerSdp, {key?})` → `{ answer, location }` (the client's own token never goes to `/whip`), `whip.end(location)`. Writes are never retried |
 | `openvibe-sdk/streams` | server | `createStreamsClient(client, {baseUrl?})`: an agent's own stream on OpenVibe.Live (the Agent Streams plan, S1; `live.agent-stream@1`, an `ags_…` id with no stream key and no slot). `startAgentStream({title, task, visibility, allowSites})` → `{stream, publish}` (the WHIP url and the one-time `wpt_…` ticket with its expiry), `renewTicket(id)` and `revokeTicket(id)` (the kill switch: Live ends the WHIP session at once), `state(id, {ticket})` (what the desk polls: viewers, `encode`, the curtain, `ends_at`), `postFrame(id, bytes, {ticket, contentType})` (the last frame while Live wants no video, JPEG or WebP at most 200 KB), `setCurtain(id, up, reason)`, `setVisibility(id, v)`, `end(id)` and `viewTicket(id)`. The publish ticket is a bearer of its own on the desk routes; a bad id, visibility, curtain reason or an oversized frame is refused before anything leaves. [Docs](docs/streams.md) |
 | `openvibe-sdk/inventory` | server | `createInventoryClient(client)`: OpenVibe.Inventory, the network-wide inventory (ADR-054). Public reads: `kinds.list/get`, `definitions.list({kind, issuer})/get`, `people.items(subject)`, `people.equipped(subject)`, `equipped([subjects])` (≤ 100, for chat renders). The person's own: `me.items()`, `me.equip({kind, slot, instance_id | null})`. An issuer's: `definitions.create/update`, `grants.create({definition_id, subject, idempotency_key})` → `{ instance, created }` (retry-safe on the key), `instances.consume/revoke`. `forPerson(usr_…)` sends `X-OV-Subject` for a service acting for a person. Audience `openvibe.inventory` |
@@ -493,6 +501,18 @@ Install the drivers the service uses: `pg` and `iovalkey` (production), `@electr
 
 ### The OpenVibe camera element
 
+The browser bundle also offers `ov.cam.open()` for video, photo or screen capture in place. It loads Cam's
+SRI-pinned recorder once, then gives your page a `File` and metadata after the person reviews and chooses Use this:
+
+```js
+import ov from 'openvibe-sdk';
+const result = await ov.cam.open({ mode: 'video', maxSeconds: 60 });
+if (result) await upload(result.file);
+```
+
+Closing Cam resolves to `null`. The calling site owns the file and upload. `openvibe-sdk/cam` also exports
+`open`, `loadCamKit`, `CAM_KIT_SRC` and `CAM_KIT_SRI` for direct use.
+
 `openvibe-sdk/cam` loads the camera app's framework-free `<ov-camera>` element from OpenVibe.Cam and types its
 attributes, events and methods. It injects the embed script once and resolves to the element class:
 
@@ -643,6 +663,9 @@ const client = ov.createClient();
 const report = ov.report.createReportClient(client);
 const leaders = await report.ai.leaderboard({ kind: 'code', limit: 25 });
 const headToHead = await report.ai.compare(['openai/gpt-4o', 'anthropic/claude-sonnet']);
+const mine = await report.me({ days: 30 });                 // private by default; the switches say what is public
+await report.publish({ sites: true, activity: true, made: false, ai: false, money: false });
+const theirs = await report.person('goosely');              // only the sections they published
 
 const exchange = require('openvibe-sdk/exchange').createExchangeClient({ developerKey });
 const round = await exchange.arena.start({ prompt: 'Explain a binary search.', category: 'code', entries });

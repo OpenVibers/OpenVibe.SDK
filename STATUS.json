@@ -3,7 +3,7 @@
   "stage": "alpha",
   "code": true,
   "wave": "W2",
-  "version": "0.106.0",
+  "version": "0.117.0",
   "plan": "OpenVibe End-to-End Realignment & Implementation Plan, revision 3 (20 Sep 2026), §3.2; roadmap §30",
   "deployed": false,
   "deployment": "none: a package released as git tags; services and apps pin a tag",
@@ -49,5 +49,5 @@
     "vibes (openvibe-sdk/vibes): Vibes Pay charges (create with the app reference as the Idempotency-Key, get, refund) and constant-time webhook verification (X-OpenVibe-Signature-V2, ±300 s) for developer apps",
     "streams (openvibe-sdk/streams): the Agent Streams plan S1 — start an agent stream on OpenVibe.Live (live.agent-stream@1) with its publish ticket, renew and revoke that ticket (the kill switch), poll state, post the last frame, set the curtain, switch visibility, end it and mint the view ticket; the publish ticket is a bearer of its own on the desk routes"
   ],
-  "updated": "2026-11-08"
+  "updated": "2026-11-09"
 }

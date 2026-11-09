@@ -64,6 +64,10 @@ function createActorClient(client, { baseUrl } = {}) {
     }
 
     return {
+        /** The public catalogue of skills a person can run. */
+        skills: ({ signal } = {}) => call({ path: '/api/v1/skills', signal }),
+        /** Start one catalogue skill as a normal Actor task, for this person. */
+        run: (skill, input = {}, { choice = { mode: 'balanced' }, signal } = {}) => once({ method: 'POST', path: '/api/v1/runs', json: { skill, input, choice }, signal }),
         agents: {
             /** The agent systems a task can go to, with what they are good at and cost (public). */
             catalog: ({ signal } = {}) => call({ path: '/api/v1/agent-systems', signal }),

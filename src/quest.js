@@ -46,7 +46,17 @@ function createQuestClient(client, { baseUrl } = {}) {
         /** Retire one: no longer counted or listed; its completions and badges stay. → quest.app-quest@1 */
         retire: (slug, { signal } = {}) => call({ method: 'DELETE', path: `/api/v1/app-quests/${enc(slug)}`, signal }),
     };
-    return { appQuests, eventType, projectKey };
+    return {
+        appQuests, eventType, projectKey,
+        /** The network-wide quest for today, or a past YYYY-MM-DD date (quest.daily@1). */
+        daily: ({ date, signal } = {}) => call({ path: date ? `/api/v1/daily/${enc(date)}` : '/api/v1/daily', signal }),
+        /** The person token's own checklist, completion and streak (quest.daily-progress@1). */
+        myDaily: ({ signal } = {}) => call({ path: '/api/v1/me/daily', signal }),
+        /** Approved event-backed step types (quest.step-type@1). */
+        stepTypes: ({ signal } = {}) => call({ path: '/api/v1/step-types', signal }),
+        /** Suggest a step; the app token needs quest.steps.contribute. Review precedes use. */
+        contributeStepType: (stepType, { signal } = {}) => call({ method: 'POST', path: '/api/v1/step-types', json: stepType, signal, idempotencyKey: false }),
+    };
 }
 
 module.exports = { createQuestClient, eventType, projectKey };
