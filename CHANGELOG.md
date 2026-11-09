@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.106.0 (2026-11-09)
+
+- Add `openvibe-sdk/home-feed` and `homeFeed` to the top-level and browser exports, with home layout, Today frame, and personal feed methods.
+
 ## 0.105.0 (2026-11-09)
 
 - Add Report AI leaderboard, model, provider, comparison and picks reads, plus Exchange Arena start and vote methods.

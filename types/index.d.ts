@@ -10,6 +10,7 @@ export * as events from './events';
 export * as realtime from './realtime';
 export * as media from './media';
 export * as community from './community';
+export * as homeFeed from './home-feed';
 export * as bot from './bot';
 export * as search from './search';
 export * as bench from './bench';

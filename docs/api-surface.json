@@ -155,6 +155,11 @@
         "createGeoClient"
       ]
     },
+    "homeFeed": {
+      "object": [
+        "createHomeFeedClient"
+      ]
+    },
     "host": {
       "object": [
         "createHostClient"
@@ -722,6 +727,9 @@
       ]
     },
     "createGovernor": "function"
+  },
+  "openvibe-sdk/home-feed": {
+    "createHomeFeedClient": "function"
   },
   "openvibe-sdk/host": {
     "createHostClient": "function"

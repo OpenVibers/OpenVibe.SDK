@@ -1,6 +1,6 @@
 {
   "name": "openvibe-sdk",
-  "version": "0.105.0",
+  "version": "0.106.0",
   "description": "Supported browser and server clients for the OpenVibe platform: auth (incl. developer apps), registry discovery, identity, user modules, events, realtime, media, community, Bot robots, search, chat, AI runs, Tools (registry, run API and jobs), VIP memberships and developer projects, the async PostgreSQL data layer (db) and the Valkey cache, limits store, queue and pub/sub, with deadlines, safe retries, problem errors and trace propagation.",
   "main": "index.js",
   "types": "types/index.d.ts",
@@ -293,6 +293,12 @@
       "import": "./esm/menu.mjs",
       "default": "./src/menu/index.js"
     },
+    "./home-feed": {
+      "types": "./types/home-feed.d.ts",
+      "browser": "./src/home-feed.js",
+      "import": "./esm/home-feed.mjs",
+      "default": "./src/home-feed.js"
+    },
     "./geo": {
       "types": "./types/geo.d.ts",
       "import": "./esm/geo.mjs",
@@ -578,7 +584,7 @@
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
     "iovalkey": "^0.4.0",
-    "openvibe-contracts": "https://codeload.github.com/OpenVibers/OpenVibe.Contracts/tar.gz/refs/tags/v0.351.0",
+    "openvibe-contracts": "https://codeload.github.com/OpenVibers/OpenVibe.Contracts/tar.gz/refs/tags/v0.352.0",
     "pg": "^8.23.0"
   },
   "peerDependencies": {
