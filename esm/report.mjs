@@ -2,6 +2,6 @@
 import cjs from '../src/report.js';
 
 export const {
-    createReportClient, REPORT_URL,
+    createReportClient, REPORT_URL, DAYS, SECTIONS,
 } = cjs;
 export default cjs;

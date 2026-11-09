@@ -655,6 +655,9 @@ const client = ov.createClient();
 const report = ov.report.createReportClient(client);
 const leaders = await report.ai.leaderboard({ kind: 'code', limit: 25 });
 const headToHead = await report.ai.compare(['openai/gpt-4o', 'anthropic/claude-sonnet']);
+const mine = await report.me({ days: 30 });                 // private by default; the switches say what is public
+await report.publish({ sites: true, activity: true, made: false, ai: false, money: false });
+const theirs = await report.person('goosely');              // only the sections they published
 
 const exchange = require('openvibe-sdk/exchange').createExchangeClient({ developerKey });
 const round = await exchange.arena.start({ prompt: 'Explain a binary search.', category: 'code', entries });

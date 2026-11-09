@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.108.0 — 2026-11-09
+
+- Add the person's stats to `openvibe-sdk/report`: `report.me({ days })` (GET `/api/v1/me/stats`, the signed-in person's own numbers), `report.person(username)` (GET `/api/v1/u/:name/stats`, only the sections they published) and `report.publish({ sites, activity, made, ai, money }, { days })` (PUT `/api/v1/me/stats/published`, all five switches named). The answers are `report.me-stats@1`; a source that does not answer leaves its section out, never a zero. `me` and `publish` need the person's own session token; `person` is public and is a 404 when nothing is published.
+
 ## 0.107.0 — 2026-11-09
 
 - Add `ov.cam.open()` for the Cam recorder, with typed modes, options and file results across Node and browser exports.
