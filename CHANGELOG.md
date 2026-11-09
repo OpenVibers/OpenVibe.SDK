@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.108.0 — 2026-11-09
+
+- Add the Feed and status posts to `openvibe-sdk/community`: `feed({ kind, site, q, following, cursor, limit })` reads
+  Community's `GET /api/v1/feed` (one stream over Pulse from every OpenVibe site) and `posts.create({ text, pictures })`
+  posts up to four Media pictures with required alt text, in the Feed at once.
+
 ## 0.107.0 — 2026-11-09
 
 - Add `ov.cam.open()` for the Cam recorder, with typed modes, options and file results across Node and browser exports.
