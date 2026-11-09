@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Add `openvibe-sdk/home-feed` and `homeFeed` to the top-level and browser exports, with home layout, Today frame, and personal feed methods.
+
 ## 0.104.0 (2026-11-08)
 
 - Add `createAccountEmailsClient` to `openvibe-sdk/identity` for managing the signed-in person's verified Network email addresses.
