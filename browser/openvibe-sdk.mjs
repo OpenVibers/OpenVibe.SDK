@@ -3247,7 +3247,7 @@ function (module, exports) {
  */
 const OV_CAMERA_SRC = 'https://openvibe.cam/embed/ov-camera.js';
 const CAM_KIT_SRC = 'https://openvibe.cam/embed/cam-kit.js';
-const CAM_KIT_SRI = 'sha384-yyBcgyfpQZGD0KoQ6gGqV4J8FNPxY3GOEfUS9PBwVRGd03N0EA+nVXbHamhShdPx';
+const CAM_KIT_SRI = 'sha384-yqqjh1FiP7a4l9uelJHaryd8Y5IwnHVbqjt1d0AXbgCcytI9Z5MMmItFqbwB4YZG';
 
 // One promise per src: a second call while the script is in flight gets the same load, never a second tag.
 const pending = new Map();
@@ -3276,6 +3276,23 @@ function loadCamKit() {
 
 /** Open Cam on this page. Resolves to a File and metadata after Use this, or null on cancel. */
 function open(options = {}) { return loadCamKit().then((kit) => kit.open(options)); }
+
+async function cameraSettings(token, method, body) {
+    if (typeof token !== 'string' || !token) throw new TypeError('A person’s Network token is required.');
+    const response = await fetch('https://openvibe.cam/api/v1/me/camera-settings', {
+        method, headers: { Authorization: `Bearer ${token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || 'Could not load camera settings');
+    return data;
+}
+
+/** Camera choices follow a signed-in person across sites. Server callers forward the person's token. */
+const settings = Object.freeze({
+    get: ({ token }) => cameraSettings(token, 'GET'),
+    put: ({ token, values }) => cameraSettings(token, 'PUT', values),
+});
 
 /**
  * Inject the <ov-camera> embed once and resolve to the element class.
@@ -3313,7 +3330,7 @@ function defineOvCamera(options = {}) {
     return load;
 }
 
-module.exports = { defineOvCamera, OV_CAMERA_SRC, CAM_KIT_SRC, CAM_KIT_SRI, loadCamKit, open };
+module.exports = { defineOvCamera, OV_CAMERA_SRC, CAM_KIT_SRC, CAM_KIT_SRI, loadCamKit, open, settings };
 },
 // ── 27: src/community.js ────────────────────────────────────────────
 function (module, exports) {

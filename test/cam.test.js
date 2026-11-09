@@ -14,8 +14,25 @@ const cam = require('../src/cam');
 const pkg = require('../package.json');
 
 run([
+    ['camera settings use the person token and return saved choices', async () => {
+        const original = global.fetch;
+        const calls = [];
+        global.fetch = async (url, options) => {
+            calls.push({ url, options });
+            return { ok: true, json: async () => ({ facing: 'user', lens: 'main', mic: 'default', resolution: '720', mirror: true, updated_at: null }) };
+        };
+        try {
+            await cam.settings.get({ token: 'person-token' });
+            await cam.settings.put({ token: 'person-token', values: { mirror: false } });
+            assert.equal(calls[0].url, 'https://openvibe.cam/api/v1/me/camera-settings');
+            assert.equal(calls[0].options.method, 'GET');
+            assert.equal(calls[1].options.method, 'PUT');
+            assert.equal(JSON.parse(calls[1].options.body).mirror, false);
+            assert.equal(calls[1].options.headers.Authorization, 'Bearer person-token');
+        } finally { global.fetch = original; }
+    }],
     ['the entry resolves by name and names the loader and the default script', async () => {
-        assert.deepEqual(Object.keys(cam).sort(), ['CAM_KIT_SRC', 'CAM_KIT_SRI', 'OV_CAMERA_SRC', 'defineOvCamera', 'loadCamKit', 'open']);
+        assert.deepEqual(Object.keys(cam).sort(), ['CAM_KIT_SRC', 'CAM_KIT_SRI', 'OV_CAMERA_SRC', 'defineOvCamera', 'loadCamKit', 'open', 'settings']);
         assert.equal(cam.OV_CAMERA_SRC, 'https://openvibe.cam/embed/ov-camera.js');
         assert.equal(cam.CAM_KIT_SRC, 'https://openvibe.cam/embed/cam-kit.js');
         assert.match(cam.CAM_KIT_SRI, /^sha384-/);

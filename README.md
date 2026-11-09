@@ -660,3 +660,8 @@ const exchange = require('openvibe-sdk/exchange').createExchangeClient({ develop
 const round = await exchange.arena.start({ prompt: 'Explain a binary search.', category: 'code', entries });
 await exchange.arena.vote(round.id, 'left');
 ```
+## Camera settings
+
+Camera choices can be read or saved on behalf of a signed-in person with `ov.cam.settings.get({ token })` and
+`ov.cam.settings.put({ token, values: { facing, lens, mic, resolution, mirror } })`. Server callers should forward
+the person's Network token; Cam keeps these preferences per person, and a missing device id is only a hint.
