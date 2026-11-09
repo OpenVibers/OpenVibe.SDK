@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.133.0 (2026-11-09)
+
+- ov.blog.changelog({ service, kind, area, q, limit, before }): the network changelog's blog.changelog-entry@2 rows, newest first
+
 ## 0.132.0 (2026-11-09)
 
 - `openvibe-sdk/wiki`: articles on blocks (`articles.create`/`update({ blocks })`, `pages.blocks`), picture suggestions from the `wiki.article.images` task (`images.suggest`), and the `content.wiki` writer (`articles.draft`), whose revision is a pending proposal a person reviews.

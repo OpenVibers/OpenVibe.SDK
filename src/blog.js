@@ -40,6 +40,16 @@ function createBlogClient(client, { baseUrl } = {}) {
     };
 
     return {
+        /**
+         * The network changelog: what shipped on every OpenVibe site, newest first, as
+         * blog.changelog-entry@2 rows (plain, kind, areas, time, commit and pull request).
+         *   blog.changelog({ service: 'live', kind: 'new', area: 'video', q: 'devblog' })
+         * Filters: service (one site), kind (new, better, fixed, internal), area (one of
+         * Blog's areas), q (searches the plain words and the subject), limit and before (the
+         * previous page's next cursor). Without service the answer also lists the sites.
+         */
+        changelog: ({ service, kind, area, q, limit, before } = {}, { signal } = {}) =>
+            call({ path: '/api/v1/changelog', query: { service, kind, area, q, limit, before }, signal }),
         blogs: {
             /** A blog's public profile. */
             get: (h, { signal } = {}) => call({ path: handle(h), signal }),
