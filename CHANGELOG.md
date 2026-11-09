@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.117.0 (2026-11-09)
+
+- ov.cam loads Cam's kit at its versioned URL and its new hash (Cam #116 changed the kit)
+
 ## 0.116.0 (2026-11-09)
 
 - npm metadata (keywords, homepage, funding), the README's first screen and CITATION.cff
