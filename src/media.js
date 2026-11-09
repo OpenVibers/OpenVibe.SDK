@@ -10,6 +10,7 @@
  * delete, media.object.read to list and get. Media refuses a user JWT here: a browser uploads
  * through its own app server, which names the user with X-OV-User-Id (the `actingUserId` option).
  * Browser-safe code (FormData/Blob), but the credentials it needs belong on a server.
+ * The upload facade lives at openvibe-sdk/media-upload so this frozen module keeps its names.
  *
  * Sandbox app tokens land in the project's sandbox tenant (`<prj_…>-sandbox`, shown as `app_id`),
  * whose files are never served publicly: Media answers them with `sandbox: true`, a signed,

@@ -72,7 +72,7 @@ run([
                 })().catch((err) => { console.error(err); process.exit(1); });`;
             const res = execFileSync(process.execPath, ['-e', script], { cwd: app, encoding: 'utf8' });
             assert.match(res, new RegExp(`consumer ok: ${subpaths.length} subpaths \\+ the browser bundle`));
-            assert.equal(subpaths.length, 93);   // Adds the home and feed client (0.106.0); 92 had the Report AI comparison client.
+            assert.equal(subpaths.length, 98);   // Adds the upload client and the UI entry (0.122.0); the wallet came in 0.119.0.
             assert.ok(!fs.existsSync(path.join(app, 'node_modules/openvibe-contracts')), 'the optional peer is not installed');
         } finally {
             fs.rmSync(tmp, { recursive: true, force: true });

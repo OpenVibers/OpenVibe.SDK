@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use openvibe-sdk in research or a product, cite it as below."
+title: openvibe-sdk
+type: software
+authors:
+  - name: OpenVibe
+    alias: OpenVibers
+    website: https://openvibe.network
+repository-code: https://github.com/OpenVibers/OpenVibe.SDK
+url: https://openvibe.services
+license: MIT
+version: 0.108.0
+date-released: 2026-11-09
+abstract: "Supported browser and server JavaScript/TypeScript clients for the OpenVibe network: OAuth 2.0/PKCE auth, registry discovery, identity, events, media, community, search, chat, AI runs, tools and the async PostgreSQL/Valkey data layer."
+keywords:
+  - openvibe
+  - sdk
+  - oauth
+  - live-streaming
+  - self-hosted

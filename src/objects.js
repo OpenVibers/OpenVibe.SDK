@@ -225,6 +225,7 @@ function createObjectsClient({
         }
         const up = created.upload || {};
         if (up.multipart) {
+            if (opts.onSession) await opts.onSession({ objectId: created.id, uploadId: up.multipart.upload_id });
             return finishMultipart(created.id, up.multipart.upload_id, sessionIo(up.multipart, { objectId: created.id }), body, { signal, onProgress, contentHash, total });
         }
         await presigned(up.url, {
