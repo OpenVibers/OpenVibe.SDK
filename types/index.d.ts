@@ -1,5 +1,7 @@
 export * from './core';
 export * as auth from './auth';
+export * as report from './report';
+export * as report from './report';
 export * as registry from './registry';
 export * as identity from './identity';
 export * as trust from './trust';
