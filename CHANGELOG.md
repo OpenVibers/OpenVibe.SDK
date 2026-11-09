@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.122.0 (2026-11-09)
+
+- dms.viewPreference() and setViewPreference(): a conversation's saved view, bubbles or room
+
 ## 0.121.0 (2026-11-09)
 
 - ov.cam.settings.get/put: a person's saved camera choices (Cam #116)

@@ -83,6 +83,9 @@ function createChatClient(client, defaults = {}) {
             blocks: (o = {}) => call({ path: '/api/dm/blocks' }, o),
             block: (userId, o = {}) => call({ method: 'POST', path: `/api/dm/blocks/${enc(userId)}`, ...once }, o),
             unblock: (userId, o = {}) => call({ method: 'DELETE', path: `/api/dm/blocks/${enc(userId)}`, ...once }, o),
+            /** Saved view for one conversation: { view: 'bubbles' | 'room' }. */
+            viewPreference: (id, o = {}) => call({ path: `${conv(id)}/view` }, o),
+            setViewPreference: (id, view, o = {}) => call({ method: 'PUT', path: `${conv(id)}/view`, json: { view }, ...once }, o),
         },
         /** Every message you sent that is still visible: { username, total, truncated, messages } (JSON). */
         exportMine: (o = {}) => call({ path: '/api/chat/me/export' }, o),
