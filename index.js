@@ -28,6 +28,7 @@ module.exports = {
     meme: require('./src/meme'),
     vision: require('./src/vision'),
     themes: require('./src/themes'),
+    design: require('./src/design'),
     redact: require('./src/redact'),
     chat: require('./src/chat'),
     chatApps: require('./src/chat-apps'),
@@ -65,5 +66,4 @@ module.exports = {
     usage: require('./src/usage'),
     commerce: require('./src/commerce'),
     telemetry: require('./src/telemetry'),
-    design: require('./src/design'),
 };

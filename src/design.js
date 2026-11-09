@@ -1,18 +1,23 @@
 'use strict';
 
+/**
+ * OpenVibe.Design: the public component registry (design.component@1; no token) and the glyph API (icons; a token).
+ * Browser-safe.
+ */
 const DEFAULT_DESIGN_URL = 'https://openvibe.design';
 const STYLES = new Set(['thin', 'light', 'regular', 'bold', 'solid', 'duotone']);
+const COMPONENT = /^[a-z][a-z0-9-]{0,63}$/;
 
-/** A small authenticated client for the Design icon API. */
-function createDesignClient({ accessToken, baseUrl = DEFAULT_DESIGN_URL, fetchImpl = globalThis.fetch, timeoutMs = 15000 } = {}) {
-    if (typeof accessToken !== 'string' || !accessToken) throw new TypeError('createDesignClient: accessToken is required');
+function createDesignClient({ accessToken = null, baseUrl = DEFAULT_DESIGN_URL, fetchImpl = globalThis.fetch, timeoutMs = 15000 } = {}) {
+    if (accessToken != null && (typeof accessToken !== 'string' || !accessToken)) throw new TypeError('createDesignClient: accessToken must be a non-empty string');
     if (typeof fetchImpl !== 'function') throw new TypeError('createDesignClient: fetch is unavailable');
     const base = String(baseUrl).replace(/\/+$/, '');
     if (!/^https?:\/\/[^/]+$/i.test(base)) throw new TypeError('createDesignClient: baseUrl must be an origin');
-    async function request(path, { method = 'GET', body, signal } = {}) {
+    async function request(path, { method = 'GET', body, signal, open = false } = {}) {
+        if (!open && !accessToken) throw new TypeError('createDesignClient: the icon API needs accessToken');
         const response = await fetchImpl(`${base}${path}`, {
             method,
-            headers: { accept: 'application/json', authorization: `Bearer ${accessToken}`,
+            headers: { accept: 'application/json', ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
                 ...(body !== undefined ? { 'content-type': 'application/json' } : {}) },
             ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
             signal: signal || AbortSignal.timeout(timeoutMs),
@@ -43,7 +48,17 @@ function createDesignClient({ accessToken, baseUrl = DEFAULT_DESIGN_URL, fetchIm
             return request(`/api/v1/glyphs/search?q=${encodeURIComponent(query)}&limit=${encodeURIComponent(Math.min(Math.max(Number(limit) || 24, 1), 60))}`, { signal });
         },
     });
-    return Object.freeze({ icons });
+    return Object.freeze({
+        icons,
+        /** The registry: → { schema: 'design.component@1', components: [definition], kitComponents: [...] }. No token. */
+        components({ signal } = {}) { return request('/api/v1/components', { signal, open: true }); },
+        /** One definition: → { schema, component, examples }, or null when no component has this name. No token. */
+        async component(name, { signal } = {}) {
+            if (!COMPONENT.test(String(name || ''))) throw new TypeError('component: pass a registry name (lowercase letters, digits and hyphens)');
+            try { return await request(`/api/v1/components/${encodeURIComponent(name)}`, { signal, open: true }); }
+            catch (error) { if (error && error.status === 404) return null; throw error; }
+        },
+    });
 }
 
 module.exports = { createDesignClient, DEFAULT_DESIGN_URL };

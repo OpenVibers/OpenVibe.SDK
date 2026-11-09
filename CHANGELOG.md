@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.118.0 (2026-11-09)
+
+- openvibe-sdk/design: `components()` and `component(name)` read OpenVibe.Design's public design.component@1 registry
+  (a missing name is null, a bad one is refused before a request). They are on the same `createDesignClient` as the
+  icons; `accessToken` is now optional and only the icon API needs it.
+
 ## 0.117.0 (2026-11-09)
 
 - ov.cam loads Cam's kit at its versioned URL and its new hash (Cam #116 changed the kit)
