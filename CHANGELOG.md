@@ -1,8 +1,12 @@
 # Changelog
 
-## 0.129.0 — 2026-11-09
+## 0.129.0 (2026-11-09)
 
 - `openvibe-sdk/wiki`: articles on blocks (`articles.create`/`update({ blocks })`, `pages.blocks`), picture suggestions from the `wiki.article.images` task (`images.suggest`), and the `content.wiki` writer (`articles.draft`), whose revision is a pending proposal a person reviews.
+
+## 0.128.0 (2026-11-09)
+
+- ov.ai: tasks(), choices.get/set, run(task, input, {choice}) and admin.defaults(); runs.create accepts `task` and `choice`
 
 ## 0.127.0 — 2026-11-09
 
