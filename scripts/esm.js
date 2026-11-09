@@ -55,7 +55,7 @@ const ENTRIES = {
     'report.mjs': '../src/report.js',
     'vibes.mjs': '../src/vibes.js',
     'delivery.mjs': '../src/delivery.js',
-    'node.mjs': '../src/node.js',
+    'link.mjs': '../src/link.js',
     'db.mjs': '../src/db/index.js',
     'valkey.mjs': '../src/valkey.js',
     'cache.mjs': '../src/cache.js',

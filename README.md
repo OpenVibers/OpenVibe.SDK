@@ -14,7 +14,7 @@ After v0.97.1 is tagged:
 npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.106.0
 ```
 
-It has no runtime dependencies. It needs Node ≥ 20, or any browser with `fetch`, Web Crypto and `TextDecoder`. There is no build step. The package is CommonJS with ESM entry points (`import` works). Each subpath has its own `.d.ts`. For a page with no bundler, `browser/openvibe-sdk.mjs` is one self-contained ES module of the browser-safe subpaths (see [Browser without a bundler](#browser-without-a-bundler)). It does not depend on `openvibe-contracts` at runtime: it copies the contract types it uses (from the temporary Contracts sharing branch, a devDependency the tests check them against).
+It has no runtime dependencies. It needs Link ≥ 20, or any browser with `fetch`, Web Crypto and `TextDecoder`. There is no build step. The package is CommonJS with ESM entry points (`import` works). Each subpath has its own `.d.ts`. For a page with no bundler, `browser/openvibe-sdk.mjs` is one self-contained ES module of the browser-safe subpaths (see [Browser without a bundler](#browser-without-a-bundler)). It does not depend on `openvibe-contracts` at runtime: it copies the contract types it uses (from the temporary Contracts sharing branch, a devDependency the tests check them against).
 
 ## Purpose
 
@@ -53,7 +53,7 @@ const sub = subscribe(['live.stream.*'], (event, { cursor }) => { render(event);
 });
 ```
 
-**The token exchange happens on your server.** First-party clients and confidential developer apps have a client secret, and a secret must never reach a browser. A public developer app has no secret, but its server should still do the exchange and keep the token in an HttpOnly session. The browser entry points contain no exchange code. A test scans every file a browser bundle can reach (and the browser bundle itself) and fails on `client_secret`, `node:` imports, `require('crypto')` or `process.env`.
+**The token exchange happens on your server.** First-party clients and confidential developer apps have a client secret, and a secret must never reach a browser. A public developer app has no secret, but its server should still do the exchange and keep the token in an HttpOnly session. The browser entry points contain no exchange code. A test scans every file a browser bundle can reach (and the browser bundle itself) and fails on `client_secret`, `link:` imports, `require('crypto')` or `process.env`.
 
 ### Server service (service principal)
 
@@ -231,9 +231,9 @@ Until OpenVibe.Tools serves the gateway facade (Tools S6), point the jobs client
 | `openvibe-sdk/runtime` | server | Build and validate `platform.runtime-offer@1` records with `runtimeOffer()` and `validateRuntimeOffer()`; `runtimeClass()`, `RUNTIME_CLASSES`, and `validateRuntimeClass()` handle known runtime classes |
 | `openvibe-sdk/storage` | server | `storageOffer()` and `validateStorageOffer()` for `platform.storage-offer@1` |
 | `openvibe-sdk/delivery` | server | `deliveryOffer()` and `validateDeliveryOffer()` for `platform.delivery-offer@1` |
-| `openvibe-sdk/node` | server | `nodeCapabilities()` and `validateNodeCapabilities()` for `platform.node-capabilities@1`; `nodeOffers()` derives resource and runtime offers from a node descriptor |
+| `openvibe-sdk/link` | server | `linkCapabilities()` and `validateLinkCapabilities()` for `platform.link-capabilities@1`; `linkOffers()` derives resource and runtime offers from a node descriptor |
 | `openvibe-sdk/service` | server | the service kit: `gracefulStop({name, server, stop, close, drainMs, deadlineMs, deadlineExitCode, beforeDrain, handles})` → `{stop, stopping}`, `within(ms, p)`; `createServiceError(name)`, `ServiceError`, `asServiceError`, `run`, `wrap`, `sendError`, `jsonBody({limit})`, `privateNoStore`, `jsonErrors()`; the HTTP telemetry kit: `createHttpTelemetry({service, sink, intervalMs?, routeLabel?, skipPrefixes?, …})` → `{middleware(), record, gauge, count, requestStarted, requestFinished, flush, stop}`, `createTelemetryMiddleware`, `telemetrySkipped`, `defaultRouteLabel`, `registerSignals`, `telemetrySample`, `validateTelemetrySample`, and the singleton `telemetry.{init, record, gauge, count, requestStarted, requestFinished, flush, stop}` + `telemetryMiddleware` (a request is aggregated per `route\|method\|status_class` per flush into one `platform.telemetry-sample@1` `http.request` sample, plus active-requests/p95/event-loop-lag gauges once per flush); re-exports (loaded on first use) of openvibe-shared `createReadiness`, `skip`, `safeReason`, `createRegistry`, `instrument`, `metricsHandler`, `isLoopbackDirect`, `releaseInfo`, `createRelease` and openvibe-contracts `problem`, `sendProblem` |
-| `openvibe-sdk/testing` | Node | `createMockPlatform()`: fake Network (incl. developer apps and projects), Events, Media, Tools jobs and the Tools platform API on an in-process `fetch` |
+| `openvibe-sdk/testing` | Link | `createMockPlatform()`: fake Network (incl. developer apps and projects), Events, Media, Tools jobs and the Tools platform API on an in-process `fetch` |
 | `openvibe-sdk/browser/openvibe-sdk.mjs` | browser | one self-contained ES module: core + auth (browser), registry, modules, realtime, media, community, bot, jobs, tools, projects |
 
 Server-only subpaths are declared `"browser": null` in the exports map, so a bundler refuses them in a browser build and doesn't ship them by accident.
@@ -520,7 +520,7 @@ The full attribute, event and method reference is at [openvibe.cam/developers](h
 
 Every open site can put its own cards in the network menu every site shares. Build the card with
 `menuCard` (it applies the house rules and validates against `frame.menu-card@1`), then mount the
-route — Express or plain `node:http`:
+route — Express or plain `link:http`:
 
 ```js
 const { menuCard, menuRoute } = require('openvibe-sdk/menu');
@@ -599,12 +599,12 @@ previous tag.
 
 ```bash
 npm test                                 # every test/*.test.js: stub servers + mock platform, then npm pack + install
-fnm exec --using=22.22.1 npm test        # the Node version production runs
+fnm exec --using=22.22.1 npm test        # the Link version production runs
 node scripts/esm.js                      # regenerate esm/*.mjs after changing a module's exports
 node scripts/browser-bundle.js           # regenerate browser/openvibe-sdk.mjs after changing a browser-safe file
 ```
 
-Style: CommonJS, 4-space indent, single quotes, semicolons. Browser-safe files use only `fetch`, `Headers`, `FormData`, `Blob`, `URL`, `TextEncoder`/`TextDecoder` and `globalThis.crypto` (Web Crypto). Server-only files may use `node:` modules and are marked `"browser": null` in `package.json`.
+Style: CommonJS, 4-space indent, single quotes, semicolons. Browser-safe files use only `fetch`, `Headers`, `FormData`, `Blob`, `URL`, `TextEncoder`/`TextDecoder` and `globalThis.crypto` (Web Crypto). Server-only files may use `link:` modules and are marked `"browser": null` in `package.json`.
 
 ## Owns
 
@@ -626,13 +626,13 @@ Part of the [OpenVibe network](https://openvibe.network). Built in the open by [
 - openvibe-contracts: v0.338.0
 <!-- versions:end -->
 
-### Network-wide sharing (Node)
+### Network-wide sharing (Link)
 
 `openvibe-sdk/share` provides local access enforcement, expiring memberships and confirmed ownership transfer. See [the sharing module](docs/share.md) for integration, API signatures, migrations and the uniform OpenAPI fragment. Agents use `require('openvibe-sdk').share({ base, token }).for('paste', id)`.
 
-### Locker: end-to-end encryption (Node and the browser)
+### Locker: end-to-end encryption (Link and the browser)
 
-`openvibe-sdk/locker` seals anything and opens it again: the Locker envelope (`locker.envelope@1`), the three locks (people, password, link), streams for files, person key pairs and the eight-word fingerprint, `wrapFor` and `rewrap` for sharing, `recoveryWords` for the phrase to write down, `inspect` for what an envelope says about itself, and opening a people lock by key. `openvibe-sdk/locker/server` gives a service the header checks without a key. WebCrypto only, in Node and the browser. See [the locker module](docs/locker.md).
+`openvibe-sdk/locker` seals anything and opens it again: the Locker envelope (`locker.envelope@1`), the three locks (people, password, link), streams for files, person key pairs and the eight-word fingerprint, `wrapFor` and `rewrap` for sharing, `recoveryWords` for the phrase to write down, `inspect` for what an envelope says about itself, and opening a people lock by key. `openvibe-sdk/locker/server` gives a service the header checks without a key. WebCrypto only, in Link and the browser. See [the locker module](docs/locker.md).
 # AI comparison and Arena
 
 Read Report's public AI data and create or vote on Exchange Arena rounds:

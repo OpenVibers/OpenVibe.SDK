@@ -1,4 +1,4 @@
-# Network-wide sharing (Node)
+# Network-wide sharing (Link)
 
 `openvibe-sdk/share` implements the 2026-11-06 sharing design in each service's PostgreSQL database. The service is the authority. The module never reads titles, content or media URLs. It uses openvibe-contracts v0.297.0 (share.v1, with the Locker lock kind and the member key slots).
 
@@ -27,7 +27,7 @@ app.use(shares.router({
 }));
 ```
 
-`verifiedViewer(req)` returns `{ subject: { type, id }, staff?: true }` from verified service authentication, or `null`. A caller's body, query, forwarded header or unverified token must never set a subject or staff bit. Cookie authentication must check CSRF for mutations in this function or in earlier middleware. Authentication precedes dispatch. The router supports Node HTTP and Express (mount at the root so it sees `/api/v1/...`); JSON bodies are capped at 64 KiB. Services still authorize their own resource read/edit routes.
+`verifiedViewer(req)` returns `{ subject: { type, id }, staff?: true }` from verified service authentication, or `null`. A caller's body, query, forwarded header or unverified token must never set a subject or staff bit. Cookie authentication must check CSRF for mutations in this function or in earlier middleware. Authentication precedes dispatch. The router supports Link HTTP and Express (mount at the root so it sees `/api/v1/...`); JSON bodies are capped at 64 KiB. Services still authorize their own resource read/edit routes.
 
 For a non-GET request without an `Authorization` header the router itself requires `X-Requested-With` (any value) or `Sec-Fetch-Site: same-origin|same-site`, otherwise it answers `403 { code: 'share.csrf' }` before authentication. Pass `csrf: false` only when `authenticate` already enforces CSRF. `describe(ref)` fills `title`, `link`, `roles`, `audiences` and `transferable`; omitted values default to `null`, `null`, `['viewer']`, all four audiences and `true`.
 
@@ -52,7 +52,7 @@ The migration creates `shares`, `share_members`, `share_transfers`, `share_acces
 | `sharedWithMe(viewer, { service?, limit = 50, cursor? }?)` | `{ items, next_cursor }`; ids and access metadata only |
 | `expireMembers({ limit = 100 }?)` | number of resources swept, including expired transfers |
 | `flush({ limit = 100 }?)` | number of durable deliveries sent |
-| `router({ service, authenticate })` | Node/Express middleware |
+| `router({ service, authenticate })` | Link/Express middleware |
 
 `ref` is `{ service, kind, id }`. Subjects follow `identity.subject-ref@1`; the common user case is `{ type: 'user', id: 'usr_<ULID>' }`. Members and transfer recipients must be active **user** subjects: a `guest`, `app`, `mod`, `agent`, `service` or `system` subject is refused, and a user subject is checked against Network (batched, cached 60 s) so unknown, banned and deleted accounts cannot be added. A bare subject-id string is never an identity projection. Expiry timestamps are absolute RFC3339 timestamps in the future. Viewer/editor membership is effective for **people** only. Public/link grant viewing to everyone but never grant editing to strangers; private is owner-only. Active pending transfer recipients may preview in every audience. Staff view/edit overrides append audit records even on public resources; staff cannot start/accept/decline another person's transfer. A staff member who is not the owner may narrow access only — set the audience to `private` and remove members — never widen, add a member or raise a role; anything else is a generic 404 like any other non-owner. Owners and trusted staff may manage share settings. Generic 404 responses reveal no resource title or existence through share settings.
 

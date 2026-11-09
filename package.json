@@ -209,11 +209,11 @@
       "import": "./esm/delivery.mjs",
       "default": "./src/delivery.js"
     },
-    "./node": {
-      "types": "./types/node.d.ts",
+    "./link": {
+      "types": "./types/link.d.ts",
       "browser": null,
-      "import": "./esm/node.mjs",
-      "default": "./src/node.js"
+      "import": "./esm/link.mjs",
+      "default": "./src/link.js"
     },
     "./db": {
       "types": "./types/db.d.ts",

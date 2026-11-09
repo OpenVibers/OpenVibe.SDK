@@ -25,6 +25,20 @@ async function hub(answer) {
 }
 
 run([
+    ['Link compute lists and picks through the same authenticated hub', async () => {
+        const { createLink } = require('../src/link');
+        const { stub, state } = await hub((req) => req.method === 'POST'
+            ? { body: { choice: { id: MACHINE.id, kind: 'personal', status: 'ready' } } }
+            : { body: { sources: [], candidates: [MACHINE] } });
+        const link = createLink({ networkUrl: stub.url, token: () => state.token });
+        try {
+            assert.equal((await link.compute.list({ kind: 'personal' })).candidates.length, 1);
+            assert.equal((await link.compute.pick({ kind: 'personal', id: MACHINE.id })).choice.id, MACHINE.id);
+            assert.equal(state.requests[0].url, '/api/v1/link/compute?kind=personal');
+            assert.equal(state.requests[1].url, '/api/v1/link/compute/pick');
+            assert.deepEqual(JSON.parse(state.requests[1].body), { kind: 'personal', id: MACHINE.id });
+        } finally { await stub.close(); }
+    }],
     ['the default timeout is ten seconds', async () => {
         assert.equal(DEFAULT_TIMEOUT_MS, 10_000);
     }],
@@ -35,7 +49,7 @@ run([
             if (req.url === '/api/v1/machines/roles') return { body: { roles: [{ id: 'codes.worker', name: 'Codes worker', installs: 'the runner', shows: 'Runs your coding jobs.' }] } };
             if (req.url.endsWith('/roles') && req.method === 'PUT') return { body: { machine: { ...MACHINE, roles: ['codes.worker', 'desks.host'] } } };
             if (req.url.endsWith('/revoke')) return { body: { machine: { ...MACHINE, online: false } } };
-            if (req.url === '/api/v1/machines/pairings') return { body: { pairing: { code: 'ABCD-EFGH', expires_at: '2026-10-31T12:00:00.000Z', installer: 'curl -fsSL https://openvibe.bot/install | sh' } } };
+            if (req.url === '/api/v1/machines/pairings') return { body: { pairing: { code: 'ABCD-EFGH', expires_at: '2026-10-31T12:00:00.000Z', installer: 'curl -fsSL https://openvibe.link/install | sh' } } };
             if (req.method === 'PATCH') return { body: { machine: { ...MACHINE, name: 'Studio' } } };
             return { body: { machine: MACHINE } };
         });

@@ -866,10 +866,10 @@
     "noLooks": "function",
     "noLooksTags": "function"
   },
-  "openvibe-sdk/node": {
-    "nodeCapabilities": "function",
-    "nodeOffers": "function",
-    "validateNodeCapabilities": "function"
+  "openvibe-sdk/link": {
+    "linkCapabilities": "function",
+    "linkOffers": "function",
+    "validateLinkCapabilities": "function"
   },
   "openvibe-sdk/notifications": {
     "createNotificationsClient": "function"

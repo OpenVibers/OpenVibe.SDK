@@ -35,14 +35,14 @@ function tokensStub() {
 }
 
 const reading = (n) => usageSample({ id: `run:job_A:${n}`, idempotency_key: `run:job_A:${n}`, service: 'run',
-    operation: 'function.invoke', quantity: 1, unit: 's', at: '2026-10-02T10:00:00Z', source: 'openvibe-node.worker' });
+    operation: 'function.invoke', quantity: 1, unit: 's', at: '2026-10-02T10:00:00Z', source: 'openvibe-link.worker' });
 
 async function open({ statuses = [], table } = {}) {
     const db = createDb({ pglite: true });
     const billing = billingStub(statuses);
     const tokens = tokensStub();
     const now = { t: 1_000_000 };
-    const reporter = createUsageReporter({ db, service: 'run', source: 'openvibe-node.worker', table,
+    const reporter = createUsageReporter({ db, service: 'run', source: 'openvibe-link.worker', table,
         billingUrl: 'http://billing.internal/', tokenClient: tokens.tokenClient, fetchImpl: billing.fetchImpl,
         now: () => now.t, log: quiet });
     await reporter.ensureSchema();
@@ -54,7 +54,7 @@ async function deliverOnce(status) {
     const db = createDb({ pglite: true });
     const billing = billingStub([status]);
     const tokens = tokensStub();
-    const reporter = createUsageReporter({ db, service: 'run', source: 'openvibe-node.worker',
+    const reporter = createUsageReporter({ db, service: 'run', source: 'openvibe-link.worker',
         billingUrl: 'http://billing.internal/', tokenClient: tokens.tokenClient, fetchImpl: billing.fetchImpl,
         now: () => 1_000_000, log: quiet });
     await reporter.ensureSchema();
@@ -83,13 +83,13 @@ run([
             const s = reporter.sample({ idempotency_key: reporter.key('job', 'job_A', 0), operation: 'function.invoke',
                 quantity: 1, unit: 's', resource: 'job_A', at: '2026-10-02T10:00:00Z' });
             assert.equal(s.service, 'run');
-            assert.equal(s.source, 'openvibe-node.worker');
+            assert.equal(s.source, 'openvibe-link.worker');
             assert.equal(s.id, s.idempotency_key, 'id defaults to the key');
             assert.deepEqual(validateUsageSample(s), { ok: true, errors: [] });
             const explicit = reporter.sample({ id: 'use-1', idempotency_key: 'k', service: 'someone-else', source: 'someone-else',
                 operation: 'function.invoke', quantity: 1, unit: 's' });
             assert.equal(explicit.service, 'run', 'the reporter service wins');
-            assert.equal(explicit.source, 'openvibe-node.worker');
+            assert.equal(explicit.source, 'openvibe-link.worker');
             assert.equal(explicit.id, 'use-1', 'an explicit id is kept');
         } finally { await done(); }
     }],
@@ -158,7 +158,7 @@ run([
     ['without a billingUrl or tokenClient the reporter still queues, but the relay is off', async () => {
         const db = createDb({ pglite: true });
         try {
-            const reporter = createUsageReporter({ db, service: 'run', source: 'openvibe-node.worker', log: quiet });
+            const reporter = createUsageReporter({ db, service: 'run', source: 'openvibe-link.worker', log: quiet });
             assert.equal(reporter.enabled, false);
             await reporter.ensureSchema();
             await assert.rejects(reporter.record(null, reading(0)), /transaction handle/);
@@ -213,7 +213,7 @@ run([
     ['requireProject refuses a reading without a production project, and accepts one with it', async () => {
         const db = createDb({ pglite: true });
         try {
-            const reporter = createUsageReporter({ db, service: 'run', source: 'openvibe-node.worker', requireProject: true, log: quiet });
+            const reporter = createUsageReporter({ db, service: 'run', source: 'openvibe-link.worker', requireProject: true, log: quiet });
             await reporter.ensureSchema();
             await assert.rejects(db.tx((t) => reporter.record(t, reading(0))), /production project/, 'a first-party reading (no project) is refused');
             // A malformed project fails contracts validation first; either way the reading is refused.
