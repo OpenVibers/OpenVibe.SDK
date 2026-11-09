@@ -4610,6 +4610,8 @@ function createChatClient(client, defaults = {}) {
         vibe: {
             /** { chats, allowance } */
             list: (o = {}) => call({ path: '/api/chat/vibe' }, o),
+            /** The same conversations in Chat and the Dock, with last line, answer time and originating site. */
+            conversations: (o = {}) => call({ path: '/api/vibe/conversations' }, o),
             /** A new chat; Vibe answers in its room (rooms.messages, or the room socket). → { room, message } */
             start: (message, o = {}) => call({ method: 'POST', path: '/api/chat/vibe', json: { message }, ...once }, o),
             rename: (slug, name, o = {}) => call({ method: 'PATCH', path: `/api/chat/vibe/${enc(slug)}`, json: { name }, ...once }, o),
