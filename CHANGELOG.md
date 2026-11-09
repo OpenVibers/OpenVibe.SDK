@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.132.0 (2026-11-09)
+## 0.133.0 (2026-11-09)
 
 - ov.blog.changelog({ service, kind, area, q, limit, before }): the network changelog's blog.changelog-entry@2 rows, newest first
 
