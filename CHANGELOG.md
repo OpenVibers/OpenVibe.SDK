@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.116.0 (2026-11-09)
+
+- npm metadata (keywords, homepage, funding), the README's first screen and CITATION.cff
+
 ## 0.115.0 (2026-11-09)
 
 - Tools discovery: ov.tools.popular() and ov.tools.trending()
