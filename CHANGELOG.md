@@ -1,8 +1,11 @@
 # Changelog
 
-## 0.124.0 (2026-11-09)
+## 0.125.0 (2026-11-09)
 
 - Add `openvibe-sdk/pics`: the public gallery and picture reads, private uploads with resumable chunks, publication, likes and albums on OpenVibe.Pics.
+
+## 0.124.0 (2026-11-09)
+
 - OpenVibe Link: `openvibe-sdk/node` is `openvibe-sdk/link` (`ov.node` is `ov.link`), building
   `platform.link-capabilities@1` and mapping a Link to its `platform.resource-offer@1` and
   `platform.runtime-offer@1`. A link principal token is never a user token. The Contracts pin moves to

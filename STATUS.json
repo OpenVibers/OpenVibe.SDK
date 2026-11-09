@@ -3,7 +3,7 @@
   "stage": "alpha",
   "code": true,
   "wave": "W2",
-  "version": "0.124.0",
+  "version": "0.125.0",
   "plan": "OpenVibe End-to-End Realignment & Implementation Plan, revision 3 (20 Sep 2026), §3.2; roadmap §30",
   "deployed": false,
   "deployment": "none: a package released as git tags; services and apps pin a tag",
@@ -11,6 +11,7 @@
   "features": [
     "menu (openvibe-sdk/menu): menuCard() builds one validated frame.menu-card@1 (plain text, the contract caps, https links on the site own origin or an openvibe.* host, an optional item picture) and menuRoute() is the Express/node:http GET /.well-known/openvibe-menu.json handler (public cache, CORS *, [] and one log line when the cards cannot be built)",
     "cam (openvibe-sdk/cam): defineOvCamera({ src }) injects the <ov-camera> element from openvibe.cam once and resolves to its class, with typed attributes, events and methods (start/stop/capture/flip); browser-only, upload=\"off\" by default",
+    "pics (openvibe-sdk/pics): the public gallery and one picture's reads, private uploads with resumable chunks, the owner's explicit publication, likes and albums on OpenVibe.Pics; reads are public, writes take a person's Network token",
     "streams (openvibe-sdk/streams, S7): schedule(), listSchedules(), cancelSchedule() and remindSchedule() for scheduled public agent streams; postStep() and steps.post() from any harness; digest.read() and poll.open()/poll.result() for a Co-pilot service token; onControl() for pause, curtain, mute and end",
     "reports (openvibe-sdk/reports, S7): write() a session report with the person's own token, private by default and idempotent per source and task ref, and read() one the caller may see; examples/cli-agent-stream.js streams any CLI command's run with steps",
     "chat-apps (openvibe-sdk/chat-apps): the three chat apps (Telegram, Discord, Slack) in one place — the delivery checks (Telegram's secret token, Slack's v0 signing, Discord's Ed25519), the button callback (signed once, used once, expiring), each app's payload as the same shape and splitText() for a long answer",
