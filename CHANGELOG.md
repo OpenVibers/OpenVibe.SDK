@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.119.0 (2026-11-09)
+
+- openvibe-sdk/wallet: the wallet, Vibes, the store and items, through Billing and Inventory with the person's bearer and idempotency keys
+
 ## 0.118.0 (2026-11-09)
 
 - openvibe-sdk/design: `components()` and `component(name)` read OpenVibe.Design's public design.component@1 registry

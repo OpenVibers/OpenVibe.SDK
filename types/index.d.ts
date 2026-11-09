@@ -59,3 +59,5 @@ export * as commerce from './commerce';
 export * as telemetry from './telemetry';
 export const share: typeof import('./share').share;
 export * as locker from './locker';
+
+export const createWalletClient: typeof import('./wallet').createWalletClient;

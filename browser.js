@@ -6,6 +6,7 @@
 const core = require('./src/core');
 
 module.exports = {
+    createWalletClient: require('./src/wallet').createWalletClient,
     ...core,
     auth: require('./src/auth/browser'),
     locker: require('./src/locker'),

@@ -120,6 +120,7 @@
       ]
     },
     "createClient": "function",
+    "createWalletClient": "function",
     "credentials": {
       "object": [
         "createCredentialsClient"
@@ -1190,6 +1191,9 @@
   "openvibe-sdk/vision": {
     "DEFAULT_AUDIENCE": "string",
     "createVisionClient": "function"
+  },
+  "openvibe-sdk/wallet": {
+    "createWalletClient": "function"
   },
   "openvibe-sdk/wiki": {
     "createWikiClient": "function"
