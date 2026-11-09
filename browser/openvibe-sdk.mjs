@@ -3246,8 +3246,10 @@ function (module, exports) {
  * pack test import it). Pass `src` to self-host the same element file.
  */
 const OV_CAMERA_SRC = 'https://openvibe.cam/embed/ov-camera.js';
-const CAM_KIT_SRC = 'https://openvibe.cam/embed/cam-kit.js';
-const CAM_KIT_SRI = 'sha384-kD5WfySp7D3rNJliBpLgJRrl4Geks+4EcgSaCIBGX+dZdecjmUVxEjzbcUw2Spp7';
+// The kit at its versioned URL (the query names the version), so Cloudflare never hands the integrity check an older
+// copy cached under the plain URL (Cam #116, 11-09). A Cam release that changes the kit ships with these two lines.
+const CAM_KIT_SRC = 'https://openvibe.cam/embed/cam-kit.js?v=yqqjh1FiP7a4';
+const CAM_KIT_SRI = 'sha384-yqqjh1FiP7a4l9uelJHaryd8Y5IwnHVbqjt1d0AXbgCcytI9Z5MMmItFqbwB4YZG';
 
 // One promise per src: a second call while the script is in flight gets the same load, never a second tag.
 const pending = new Map();
