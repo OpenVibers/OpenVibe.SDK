@@ -103,6 +103,7 @@ const ENTRIES = {
     'pics.mjs': '../src/pics.js',
     'work.mjs': '../src/work.js',
     'zone.mjs': '../src/zone.js',
+    'git.mjs': '../src/git.js',
     'vip.mjs': '../src/vip.js',
     'frame.mjs': '../src/frame.js',
     'menu.mjs': '../src/menu/index.js',

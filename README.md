@@ -10,7 +10,7 @@ npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags
 
 > Supported browser and server clients for the OpenVibe platform.
 
-**Status:** alpha, v0.126.0 (the five 1.0 core entries — `core`, `auth`, `events`, `db` and `media` — are frozen: their exported names change only with a major release; roadmap Wave 2; developer apps from Wave 20; Media objects v2 from Wave 4; the Tools platform API; Search, Chat, AI, Vision and consent clients; sign-in with recovery and a client health check). Every release is tagged (see [CHANGELOG.md](CHANGELOG.md)). Tested against local stub servers and the built-in mock platform only, never against the live platform. Services pin release tags; each repository's `STATUS.json` names the one it uses.
+**Status:** alpha, v0.129.0 (the five 1.0 core entries — `core`, `auth`, `events`, `db` and `media` — are frozen: their exported names change only with a major release; roadmap Wave 2; developer apps from Wave 20; Media objects v2 from Wave 4; the Tools platform API; Search, Chat, AI, Vision and consent clients; sign-in with recovery and a client health check). Every release is tagged (see [CHANGELOG.md](CHANGELOG.md)). Tested against local stub servers and the built-in mock platform only, never against the live platform. Services pin release tags; each repository's `STATUS.json` names the one it uses.
 **Plan:** OpenVibe End-to-End Realignment & Implementation Plan, revision 3 (20 Sep 2026), §3.2; roadmap §30.  
 **License:** MIT ([LICENSE](LICENSE)). This package is a library that apps outside the network embed, so it uses MIT. The OpenVibe services themselves stay AGPL-3.0.
 
@@ -19,7 +19,7 @@ npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags
 After v0.97.1 is tagged:
 
 ```bash
-npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.126.0
+npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.129.0
 ```
 
 It has no runtime dependencies. It needs Node ≥ 20, or any browser with `fetch`, Web Crypto and `TextDecoder`. There is no build step. The package is CommonJS with ESM entry points (`import` works). Each subpath has its own `.d.ts`. For a page with no bundler, `browser/openvibe-sdk.mjs` is one self-contained ES module of the browser-safe subpaths (see [Browser without a bundler](#browser-without-a-bundler)). It does not depend on `openvibe-contracts` at runtime: it copies the contract types it uses (from the temporary Contracts sharing branch, a devDependency the tests check them against).
@@ -256,7 +256,7 @@ Until OpenVibe.Tools serves the gateway facade (Tools S6), point the jobs client
 | `openvibe-sdk/runtime` | server | Build and validate `platform.runtime-offer@1` records with `runtimeOffer()` and `validateRuntimeOffer()`; `runtimeClass()`, `RUNTIME_CLASSES`, and `validateRuntimeClass()` handle known runtime classes |
 | `openvibe-sdk/storage` | server | `storageOffer()` and `validateStorageOffer()` for `platform.storage-offer@1` |
 | `openvibe-sdk/delivery` | server | `deliveryOffer()` and `validateDeliveryOffer()` for `platform.delivery-offer@1` |
-| `openvibe-sdk/node` | server | `nodeCapabilities()` and `validateNodeCapabilities()` for `platform.node-capabilities@1`; `nodeOffers()` derives resource and runtime offers from a node descriptor |
+| `openvibe-sdk/link` | server | `linkCapabilities()` and `validateLinkCapabilities()` for `platform.link-capabilities@1`; `linkOffers()` derives resource and runtime offers from a node descriptor |
 | `openvibe-sdk/service` | server | the service kit: `gracefulStop({name, server, stop, close, drainMs, deadlineMs, deadlineExitCode, beforeDrain, handles})` → `{stop, stopping}`, `within(ms, p)`; `createServiceError(name)`, `ServiceError`, `asServiceError`, `run`, `wrap`, `sendError`, `jsonBody({limit})`, `privateNoStore`, `jsonErrors()`; the HTTP telemetry kit: `createHttpTelemetry({service, sink, intervalMs?, routeLabel?, skipPrefixes?, …})` → `{middleware(), record, gauge, count, requestStarted, requestFinished, flush, stop}`, `createTelemetryMiddleware`, `telemetrySkipped`, `defaultRouteLabel`, `registerSignals`, `telemetrySample`, `validateTelemetrySample`, and the singleton `telemetry.{init, record, gauge, count, requestStarted, requestFinished, flush, stop}` + `telemetryMiddleware` (a request is aggregated per `route\|method\|status_class` per flush into one `platform.telemetry-sample@1` `http.request` sample, plus active-requests/p95/event-loop-lag gauges once per flush); re-exports (loaded on first use) of openvibe-shared `createReadiness`, `skip`, `safeReason`, `createRegistry`, `instrument`, `metricsHandler`, `isLoopbackDirect`, `releaseInfo`, `createRelease` and openvibe-contracts `problem`, `sendProblem` |
 | `openvibe-sdk/testing` | Node | `createMockPlatform()`: fake Network (incl. developer apps and projects), Events, Media, Tools jobs and the Tools platform API on an in-process `fetch` |
 | `openvibe-sdk/browser/openvibe-sdk.mjs` | browser | one self-contained ES module: core + auth (browser), registry, modules, realtime, media, community, bot, jobs, tools, projects |

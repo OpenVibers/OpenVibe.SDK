@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.129.0 — 2026-11-09
+
+- `openvibe-sdk/git` (G2): changes and review — `changes.list/get/create/comment/approve/merge/close/summary`,
+  `issues.list/get/create/labels/close`, `compare()`, `blame()`, `search()` and `reviewModel()`. Review requests
+  carry the expected head SHA, merge methods are checked, and mutations are POSTs with retries disabled.
+
+## 0.128.0 (2026-11-09)
+
+- ov.ai: tasks(), choices.get/set, run(task, input, {choice}) and admin.defaults(); runs.create accepts `task` and `choice`
+
+## 0.127.0 — 2026-11-09
+
+- `openvibe-sdk/git` (`ov.git`): repositories, trees, blobs, commits, branches, tags, releases, contributors,
+  insights and stars; `commits.create()` writes a branch and files without a clone; `tokens.create()` makes a
+  short-lived clone token; `clone(repo, { to: 'link' })` hands a clone to Link.
+
 ## 0.126.0 (2026-11-09)
 
 - Add `openvibe-sdk/pics`: the public gallery and picture reads, private uploads with resumable chunks, publication, likes and albums on OpenVibe.Pics.

@@ -53,6 +53,7 @@ export * as video from './video';
 export * as pics from './pics';
 export * as work from './work';
 export * as zone from './zone';
+export * as git from './git';
 export * as play from './play';
 export * as download from './download';
 export * as openre from './openre';
