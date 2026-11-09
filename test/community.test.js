@@ -118,6 +118,29 @@ run([
         await srv.close();
     }],
 
+    ['the Feed preserves stream status, counts and an empty page cursor through the community client', async () => {
+        const item = { id: 'p:42', kind: 'stream', url: 'https://openvibe.live/@alex', title: 'A broadcast', text: '',
+            at: '2026-11-09T10:00:00Z', site: 'live', site_name: 'Live', actor: null, media: null,
+            counts: { views: 7, likes: 3, comments: 2 }, live_now: false };
+        const srv = await stubServer((req, res) => {
+            const q = new URL(req.url, 'http://x').searchParams;
+            assert.equal(q.get('kind'), 'stream');
+            assert.equal(q.get('site'), 'live');
+            assert.equal(q.get('q'), 'broadcast');
+            assert.equal(q.get('following'), '1');
+            send(res, 200, q.get('cursor') ? { items: [item], next_cursor: null } : { items: [], next_cursor: 'opaque-cursor' });
+        });
+        try {
+            const sdk = require('..');
+            const community = sdk.community.createCommunityClient(sdk.createClient({ baseUrls: { community: srv.url } }));
+            const query = { kind: 'stream', site: 'live', q: 'broadcast', following: 1, limit: 1 };
+            const first = await community.feed(query);
+            assert.deepEqual(first, { items: [], next_cursor: 'opaque-cursor' });
+            const second = await community.feed({ ...query, cursor: first.next_cursor });
+            assert.deepEqual(second, { items: [item], next_cursor: null });
+        } finally { await srv.close(); }
+    }],
+
     ['the Feed and a status post: query, alt pictures in the body, acting subject, never retried', async () => {
         const srv = await echo();
         const community = createCommunityClient(createClient({ baseUrls: { community: srv.url } }), { actingSubject: USR });

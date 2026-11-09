@@ -34,10 +34,25 @@ function createMemeClient(client, defaults = {}) {
         }) }, o),
         /** GET /api/v1/entries/:slug — origin, citations, spread, variations, examples, related and revisions. */
         entry: (slug, o = {}) => call({ path: `/api/v1/entries/${enc(slug)}` }, o),
+        /** GET /api/v1/entries/:slug — the same read under the product's `get` name. */
+        get: (slug, o = {}) => call({ path: `/api/v1/entries/${enc(slug)}` }, o),
         /** GET /api/v1/entries/:slug/revisions — approved history (staff see pending/rejected too). */
         revisions: (slug, o = {}) => call({ path: `/api/v1/entries/${enc(slug)}/revisions` }, o),
         /** GET /api/v1/trends?window=day|week — rising posts with velocity, new templates and entries. */
         trends: (opts = {}, o = {}) => call({ path: '/api/v1/trends', query: queryOf({ window: opts.window || 'day', limit: opts.limit }) }, o),
+        /** GET /api/v1/templates — reusable templates and their image licences. */
+        templates: (o = {}) => call({ path: '/api/v1/templates' }, o),
+        /** POST /api/v1/render — raw PNG, GIF, or MP4 bytes from a licensed template and caption. */
+        async render(input = {}, o = {}) {
+            const templateId = String(input.template_id || input.templateId || '').trim();
+            if (!templateId) throw new TypeError('render: template_id is required');
+            if (!Array.isArray(input.lines) || input.lines.length < 1 || input.lines.length > 4 || input.lines.some((line) => typeof line !== 'string' || line.length > 120)) throw new TypeError('render: lines must contain 1–4 strings of at most 120 characters');
+            const body = { template_id: templateId, lines: input.lines };
+            if (input.format != null) body.format = input.format;
+            if (input.editor != null) body.editor = input.editor;
+            const response = await client.request({ method: 'POST', path: '/api/v1/render', service: 'meme', baseUrl: defaults.baseUrl, audience: 'openvibe.meme', responseType: 'arrayBuffer', json: body, signal: o.signal });
+            return { bytes: response.data, contentType: response.headers.get('content-type') || 'application/octet-stream' };
+        },
         /** POST /api/v1/analyze { url | media_id } — the template, matches, origins, meaning, labels, Reddit spread/tone. */
         analyze: (input = {}, o = {}) => {
             const url = input.url == null ? null : String(input.url);
