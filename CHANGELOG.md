@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.110.0 — 2026-11-09
+
+- Add `ov.chat.vibe.conversations()` for a person's Vibe conversations, with the last line, when Vibe last answered
+  and the OpenVibe site each chat began on, and `ov.actor.skills()` and `ov.actor.run(skill, input, { choice })` for
+  Actor's public skill catalogue and a run of one of its skills.
+
 ## 0.109.0 — 2026-11-09
 
 - Add Vibe compare methods to `openvibe-sdk/chat` for submitting answers and recording a user's preferred model.
