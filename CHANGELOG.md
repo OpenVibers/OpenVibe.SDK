@@ -4,6 +4,10 @@
 
 - ov.blog.changelog({ service, kind, area, q, limit, before }): the network changelog's blog.changelog-entry@2 rows, newest first
 
+## 0.131.0 (2026-11-09)
+
+- openvibe-sdk/community: the Feed's types complete, with pagination guidance
+
 ## 0.130.0 (2026-11-09)
 
 - openvibe-sdk/meme: ov.meme.templates(), .render() (PNG, GIF or MP4) and .get()

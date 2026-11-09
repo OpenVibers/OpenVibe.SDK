@@ -3529,6 +3529,11 @@ function createCommunityClient(client, defaults = {}) {
         },
     };
 
+    /**
+     * One page of public activity. Keep the same filters when passing next_cursor back as cursor;
+     * a filtered page may be empty with a non-null cursor. kind=live means currently on air,
+     * kind=stream means a past broadcast; live_now carries the current status on either kind.
+     */
     const feed = (query = {}, o = {}) => call({
         path: '/api/v1/feed',
         query: { kind: query.kind, site: query.site, q: query.q, cursor: query.cursor, limit: query.limit,
