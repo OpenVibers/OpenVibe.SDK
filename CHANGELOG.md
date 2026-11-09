@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.130.0 (2026-11-09)
+
+- openvibe-sdk/meme: ov.meme.templates(), .render() (PNG, GIF or MP4) and .get()
+
 ## 0.129.0 — 2026-11-09
 
 - `openvibe-sdk/git` (G2): changes and review — `changes.list/get/create/comment/approve/merge/close/summary`,
