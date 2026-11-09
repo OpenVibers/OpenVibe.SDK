@@ -12,7 +12,7 @@ const NODES = [node('oregon-1', 'us-west'), node('fra-1', 'eu-central'), node('s
 async function registry() {
     return stubServer((req, res) => {
         const u = new URL(req.url, 'http://x');
-        if (u.pathname === '/api/v1/nodes') {
+        if (u.pathname === '/api/v1/links') {
             const role = u.searchParams.get('role');
             return send(res, 200, { nodes: role === 'gpu' ? [] : NODES, generated_at: '2026-09-28T12:00:00Z' });
         }

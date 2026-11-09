@@ -24,7 +24,7 @@ const out = place(
         priors: { 'app:codes/claude-code@opus': 0.82 },
         outcomes,                   // the learned counts (below)
         rules: { noCloud: true, onlyFree: false, region: 'eu', prefer: 'cheapest' },
-        names: { 'node:desk': 'your desktop' },
+        names: { 'link:desk': 'your desktop' },
     },
 );
 
@@ -78,7 +78,7 @@ five-class preference order.
 **A streaming machine.** When an offer says its machine is streaming, a step that asks for a GPU or 2 or more cores
 is excluded with `it is streaming`. The contract does not carry that field yet; `place()` reads
 `offer.health.streaming === true` (and tolerates a top-level `offer.streaming`), so OpenVibe Link can start sending
-it without another SDK change. Node's status already reports `screen.state`, but Bot's `platform.resource-offer@1`
+it without another SDK change. Link's status already reports `screen.state`, but Bot's `platform.resource-offer@1`
 does not project it today.
 
 ## Learning from outcomes

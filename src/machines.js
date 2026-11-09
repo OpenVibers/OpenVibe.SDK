@@ -3,7 +3,7 @@
  * openvibe-sdk/machines — the network's machines hub (plan L34, step M2; Contracts 0.258.0).
  *
  * A person's machines are the network's: Bot stays the registry underneath, and OpenVibe.Network fronts it on
- * openvibe.network/machines for the person and for the apps the person consented to. This module is the hub's API:
+ * openvibe.link/machines for the person and for the apps the person consented to. This module is the hub's API:
  *
  *   // createMachines from the openvibe-sdk/machines entry (CommonJS or ESM)
  *   const machines = createMachines({ networkUrl: 'https://openvibe.network', token: () => sessionToken });
@@ -98,6 +98,12 @@ function createMachines({ networkUrl, token, fetch: fetchImpl = globalThis.fetch
         roles: (id, roles) => call('PUT', `/api/v1/machines/${enc(id)}/roles`, { roles: Array.isArray(roles) ? roles : [] }),
         /** The machine is no longer the caller's: { machine }. */
         revoke: (id) => call('POST', `/api/v1/machines/${enc(id)}/revoke`, {}),
+        /** All places work may run, optionally filtered to one source. */
+        compute: {
+            list: ({ kind } = {}) => call('GET', `/api/v1/link/compute${kind ? `?kind=${enc(kind)}` : ''}`),
+            /** Resolve a ready machine without starting a paid rental. */
+            pick: ({ kind = 'personal', id } = {}) => call('POST', '/api/v1/link/compute/pick', { kind, ...(id ? { id } : {}) }),
+        },
     };
 }
 

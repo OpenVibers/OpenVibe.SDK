@@ -45,7 +45,7 @@ export type ServiceTokenClaims = {
    */
   iss: string;
   sub: string;
-  actor_type: "service" | "app" | "mod" | "node" | "agent";
+  actor_type: "service" | "app" | "mod" | "link" | "agent";
   /**
    * @minItems 1
    */
@@ -112,7 +112,6 @@ export type ServiceTokenClaims = {
   };
   [k: string]: unknown | undefined;
 };
-
 /** common.entity-ref@1.0.0 (owner: contracts) */
 /**
  * Typed reference to another service's entity. Store this instead of a foreign key; resolve a display projection from the owner.
@@ -2229,11 +2228,21 @@ export interface Capability {
    */
   implementedBy?: string[];
   /**
+   * Input and output contract overrides for a route when one capability covers several operations.
+   */
+  routeSchemas?: {
+    [k: string]:
+      | {
+          inputSchema?: string;
+          outputSchema?: string;
+        }
+      | undefined;
+  };
+  /**
    * The action has an external side effect (money, sending as the person, publishing, applying, deleting, physical control): an agent needs its owner's confirmation unless a standing rule covers it (roadmap WS-Z2).
    */
   sensitive?: boolean;
 }
-
 /** events.event-envelope@1.0.0 (owner: events) */
 /**
  * Durable platform event (OpenVibe.Events, Wave 3). Producers write it to an outbox in the same transaction as the domain change.
