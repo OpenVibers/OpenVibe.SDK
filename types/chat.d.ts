@@ -2,6 +2,7 @@ import type { OpenVibeClient } from './core';
 
 type Opts = { signal?: AbortSignal };
 type Json = Record<string, unknown>;
+export type ChatMessageView = 'bubbles' | 'room';
 export interface ChatClient {
     /** Ask Vibe using Auto, one catalogue model, or two to three models side by side. */
     ask(input: { message: string; models?: string[]; slug?: string; fresh?: boolean; system_prompt?: string; temperature?: number }, opts?: Opts): Promise<{ chat: Json; message: Json }>;
@@ -38,6 +39,8 @@ export interface ChatClient {
         blocks(opts?: Opts): Promise<Json>;
         block(userId: number | string, opts?: Opts): Promise<Json>;
         unblock(userId: number | string, opts?: Opts): Promise<Json>;
+        viewPreference(id: number | string, opts?: Opts): Promise<{ view: ChatMessageView; conversation_id: number }>;
+        setViewPreference(id: number | string, view: ChatMessageView, opts?: Opts): Promise<{ view: ChatMessageView; conversation_id: number }>;
     };
     exportMine(opts?: Opts): Promise<{ username: string; exported_at: string; total: number; truncated: boolean; messages: Json[] }>;
     vibe: {

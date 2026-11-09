@@ -2,18 +2,18 @@
 import cjs from '../index.js';
 
 export const {
-    createClient, OpenVibeError, isOpenVibeError, paginate, offsetPager, parseTraceparent,
-    startSpan, contextFromHeaders, ulid, newEventId, newIdempotencyKey, isActingSubjectId,
-    satisfiesRange, compareVersions, CONTRACTS_RANGE, DEFAULT_NETWORK, SDK_VERSION, report,
-    share, locker, auth, registry, identity, trust,
-    modules, events, realtime, media, cam, community,
-    homeFeed, bot, search, bench, meme, vision,
-    themes, redact, chat, chatApps, ai, credentials,
-    jobs, tools, projects, resources, vip, quest,
-    live, inventory, tips, blog, reviews, wiki,
-    coupons, deals, shoes, trade, space, host,
-    news, food, actor, run, video, work,
-    zone, play, download, openre, geo, usage,
-    commerce, telemetry, design,
+    createWalletClient, createClient, OpenVibeError, isOpenVibeError, paginate, offsetPager,
+    parseTraceparent, startSpan, contextFromHeaders, ulid, newEventId, newIdempotencyKey,
+    isActingSubjectId, satisfiesRange, compareVersions, CONTRACTS_RANGE, DEFAULT_NETWORK, SDK_VERSION,
+    report, share, locker, auth, registry, identity,
+    trust, modules, events, realtime, media, cam,
+    mediaUpload, ui, community, homeFeed, bot, search,
+    bench, meme, vision, themes, design, redact,
+    chat, chatApps, ai, credentials, jobs, tools,
+    projects, resources, vip, quest, live, inventory,
+    tips, blog, reviews, wiki, coupons, deals,
+    shoes, trade, space, host, news, food,
+    actor, run, video, work, zone, play,
+    download, openre, geo, usage, commerce, telemetry,
 } = cjs;
 export default cjs;

@@ -1,10 +1,37 @@
 # Changelog
 
-## 0.118.0 (2026-11-09)
+## 0.124.0 (2026-11-09)
 
 - OpenVibe Link: `openvibe-sdk/node` is `openvibe-sdk/link` (`ov.node` is `ov.link`), building
   `platform.link-capabilities@1` and mapping a Link to its `platform.resource-offer@1` and
-  `platform.runtime-offer@1`. The machine APIs follow the Link name.
+  `platform.runtime-offer@1`. A link principal token is never a user token. The Contracts pin moves to
+  v0.372.0.
+
+## 0.123.0 (2026-11-09)
+
+- ov.exchange: keys (list, create, revoke), private usage, deployments, and web, image and icon search with fetch (the Exchange API platform)
+
+## 0.122.0 (2026-11-09)
+
+- dms.viewPreference() and setViewPreference(): a conversation's saved view, bubbles or room
+
+## 0.121.0 (2026-11-09)
+
+- ov.cam.settings.get/put: a person's saved camera choices (Cam #116)
+
+## 0.120.0 (2026-11-09)
+
+- createUploadClient(): resumable Media uploads in 8 MiB parts, three at a time, with a session reference to resume; ov.ui.progress(el)
+
+## 0.119.0 (2026-11-09)
+
+- openvibe-sdk/wallet: the wallet, Vibes, the store and items, through Billing and Inventory with the person's bearer and idempotency keys
+
+## 0.118.0 (2026-11-09)
+
+- openvibe-sdk/design: `components()` and `component(name)` read OpenVibe.Design's public design.component@1 registry
+  (a missing name is null, a bad one is refused before a request). They are on the same `createDesignClient` as the
+  icons; `accessToken` is now optional and only the icon API needs it.
 
 ## 0.117.0 (2026-11-09)
 
@@ -82,7 +109,7 @@
 
 - Add `openvibe-sdk/trust`: `createTrustClient({ networkUrl, getToken })` with `.me()` (the caller's own signals, a
   person's or a guest's token) and `.of(subject)` (a service token with `identity.trust.read`), the typed
-  `identity.trust@1` result for accounts and guests, and pure helpers (`isNew`, `atLeast`, the age-band order) for Link
+  `identity.trust@1` result for accounts and guests, and pure helpers (`isNew`, `atLeast`, the age-band order) for Node
   and the browser bundle. Signals are age bands and aggregate counts only: never an IP, email or last-seen time.
 
 ## 0.101.0 (2026-11-08)
@@ -134,7 +161,7 @@
 
 ## 0.97.1 (2026-11-07)
 
-- `types/menu.d.ts`: `MenuRequest` gives `url` and `method` the `| undefined` that `link:http`'s
+- `types/menu.d.ts`: `MenuRequest` gives `url` and `method` the `| undefined` that `node:http`'s
   `IncomingMessage` has, and `MenuResponse` no longer adds an index signature, so a plain
   `IncomingMessage`/`ServerResponse` handler type-checks under `exactOptionalPropertyTypes`
   (Games' `createMenuCardHandler`). No runtime change.
@@ -165,7 +192,7 @@
 
 - Add `openvibe-sdk/cam`: `defineOvCamera({ src })` injects OpenVibe.Cam's framework-free `<ov-camera>` element
   once (default `https://openvibe.cam/embed/ov-camera.js`) and resolves to the class. It is browser-only by nature:
-  calling it in Link rejects instead of touching `document`. `OV_CAMERA_SRC` is the default URL.
+  calling it in Node rejects instead of touching `document`. `OV_CAMERA_SRC` is the default URL.
 - Type the element: `OvCameraElement` (`start()`, `stop()`, `capture()`, `flip()`), `OvCameraAttributes` (facing,
   filters, timer, mode, upload), `OvCameraCaptureDetail` / `OvCameraErrorDetail`, the two event types and the
   `HTMLElementTagNameMap` entry. `upload="off"` is still the default: a capture is a `Blob` in the page until the
@@ -249,7 +276,7 @@
 
 - Add `openvibe-sdk/exchange`: OpenVibe.Exchange, the buyer and the seller side of the model exchange (the plan of 2026-11-06, "For builders", item 7).
   - The buyer side speaks the Exchange’s v1 API with a Network developer key: `chat()` (streaming and not, the OpenAI shape), `models()`, `offers(model)`, `catalog()`, `presets()` (list, create, update, delete), `usage()` and `receipt(id)`. Every call takes an `AbortSignal`, and a 429 or a 5xx is retried with a jittered backoff: a safe method always, a write only when it is idempotent, so a completion is never run twice.
-  - The seller side registers an offer in the Network’s user-owned AI offers — the same registry OpenVibe Link’s "Offer to the network" writes to (`POST /internal/ai/offers/report`, the capability `network.resource.report`), so any server that speaks the OpenAI API can be a provider and not only a Link. The SDK sends the document that registry validates, field for field, and refuses an offer the registry would refuse before anything is sent; `earnings()` and `verification()` read the seller dashboard (the tokens served, the credits earned, the canaries, the spot re-runs, the reputation, the uptime).
+  - The seller side registers an offer in the Network’s user-owned AI offers — the same registry OpenVibe Link’s "Offer to the network" writes to (`POST /internal/ai/offers/report`, the capability `network.resource.report`), so any server that speaks the OpenAI API can be a provider and not only a Node. The SDK sends the document that registry validates, field for field, and refuses an offer the registry would refuse before anything is sent; `earnings()` and `verification()` read the seller dashboard (the tokens served, the credits earned, the canaries, the spot re-runs, the reputation, the uptime).
   - The webhooks (usage, earnings, an offer going down) carry `X-OpenVibe-Signature-V2`; `webhooks.verify` checks the raw body in constant time and refuses a timestamp more than 300 s either way.
 
 ## 0.88.0 (2026-11-06)
@@ -280,7 +307,7 @@
 
 ## 0.86.0 (2026-11-06)
 
-- Add `openvibe-sdk/locker`: the Locker envelope (`locker.envelope@1`), end-to-end encryption for anything on OpenVibe, in Link and in the browser. WebCrypto only (`globalThis.crypto.subtle`), no other crypto library and nothing hand-rolled.
+- Add `openvibe-sdk/locker`: the Locker envelope (`locker.envelope@1`), end-to-end encryption for anything on OpenVibe, in Node and in the browser. WebCrypto only (`globalThis.crypto.subtle`), no other crypto library and nothing hand-rolled.
   - `seal` and `open` for text and bytes, and `sealStream` and `openStream` for files: a stream holds one 1 MiB chunk at a time, so a 64 MiB file costs a few MiB of memory. A stream that ends early throws at the end: discard what it yielded.
   - The size is padded with Padmé (PoPETs 2019): at most about twelve per cent over the real size, never below 256 bytes, and O(log log n) bits of leakage. Every chunk but the last is a whole chunk; the last holds the rest.
   - A people slot names the recipient's key by its RFC 7638 thumbprint, and the reader checks it before it derives anything.
@@ -483,14 +510,14 @@ release may change an API and says so here.
 ## 0.75.0 (2026-10-30)
 
 - **`openvibe-sdk/redact`: one secret scrubber for Link and AI (Memory M2).**
-  - `redact(text)` → `{ text, count }` ports OpenVibe Link's `internal/memory/redact.go` (Link #87): the same shapes,
+  - `redact(text)` → `{ text, count }` ports OpenVibe Link's `internal/memory/redact.go` (Node #87): the same shapes,
     the whole-text pass with a sentinel before the per-item pass, the unterminated private key block, Luhn card
     numbers, and the deliberately wide environment-assignment rule. `onlySecret(text)` says an item was nothing but a
     secret, so AI refuses it.
-  - `test/redact-corpus.json` holds every case of Link's `TestRedactEveryShape`, the split and unterminated key
-    blocks, the `.env` block and the harmless texts that must not change. Link copies the file and runs the same
+  - `test/redact-corpus.json` holds every case of Node's `TestRedactEveryShape`, the split and unterminated key
+    blocks, the `.env` block and the harmless texts that must not change. Node copies the file and runs the same
     cases against its Go scrubber, so the two ends share one list and one corpus.
-  - Pure functions, no dependencies: exported for Link and the browser, with ESM and TypeScript entries.
+  - Pure functions, no dependencies: exported for Node and the browser, with ESM and TypeScript entries.
 
 All notable changes to `openvibe-sdk`. The package follows semver; while it is `0.x`, a minor
 release may change an API and says so here.
@@ -701,7 +728,7 @@ All additions: nothing exported before changes.
 - **`openvibe-sdk/no-looks`**: the owner's rule that public AI text never describes a person, as one shared filter.
   `noLooks(text)`, `noLooksTags(tags)`, `hasLooks(title)` and `RULES_VERSION`, moved from OpenVibe.Live
   (Live#298–#302) with its test corpus, so Community, Search, MediaHub and every service that stores public AI text
-  run the same rules. Pure and dependency-free (Link and browsers).
+  run the same rules. Pure and dependency-free (Node and browsers).
 
 ## 0.60.0 (2026-10-20)
 
@@ -941,7 +968,7 @@ still passes a number:
 
 ## 0.40.1 (2026-10-10)
 
-- **`verifyUserToken` refuses node principals.** A node token (`actor_type: node`, `sub link:lnk_…`: a machine paired
+- **`verifyUserToken` refuses node principals.** A node token (`actor_type: link`, `sub link:lnk_…`: a machine paired
   for a service, such as a robot's computer for OpenVibe.Bot) is signed with Network's key like every principal token.
   It was refused for service, app and module principals only, so a service that checks user tokens without an
   audience would have taken a node token for a session. It is `token.not_user` now, by its `actor_type` or its `sub`
@@ -1195,8 +1222,8 @@ still passes a number:
   `platform.storage-offer@1`.
 - **`openvibe-sdk/delivery` (new, server; plan T1):** `deliveryOffer()` / `validateDeliveryOffer()` for
   `platform.delivery-offer@1`.
-- **`openvibe-sdk/link` (new, server; plan T1):** `linkCapabilities()` / `validateLinkCapabilities()` for
-  `platform.link-capabilities@1`, and `linkOffers(descriptor)`, which derives a node's resource and runtime offers.
+- **`openvibe-sdk/node` (new, server; plan T1):** `nodeCapabilities()` / `validateNodeCapabilities()` for
+  `platform.node-capabilities@1`, and `nodeOffers(descriptor)`, which derives a node's resource and runtime offers.
 - **`openvibe-sdk/placement` exports `TRUST_CLASSES`** (the five T1 trust classes) and `TRUST_ORDER` (the planner's
   default preference, unchanged), with their type declarations.
 - **`openvibe-sdk/usage` (new, server; plan T1):** `platform.usage-sample@1` readings in one place.
@@ -1379,7 +1406,7 @@ This release makes the move from better-sqlite3 mostly mechanical: call sites ke
 ## 0.17.0 (2026-09-28)
 
 - **`openvibe-sdk/geo`** (browser and server): `createGeoClient(client, { samples?, timeoutMs? })` finds the closest OpenVibe Link (roadmap WS-X1 task 5).
-  - `nodes({ role?, region? })` reads Network's public node registry, `GET /api/v1/links` (`network.link-list-result@1`), without sending a token.
+  - `nodes({ role?, region? })` reads Network's public node registry, `GET /api/v1/nodes` (`network.node-list-result@1`), without sending a token.
   - `measure(nodes)` times each node's beacon several times (the best sample counts, since the first also pays for DNS and TLS) and returns the nodes fastest first.
   - `nearest({ role?, region?, preferRegion? })` returns the fastest measured node that is up or degraded. When nothing can be measured, it falls back to `preferRegion`, then to the first healthy node, and returns `measured: false`.
 - The root export and the browser bundle include `geo`. The root export also includes `openre`.
@@ -1436,7 +1463,7 @@ This release makes the move from better-sqlite3 mostly mechanical: call sites ke
 - The actor is the verified principal (`svc:live`, `app:…`), else the signed-in person (`user:<subject>`), else `ip:<address>`; `actor(req)` overrides it, and null skips counting.
 - A route's limits replace the defaults window by window.
 - Counters are per process and bounded (`maxActors`, oldest dropped first), and `onLimited` observes refusals.
-Link only. Additive.
+Node only. Additive.
 
 ## 0.11.0 (2026-09-25)
 

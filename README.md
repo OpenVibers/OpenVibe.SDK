@@ -10,7 +10,7 @@ npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags
 
 > Supported browser and server clients for the OpenVibe platform.
 
-**Status:** alpha, v0.118.0 (the five 1.0 core entries — `core`, `auth`, `events`, `db` and `media` — are frozen: their exported names change only with a major release; roadmap Wave 2; developer apps from Wave 20; Media objects v2 from Wave 4; the Tools platform API; Search, Chat, AI, Vision and consent clients; sign-in with recovery and a client health check). Every release is tagged (see [CHANGELOG.md](CHANGELOG.md)). Tested against local stub servers and the built-in mock platform only, never against the live platform. Services pin release tags; each repository's `STATUS.json` names the one it uses.
+**Status:** alpha, v0.124.0 (the five 1.0 core entries — `core`, `auth`, `events`, `db` and `media` — are frozen: their exported names change only with a major release; roadmap Wave 2; developer apps from Wave 20; Media objects v2 from Wave 4; the Tools platform API; Search, Chat, AI, Vision and consent clients; sign-in with recovery and a client health check). Every release is tagged (see [CHANGELOG.md](CHANGELOG.md)). Tested against local stub servers and the built-in mock platform only, never against the live platform. Services pin release tags; each repository's `STATUS.json` names the one it uses.
 **Plan:** OpenVibe End-to-End Realignment & Implementation Plan, revision 3 (20 Sep 2026), §3.2; roadmap §30.  
 **License:** MIT ([LICENSE](LICENSE)). This package is a library that apps outside the network embed, so it uses MIT. The OpenVibe services themselves stay AGPL-3.0.
 
@@ -19,10 +19,10 @@ npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags
 After v0.97.1 is tagged:
 
 ```bash
-npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.118.0
+npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.124.0
 ```
 
-It has no runtime dependencies. It needs Link ≥ 20, or any browser with `fetch`, Web Crypto and `TextDecoder`. There is no build step. The package is CommonJS with ESM entry points (`import` works). Each subpath has its own `.d.ts`. For a page with no bundler, `browser/openvibe-sdk.mjs` is one self-contained ES module of the browser-safe subpaths (see [Browser without a bundler](#browser-without-a-bundler)). It does not depend on `openvibe-contracts` at runtime: it copies the contract types it uses (from the temporary Contracts sharing branch, a devDependency the tests check them against).
+It has no runtime dependencies. It needs Node ≥ 20, or any browser with `fetch`, Web Crypto and `TextDecoder`. There is no build step. The package is CommonJS with ESM entry points (`import` works). Each subpath has its own `.d.ts`. For a page with no bundler, `browser/openvibe-sdk.mjs` is one self-contained ES module of the browser-safe subpaths (see [Browser without a bundler](#browser-without-a-bundler)). It does not depend on `openvibe-contracts` at runtime: it copies the contract types it uses (from the temporary Contracts sharing branch, a devDependency the tests check them against).
 
 ## Purpose
 
@@ -61,7 +61,7 @@ const sub = subscribe(['live.stream.*'], (event, { cursor }) => { render(event);
 });
 ```
 
-**The token exchange happens on your server.** First-party clients and confidential developer apps have a client secret, and a secret must never reach a browser. A public developer app has no secret, but its server should still do the exchange and keep the token in an HttpOnly session. The browser entry points contain no exchange code. A test scans every file a browser bundle can reach (and the browser bundle itself) and fails on `client_secret`, `link:` imports, `require('crypto')` or `process.env`.
+**The token exchange happens on your server.** First-party clients and confidential developer apps have a client secret, and a secret must never reach a browser. A public developer app has no secret, but its server should still do the exchange and keep the token in an HttpOnly session. The browser entry points contain no exchange code. A test scans every file a browser bundle can reach (and the browser bundle itself) and fails on `client_secret`, `node:` imports, `require('crypto')` or `process.env`.
 
 ### Server service (service principal)
 
@@ -108,6 +108,23 @@ const media = sdk.media.createMediaClient(client, { app: unverifiedClaims.projec
 const file = await media.upload(fs.readFileSync('logo.png'), { filename: 'logo.png', contentType: 'image/png' });
 file.public_url;   // https://openvibe.media/f/<key>
 ```
+
+For large files, use Media's resumable multipart object API. The uploader uses 8 MiB parts,
+three concurrent requests, retries missing parts, and exposes the upload reference before
+any bytes leave so the app can persist it. Keep the credential on a server.
+
+```js
+const uploader = sdk.mediaUpload.createUploadClient({ app: unverifiedClaims.project_id, tokenClient: tokens });
+const object = await uploader.upload(file, {
+  onSession: ({ objectId, uploadId }) => saveUploadReference({ objectId, uploadId }),
+  onProgress: ({ uploadedBytes, totalBytes }) => reportProgress(uploadedBytes, totalBytes),
+});
+// After a restart: uploader.resume(savedReference, sameFile, { onProgress });
+```
+
+On a page that loads the pinned `ov-upload.js` and `ov-upload.css` from
+`openvibe-shared`, `sdk.ui.progress(el)` mounts the same progress component used
+across OpenVibe sites.
 
 The token's `env` picks the tenant: a sandbox app's files go to the project's sandbox tenant (`app_id: '<prj_…>-sandbox'`) and are never served publicly. Media answers them with `sandbox: true`, a signed, expiring `url` and `url_expires_at`; the client adds `signed_url` (the same URL) and sets `public_url` to `null`. Uploading and deleting need `media.object.upload`, listing and getting `media.object.read`.
 
@@ -239,9 +256,9 @@ Until OpenVibe.Tools serves the gateway facade (Tools S6), point the jobs client
 | `openvibe-sdk/runtime` | server | Build and validate `platform.runtime-offer@1` records with `runtimeOffer()` and `validateRuntimeOffer()`; `runtimeClass()`, `RUNTIME_CLASSES`, and `validateRuntimeClass()` handle known runtime classes |
 | `openvibe-sdk/storage` | server | `storageOffer()` and `validateStorageOffer()` for `platform.storage-offer@1` |
 | `openvibe-sdk/delivery` | server | `deliveryOffer()` and `validateDeliveryOffer()` for `platform.delivery-offer@1` |
-| `openvibe-sdk/link` | server | `linkCapabilities()` and `validateLinkCapabilities()` for `platform.link-capabilities@1`; `linkOffers()` derives resource and runtime offers from a node descriptor |
+| `openvibe-sdk/node` | server | `nodeCapabilities()` and `validateNodeCapabilities()` for `platform.node-capabilities@1`; `nodeOffers()` derives resource and runtime offers from a node descriptor |
 | `openvibe-sdk/service` | server | the service kit: `gracefulStop({name, server, stop, close, drainMs, deadlineMs, deadlineExitCode, beforeDrain, handles})` → `{stop, stopping}`, `within(ms, p)`; `createServiceError(name)`, `ServiceError`, `asServiceError`, `run`, `wrap`, `sendError`, `jsonBody({limit})`, `privateNoStore`, `jsonErrors()`; the HTTP telemetry kit: `createHttpTelemetry({service, sink, intervalMs?, routeLabel?, skipPrefixes?, …})` → `{middleware(), record, gauge, count, requestStarted, requestFinished, flush, stop}`, `createTelemetryMiddleware`, `telemetrySkipped`, `defaultRouteLabel`, `registerSignals`, `telemetrySample`, `validateTelemetrySample`, and the singleton `telemetry.{init, record, gauge, count, requestStarted, requestFinished, flush, stop}` + `telemetryMiddleware` (a request is aggregated per `route\|method\|status_class` per flush into one `platform.telemetry-sample@1` `http.request` sample, plus active-requests/p95/event-loop-lag gauges once per flush); re-exports (loaded on first use) of openvibe-shared `createReadiness`, `skip`, `safeReason`, `createRegistry`, `instrument`, `metricsHandler`, `isLoopbackDirect`, `releaseInfo`, `createRelease` and openvibe-contracts `problem`, `sendProblem` |
-| `openvibe-sdk/testing` | Link | `createMockPlatform()`: fake Network (incl. developer apps and projects), Events, Media, Tools jobs and the Tools platform API on an in-process `fetch` |
+| `openvibe-sdk/testing` | Node | `createMockPlatform()`: fake Network (incl. developer apps and projects), Events, Media, Tools jobs and the Tools platform API on an in-process `fetch` |
 | `openvibe-sdk/browser/openvibe-sdk.mjs` | browser | one self-contained ES module: core + auth (browser), registry, modules, realtime, media, community, bot, jobs, tools, projects |
 
 Server-only subpaths are declared `"browser": null` in the exports map, so a bundler refuses them in a browser build and doesn't ship them by accident.
@@ -540,7 +557,7 @@ The full attribute, event and method reference is at [openvibe.cam/developers](h
 
 Every open site can put its own cards in the network menu every site shares. Build the card with
 `menuCard` (it applies the house rules and validates against `frame.menu-card@1`), then mount the
-route — Express or plain `link:http`:
+route — Express or plain `node:http`:
 
 ```js
 const { menuCard, menuRoute } = require('openvibe-sdk/menu');
@@ -575,7 +592,7 @@ shows the cards in `GET /api/frame`.
 
 - **Community comments on other content, the forum and Pulse** are being built in Community right now. Only paste comments are wrapped. The rest is a TODO in `src/community.js` until those APIs settle.
 - **Media:** the v1 files API, the object API v2 (`createObjectsClient`) and the public URL helpers are wrapped. Retention holds on v2 objects are not (app keys only). VOD, clip, thumbnail and admin-storage routes are not wrapped because apps reach them only through Live and Media's own servers. Media's own paste API is not wrapped because pastes moved to Community (ADR-011). The mock platform (`openvibe-sdk/testing`) models Media's v1 files only, not v2 objects.
-- **Media from the browser:** Media refuses user JWTs on `/api/v1/:app/files`, so a browser uploads through its own app server. That server holds the app key and names the user with `actingUserId`.
+- **Media from the browser:** Media refuses user JWTs on the v1 files and v2 objects APIs, so a browser uploads through its own app server. That server holds the app credential and names the user with `actingUserId` or a subject.
 - **Network coins, notifications and legacy-map writes** are internal service-to-service routes with no public capability, so they are not wrapped. Staff-only paste routes are also internal: admin stats, bulk, censor and the AI pass.
 - **Billing and Games** from the original charter come when those services publish their capabilities in Contracts (Live has its module since v0.52.0). Codes' tasks (they run code on a person's own machine) stay first-party, and OpenVibe.Watch is not built yet; Host and News have modules for their public reads, while editing stays first-party. Blog opened its posts to apps (openvibe-contracts 0.206.0, `openvibe-sdk/blog`), then Reviews and the Wiki their reads (0.207.0), then Coupons, Deals and Trade what a person does for themselves (0.208.0), then Space its sites (0.209.0). News' published stories need no capability, but its editorial reads stay first-party. Chat is wrapped over REST as the token's person (`openvibe-sdk/chat`, v0.11.0), but it has no app principal (`chat.message.send` is `first-party`) and the mock platform has no Chat.
 - **Tools** are not wrapped one by one: `openvibe-sdk/tools` runs any tool with `api: true` by id, and its descriptor (`tools.get(id)`) gives the input schema, files and limits. `openvibe-sdk/jobs` still submits any job `type` directly. The YouTube downloader is page-only (`api: false`), so it is not in the SDK.
@@ -619,12 +636,12 @@ previous tag.
 
 ```bash
 npm test                                 # every test/*.test.js: stub servers + mock platform, then npm pack + install
-fnm exec --using=22.22.1 npm test        # the Link version production runs
+fnm exec --using=22.22.1 npm test        # the Node version production runs
 node scripts/esm.js                      # regenerate esm/*.mjs after changing a module's exports
 node scripts/browser-bundle.js           # regenerate browser/openvibe-sdk.mjs after changing a browser-safe file
 ```
 
-Style: CommonJS, 4-space indent, single quotes, semicolons. Browser-safe files use only `fetch`, `Headers`, `FormData`, `Blob`, `URL`, `TextEncoder`/`TextDecoder` and `globalThis.crypto` (Web Crypto). Server-only files may use `link:` modules and are marked `"browser": null` in `package.json`.
+Style: CommonJS, 4-space indent, single quotes, semicolons. Browser-safe files use only `fetch`, `Headers`, `FormData`, `Blob`, `URL`, `TextEncoder`/`TextDecoder` and `globalThis.crypto` (Web Crypto). Server-only files may use `node:` modules and are marked `"browser": null` in `package.json`.
 
 ## Owns
 
@@ -646,13 +663,13 @@ Part of the [OpenVibe network](https://openvibe.network). Built in the open by [
 - openvibe-contracts: v0.338.0
 <!-- versions:end -->
 
-### Network-wide sharing (Link)
+### Network-wide sharing (Node)
 
 `openvibe-sdk/share` provides local access enforcement, expiring memberships and confirmed ownership transfer. See [the sharing module](docs/share.md) for integration, API signatures, migrations and the uniform OpenAPI fragment. Agents use `require('openvibe-sdk').share({ base, token }).for('paste', id)`.
 
-### Locker: end-to-end encryption (Link and the browser)
+### Locker: end-to-end encryption (Node and the browser)
 
-`openvibe-sdk/locker` seals anything and opens it again: the Locker envelope (`locker.envelope@1`), the three locks (people, password, link), streams for files, person key pairs and the eight-word fingerprint, `wrapFor` and `rewrap` for sharing, `recoveryWords` for the phrase to write down, `inspect` for what an envelope says about itself, and opening a people lock by key. `openvibe-sdk/locker/server` gives a service the header checks without a key. WebCrypto only, in Link and the browser. See [the locker module](docs/locker.md).
+`openvibe-sdk/locker` seals anything and opens it again: the Locker envelope (`locker.envelope@1`), the three locks (people, password, link), streams for files, person key pairs and the eight-word fingerprint, `wrapFor` and `rewrap` for sharing, `recoveryWords` for the phrase to write down, `inspect` for what an envelope says about itself, and opening a people lock by key. `openvibe-sdk/locker/server` gives a service the header checks without a key. WebCrypto only, in Node and the browser. See [the locker module](docs/locker.md).
 # AI comparison and Arena
 
 Read Report's public AI data and create or vote on Exchange Arena rounds:
@@ -671,3 +688,8 @@ const exchange = require('openvibe-sdk/exchange').createExchangeClient({ develop
 const round = await exchange.arena.start({ prompt: 'Explain a binary search.', category: 'code', entries });
 await exchange.arena.vote(round.id, 'left');
 ```
+## Camera settings
+
+Camera choices can be read or saved on behalf of a signed-in person with `ov.cam.settings.get({ token })` and
+`ov.cam.settings.put({ token, values: { facing, lens, mic, resolution, mirror } })`. Server callers should forward
+the person's Network token; Cam keeps these preferences per person, and a missing device id is only a hint.

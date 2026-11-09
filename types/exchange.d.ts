@@ -332,7 +332,25 @@ export type ExchangeEarnings = {
     [field: string]: unknown;
 };
 
+export type ExchangeKey = { id: string; name: string; prefix: string; monthly_cap_usd: number; allowed_models: string[]; created_at: string; revoked_at: string | null };
+export type ExchangeSearchOptions = { engine?: string; limit?: number; license?: string; commercial?: boolean; format?: string; orientation?: string; size?: string; style?: 'line' | 'solid' | 'any'; set?: string; signal?: AbortSignal };
+export type ExchangeSearchResult = { results: Array<{ title: string; url: string; snippet: string; engine: string; published: string | null; thumbnail?: string | null; license?: string | null; author?: string | null; source_page?: string | null; attribution?: string | null }>; receipt: { engine: string; cost_usd: number; time_ms: number } };
 export type ExchangeClient = {
+    keys: {
+        list(opts?: { signal?: AbortSignal }): Promise<{ keys: ExchangeKey[] }>;
+        create(input: { name: string; monthly_cap_usd: number; allowed_models: string[] }, opts?: { signal?: AbortSignal }): Promise<{ key: ExchangeKey; secret: string }>;
+        revoke(id: string, opts?: { signal?: AbortSignal }): Promise<{ id: string; revoked: boolean }>;
+    };
+    keyUsage(opts?: { signal?: AbortSignal }): Promise<{ rows: Array<{ day: string; key_id: string; model: string; requests: number; tokens_in: number; tokens_out: number; cost_usd: number; status: string }> }>;
+    deployments: {
+        list(opts?: { signal?: AbortSignal }): Promise<{ endpoints: unknown[]; status: unknown }>;
+        create(input: { model: string; idle_minutes?: number }, opts?: { signal?: AbortSignal }): Promise<unknown>;
+        stop(id: string, opts?: { signal?: AbortSignal }): Promise<unknown>;
+    };
+    search: ((q: string, opts?: ExchangeSearchOptions) => Promise<ExchangeSearchResult>) & { icons(q: string, opts?: ExchangeSearchOptions): Promise<ExchangeSearchResult> };
+    images(q: string, opts?: ExchangeSearchOptions): Promise<ExchangeSearchResult>;
+    fetch(url: string, opts?: { signal?: AbortSignal }): Promise<{ url: string; text: string; receipt: ExchangeSearchResult['receipt'] }>;
+
     arena: {
         start(input: { prompt: string; category?: string; entries: unknown[] }, options?: { signal?: AbortSignal }): Promise<unknown>;
         vote(roundId: string, choice: 'left' | 'right' | 'tie' | 'both_bad', options?: { signal?: AbortSignal }): Promise<unknown>;
@@ -352,8 +370,8 @@ export type ExchangeClient = {
         update(name: string, input: { policy: ExchangePresetPolicy }, opts?: { signal?: AbortSignal }): Promise<ExchangePreset>;
         remove(name: string, opts?: { signal?: AbortSignal }): Promise<unknown>;
     };
-    /** The public aggregate, or the platform's own usage for a requester. */
-    usage(query?: { days?: number; from?: string; to?: string; requester?: string }, opts?: { signal?: AbortSignal }): Promise<ExchangeUsageAggregate | { usage: unknown }>;
+    /** Private key usage by default; days or scope public requests aggregates. */
+    usage(query?: { scope?: 'mine' | 'public'; days?: number; from?: string; to?: string; requester?: string }, opts?: { signal?: AbortSignal }): Promise<ExchangeUsageAggregate | { usage: unknown } | { rows: unknown[] }>;
     /** The receipt of one answered request. */
     receipt(id: string, opts?: { signal?: AbortSignal }): Promise<ExchangeReceipt>;
     seller: {

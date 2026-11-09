@@ -6,6 +6,7 @@
 const core = require('./src/core');
 
 module.exports = {
+    createWalletClient: require('./src/wallet').createWalletClient,
     ...core,
     auth: require('./src/auth/browser'),
     locker: require('./src/locker'),
@@ -15,6 +16,8 @@ module.exports = {
     realtime: require('./src/realtime'),
     media: require('./src/media'),
     cam: require('./src/cam'),
+    mediaUpload: require('./src/media-upload'),
+    ui: require('./src/ui'),
     community: require('./src/community'),
     homeFeed: require('./src/home-feed'),
     bot: require('./src/bot'),
@@ -23,6 +26,7 @@ module.exports = {
     meme: require('./src/meme'),
     vision: require('./src/vision'),
     themes: require('./src/themes'),
+    design: require('./src/design'),
     redact: require('./src/redact'),
     chat: require('./src/chat'),
     ai: require('./src/ai'),

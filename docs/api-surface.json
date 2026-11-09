@@ -65,7 +65,8 @@
         "OV_CAMERA_SRC",
         "defineOvCamera",
         "loadCamKit",
-        "open"
+        "open",
+        "settings"
       ]
     },
     "chat": {
@@ -120,6 +121,7 @@
       ]
     },
     "createClient": "function",
+    "createWalletClient": "function",
     "credentials": {
       "object": [
         "createCredentialsClient"
@@ -248,6 +250,11 @@
         "createMediaClient",
         "createObjectsClient",
         "mediaUrls"
+      ]
+    },
+    "mediaUpload": {
+      "object": [
+        "createUploadClient"
       ]
     },
     "meme": {
@@ -408,6 +415,11 @@
         "isNew"
       ]
     },
+    "ui": {
+      "object": [
+        "progress"
+      ]
+    },
     "ulid": "function",
     "usage": {
       "object": [
@@ -535,7 +547,13 @@
     "OV_CAMERA_SRC": "string",
     "defineOvCamera": "function",
     "loadCamKit": "function",
-    "open": "function"
+    "open": "function",
+    "settings": {
+      "object": [
+        "get",
+        "put"
+      ]
+    }
   },
   "openvibe-sdk/chat": {
     "createChatClient": "function",
@@ -882,6 +900,9 @@
     "createObjectsClient": "function",
     "mediaUrls": "function"
   },
+  "openvibe-sdk/media-upload": {
+    "createUploadClient": "function"
+  },
   "openvibe-sdk/meme": {
     "createMemeClient": "function"
   },
@@ -1166,6 +1187,9 @@
     "createTrustClient": "function",
     "isNew": "function"
   },
+  "openvibe-sdk/ui": {
+    "progress": "function"
+  },
   "openvibe-sdk/usage": {
     "createUsageReporter": "function",
     "usageKey": "function",
@@ -1191,6 +1215,9 @@
   "openvibe-sdk/vision": {
     "DEFAULT_AUDIENCE": "string",
     "createVisionClient": "function"
+  },
+  "openvibe-sdk/wallet": {
+    "createWalletClient": "function"
   },
   "openvibe-sdk/wiki": {
     "createWikiClient": "function"

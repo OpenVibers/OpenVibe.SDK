@@ -540,7 +540,23 @@ function createExchangeClient({
         },
     };
 
+    const search = (q, opts = {}) => { const { signal, ...query } = opts; return jsonCall('POST', '/v1/search', { json: { ...query, q }, signal }); };
+    search.icons = (q, opts = {}) => { const { signal, ...query } = opts; return jsonCall('POST', '/v1/search/icons', { json: { ...query, q }, signal }); };
     return {
+        keys: {
+            list: ({ signal } = {}) => jsonCall('GET', '/api/v1/exchange/keys', { signal }),
+            create: (input, { signal } = {}) => jsonCall('POST', '/api/v1/exchange/keys', { json: input, signal }),
+            revoke: (id, { signal } = {}) => { if (!id) throw new TypeError('keys.revoke: id is required'); return jsonCall('DELETE', '/api/v1/exchange/keys/' + encodeURIComponent(id), { signal }); },
+        },
+        keyUsage: ({ signal } = {}) => jsonCall('GET', '/api/v1/exchange/key-usage', { signal }),
+        deployments: {
+            list: ({ signal } = {}) => jsonCall('GET', '/api/v1/exchange/deployments', { signal }),
+            create: (input, { signal } = {}) => jsonCall('POST', '/api/v1/exchange/deployments', { json: input, signal }),
+            stop: (id, { signal } = {}) => { if (!id) throw new TypeError('deployments.stop: id is required'); return jsonCall('POST', '/api/v1/exchange/deployments/' + encodeURIComponent(id) + '/stop', { signal }); },
+        },
+        search,
+        images: (q, opts = {}) => { const { signal, ...query } = opts; return jsonCall('POST', '/v1/search/images', { json: { ...query, q }, signal }); },
+        fetch: (url, { signal } = {}) => jsonCall('POST', '/v1/fetch', { json: { url }, signal }),
         arena: {
             /** Start a blind comparison round using the caller's prompt and pair. */
             async start({ prompt, category = 'chat', entries } = {}, { signal } = {}) {
@@ -619,11 +635,12 @@ function createExchangeClient({
         },
 
         /**
-         * The usage of the Exchange: by default the public aggregate (requests, tokens and spend by day, by
-         * model and by product); with from, to or requester, the platform's own usage for that requester,
+         * The caller's key usage by default. With days or scope public, the public aggregate;
+         * with from, to or requester, the platform's own usage for that requester,
          * which needs the capability ai.usage.read.
          */
-        async usage({ days = 30, from = null, to = null, requester = null } = {}, { signal } = {}) {
+        async usage({ days = null, from = null, to = null, requester = null, scope = 'mine' } = {}, { signal } = {}) {
+            if (days == null && !from && !to && !requester && scope === 'mine') return await jsonCall('GET', '/api/v1/exchange/key-usage', { signal });
             if (from || to || requester) {
                 return await jsonCall('GET', paths.platformUsage, { query: { from, to, requester }, signal });
             }
