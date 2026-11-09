@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.132.0 (2026-11-09)
+
+- `openvibe-sdk/wiki`: articles on blocks (`articles.create`/`update({ blocks })`, `pages.blocks`), picture suggestions from the `wiki.article.images` task (`images.suggest`), and the `content.wiki` writer (`articles.draft`), whose revision is a pending proposal a person reviews.
+
 ## 0.131.0 (2026-11-09)
 
 - openvibe-sdk/community: the Feed's types complete, with pagination guidance
