@@ -812,6 +812,12 @@
     "createValkeyLimitStore": "function",
     "defaultActor": "function"
   },
+  "openvibe-sdk/link": {
+    "createLink": "function",
+    "linkCapabilities": "function",
+    "linkOffers": "function",
+    "validateLinkCapabilities": "function"
+  },
   "openvibe-sdk/live": {
     "createLiveClient": "function"
   },
@@ -922,11 +928,6 @@
     "isExplicit": "function",
     "noLooks": "function",
     "noLooksTags": "function"
-  },
-  "openvibe-sdk/node": {
-    "nodeCapabilities": "function",
-    "nodeOffers": "function",
-    "validateNodeCapabilities": "function"
   },
   "openvibe-sdk/notifications": {
     "createNotificationsClient": "function"

@@ -62,7 +62,7 @@ adult gate. A request names one as `model: '@preset/<name>'`.
 An offer has two forms. A **Link machine** reports its offer to the Network's user-owned AI offers — the same registry
 OpenVibe Link's "Offer to the network" writes to (`POST /internal/ai/offers/report`, the capability
 `network.resource.report`). A **standalone server** registers itself on the Exchange's public seller API with the
-developer key, so it needs no Node at all. The SDK validates both before anything is sent.
+developer key, so it needs no Link at all. The SDK validates both before anything is sent.
 
 ```js
 const offer = await exchange.seller.offer({

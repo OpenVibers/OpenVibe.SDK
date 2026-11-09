@@ -1,12 +1,12 @@
 'use strict';
 /**
- * openvibe-sdk/geo — which OpenVibe node is closest (roadmap WS-X1 task 5, ADR-034 §12). Browser-safe.
+ * openvibe-sdk/geo — which OpenVibe Link is closest (roadmap WS-X1 task 5, ADR-034 §12). Browser-safe.
  *
  *   const geo = createGeoClient(createClient());
  *   const { node, rtt_ms } = await geo.nearest({ role: 'edge-probe' });   // measured from here
  *   const all = await geo.measure(await geo.nodes({ role: 'ingest' }));  // [{ node, rtt_ms, ok }] fastest first
  *
- * The registry is Network's public GET /api/v1/nodes (network.node-list-result@1). Distance is measured, not
+ * The registry is Network's public GET /api/v1/links (network.link-list-result@1). Distance is measured, not
  * guessed: each node's beacon is fetched `samples` times and the best round trip counts (the first fetch also
  * pays for DNS and TLS). Only up or degraded nodes are candidates. When nothing can be measured (offline, every
  * beacon blocked) nearest() falls back to `preferRegion`, then to the first healthy node, and says so
@@ -20,7 +20,7 @@ function createGeoClient(client, { baseUrl, fetch: fetchImpl = null, samples = 3
 
     /** The registry's nodes, optionally for one role or region. */
     async function nodes({ role, region } = {}) {
-        const r = await client.json({ service: 'network', baseUrl, path: '/api/v1/nodes', query: { role, region }, auth: false });
+        const r = await client.json({ service: 'network', baseUrl, path: '/api/v1/links', query: { role, region }, auth: false });
         return (r && r.nodes) || [];
     }
 
