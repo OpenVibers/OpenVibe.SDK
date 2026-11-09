@@ -3247,7 +3247,7 @@ function (module, exports) {
  */
 const OV_CAMERA_SRC = 'https://openvibe.cam/embed/ov-camera.js';
 const CAM_KIT_SRC = 'https://openvibe.cam/embed/cam-kit.js';
-const CAM_KIT_SRI = 'sha384-yyBcgyfpQZGD0KoQ6gGqV4J8FNPxY3GOEfUS9PBwVRGd03N0EA+nVXbHamhShdPx';
+const CAM_KIT_SRI = 'sha384-kD5WfySp7D3rNJliBpLgJRrl4Geks+4EcgSaCIBGX+dZdecjmUVxEjzbcUw2Spp7';
 
 // One promise per src: a second call while the script is in flight gets the same load, never a second tag.
 const pending = new Map();
