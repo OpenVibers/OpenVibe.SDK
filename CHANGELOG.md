@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.125.0 (2026-11-09)
+
+- openvibe-sdk/blog: posts are written and read as Markdown or as blocks (publishing.block@1), ?format=blocks
+
 ## 0.124.0 (2026-11-09)
 
 - OpenVibe Link: `openvibe-sdk/node` is `openvibe-sdk/link` (`ov.node` is `ov.link`), building

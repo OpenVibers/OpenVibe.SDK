@@ -239,6 +239,7 @@ const ids = { plan: `pln_${ULID}`, task: `tsk_${ULID}`, agent: `agt_${ULID}`, me
         await blog.blogs.feed('goosely');
         await busyOnce(() => blog.posts.create('goosely', { title: 'Tonight on stream', body: 'Hi', visibility: 'public' }));
         await blog.posts.get(ids.post);
+        await blog.posts.blocks(ids.post);
         await blog.posts.update(ids.post, { body: 'Hi again', expected_revision: 1 });
         await blog.posts.publish(ids.post);
         await blog.posts.unpublish(ids.post);
@@ -252,11 +253,11 @@ const ids = { plan: `pln_${ULID}`, task: `tsk_${ULID}`, agent: `agt_${ULID}`, me
         const P = `/api/v1/posts/${ids.post}`;
         assert.deepStrictEqual(b.map((x) => `${x.method} ${x.url}`), [
             'GET /api/v1/blogs/goosely', 'GET /api/v1/blogs/goosely/posts?limit=10&all=1', 'GET /api/v1/blogs/goosely/feed',
-            'POST /api/v1/blogs/goosely/posts', `GET ${P}`, `PATCH ${P}`, `PATCH ${P}`, `POST ${P}/publish`, `POST ${P}/publish`,
+            'POST /api/v1/blogs/goosely/posts', `GET ${P}`, `GET ${P}?format=blocks`, `PATCH ${P}`, `PATCH ${P}`, `POST ${P}/publish`, `POST ${P}/publish`,
             `POST ${P}/unpublish`, `POST ${P}/unpublish`, `POST ${P}/schedule`, `POST ${P}/schedule`, `DELETE ${P}/schedule`,
             `DELETE ${P}/schedule`, `POST ${P}/revert`, `GET ${P}/revisions`, `GET ${P}/revisions/2`, `DELETE ${P}`, `DELETE ${P}`,
         ]);
-        assert.deepStrictEqual(b[11].body, { at: '2026-10-21T18:00:00Z', revision: 2 });
+        assert.deepStrictEqual(b[12].body, { at: '2026-10-21T18:00:00Z', revision: 2 });
         assert.throws(() => blog.posts.get('post_1'), /pst_/);
         assert.throws(() => blog.posts.create('goosely', { body: 'no title' }), /title/);
         assert.throws(() => blog.posts.schedule(ids.post, { at: 'tomorrow' }), /ISO 8601/);
