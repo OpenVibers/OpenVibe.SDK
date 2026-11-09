@@ -429,6 +429,12 @@
       "import": "./esm/deals.mjs",
       "default": "./src/deals.js"
     },
+    "./shoes": {
+      "types": "./types/shoes.d.ts",
+      "browser": null,
+      "import": "./esm/shoes.mjs",
+      "default": "./src/shoes.js"
+    },
     "./trade": {
       "types": "./types/trade.d.ts",
       "browser": null,
