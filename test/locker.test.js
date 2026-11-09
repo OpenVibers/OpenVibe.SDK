@@ -137,9 +137,9 @@ run([
         const words = phrase.split(' ');
         assert.equal(words.length, 24, 'the phrase has 24 words');
         for (const word of words) assert.ok(locker.WORDS.includes(word), `${word} is one of the 256`);
-        // Two phrases are never the same: the words come from the platform's CSPRNG.
+        // Two phrases are never the same: the words come from the platform's CSPRNG. (Not the first words alone: two
+        // phrases share one 1 time in 256, which failed SDK #165's macOS run on 2026-11-09.)
         assert.notEqual(phrase, locker.recoveryWords());
-        assert.notEqual(phrase.split(' ')[0], locker.recoveryWords().split(' ')[0]);
         // Another number of words, and the same check on a typed phrase.
         assert.equal(locker.recoveryWords(12).split(' ').length, 12);
         assert.equal(locker.isRecoveryPhrase(phrase), true);
