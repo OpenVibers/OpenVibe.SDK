@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.115.0 (2026-11-09)
+
+- Tools discovery: ov.tools.popular() and ov.tools.trending()
+
 ## 0.114.0 (2026-11-09)
 
 - Dock v2: Vibe conversations (ov.chat.vibe.conversations) and Actor skill runs (ov.actor.skills.run)
