@@ -19,6 +19,19 @@ async function chatStub() {
 }
 
 run([
+    ['Vibe comparison sends models and records a pick and preference', async () => {
+        const srv = await chatStub();
+        const chat = createChatClient(createClient({ baseUrls: { chat: srv.url }, token: 'person-token' }));
+        await chat.ask({ message: 'Explain this', models: ['maker/one', 'maker/two'] });
+        await chat.pick(42, 'maker/two');
+        await chat.prefer(42, 'maker/two');
+        assert.deepEqual(srv.requests.map((r) => [r.method, r.url, JSON.parse(String(r.body))]), [
+            ['POST', '/api/vibe/ask', { message: 'Explain this', models: ['maker/one', 'maker/two'] }],
+            ['POST', '/api/vibe/pick', { message_id: 42, model: 'maker/two' }],
+            ['POST', '/api/vibe/prefer', { message_id: 42, model: 'maker/two' }],
+        ]);
+        await srv.close();
+    }],
     ['global, rooms and DMs go to the right paths with the right bodies', async () => {
         const srv = await chatStub();
         const chat = createChatClient(createClient({ baseUrls: { chat: srv.url }, token: 'user-jwt', retries: 2 }));
@@ -68,6 +81,7 @@ run([
         await chat.feeds.view('fed_Z', { limit: 5 });
         await chat.feeds.onLive({ slot: [77, 78] });
         await chat.vibe.start('hello');
+        await chat.vibe.conversations();
         await chat.inboxes.saveReply('inb_X', 'refund', 'Five days.');
         await chat.inboxes.addWebhook('inb_X', 'https://hooks.slack.com/services/x');
         await chat.inboxes.assign('inb_X', 'cnv_Y', 7);
@@ -84,6 +98,7 @@ run([
             ['GET', '/api/chat/feeds/fed_Z?limit=5', null],
             ['GET', '/api/chat/feeds?slot=77%2C78', null],
             ['POST', '/api/chat/vibe', { message: 'hello' }],
+            ['GET', '/api/vibe/conversations', null],
             ['POST', '/api/chat/inboxes/inb_X/replies', { shortcut: 'refund', body: 'Five days.' }],
             ['POST', '/api/chat/inboxes/inb_X/webhooks', { url: 'https://hooks.slack.com/services/x' }],
             ['PATCH', '/api/chat/inboxes/inb_X/conversations/cnv_Y', { assignee_id: 7 }],

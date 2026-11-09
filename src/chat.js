@@ -41,6 +41,10 @@ function createChatClient(client, defaults = {}) {
     const feed = (id) => `/api/chat/feeds/${enc(id)}`;
 
     return {
+        /** Vibe's model comparison API, authenticated as the person. */
+        ask: (input, o = {}) => call({ method: 'POST', path: '/api/vibe/ask', json: input, ...once }, o),
+        pick: (messageId, model, o = {}) => call({ method: 'POST', path: '/api/vibe/pick', json: { message_id: messageId, model }, ...once }, o),
+        prefer: (messageId, model, o = {}) => call({ method: 'POST', path: '/api/vibe/prefer', json: { message_id: messageId, model }, ...once }, o),
         global: {
             /** { messages, … } — the global feed; query: limit, after_id (a delta after a message id). */
             history: (query = {}, o = {}) => call({ path: '/api/chat/global/history', query }, o),
@@ -89,6 +93,8 @@ function createChatClient(client, defaults = {}) {
         vibe: {
             /** { chats, allowance } */
             list: (o = {}) => call({ path: '/api/chat/vibe' }, o),
+            /** The same conversations in Chat and the Dock, with last line, answer time and originating site. */
+            conversations: (o = {}) => call({ path: '/api/vibe/conversations' }, o),
             /** A new chat; Vibe answers in its room (rooms.messages, or the room socket). → { room, message } */
             start: (message, o = {}) => call({ method: 'POST', path: '/api/chat/vibe', json: { message }, ...once }, o),
             rename: (slug, name, o = {}) => call({ method: 'PATCH', path: `/api/chat/vibe/${enc(slug)}`, json: { name }, ...once }, o),

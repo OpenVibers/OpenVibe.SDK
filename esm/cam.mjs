@@ -2,6 +2,7 @@
 import cjs from '../src/cam/index.js';
 
 export const {
-    defineOvCamera, OV_CAMERA_SRC,
+    defineOvCamera, OV_CAMERA_SRC, CAM_KIT_SRC, CAM_KIT_SRI, loadCamKit, open,
+    settings,
 } = cjs;
 export default cjs;

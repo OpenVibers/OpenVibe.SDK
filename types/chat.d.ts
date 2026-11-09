@@ -4,6 +4,10 @@ type Opts = { signal?: AbortSignal };
 type Json = Record<string, unknown>;
 export type ChatMessageView = 'bubbles' | 'room';
 export interface ChatClient {
+    /** Ask Vibe using Auto, one catalogue model, or two to three models side by side. */
+    ask(input: { message: string; models?: string[]; slug?: string; fresh?: boolean; system_prompt?: string; temperature?: number }, opts?: Opts): Promise<{ chat: Json; message: Json }>;
+    pick(messageId: number, model: string, opts?: Opts): Promise<{ chat: Json; model: string }>;
+    prefer(messageId: number, model: string, opts?: Opts): Promise<{ recorded: boolean; model: string }>;
     global: {
         history(query?: { limit?: number; after_id?: number }, opts?: Opts): Promise<Json>;
         send(message: string, extra?: { reply_to_id?: number; auto_delete_minutes?: number }, opts?: Opts): Promise<Json>;
@@ -41,6 +45,7 @@ export interface ChatClient {
     exportMine(opts?: Opts): Promise<{ username: string; exported_at: string; total: number; truncated: boolean; messages: Json[] }>;
     vibe: {
         list(opts?: Opts): Promise<{ chats: Json[]; allowance?: Json }>;
+        conversations(opts?: Opts): Promise<{ conversations: Array<{ slug: string; name: string; last_message_at: string; created_at: string; last_line: string | null; last_answer_at: string | null; site: string | null }>; count: number }>;
         start(message: string, opts?: Opts): Promise<{ room: Json; message: Json }>;
         rename(slug: string, name: string, opts?: Opts): Promise<Json>;
         remove(slug: string, opts?: Opts): Promise<Json>;

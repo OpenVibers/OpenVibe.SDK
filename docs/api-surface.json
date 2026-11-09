@@ -58,6 +58,17 @@
         "createBotClient"
       ]
     },
+    "cam": {
+      "object": [
+        "CAM_KIT_SRC",
+        "CAM_KIT_SRI",
+        "OV_CAMERA_SRC",
+        "defineOvCamera",
+        "loadCamKit",
+        "open",
+        "settings"
+      ]
+    },
     "chat": {
       "object": [
         "createChatClient",
@@ -110,6 +121,7 @@
       ]
     },
     "createClient": "function",
+    "createWalletClient": "function",
     "credentials": {
       "object": [
         "createCredentialsClient"
@@ -118,6 +130,12 @@
     "deals": {
       "object": [
         "createDealsClient"
+      ]
+    },
+    "design": {
+      "object": [
+        "DEFAULT_DESIGN_URL",
+        "createDesignClient"
       ]
     },
     "download": {
@@ -234,6 +252,11 @@
         "mediaUrls"
       ]
     },
+    "mediaUpload": {
+      "object": [
+        "createUploadClient"
+      ]
+    },
     "meme": {
       "object": [
         "createMemeClient"
@@ -297,7 +320,9 @@
     },
     "report": {
       "object": [
+        "DAYS",
         "REPORT_URL",
+        "SECTIONS",
         "createReportClient"
       ]
     },
@@ -331,6 +356,11 @@
       ]
     },
     "share": "function",
+    "shoes": {
+      "object": [
+        "createShoesClient"
+      ]
+    },
     "space": {
       "object": [
         "createSpaceClient"
@@ -383,6 +413,11 @@
         "atLeast",
         "createTrustClient",
         "isNew"
+      ]
+    },
+    "ui": {
+      "object": [
+        "progress"
       ]
     },
     "ulid": "function",
@@ -507,8 +542,18 @@
     "createCache": "function"
   },
   "openvibe-sdk/cam": {
+    "CAM_KIT_SRC": "string",
+    "CAM_KIT_SRI": "string",
     "OV_CAMERA_SRC": "string",
-    "defineOvCamera": "function"
+    "defineOvCamera": "function",
+    "loadCamKit": "function",
+    "open": "function",
+    "settings": {
+      "object": [
+        "get",
+        "put"
+      ]
+    }
   },
   "openvibe-sdk/chat": {
     "createChatClient": "function",
@@ -649,6 +694,10 @@
   "openvibe-sdk/delivery": {
     "deliveryOffer": "function",
     "validateDeliveryOffer": "function"
+  },
+  "openvibe-sdk/design": {
+    "DEFAULT_DESIGN_URL": "string",
+    "createDesignClient": "function"
   },
   "openvibe-sdk/download": {
     "contentTypeOf": "function",
@@ -845,6 +894,9 @@
     "createObjectsClient": "function",
     "mediaUrls": "function"
   },
+  "openvibe-sdk/media-upload": {
+    "createUploadClient": "function"
+  },
   "openvibe-sdk/meme": {
     "createMemeClient": "function"
   },
@@ -942,7 +994,9 @@
     "createRegistryClient": "function"
   },
   "openvibe-sdk/report": {
+    "DAYS": "array",
     "REPORT_URL": "string",
+    "SECTIONS": "array",
     "createReportClient": "function"
   },
   "openvibe-sdk/reports": {
@@ -1041,6 +1095,9 @@
     "shareOpenApi": "function",
     "sharesSchema": "function"
   },
+  "openvibe-sdk/shoes": {
+    "createShoesClient": "function"
+  },
   "openvibe-sdk/space": {
     "createSpaceClient": "function"
   },
@@ -1129,6 +1186,9 @@
     "createTrustClient": "function",
     "isNew": "function"
   },
+  "openvibe-sdk/ui": {
+    "progress": "function"
+  },
   "openvibe-sdk/usage": {
     "createUsageReporter": "function",
     "usageKey": "function",
@@ -1154,6 +1214,9 @@
   "openvibe-sdk/vision": {
     "DEFAULT_AUDIENCE": "string",
     "createVisionClient": "function"
+  },
+  "openvibe-sdk/wallet": {
+    "createWalletClient": "function"
   },
   "openvibe-sdk/wiki": {
     "createWikiClient": "function"
