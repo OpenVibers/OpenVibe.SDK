@@ -64,4 +64,5 @@ module.exports = {
     usage: require('./src/usage'),
     commerce: require('./src/commerce'),
     telemetry: require('./src/telemetry'),
+    design: require('./src/design'),
 };

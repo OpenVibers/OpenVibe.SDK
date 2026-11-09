@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.110.0 — 2026-11-09
+
+- **`openvibe-sdk/design`: a typed client for the Design glyph API.**
+  - `createDesignClient({ accessToken, baseUrl })` returns `icons.search(q)`, `icons.draft({ name, sentence, styles, sourceSvg })`
+    and `icons.get(name, { style })` for the authenticated glyph draft, get and search calls. It is server-side only
+    (the `./design` subpath is browser-blocked) and takes a signed-in access token rather than a service token.
+  - Styles are checked against the set the API accepts (`thin`, `light`, `regular`, `bold`, `solid`, `duotone`).
+
 ## 0.109.0 — 2026-11-09
 
 - Add Vibe compare methods to `openvibe-sdk/chat` for submitting answers and recording a user's preferred model.

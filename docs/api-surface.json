@@ -130,6 +130,12 @@
         "createDealsClient"
       ]
     },
+    "design": {
+      "object": [
+        "DEFAULT_DESIGN_URL",
+        "createDesignClient"
+      ]
+    },
     "download": {
       "object": [
         "contentTypeOf",
@@ -663,6 +669,10 @@
   "openvibe-sdk/delivery": {
     "deliveryOffer": "function",
     "validateDeliveryOffer": "function"
+  },
+  "openvibe-sdk/design": {
+    "DEFAULT_DESIGN_URL": "string",
+    "createDesignClient": "function"
   },
   "openvibe-sdk/download": {
     "contentTypeOf": "function",
