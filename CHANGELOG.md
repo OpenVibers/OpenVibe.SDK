@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.131.0 (2026-11-09)
+
+- openvibe-sdk/community: the Feed's types complete, with pagination guidance
+
 ## 0.130.0 (2026-11-09)
 
 - openvibe-sdk/meme: ov.meme.templates(), .render() (PNG, GIF or MP4) and .get()
