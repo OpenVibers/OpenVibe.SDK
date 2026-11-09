@@ -4,6 +4,7 @@ import * as registry from './registry';
 import * as modules from './modules';
 import * as realtime from './realtime';
 import * as media from './media';
+import * as cam from './cam';
 import * as community from './community';
 import * as homeFeed from './home-feed';
 import * as bot from './bot';
@@ -30,6 +31,7 @@ export * as registry from './registry';
 export * as modules from './modules';
 export * as realtime from './realtime';
 export * as media from './media';
+export * as cam from './cam';
 export * as community from './community';
 export * as homeFeed from './home-feed';
 export * as bot from './bot';
@@ -51,6 +53,6 @@ export * as trust from './trust';
 
 declare const sdk: typeof core & {
     auth: typeof auth; registry: typeof registry; modules: typeof modules; realtime: typeof realtime;
-    media: typeof media; community: typeof community; homeFeed: typeof homeFeed; bot: typeof bot; search: typeof search; bench: typeof bench; meme: typeof meme; vision: typeof vision; themes: typeof themes; redact: typeof redact; chat: typeof chat; ai: typeof ai; credentials: typeof credentials; jobs: typeof jobs; tools: typeof tools; projects: typeof projects; geo: typeof geo; locker: typeof locker; trust: typeof trust;
+    media: typeof media; cam: typeof cam; community: typeof community; homeFeed: typeof homeFeed; bot: typeof bot; search: typeof search; bench: typeof bench; meme: typeof meme; vision: typeof vision; themes: typeof themes; redact: typeof redact; chat: typeof chat; ai: typeof ai; credentials: typeof credentials; jobs: typeof jobs; tools: typeof tools; projects: typeof projects; geo: typeof geo; locker: typeof locker; trust: typeof trust;
 };
 export default sdk;
