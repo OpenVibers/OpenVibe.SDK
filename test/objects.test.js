@@ -10,7 +10,8 @@ const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const { stubServer, send, problem, run } = require('./helpers');
 const { createClient } = require('../src/core');
-const { createObjectsClient, createUploadClient } = require('../src/media');
+const { createObjectsClient } = require('../src/media');
+const { createUploadClient } = require('../src/media-upload');
 
 const sha = (b) => crypto.createHash('sha256').update(b).digest('hex');
 

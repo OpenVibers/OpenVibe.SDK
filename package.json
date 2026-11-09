@@ -84,6 +84,11 @@
       "import": "./esm/media.mjs",
       "default": "./src/media.js"
     },
+    "./media-upload": {
+      "types": "./types/media-upload.d.ts",
+      "import": "./esm/media-upload.mjs",
+      "default": "./src/media-upload.js"
+    },
     "./ui": {
       "types": "./types/ui.d.ts",
       "import": "./esm/ui.mjs",

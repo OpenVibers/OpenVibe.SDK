@@ -106,7 +106,7 @@ three concurrent requests, retries missing parts, and exposes the upload referen
 any bytes leave so the app can persist it. Keep the credential on a server.
 
 ```js
-const uploader = sdk.media.createUploadClient({ app: unverifiedClaims.project_id, tokenClient: tokens });
+const uploader = sdk.mediaUpload.createUploadClient({ app: unverifiedClaims.project_id, tokenClient: tokens });
 const object = await uploader.upload(file, {
   onSession: ({ objectId, uploadId }) => saveUploadReference({ objectId, uploadId }),
   onProgress: ({ uploadedBytes, totalBytes }) => reportProgress(uploadedBytes, totalBytes),

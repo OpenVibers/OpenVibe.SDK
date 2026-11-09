@@ -9,6 +9,7 @@ export * as modules from './modules';
 export * as events from './events';
 export * as realtime from './realtime';
 export * as media from './media';
+export * as mediaUpload from './media-upload';
 export * as ui from './ui';
 export * as community from './community';
 export * as homeFeed from './home-feed';

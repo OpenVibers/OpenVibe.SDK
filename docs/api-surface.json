@@ -231,8 +231,12 @@
         "DEFAULT_PUBLIC_ORIGIN",
         "createMediaClient",
         "createObjectsClient",
-        "createUploadClient",
         "mediaUrls"
+      ]
+    },
+    "mediaUpload": {
+      "object": [
+        "createUploadClient"
       ]
     },
     "meme": {
@@ -849,8 +853,10 @@
     "DEFAULT_PUBLIC_ORIGIN": "string",
     "createMediaClient": "function",
     "createObjectsClient": "function",
-    "createUploadClient": "function",
     "mediaUrls": "function"
+  },
+  "openvibe-sdk/media-upload": {
+    "createUploadClient": "function"
   },
   "openvibe-sdk/meme": {
     "createMemeClient": "function"
