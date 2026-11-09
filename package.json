@@ -539,6 +539,12 @@
       "browser": null,
       "import": "./esm/compute.mjs",
       "default": "./src/compute/index.js"
+    },
+    "./wallet": {
+      "types": "./types/wallet.d.ts",
+      "browser": "./src/wallet.js",
+      "import": "./esm/wallet.mjs",
+      "default": "./src/wallet.js"
     }
   },
   "bin": {

@@ -7,6 +7,7 @@
 const core = require('./src/core');
 
 module.exports = {
+    createWalletClient: require('./src/wallet').createWalletClient,
     ...core,
     report: require('./src/report'),
     share: require('./src/share').share,

@@ -13,30 +13,31 @@ function (module, exports) {
 const core = __load(1);
 
 module.exports = {
+    createWalletClient: __load(8).createWalletClient,
     ...core,
-    auth: __load(8),
-    locker: __load(9),
-    registry: __load(20),
-    trust: __load(21),
-    modules: __load(22),
-    realtime: __load(23),
-    media: __load(24),
-    community: __load(26),
-    homeFeed: __load(27),
-    bot: __load(28),
-    search: __load(29),
-    bench: __load(30),
-    meme: __load(31),
-    vision: __load(32),
-    themes: __load(33),
-    redact: __load(34),
-    chat: __load(35),
-    ai: __load(36),
-    credentials: __load(37),
-    jobs: __load(38),
-    tools: __load(40),
-    projects: __load(41),
-    geo: __load(42),
+    auth: __load(9),
+    locker: __load(10),
+    registry: __load(21),
+    trust: __load(22),
+    modules: __load(23),
+    realtime: __load(24),
+    media: __load(25),
+    community: __load(27),
+    homeFeed: __load(28),
+    bot: __load(29),
+    search: __load(30),
+    bench: __load(31),
+    meme: __load(32),
+    vision: __load(33),
+    themes: __load(34),
+    redact: __load(35),
+    chat: __load(36),
+    ai: __load(37),
+    credentials: __load(38),
+    jobs: __load(39),
+    tools: __load(41),
+    projects: __load(42),
+    geo: __load(43),
 };
 },
 // ── 1: src/core/index.js ───────────────────────────────────────────
@@ -699,7 +700,56 @@ function offsetPager(load, { limit = 50 } = {}) {
 
 module.exports = { paginate, offsetPager };
 },
-// ── 8: src/auth/browser.js ─────────────────────────────────────────
+// ── 8: src/wallet.js ───────────────────────────────────────────────
+function (module, exports) {
+'use strict';
+
+/** Personal bearer wallet/store facade. Amounts and ownership are enforced by Billing and Inventory. */
+function createWalletClient(client, { billingUrl, inventoryUrl } = {}) {
+    if (!client || typeof client.json !== 'function') throw new TypeError('createWalletClient requires an SDK core client');
+    const call = (service, path, opts = {}) => client.json({ service, baseUrl: service === 'billing' ? billingUrl : inventoryUrl,
+        audience: `openvibe.${service}`, path, credentials: 'omit', ...opts });
+    const key = (v) => {
+        if (typeof v !== 'string' || !/^[A-Za-z0-9._:-]{8,128}$/.test(v)) throw new TypeError('An idempotency_key of 8–128 letters, digits, dot, colon, underscore or dash is required');
+        return v;
+    };
+    const whole = (v) => { if (!Number.isSafeInteger(v) || v < 1) throw new TypeError('Choose a positive whole amount'); return v; };
+    const itemId = (v) => { if (!/^itd_[0-9A-HJKMNP-TV-Z]{26}$/.test(v || '')) throw new TypeError('An item id is an itd_ id'); return encodeURIComponent(v); };
+    // The BODY key is durable in both services. Retries keep it; the SDK must not add an unrelated header key.
+    const write = (service, path, json, { signal } = {}) => call(service, path, { method: 'POST', json,
+        idempotencyKey: false, idempotent: true, signal });
+    return {
+        wallet: {
+            get: ({ signal } = {}) => call('billing', '/api/v1/me/wallet', { signal }),
+            topUp: ({ provider, amount_cents, idempotency_key }, options) => write('billing', '/api/v1/me/wallet/topups',
+                { provider, amount_cents: whole(amount_cents), idempotency_key: key(idempotency_key) }, options),
+        },
+        vibes: {
+            buy: ({ provider, vibes, idempotency_key }, options) => write('billing', '/api/v1/me/vibes/buy',
+                { provider, vibes: whole(vibes), idempotency_key: key(idempotency_key) }, options),
+        },
+        store: {
+            list: ({ signal } = {}) => call('inventory', '/api/v1/store', { signal }),
+            buy: (id, { currency, idempotency_key }, options) => {
+                if (!['coins', 'vibes'].includes(currency)) throw new TypeError('currency is coins or vibes');
+                return write('inventory', `/api/v1/store/${itemId(id)}/buy`, { currency, idempotency_key: key(idempotency_key) }, options);
+            },
+            submit: (id, prices, { signal } = {}) => call('inventory', `/api/v1/store/${itemId(id)}/list`,
+                { method: 'POST', json: { prices }, idempotencyKey: false, retries: 0, signal }),
+        },
+        items: {
+            list: ({ cursor, limit, kind, signal } = {}) => call('inventory', '/api/v1/me/items', { query: { cursor, limit, kind }, signal }),
+            equip: ({ kind, slot, instance_id }, { signal } = {}) => {
+                if (instance_id !== null && !/^inv_[0-9A-HJKMNP-TV-Z]{26}$/.test(instance_id || '')) throw new TypeError('instance_id is an inv_ id, or null to unequip');
+                return call('inventory', '/api/v1/me/equipped', { method: 'PUT', json: { kind, slot, instance_id }, signal });
+            },
+        },
+    };
+}
+
+module.exports = { createWalletClient };
+},
+// ── 9: src/auth/browser.js ─────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -842,16 +892,16 @@ function unverifiedClaims(token) {
 
 module.exports = { createPkcePair, createState, buildAuthorizeUrl, startAuthorization, readCallback, base64url, decodeUnverified, unverifiedClaims };
 },
-// ── 9: src/locker.js ───────────────────────────────────────────────
+// ── 10: src/locker.js ───────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
  * openvibe-sdk/locker: the subpath entry. The format, the three locks, the streams and the
  * keys. WebCrypto only, in Node and in the browser.
  */
-module.exports = __load(10);
+module.exports = __load(11);
 },
-// ── 10: src/locker/index.js ─────────────────────────────────────────
+// ── 11: src/locker/index.js ─────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -865,14 +915,14 @@ function (module, exports) {
  *   const sealed = await seal('a note', { lock: 'people', keys: [{ subject, publicKey: person.ecdhPublic }] });
  *   const note = await open(sealed, { privateKey: person.ecdh.privateKey, subject });
  */
-const format = __load(11);
-const keys = __load(15);
-const seal = __load(17);
-const { padme } = __load(14);
-const { inspect } = __load(18);
-const { recoveryWords, isRecoveryPhrase, RECOVERY_WORDS } = __load(19);
-const { WORDS } = __load(16);
-const { LockerError } = __load(13);
+const format = __load(12);
+const keys = __load(16);
+const seal = __load(18);
+const { padme } = __load(15);
+const { inspect } = __load(19);
+const { recoveryWords, isRecoveryPhrase, RECOVERY_WORDS } = __load(20);
+const { WORDS } = __load(17);
+const { LockerError } = __load(14);
 
 module.exports = {
     // The format.
@@ -923,7 +973,7 @@ module.exports = {
     LockerError,
 };
 },
-// ── 11: src/locker/format.js ────────────────────────────────────────
+// ── 12: src/locker/format.js ────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -942,9 +992,9 @@ function (module, exports) {
  *   | len  | flags| nonce (12 bytes)         | ciphertext + 16-byte tag |
  *   +------+------+--------------------------+--------------------------+
  */
-const { utf8, fromUtf8, concat, base64, fromBase64, u32be, readU32be, canonicalJson } = __load(12);
-const { fail } = __load(13);
-const { padme } = __load(14);
+const { utf8, fromUtf8, concat, base64, fromBase64, u32be, readU32be, canonicalJson } = __load(13);
+const { fail } = __load(14);
+const { padme } = __load(15);
 
 /** The four bytes that say "this is a Locker envelope". */
 const MAGIC = 'OVLK';
@@ -1072,7 +1122,7 @@ module.exports = {
     chunkCount, lastChunkSize, paddedSize, chunkNonce, encodeChunk, nonceBaseBytes,
 };
 },
-// ── 12: src/locker/bytes.js ─────────────────────────────────────────
+// ── 13: src/locker/bytes.js ─────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -1161,7 +1211,7 @@ module.exports = {
     u32be, readU32be, u64be, readU64be, canonicalJson,
 };
 },
-// ── 13: src/locker/errors.js ────────────────────────────────────────
+// ── 14: src/locker/errors.js ────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -1187,7 +1237,7 @@ function fail(code, message) { throw new LockerError(code, message); }
 
 module.exports = { LockerError, fail };
 },
-// ── 14: src/locker/padme.js ─────────────────────────────────────────
+// ── 15: src/locker/padme.js ─────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -1238,7 +1288,7 @@ function padme(size) {
 
 module.exports = { padme, exponentOf };
 },
-// ── 15: src/locker/keys.js ──────────────────────────────────────────
+// ── 16: src/locker/keys.js ──────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -1248,9 +1298,9 @@ function (module, exports) {
  * WebCrypto only: globalThis.crypto.subtle. No other crypto library, nothing hand-rolled: the
  * ECDH, the ECDSA, the HKDF, the PBKDF2 and the AES-GCM are all the browser's own.
  */
-const { utf8, concat, base64, base64url, fromBase64, canonicalJson } = __load(12);
-const { fail } = __load(13);
-const { WORDS } = __load(16);
+const { utf8, concat, base64, base64url, fromBase64, canonicalJson } = __load(13);
+const { fail } = __load(14);
+const { WORDS } = __load(17);
 
 /** The suite of the key pairs: P-256, which every browser's WebCrypto has. */
 const CURVE = 'P-256';
@@ -1606,7 +1656,7 @@ module.exports = {
     peopleSlotAad, passwordSlotAad, wrapFor, unwrapPeopleSlot, wrapForPassword, unwrapPasswordSlot,
 };
 },
-// ── 16: src/locker/words.js ─────────────────────────────────────────
+// ── 17: src/locker/words.js ─────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -1656,7 +1706,7 @@ const WORDS = [
 
 module.exports = { WORDS };
 },
-// ── 17: src/locker/seal.js ──────────────────────────────────────────
+// ── 18: src/locker/seal.js ──────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -1668,17 +1718,17 @@ function (module, exports) {
  */
 const {
     utf8, fromUtf8, concat, base64, base64url, fromBase64url, u32be, readU32be, u64be, readU64be,
-} = __load(12);
-const { fail } = __load(13);
+} = __load(13);
+const { fail } = __load(14);
 const {
     MAGIC, VERSION, SUITE, CHUNK_SIZE, TAG_SIZE, NONCE_BASE_SIZE, LENGTH_PREFIX, MIN_PADDED_SIZE,
     FINAL_FLAG, coreOf, chunkAad, encodeHeader, encodeEnvelope, readHeader, chunkCount,
     lastChunkSize, paddedSize, chunkNonce, encodeChunk, nonceBaseBytes,
-} = __load(11);
+} = __load(12);
 const {
     KEY_BYTES, PASSWORD_ITERATIONS, subtle, platformRandom, importContentKey, publicJwk,
     jwkThumbprint, wrapFor, unwrapPeopleSlot, wrapForPassword, unwrapPasswordSlot, resolveEphemeral,
-} = __load(15);
+} = __load(16);
 
 /** The content as bytes: a string is UTF-8, anything else is taken as it is. */
 function toBytes(content) {
@@ -2266,7 +2316,7 @@ module.exports = {
     publicKeyOf, privateKeyOf, slotForPerson,
 };
 },
-// ── 18: src/locker/inspect.js ───────────────────────────────────────
+// ── 19: src/locker/inspect.js ───────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -2279,8 +2329,8 @@ function (module, exports) {
  * The header holds no content, only wrapped keys, so this says nothing the server does not
  * already see.
  */
-const { envelopeBytes, readCore } = __load(17);
-const { readHeader } = __load(11);
+const { envelopeBytes, readCore } = __load(18);
+const { readHeader } = __load(12);
 
 /**
  * What an envelope says about itself.
@@ -2312,7 +2362,7 @@ function inspect(bytes) {
 
 module.exports = { inspect };
 },
-// ── 19: src/locker/recovery.js ──────────────────────────────────────
+// ── 20: src/locker/recovery.js ──────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -2326,9 +2376,9 @@ function (module, exports) {
  * wrong simply does not open anything. isRecoveryPhrase only says whether every word is one of
  * the 256, so a UI can tell a typo from a word that was never in the list.
  */
-const { fail } = __load(13);
-const { platformRandom } = __load(15);
-const { WORDS } = __load(16);
+const { fail } = __load(14);
+const { platformRandom } = __load(16);
+const { WORDS } = __load(17);
 
 /** How many words a recovery phrase has, unless the caller says otherwise. */
 const RECOVERY_WORDS = 24;
@@ -2363,7 +2413,7 @@ function isRecoveryPhrase(phrase) {
 
 module.exports = { RECOVERY_WORDS, recoveryWords, isRecoveryPhrase };
 },
-// ── 20: src/registry.js ─────────────────────────────────────────────
+// ── 21: src/registry.js ─────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -2400,7 +2450,7 @@ function createRegistryClient(client, { baseUrl } = {}) {
 
 module.exports = { createRegistryClient };
 },
-// ── 21: src/trust.js ────────────────────────────────────────────────
+// ── 22: src/trust.js ────────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 
@@ -2458,7 +2508,7 @@ function atLeast(signals, band) {
 
 module.exports = { createTrustClient, isNew, atLeast, AGE_BANDS };
 },
-// ── 22: src/modules.js ──────────────────────────────────────────────
+// ── 23: src/modules.js ──────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -2537,7 +2587,7 @@ function createModulesClient(client, { baseUrl, maxAttempts = 5 } = {}) {
 
 module.exports = { createModulesClient };
 },
-// ── 23: src/realtime.js ─────────────────────────────────────────────
+// ── 24: src/realtime.js ─────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -2790,7 +2840,7 @@ function createRealtimeClient(client, defaults = {}) {
 
 module.exports = { subscribe, createRealtimeClient, parseSSE, DEFAULT_ORIGIN };
 },
-// ── 24: src/media.js ────────────────────────────────────────────────
+// ── 25: src/media.js ────────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -2812,7 +2862,7 @@ function (module, exports) {
  */
 const { isOpenVibeError } = __load(3);
 const { paginate, offsetPager } = __load(7);
-const { createObjectsClient } = __load(25);
+const { createObjectsClient } = __load(26);
 
 const DEFAULT_PUBLIC_ORIGIN = 'https://openvibe.media';
 const enc = encodeURIComponent;
@@ -2904,7 +2954,7 @@ function createMediaClient(client, { app, apiKey, actingUserId, baseUrl, publicO
 
 module.exports = { createMediaClient, createObjectsClient, mediaUrls, DEFAULT_PUBLIC_ORIGIN };
 },
-// ── 25: src/objects.js ──────────────────────────────────────────────
+// ── 26: src/objects.js ──────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -3223,7 +3273,7 @@ function createObjectsClient({
 
 module.exports = { createObjectsClient };
 },
-// ── 26: src/community.js ────────────────────────────────────────────
+// ── 27: src/community.js ────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -3342,7 +3392,7 @@ function createCommunityClient(client, defaults = {}) {
 
 module.exports = { createCommunityClient, actingHeaders };
 },
-// ── 27: src/home-feed.js ────────────────────────────────────────────
+// ── 28: src/home-feed.js ────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /** The menu's portable Home layout, network day counts and personal wall. Pass a user-token core client;
@@ -3369,7 +3419,7 @@ function createHomeFeedClient(client, { networkBaseUrl, communityBaseUrl } = {})
 
 module.exports = { createHomeFeedClient };
 },
-// ── 28: src/bot.js ──────────────────────────────────────────────────
+// ── 29: src/bot.js ──────────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -3591,7 +3641,7 @@ function createBotClient(client, defaults = {}) {
 
 module.exports = { createBotClient, actingHeaders };
 },
-// ── 29: src/search.js ───────────────────────────────────────────────
+// ── 30: src/search.js ───────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -3704,7 +3754,7 @@ function createSearchClient(client, defaults = {}) {
 
 module.exports = { createSearchClient, queryOf, fabricOf };
 },
-// ── 30: src/bench.js ────────────────────────────────────────────────
+// ── 31: src/bench.js ────────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /** openvibe-sdk/bench: OpenVibe.Bench's JSON API and streamed open dataset. Browser-safe. */
@@ -3805,7 +3855,7 @@ function createBenchClient(client, defaults = {}) {
 
 module.exports = { createBenchClient };
 },
-// ── 31: src/meme.js ─────────────────────────────────────────────────
+// ── 32: src/meme.js ─────────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -3873,7 +3923,7 @@ function createMemeClient(client, defaults = {}) {
 
 module.exports = { createMemeClient };
 },
-// ── 32: src/vision.js ───────────────────────────────────────────────
+// ── 33: src/vision.js ───────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -4031,7 +4081,7 @@ function pick(o, keys) {
 
 module.exports = { createVisionClient, DEFAULT_AUDIENCE };
 },
-// ── 33: src/themes.js ───────────────────────────────────────────────
+// ── 34: src/themes.js ───────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -4181,7 +4231,7 @@ function followTheme(fn, opts = {}) {
 
 module.exports = { createThemesClient, followTheme, readTheme, applyTheme, seasonOn, onColor, DISPLAY_OPTIONS, TOKENS };
 },
-// ── 34: src/redact.js ───────────────────────────────────────────────
+// ── 35: src/redact.js ───────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -4428,7 +4478,7 @@ function onlySecret(text) {
 
 module.exports = { redact, onlySecret };
 },
-// ── 35: src/chat.js ─────────────────────────────────────────────────
+// ── 36: src/chat.js ─────────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -4670,7 +4720,7 @@ function createFeedPublisher(client, { feed, key, baseUrl } = {}) {
 
 module.exports = { createChatClient, createInboxVisitor, createFeedPublisher };
 },
-// ── 36: src/ai.js ───────────────────────────────────────────────────
+// ── 37: src/ai.js ───────────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -4802,7 +4852,7 @@ function createAiClient(client, defaults = {}) {
 
 module.exports = { createAiClient, TERMINAL, OPS, CLASSES };
 },
-// ── 37: src/credentials.js ──────────────────────────────────────────
+// ── 38: src/credentials.js ──────────────────────────────────────────
 function (module, exports) {
 'use strict';
 
@@ -4820,7 +4870,7 @@ function createCredentialsClient(client, defaults = {}) {
 
 module.exports = { createCredentialsClient };
 },
-// ── 38: src/jobs.js ─────────────────────────────────────────────────
+// ── 39: src/jobs.js ─────────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -4858,8 +4908,8 @@ function (module, exports) {
  */
 const { OpenVibeError, isOpenVibeError } = __load(3);
 const { newIdempotencyKey } = __load(5);
-const { appendFiles } = __load(39);
-const { parseSSE } = __load(23);
+const { appendFiles } = __load(40);
+const { parseSSE } = __load(24);
 
 const TERMINAL = new Set(['succeeded', 'failed', 'cancelled']);
 const TERMINAL_EVENTS = new Set(['job.succeeded', 'job.failed', 'job.cancelled']);
@@ -5022,7 +5072,7 @@ function createJobsClient(client, { baseUrl, service = 'tools', audience = 'open
 
 module.exports = { createJobsClient, isTerminal, TERMINAL_STATES: [...TERMINAL] };
 },
-// ── 39: src/core/form.js ────────────────────────────────────────────
+// ── 40: src/core/form.js ────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -5056,7 +5106,7 @@ function appendFiles(form, list, where) {
 
 module.exports = { isBlob, isUpload, appendFiles };
 },
-// ── 40: src/tools.js ────────────────────────────────────────────────
+// ── 41: src/tools.js ────────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -5090,8 +5140,8 @@ function (module, exports) {
  */
 const { OpenVibeError, isOpenVibeError } = __load(3);
 const { newIdempotencyKey } = __load(5);
-const { isUpload, appendFiles } = __load(39);
-const { createJobsClient } = __load(38);
+const { isUpload, appendFiles } = __load(40);
+const { createJobsClient } = __load(39);
 
 const enc = encodeURIComponent;
 const ID_RE = /^[a-z][a-z0-9-]{0,39}$/;
@@ -5341,7 +5391,7 @@ function createToolsClient(client, { baseUrl, service = 'tools', audience = 'ope
 
 module.exports = { createToolsClient, ToolRunError, isToolRunError };
 },
-// ── 41: src/projects.js ─────────────────────────────────────────────
+// ── 42: src/projects.js ─────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -5457,7 +5507,7 @@ function createProjectsClient(client, { baseUrl } = {}) {
 
 module.exports = { createProjectsClient };
 },
-// ── 42: src/geo.js ──────────────────────────────────────────────────
+// ── 43: src/geo.js ──────────────────────────────────────────────────
 function (module, exports) {
 'use strict';
 /**
@@ -5533,12 +5583,12 @@ function __load(i) {
 const sdk = __load(0);
 
 export const {
-    createClient, OpenVibeError, isOpenVibeError, paginate, offsetPager, parseTraceparent,
-    startSpan, contextFromHeaders, ulid, newEventId, newIdempotencyKey, isActingSubjectId,
-    satisfiesRange, compareVersions, CONTRACTS_RANGE, DEFAULT_NETWORK, SDK_VERSION, auth,
-    locker, registry, trust, modules, realtime, media,
-    community, homeFeed, bot, search, bench, meme,
-    vision, themes, redact, chat, ai, credentials,
-    jobs, tools, projects, geo,
+    createWalletClient, createClient, OpenVibeError, isOpenVibeError, paginate, offsetPager,
+    parseTraceparent, startSpan, contextFromHeaders, ulid, newEventId, newIdempotencyKey,
+    isActingSubjectId, satisfiesRange, compareVersions, CONTRACTS_RANGE, DEFAULT_NETWORK, SDK_VERSION,
+    auth, locker, registry, trust, modules, realtime,
+    media, community, homeFeed, bot, search, bench,
+    meme, vision, themes, redact, chat, ai,
+    credentials, jobs, tools, projects, geo,
 } = sdk;
 export default sdk;

@@ -23,6 +23,7 @@ import * as geo from './geo';
 import * as locker from './locker';
 import * as trust from './trust';
 import * as core from './core';
+export const createWalletClient: typeof import('./wallet').createWalletClient;
 
 export * from './core';
 export * as auth from './auth-browser';
@@ -50,6 +51,7 @@ export * as locker from './locker';
 export * as trust from './trust';
 
 declare const sdk: typeof core & {
+    createWalletClient: typeof createWalletClient;
     auth: typeof auth; registry: typeof registry; modules: typeof modules; realtime: typeof realtime;
     media: typeof media; community: typeof community; homeFeed: typeof homeFeed; bot: typeof bot; search: typeof search; bench: typeof bench; meme: typeof meme; vision: typeof vision; themes: typeof themes; redact: typeof redact; chat: typeof chat; ai: typeof ai; credentials: typeof credentials; jobs: typeof jobs; tools: typeof tools; projects: typeof projects; geo: typeof geo; locker: typeof locker; trust: typeof trust;
 };
