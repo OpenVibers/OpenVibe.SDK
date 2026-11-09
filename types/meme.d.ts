@@ -2,6 +2,15 @@ import type { OpenVibeClient } from './core';
 
 export interface MemeOptions { signal?: AbortSignal; }
 export interface MemeDefaults extends MemeOptions { baseUrl?: string; }
+export interface MemeTemplate { id: string; name: string; image_url: string; box_count: number; source: string; license: string; credit?: string; source_url?: string; layout?: Record<string, unknown>; captions?: number; uses_today?: number; }
+export interface MemeRenderInput {
+    template_id?: string;
+    templateId?: string;
+    lines: string[];
+    format?: 'png' | 'gif' | 'mp4';
+    editor?: Record<string, unknown>;
+}
+export interface MemeRenderOutput { bytes: ArrayBuffer; contentType: string; }
 
 export type MemeScope = 'openvibe' | 'internet';
 export type MemeStatus = 'rising' | 'peaked' | 'classic' | 'dead';
@@ -174,8 +183,12 @@ export interface MemeGenerateResult {
 export interface MemeClient {
     search(query?: MemeSearchQuery): Promise<MemeSearchResult>;
     entry(slug: string, opts?: MemeOptions): Promise<MemeEntryDetail>;
+    /** The same read as entry(), under the product's `get` name. */
+    get(slug: string, opts?: MemeOptions): Promise<MemeEntryDetail>;
     revisions(slug: string, opts?: MemeOptions): Promise<{ slug: string; count: number; revisions: MemeRevision[] }>;
     trends(opts?: { window?: 'day' | 'week'; limit?: number } & MemeOptions): Promise<MemeTrends>;
+    templates(opts?: MemeOptions): Promise<{ count: number; templates: MemeTemplate[] }>;
+    render(input: MemeRenderInput, opts?: MemeOptions): Promise<MemeRenderOutput>;
     analyze(input: MemeAnalysisInput, opts?: MemeOptions): Promise<MemeAnalysis>;
     research(topic: string, opts?: MemeOptions): Promise<MemeResearch>;
     researchGet(id: string, opts?: MemeOptions): Promise<MemeResearch>;
