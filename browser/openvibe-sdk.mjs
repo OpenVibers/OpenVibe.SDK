@@ -4565,6 +4565,10 @@ function createChatClient(client, defaults = {}) {
     const feed = (id) => `/api/chat/feeds/${enc(id)}`;
 
     return {
+        /** Vibe's model comparison API, authenticated as the person. */
+        ask: (input, o = {}) => call({ method: 'POST', path: '/api/vibe/ask', json: input, ...once }, o),
+        pick: (messageId, model, o = {}) => call({ method: 'POST', path: '/api/vibe/pick', json: { message_id: messageId, model }, ...once }, o),
+        prefer: (messageId, model, o = {}) => call({ method: 'POST', path: '/api/vibe/prefer', json: { message_id: messageId, model }, ...once }, o),
         global: {
             /** { messages, … } — the global feed; query: limit, after_id (a delta after a message id). */
             history: (query = {}, o = {}) => call({ path: '/api/chat/global/history', query }, o),

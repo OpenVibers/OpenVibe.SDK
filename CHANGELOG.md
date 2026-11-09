@@ -8,6 +8,10 @@
     (the `./design` subpath is browser-blocked) and takes a signed-in access token rather than a service token.
   - Styles are checked against the set the API accepts (`thin`, `light`, `regular`, `bold`, `solid`, `duotone`).
 
+## 0.109.0 — 2026-11-09
+
+- Add Vibe compare methods to `openvibe-sdk/chat` for submitting answers and recording a user's preferred model.
+
 ## 0.108.0 — 2026-11-09
 
 - Add daily quest reads, progress, step type listings and reviewable step contributions to `openvibe-sdk/quest`.
