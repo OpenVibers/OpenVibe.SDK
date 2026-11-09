@@ -1,4 +1,12 @@
+![openvibe-sdk](https://openvibe.services/shared/social/services.jpg)
+
 # OpenVibe.SDK
+
+**Open source JavaScript/TypeScript SDK and API clients for the OpenVibe network** — docs at [openvibe.services](https://openvibe.services).
+
+```bash
+npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.108.0
+```
 
 > Supported browser and server clients for the OpenVibe platform.
 
