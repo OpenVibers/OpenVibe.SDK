@@ -56,7 +56,7 @@ const { paginate, offsetPager } = __load(7);
 const semver = __load(6);
 
 /** The package version (test/version.test.js keeps it equal to package.json). */
-const SDK_VERSION = '0.128.0';
+const SDK_VERSION = '0.129.0';
 
 module.exports = {
     createClient,
