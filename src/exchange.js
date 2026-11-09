@@ -541,6 +541,20 @@ function createExchangeClient({
     };
 
     return {
+        arena: {
+            /** Start a blind comparison round using the caller's prompt and pair. */
+            async start({ prompt, category = 'chat', entries } = {}, { signal } = {}) {
+                if (typeof prompt !== 'string' || !prompt.trim()) throw new TypeError('arena.start: prompt is required');
+                if (!Array.isArray(entries) || entries.length < 2) throw new TypeError('arena.start: at least two entries are required');
+                return await jsonCall('POST', '/api/v1/arena/rounds', { json: { prompt, category, entries }, signal });
+            },
+            /** Submit a blind vote. choice is left, right, tie or both_bad. */
+            async vote(roundId, choice, { signal } = {}) {
+                if (!roundId) throw new TypeError('arena.vote: roundId is required');
+                if (!['left', 'right', 'tie', 'both_bad'].includes(choice)) throw new TypeError('arena.vote: choice must be left, right, tie or both_bad');
+                return await jsonCall('POST', `/api/v1/arena/rounds/${encodeURIComponent(roundId)}/votes`, { json: { outcome: choice }, signal });
+            },
+        },
         /**
          * One chat completion. The body is the OpenAI shape; stream: true answers an async iterable of
          * chunks instead of the finished completion.

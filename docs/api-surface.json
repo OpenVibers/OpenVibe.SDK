@@ -295,6 +295,12 @@
         "createRegistryClient"
       ]
     },
+    "report": {
+      "object": [
+        "REPORT_URL",
+        "createReportClient"
+      ]
+    },
     "resources": {
       "object": [
         "RESOURCE_KINDS",
@@ -934,6 +940,10 @@
   },
   "openvibe-sdk/registry": {
     "createRegistryClient": "function"
+  },
+  "openvibe-sdk/report": {
+    "REPORT_URL": "string",
+    "createReportClient": "function"
   },
   "openvibe-sdk/reports": {
     "cleanReport": "function",

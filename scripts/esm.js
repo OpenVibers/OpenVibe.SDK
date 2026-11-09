@@ -52,6 +52,7 @@ const ENTRIES = {
     'storage.mjs': '../src/storage.js',
     'commerce.mjs': '../src/commerce.js',
     'exchange.mjs': '../src/exchange.js',
+    'report.mjs': '../src/report.js',
     'vibes.mjs': '../src/vibes.js',
     'delivery.mjs': '../src/delivery.js',
     'node.mjs': '../src/node.js',
