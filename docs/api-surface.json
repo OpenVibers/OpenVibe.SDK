@@ -347,6 +347,11 @@
       ]
     },
     "share": "function",
+    "shoes": {
+      "object": [
+        "createShoesClient"
+      ]
+    },
     "space": {
       "object": [
         "createSpaceClient"
@@ -1064,6 +1069,9 @@
     "share": "function",
     "shareOpenApi": "function",
     "sharesSchema": "function"
+  },
+  "openvibe-sdk/shoes": {
+    "createShoesClient": "function"
   },
   "openvibe-sdk/space": {
     "createSpaceClient": "function"

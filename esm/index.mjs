@@ -11,9 +11,9 @@ export const {
     themes, redact, chat, chatApps, ai, credentials,
     jobs, tools, projects, resources, vip, quest,
     live, inventory, tips, blog, reviews, wiki,
-    coupons, deals, trade, space, host, news,
-    food, actor, run, video, work, zone,
-    play, download, openre, geo, usage, commerce,
-    telemetry, design,
+    coupons, deals, shoes, trade, space, host,
+    news, food, actor, run, video, work,
+    zone, play, download, openre, geo, usage,
+    commerce, telemetry, design,
 } = cjs;
 export default cjs;
