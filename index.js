@@ -8,6 +8,7 @@ const core = require('./src/core');
 
 module.exports = {
     ...core,
+    report: require('./src/report'),
     share: require('./src/share').share,
     locker: require('./src/locker'),
     auth: require('./src/auth'),

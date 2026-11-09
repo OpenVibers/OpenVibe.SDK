@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.105.0 (2026-11-09)
+
+- Add Report AI leaderboard, model, provider, comparison and picks reads, plus Exchange Arena start and vote methods.
+
 ## 0.104.0 (2026-11-08)
 
 - Add `createAccountEmailsClient` to `openvibe-sdk/identity` for managing the signed-in person's verified Network email addresses.

@@ -333,6 +333,10 @@ export type ExchangeEarnings = {
 };
 
 export type ExchangeClient = {
+    arena: {
+        start(input: { prompt: string; category?: string; entries: unknown[] }, options?: { signal?: AbortSignal }): Promise<unknown>;
+        vote(roundId: string, choice: 'left' | 'right' | 'tie' | 'both_bad', options?: { signal?: AbortSignal }): Promise<unknown>;
+    };
     /** One chat completion; stream: true answers an async iterable of chunks. */
     chat(body: ExchangeChatRequest, opts?: { signal?: AbortSignal }): Promise<ExchangeChatCompletion | AsyncIterable<ExchangeChatChunk>>;
     /** The models the Exchange can serve. */
