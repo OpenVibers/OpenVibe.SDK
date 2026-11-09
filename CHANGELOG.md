@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.109.0 — 2026-11-09
+
+- Add `openvibe-sdk/design`: `ov.design.components()` and `component(name)` for the public `design.component@1` registry at openvibe.design.
+
 ## 0.108.0 — 2026-11-09
 
 - Add daily quest reads, progress, step type listings and reviewable step contributions to `openvibe-sdk/quest`.

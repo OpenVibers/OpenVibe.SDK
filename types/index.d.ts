@@ -17,6 +17,7 @@ export * as search from './search';
 export * as bench from './bench';
 export * as vision from './vision';
 export * as themes from './themes';
+export * as design from './design';
 export * as redact from './redact';
 export * as chat from './chat';
 export * as chatApps from './chat-apps';

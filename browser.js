@@ -23,6 +23,7 @@ module.exports = {
     meme: require('./src/meme'),
     vision: require('./src/vision'),
     themes: require('./src/themes'),
+    design: require('./src/design'),
     redact: require('./src/redact'),
     chat: require('./src/chat'),
     ai: require('./src/ai'),
