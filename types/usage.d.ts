@@ -22,7 +22,7 @@ export type UsageReporterOptions = {
     db: unknown;
     /** The Contracts service id (services/<id>.json), e.g. 'run', 'tools', 'ai'. */
     service: string;
-    /** The sample's `source`, e.g. 'openvibe-node.worker', 'ai.runs'. */
+    /** The sample's `source`, e.g. 'openvibe-link.worker', 'ai.runs'. */
     source: string;
     /** The outbox table (default 'usage_outbox'); services create it in a migration. */
     table?: string;

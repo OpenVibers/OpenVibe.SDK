@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.124.0 (2026-11-09)
+
+- OpenVibe Link: `openvibe-sdk/node` is `openvibe-sdk/link` (`ov.node` is `ov.link`), building
+  `platform.link-capabilities@1` and mapping a Link to its `platform.resource-offer@1` and
+  `platform.runtime-offer@1`. A link principal token is never a user token. The Contracts pin moves to
+  v0.372.0.
+
 ## 0.123.0 (2026-11-09)
 
 - ov.exchange: keys (list, create, revoke), private usage, deployments, and web, image and icon search with fetch (the Exchange API platform)
@@ -423,7 +430,7 @@
 ## 0.79.0 (2026-10-31)
 
 - **`openvibe-sdk/machines`: the network's machines hub** (plan L34, step M2; Contracts 0.258.0). A person's machines
-  are the network's: Bot stays the registry underneath, and OpenVibe.Network fronts it on openvibe.network/machines for
+  are the network's: Bot stays the registry underneath, and OpenVibe.Network fronts it on openvibe.link/machines for
   the person and for the apps the person consented to.
   - `createMachines({ networkUrl, token, fetch, timeoutMs })`: `token` returns the caller's own bearer token — the
     person's session token, or an app's token holding `network.machines.read` or `network.machines.manage` with the
@@ -961,7 +968,7 @@ still passes a number:
 
 ## 0.40.1 (2026-10-10)
 
-- **`verifyUserToken` refuses node principals.** A node token (`actor_type: node`, `sub node:nod_…`: a machine paired
+- **`verifyUserToken` refuses node principals.** A node token (`actor_type: link`, `sub link:lnk_…`: a machine paired
   for a service, such as a robot's computer for OpenVibe.Bot) is signed with Network's key like every principal token.
   It was refused for service, app and module principals only, so a service that checks user tokens without an
   audience would have taken a node token for a session. It is `token.not_user` now, by its `actor_type` or its `sub`
@@ -1398,7 +1405,7 @@ This release makes the move from better-sqlite3 mostly mechanical: call sites ke
 
 ## 0.17.0 (2026-09-28)
 
-- **`openvibe-sdk/geo`** (browser and server): `createGeoClient(client, { samples?, timeoutMs? })` finds the closest OpenVibe node (roadmap WS-X1 task 5).
+- **`openvibe-sdk/geo`** (browser and server): `createGeoClient(client, { samples?, timeoutMs? })` finds the closest OpenVibe Link (roadmap WS-X1 task 5).
   - `nodes({ role?, region? })` reads Network's public node registry, `GET /api/v1/nodes` (`network.node-list-result@1`), without sending a token.
   - `measure(nodes)` times each node's beacon several times (the best sample counts, since the first also pays for DNS and TLS) and returns the nodes fastest first.
   - `nearest({ role?, region?, preferRegion? })` returns the fastest measured node that is up or degraded. When nothing can be measured, it falls back to `preferRegion`, then to the first healthy node, and returns `measured: false`.

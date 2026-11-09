@@ -1,7 +1,7 @@
 # openvibe-sdk/redact
 
 The shared secret scrubber for memory (Memory M2). It is the JavaScript port of OpenVibe Link's
-`internal/memory/redact.go` (Node #87), so Link and OpenVibe.AI run one shape list against one corpus.
+`internal/memory/redact.go` (Link #87), so Link and OpenVibe.AI run one shape list against one corpus.
 
 ```js
 const { redact, onlySecret } = require('openvibe-sdk/redact');

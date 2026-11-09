@@ -1,6 +1,6 @@
 # Locker: end-to-end encryption, in the SDK
 
-`openvibe-sdk/locker` seals anything and opens it again, in Node and in the browser, with WebCrypto
+`openvibe-sdk/locker` seals anything and opens it again, in Link and in the browser, with WebCrypto
 only: `globalThis.crypto.subtle`, no other crypto library, nothing hand-rolled. The format is
 `locker.envelope@1` in OpenVibe.Contracts; the written-out format is
 [docs/locker.md in Contracts](https://github.com/OpenVibers/OpenVibe.Contracts/blob/main/docs/locker.md).

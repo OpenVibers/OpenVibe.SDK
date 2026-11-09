@@ -12,7 +12,7 @@ export interface Machine {
     roles: string[];
     /** What it does right now: its Codes jobs, its desks, its local models, its robots. */
     running: Array<{ kind: 'codes.jobs' | 'desks' | 'models' | 'robots'; count: number; label?: string }>;
-    /** The node principal on Network (nod_…), when it has one. */
+    /** The node principal on Network (lnk_…), when it has one. */
     principal_id?: string;
     /** The name the owner gave it. */
     name?: string;
@@ -66,6 +66,24 @@ export interface MachinesClient {
     roles(id: string, roles: string[]): Promise<{ machine: Machine }>;
     /** The machine is no longer the caller's. */
     revoke(id: string): Promise<{ machine: Machine }>;
+    compute: LinkComputeClient;
+}
+
+export type LinkComputeKind = 'personal' | 'cloud' | 'exchange' | 'community';
+export type LinkComputeStatus = 'ready' | 'unavailable' | 'coming_soon';
+export interface LinkComputeSource {
+    kind: LinkComputeKind;
+    name: string;
+    status: LinkComputeStatus;
+    reason: string | null;
+    price?: { amount_usd: number; unit: 'hour' } | null;
+    quoted_at?: string;
+    expires_at?: string;
+}
+export interface LinkComputeCandidate extends LinkComputeSource { id: string; principal_id?: string; price: { amount_usd: number; unit: 'hour' } | null }
+export interface LinkComputeClient {
+    list(options?: { kind?: LinkComputeKind }): Promise<{ sources: LinkComputeSource[]; candidates: LinkComputeCandidate[] }>;
+    pick(input?: { kind?: LinkComputeKind; id?: string }): Promise<{ choice: LinkComputeCandidate }>;
 }
 
 /** A refusal: the hub's own status and code (err.status, err.code). */

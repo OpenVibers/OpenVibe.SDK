@@ -1,16 +1,16 @@
 'use strict';
 /**
- * openvibe-sdk/node — platform.node-capabilities@1, plus nodeOffers() that maps a node descriptor to a
+ * openvibe-sdk/link — platform.link-capabilities@1, plus linkOffers() that maps a node descriptor to a
  * platform.resource-offer@1 (kind "node") and a platform.runtime-offer@1.
  * Pure construction and validation, no I/O and no dependency at require time.
  *
- *   const { nodeCapabilities, nodeOffers, validateNodeCapabilities } = require('openvibe-sdk/node');
- *   const caps = nodeCapabilities({ node_id, cpu, arch, memory_mb, storage, network, regions, tags, costs });
- *   const { resource, runtime } = nodeOffers(caps);
+ *   const { linkCapabilities, linkOffers, validateLinkCapabilities } = require('openvibe-sdk/link');
+ *   const caps = linkCapabilities({ node_id, cpu, arch, memory_mb, storage, network, regions, tags, costs });
+ *   const { resource, runtime } = linkOffers(caps);
  */
 
-/** The fields platform.node-capabilities@1 requires or allows; null/undefined are stripped. */
-function nodeCapabilities(fields) {
+/** The fields platform.link-capabilities@1 requires or allows; null/undefined are stripped. */
+function linkCapabilities(fields) {
     const f = fields || {};
     const record = {
         node_id: f.node_id,
@@ -32,14 +32,14 @@ function nodeCapabilities(fields) {
 }
 
 /**
- * Map a node descriptor (platform.node-capabilities@1) to two offers:
+ * Map a node descriptor (platform.link-capabilities@1) to two offers:
  *  - resource: a platform.resource-offer@1 with kind "node", capabilities including every advertised
  *    worker capability prefixed "worker:<name>", trust from opts.trust or "first-party";
  *  - runtime: a platform.runtime-offer@1 with kind "container" (the default runtime a node offers),
  *    limits from cpu/memory, price from costs.per_hour_usd.
  * opts.trust defaults to "first-party"; it is "user-owned" only when opts.trust says so.
  */
-function nodeOffers(descriptor, opts = {}) {
+function linkOffers(descriptor, opts = {}) {
     const d = descriptor || {};
     const trust = opts.trust || 'first-party';
     const caps = Array.isArray(d.capabilities) ? d.capabilities.slice() : [];
@@ -86,13 +86,18 @@ function nodeOffers(descriptor, opts = {}) {
     return { resource, runtime };
 }
 
-/** { ok, errors } for a record against platform.node-capabilities@1. */
-function validateNodeCapabilities(record) {
+/** { ok, errors } for a record against platform.link-capabilities@1. */
+function validateLinkCapabilities(record) {
     let contracts = null;
     try { contracts = require('openvibe-contracts'); } catch { /* not installed */ }
     if (!contracts) return { ok: false, errors: [] };
-    const r = contracts.validate('platform.node-capabilities@1', record);
+    const r = contracts.validate('platform.link-capabilities@1', record);
     return { ok: Boolean(r.valid), errors: r.errors || [] };
 }
 
-module.exports = { nodeCapabilities, nodeOffers, validateNodeCapabilities };
+/** A Link client whose compute API is shared by products choosing where work runs. */
+function createLink(options) {
+    return { compute: require('./machines').createMachines(options).compute };
+}
+
+module.exports = { linkCapabilities, linkOffers, validateLinkCapabilities, createLink };

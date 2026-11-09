@@ -24,7 +24,7 @@
  * sandbox traffic, so callers must only record billable production readings; `requireProject: true` makes
  * record() refuse a reading whose `project` is not a `prj_…` id.
  *
- *   const reporter = createUsageReporter({ db, service: 'run', source: 'openvibe-node.worker',
+ *   const reporter = createUsageReporter({ db, service: 'run', source: 'openvibe-link.worker',
  *       billingUrl, tokenClient: createServiceTokenClient({ clientId: 'run', clientSecret }) });
  *   await reporter.ensureSchema();                                  // services put it in a migration instead
  *   const reading = reporter.sample({ idempotency_key: reporter.key('job', jobId, n), operation: 'function.invoke',
@@ -105,7 +105,7 @@ const PROJECT_RE = /^prj_[0-9A-HJKMNP-TV-Z]{26}$/;
  * @param {object} o
  * @param {object} o.db           openvibe-sdk/db handle (server); the outbox table lives in the same database
  * @param {string} o.service      the Contracts service id (services/<id>.json), e.g. 'run', 'tools', 'ai'
- * @param {string} o.source       the sample's `source`, e.g. 'openvibe-node.worker', 'ai.runs'
+ * @param {string} o.source       the sample's `source`, e.g. 'openvibe-link.worker', 'ai.runs'
  * @param {string} [o.table]      the outbox table (default 'usage_outbox'); services create it in a migration
  * @param {string} [o.billingUrl] OpenVibe.Billing's base URL; without it (or a tokenClient) only queueing happens
  * @param {{ getToken(ctx?: { audience?: string }): Promise<string> }} [o.tokenClient] openvibe-sdk/auth's

@@ -62,10 +62,10 @@ run([
         await assert.rejects(verifyUserToken(svc, { jwks }), { code: 'token.not_user' });
         assert.equal((await verifyUserToken(svc, { jwks, allowServiceTokens: true })).sub, 'svc:live');
         // A node token (a machine paired for Bot) is a principal too, by its actor_type or its sub alone.
-        const node = { iss: 'https://openvibe.network', sub: 'node:nod_01JAB2C3D4E5F6G7H8J9K0MNPR', actor_type: 'node', aud: ['openvibe.bot'], cap: [], iat: now(), exp: now() + 300, jti: 'tok_2' };
+        const node = { iss: 'https://openvibe.network', sub: 'link:lnk_01JAB2C3D4E5F6G7H8J9K0MNPR', actor_type: 'link', aud: ['openvibe.bot'], cap: [], iat: now(), exp: now() + 300, jti: 'tok_2' };
         await assert.rejects(verifyUserToken(sign(node, good.privateKey), { jwks }), { code: 'token.not_user' });
         await assert.rejects(verifyUserToken(sign({ ...node, actor_type: undefined }, good.privateKey), { jwks }), { code: 'token.not_user' });
-        await assert.rejects(verifyUserToken(sign({ ...claims(), actor_type: 'node' }, good.privateKey), { jwks }), { code: 'token.not_user' });
+        await assert.rejects(verifyUserToken(sign({ ...claims(), actor_type: 'link' }, good.privateKey), { jwks }), { code: 'token.not_user' });
         await assert.rejects(verifyUserToken(sign(claims(), good.privateKey), { jwks: { keys: [] } }), { code: 'token.no_key' });
     }],
 
