@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.129.0 — 2026-11-09
+
+- `openvibe-sdk/git` (G2): changes and review — `changes.list/get/create/comment/approve/merge/close/summary`,
+  `issues.list/get/create/labels/close`, `compare()`, `blame()`, `search()` and `reviewModel()`. Review requests
+  carry the expected head SHA, merge methods are checked, and mutations are POSTs with retries disabled.
+
 ## 0.128.0 (2026-11-09)
 
 - ov.ai: tasks(), choices.get/set, run(task, input, {choice}) and admin.defaults(); runs.create accepts `task` and `choice`

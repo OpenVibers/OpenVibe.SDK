@@ -47,6 +47,27 @@ export interface GitRepos {
 }
 
 export interface GitClient {
+    changes: {
+        list(full: string, opts?: Opts): Promise<GitJson>;
+        get(full: string, number: number | string, opts?: Opts): Promise<GitJson>;
+        create(full: string, input: { title: string; body?: string; base_ref: string; head_ref: string; source_repo?: string }, opts?: Opts): Promise<GitJson>;
+        comment(full: string, number: number | string, input: { head_sha: string; path: string; line: number; side: 'old' | 'new'; message: string }, opts?: Opts): Promise<GitJson>;
+        approve(full: string, number: number | string, headSha: string, opts?: Opts): Promise<GitJson>;
+        merge(full: string, number: number | string, input: { head_sha: string; method?: 'merge' | 'squash' | 'rebase' }, opts?: Opts): Promise<GitJson>;
+        close(full: string, number: number | string, opts?: Opts): Promise<GitJson>;
+        summary(full: string, number: number | string, headSha: string, opts?: Opts): Promise<GitJson>;
+    };
+    issues: {
+        list(full: string, opts?: Opts): Promise<GitJson>;
+        get(full: string, number: number | string, opts?: Opts): Promise<GitJson>;
+        create(full: string, input: { title: string; body?: string }, opts?: Opts): Promise<GitJson>;
+        labels(full: string, number: number | string, labels: string[], opts?: Opts): Promise<GitJson>;
+        close(full: string, number: number | string, opts?: Opts): Promise<GitJson>;
+    };
+    compare(full: string, base: string, head: string, opts?: Opts): Promise<GitJson>;
+    blame(full: string, ref: string, path: string, opts?: Opts): Promise<GitJson>;
+    search(full: string, query: string, opts?: Opts): Promise<GitJson>;
+    reviewModel(full: string, model: string, opts?: Opts): Promise<GitJson>;
     repos: GitRepos;
     commits: {
         create(full: string, fields: { branch: string; message: string; files: { path: string; content: string; encoding?: 'utf8' | 'base64' }[]; base?: string; author?: { name: string; email: string } }, opts?: Opts): Promise<GitJson>;
