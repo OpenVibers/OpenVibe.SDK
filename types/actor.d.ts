@@ -19,6 +19,8 @@ export interface TaskRequest {
 }
 export interface TaskEvent { id: number | null; event: string; data: any }
 export interface ActorClient {
+    skills(opts?: Opts): Promise<{ listings: ActorJson[] }>;
+    run(skill: string, input?: Record<string, unknown>, opts?: Opts & { choice?: { mode?: ActorMode } }): Promise<{ run: ActorJson }>;
     agents: { catalog(opts?: Opts): Promise<{ agents: ActorJson[] }>; list(opts?: Opts): Promise<{ agents: ActorJson[] }> };
     contacts: {
         list(opts?: Opts): Promise<{ agents: ActorAgent[] }>;

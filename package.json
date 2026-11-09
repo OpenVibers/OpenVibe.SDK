@@ -1,7 +1,7 @@
 {
   "name": "openvibe-sdk",
-  "version": "0.108.0",
-  "description": "Open source JavaScript/TypeScript SDK and API clients for the OpenVibe network: OAuth 2.0/PKCE auth (incl. developer apps), registry discovery, identity, user modules, events, realtime, media, community, Bot robots, search, chat, AI runs, Tools (registry, run API and jobs), VIP memberships and developer projects, plus the async PostgreSQL data layer (db), the Valkey cache, limits store, queue and pub/sub, with deadlines, safe retries, problem errors and trace propagation.",
+  "version": "0.116.0",
+  "description": "Supported browser and server clients for the OpenVibe platform: auth (incl. developer apps), registry discovery, identity, user modules, events, realtime, media, community, Bot robots, search, chat, AI runs, Tools (registry, run API and jobs), VIP memberships and developer projects, the async PostgreSQL data layer (db) and the Valkey cache, limits store, queue and pub/sub, with deadlines, safe retries, problem errors and trace propagation.",
   "main": "index.js",
   "types": "types/index.d.ts",
   "browser": "browser.js",
@@ -197,6 +197,12 @@
       "browser": null,
       "import": "./esm/exchange.mjs",
       "default": "./src/exchange.js"
+    },
+    "./design": {
+      "types": "./types/design.d.ts",
+      "browser": null,
+      "import": "./esm/design.mjs",
+      "default": "./src/design.js"
     },
     "./report": {
       "types": "./types/report.d.ts",
@@ -429,6 +435,12 @@
       "import": "./esm/deals.mjs",
       "default": "./src/deals.js"
     },
+    "./shoes": {
+      "types": "./types/shoes.d.ts",
+      "browser": null,
+      "import": "./esm/shoes.mjs",
+      "default": "./src/shoes.js"
+    },
     "./trade": {
       "types": "./types/trade.d.ts",
       "browser": null,
@@ -572,21 +584,14 @@
     "sdk",
     "oauth",
     "pkce",
-    "oauth2",
-    "api-client",
-    "open-source",
-    "self-hosted",
     "events",
     "sse",
-    "realtime",
     "media",
     "jobs",
     "tools",
-    "ai",
     "developer-apps"
   ],
   "repository": "github:OpenVibers/OpenVibe.SDK",
-  "homepage": "https://openvibe.services",
   "license": "MIT",
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
