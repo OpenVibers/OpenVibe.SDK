@@ -288,6 +288,12 @@
       "import": "./esm/menu.mjs",
       "default": "./src/menu/index.js"
     },
+    "./home-feed": {
+      "types": "./types/home-feed.d.ts",
+      "browser": "./src/home-feed.js",
+      "import": "./esm/home-feed.mjs",
+      "default": "./src/home-feed.js"
+    },
     "./geo": {
       "types": "./types/geo.d.ts",
       "import": "./esm/geo.mjs",

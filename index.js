@@ -19,6 +19,7 @@ module.exports = {
     realtime: require('./src/realtime'),
     media: require('./src/media'),
     community: require('./src/community'),
+    homeFeed: require('./src/home-feed'),
     bot: require('./src/bot'),
     search: require('./src/search'),
     bench: require('./src/bench'),

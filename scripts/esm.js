@@ -100,6 +100,7 @@ const ENTRIES = {
     'vip.mjs': '../src/vip.js',
     'frame.mjs': '../src/frame.js',
     'menu.mjs': '../src/menu/index.js',
+    'home-feed.mjs': '../src/home-feed.js',
     'service.mjs': '../src/service/index.js',
     'testing.mjs': '../src/testing/index.js',
 };
