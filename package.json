@@ -427,6 +427,12 @@
       "import": "./esm/zone.mjs",
       "default": "./src/zone.js"
     },
+    "./git": {
+      "types": "./types/git.d.ts",
+      "browser": null,
+      "import": "./esm/git.mjs",
+      "default": "./src/git.js"
+    },
     "./reviews": {
       "types": "./types/reviews.d.ts",
       "browser": null,

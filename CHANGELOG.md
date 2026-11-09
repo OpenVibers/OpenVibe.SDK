@@ -4,6 +4,11 @@
 
 - ov.ai: tasks(), choices.get/set, run(task, input, {choice}) and admin.defaults(); runs.create accepts `task` and `choice`
 
+## 0.127.0 — 2026-11-09
+
+- `openvibe-sdk/git` (`ov.git`): repositories, trees, blobs, commits, branches, tags, releases, contributors,
+  insights and stars; `commits.create()` writes a branch and files without a clone; `tokens.create()` makes a
+  short-lived clone token; `clone(repo, { to: 'link' })` hands a clone to Link.
 
 ## 0.126.0 (2026-11-09)
 
