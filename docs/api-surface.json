@@ -58,6 +58,16 @@
         "createBotClient"
       ]
     },
+    "cam": {
+      "object": [
+        "CAM_KIT_SRC",
+        "CAM_KIT_SRI",
+        "OV_CAMERA_SRC",
+        "defineOvCamera",
+        "loadCamKit",
+        "open"
+      ]
+    },
     "chat": {
       "object": [
         "createChatClient",
@@ -110,6 +120,7 @@
       ]
     },
     "createClient": "function",
+    "createWalletClient": "function",
     "credentials": {
       "object": [
         "createCredentialsClient"
@@ -118,6 +129,12 @@
     "deals": {
       "object": [
         "createDealsClient"
+      ]
+    },
+    "design": {
+      "object": [
+        "DEFAULT_DESIGN_URL",
+        "createDesignClient"
       ]
     },
     "download": {
@@ -302,7 +319,9 @@
     },
     "report": {
       "object": [
+        "DAYS",
         "REPORT_URL",
+        "SECTIONS",
         "createReportClient"
       ]
     },
@@ -336,6 +355,11 @@
       ]
     },
     "share": "function",
+    "shoes": {
+      "object": [
+        "createShoesClient"
+      ]
+    },
     "space": {
       "object": [
         "createSpaceClient"
@@ -517,8 +541,12 @@
     "createCache": "function"
   },
   "openvibe-sdk/cam": {
+    "CAM_KIT_SRC": "string",
+    "CAM_KIT_SRI": "string",
     "OV_CAMERA_SRC": "string",
-    "defineOvCamera": "function"
+    "defineOvCamera": "function",
+    "loadCamKit": "function",
+    "open": "function"
   },
   "openvibe-sdk/chat": {
     "createChatClient": "function",
@@ -659,6 +687,10 @@
   "openvibe-sdk/delivery": {
     "deliveryOffer": "function",
     "validateDeliveryOffer": "function"
+  },
+  "openvibe-sdk/design": {
+    "DEFAULT_DESIGN_URL": "string",
+    "createDesignClient": "function"
   },
   "openvibe-sdk/download": {
     "contentTypeOf": "function",
@@ -955,7 +987,9 @@
     "createRegistryClient": "function"
   },
   "openvibe-sdk/report": {
+    "DAYS": "array",
     "REPORT_URL": "string",
+    "SECTIONS": "array",
     "createReportClient": "function"
   },
   "openvibe-sdk/reports": {
@@ -1053,6 +1087,9 @@
     "share": "function",
     "shareOpenApi": "function",
     "sharesSchema": "function"
+  },
+  "openvibe-sdk/shoes": {
+    "createShoesClient": "function"
   },
   "openvibe-sdk/space": {
     "createSpaceClient": "function"
@@ -1170,6 +1207,9 @@
   "openvibe-sdk/vision": {
     "DEFAULT_AUDIENCE": "string",
     "createVisionClient": "function"
+  },
+  "openvibe-sdk/wallet": {
+    "createWalletClient": "function"
   },
   "openvibe-sdk/wiki": {
     "createWikiClient": "function"

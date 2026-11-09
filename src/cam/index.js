@@ -18,9 +18,38 @@
  * pack test import it). Pass `src` to self-host the same element file.
  */
 const OV_CAMERA_SRC = 'https://openvibe.cam/embed/ov-camera.js';
+// The kit at its versioned URL (the query names the version), so Cloudflare never hands the integrity check an older
+// copy cached under the plain URL (Cam #116, 11-09). A Cam release that changes the kit ships with these two lines.
+const CAM_KIT_SRC = 'https://openvibe.cam/embed/cam-kit.js?v=yqqjh1FiP7a4';
+const CAM_KIT_SRI = 'sha384-yqqjh1FiP7a4l9uelJHaryd8Y5IwnHVbqjt1d0AXbgCcytI9Z5MMmItFqbwB4YZG';
 
 // One promise per src: a second call while the script is in flight gets the same load, never a second tag.
 const pending = new Map();
+let kitPending = null;
+
+/** Load Cam's in-page recorder once. The pinned script gives the calling site a File. */
+function loadCamKit() {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return Promise.reject(new Error('openvibe-sdk/cam: open() needs a browser.'));
+    if (window.OpenVibeCam && typeof window.OpenVibeCam.open === 'function') return Promise.resolve(window.OpenVibeCam);
+    if (kitPending) return kitPending;
+    kitPending = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = CAM_KIT_SRC;
+        script.integrity = CAM_KIT_SRI;
+        script.crossOrigin = 'anonymous';
+        script.async = true;
+        script.addEventListener('load', () => {
+            if (window.OpenVibeCam && typeof window.OpenVibeCam.open === 'function') resolve(window.OpenVibeCam);
+            else reject(new Error('openvibe-sdk/cam: Cam kit loaded without OpenVibeCam.open().'));
+        });
+        script.addEventListener('error', () => { script.remove(); reject(new Error('openvibe-sdk/cam: could not load the Cam kit.')); });
+        (document.head || document.documentElement).appendChild(script);
+    }).finally(() => { kitPending = null; });
+    return kitPending;
+}
+
+/** Open Cam on this page. Resolves to a File and metadata after Use this, or null on cancel. */
+function open(options = {}) { return loadCamKit().then((kit) => kit.open(options)); }
 
 /**
  * Inject the <ov-camera> embed once and resolve to the element class.
@@ -58,4 +87,4 @@ function defineOvCamera(options = {}) {
     return load;
 }
 
-module.exports = { defineOvCamera, OV_CAMERA_SRC };
+module.exports = { defineOvCamera, OV_CAMERA_SRC, CAM_KIT_SRC, CAM_KIT_SRI, loadCamKit, open };

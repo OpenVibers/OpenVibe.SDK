@@ -93,7 +93,31 @@ export declare class ToolRunError extends OpenVibeError {
 }
 export declare function isToolRunError(err: unknown): err is ToolRunError;
 
+export interface ToolRankingItem {
+    id: string;
+    name: string;
+    description: string;
+    family: string;
+    icon: string;
+    url: string;
+    uses: number;
+    /** Trending only: use count in the preceding comparison window. */
+    previous_uses?: number;
+    increase?: number;
+}
+export interface ToolRanking {
+    metric: 'successful_api_runs';
+    window: 'hour' | 'week';
+    updated_at: string;
+    uses_today: number;
+    tools: ToolRankingItem[];
+    count: number;
+}
 export interface ToolsClient {
+    /** Rising successful API use versus the preceding UTC hour or seven-day window. */
+    trending(opts?: { window?: 'hour' | 'week'; limit?: number; signal?: AbortSignal }): Promise<ToolRanking>;
+    /** Most successful API uses in the last seven days. */
+    popular(opts?: { limit?: number; signal?: AbortSignal }): Promise<ToolRanking>;
     /** GET /api/v1/tools: tools.tool-list@1, schemas as { $ref }. */
     list(query?: ToolListQuery): Promise<ToolList>;
     /** GET /api/v1/tools/:id: the descriptor with its schemas embedded, or null. */

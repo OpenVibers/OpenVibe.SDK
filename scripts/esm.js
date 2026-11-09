@@ -12,6 +12,7 @@ const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
 const ENTRIES = {
+    'wallet.mjs': '../src/wallet.js',
     'compute.mjs': '../src/compute/index.js',
     'share.mjs': '../src/share.js',
     'locker.mjs': '../src/locker.js',
@@ -42,6 +43,7 @@ const ENTRIES = {
     'bench.mjs': '../src/bench.js',
     'meme.mjs': '../src/meme.js',
     'themes.mjs': '../src/themes.js',
+    'design.mjs': '../src/design.js',
     'limits.mjs': '../src/limits.js',
     'account-data.mjs': '../src/account-data.js',
     'govern.mjs': '../src/govern.js',

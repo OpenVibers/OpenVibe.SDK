@@ -7,6 +7,7 @@
 const core = require('./src/core');
 
 module.exports = {
+    createWalletClient: require('./src/wallet').createWalletClient,
     ...core,
     report: require('./src/report'),
     share: require('./src/share').share,
@@ -19,6 +20,7 @@ module.exports = {
     events: require('./src/events'),
     realtime: require('./src/realtime'),
     media: require('./src/media'),
+    cam: require('./src/cam'),
     mediaUpload: require('./src/media-upload'),
     ui: require('./src/ui'),
     community: require('./src/community'),
@@ -29,6 +31,7 @@ module.exports = {
     meme: require('./src/meme'),
     vision: require('./src/vision'),
     themes: require('./src/themes'),
+    design: require('./src/design'),
     redact: require('./src/redact'),
     chat: require('./src/chat'),
     chatApps: require('./src/chat-apps'),
@@ -48,6 +51,7 @@ module.exports = {
     wiki: require('./src/wiki'),
     coupons: require('./src/coupons'),
     deals: require('./src/deals'),
+    shoes: require('./src/shoes'),
     trade: require('./src/trade'),
     space: require('./src/space'),
     host: require('./src/host'),
