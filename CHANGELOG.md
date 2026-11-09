@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.128.0 (2026-11-09)
+
+- Complete the Community Feed types with `live_now` for live and ended streams, document filtered cursor pagination, and verify feed responses and cursors through `ov.community.feed`.
+
 ## 0.126.0 (2026-11-09)
 
 - Add `openvibe-sdk/pics`: the public gallery and picture reads, private uploads with resumable chunks, publication, likes and albums on OpenVibe.Pics.

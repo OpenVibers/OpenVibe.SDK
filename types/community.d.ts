@@ -47,6 +47,8 @@ export interface FeedItem {
     actor: { name: string | null; avatar: string | null } | null;
     media: { thumb: string; ratio: number; length?: number } | null;
     counts: { views?: number; likes?: number; comments?: number };
+    /** True while on air; false on an ended stream. Absent for other kinds. */
+    live_now?: boolean;
     label?: 'Trending' | 'AI' | 'System';
 }
 export interface CreatePostInput {
