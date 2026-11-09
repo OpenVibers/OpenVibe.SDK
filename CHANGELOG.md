@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.118.0 (2026-11-09)
+
+- OpenVibe Link: `openvibe-sdk/node` is `openvibe-sdk/link` (`ov.node` is `ov.link`), building
+  `platform.link-capabilities@1` and mapping a Link to its `platform.resource-offer@1` and
+  `platform.runtime-offer@1`. The machine APIs follow the Link name.
+
 ## 0.117.0 (2026-11-09)
 
 - ov.cam loads Cam's kit at its versioned URL and its new hash (Cam #116 changed the kit)

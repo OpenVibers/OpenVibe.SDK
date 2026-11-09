@@ -77,7 +77,7 @@ async function verifyUserToken(token, opts = {}) {
     const claims = await verifyJwt(token, opts, 'user');
     // Every Network principal: a service, a developer app, a module, or a node (a machine paired for a service, e.g.
     // a robot's computer for OpenVibe.Bot). None of them is a person's session, whatever audience it names.
-    const principal = ['service', 'app', 'mod', 'node'].includes(claims.actor_type) || /^(svc|app|mod|node):/.test(String(claims.sub || ''));
+    const principal = ['service', 'app', 'mod', 'link'].includes(claims.actor_type) || /^(svc|app|mod|link):/.test(String(claims.sub || ''));
     if (principal && !opts.allowServiceTokens) throw fail('token.not_user', 'a principal token (service, app, module or node) is not a user token');
     // A typed token (Network's realtime ticket, an export token: `typ` or `purpose` set) is never a session, whatever its
     // issuer and audience say (OpenVibe.Events' rule, now every service's).
