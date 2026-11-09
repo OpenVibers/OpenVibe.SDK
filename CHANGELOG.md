@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.127.0 (2026-11-09)
+## 0.128.0 (2026-11-09)
 
 - ov.ai: tasks(), choices.get/set, run(task, input, {choice}) and admin.defaults(); runs.create accepts `task` and `choice`
 
