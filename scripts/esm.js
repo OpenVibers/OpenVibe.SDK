@@ -52,6 +52,7 @@ const ENTRIES = {
     'storage.mjs': '../src/storage.js',
     'commerce.mjs': '../src/commerce.js',
     'exchange.mjs': '../src/exchange.js',
+    'report.mjs': '../src/report.js',
     'vibes.mjs': '../src/vibes.js',
     'delivery.mjs': '../src/delivery.js',
     'node.mjs': '../src/node.js',
@@ -100,6 +101,7 @@ const ENTRIES = {
     'vip.mjs': '../src/vip.js',
     'frame.mjs': '../src/frame.js',
     'menu.mjs': '../src/menu/index.js',
+    'home-feed.mjs': '../src/home-feed.js',
     'service.mjs': '../src/service/index.js',
     'testing.mjs': '../src/testing/index.js',
 };

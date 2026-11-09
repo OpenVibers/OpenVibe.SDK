@@ -1,4 +1,4 @@
-/* Copied verbatim from openvibe-contracts feat/sharing-core-contracts (0.291.0) generated/typescript/index.d.ts (the SDK does not
+/* Copied verbatim from openvibe-contracts v0.355.0 generated/typescript/index.d.ts (the SDK does not
  * require the package at runtime; it is a devDependency for the tests). test/types.test.js checks
  * these against it. */
 /* eslint-disable */
@@ -77,6 +77,10 @@ export type ServiceTokenClaims = {
    * The person who authorized an app through the authorization-code flow, or the owner an agent acts for (always present on agent tokens). Also present on a node token that asks for an audience where the machine acts for its owner (Agent Streams S1: openvibe.live and live.agent_stream.publish); absent on every other client_credentials token.
    */
   on_behalf_of?: string;
+  /**
+   * Signed display name of a developer app, for attribution such as via <app>.
+   */
+  app_name?: string;
   /**
    * App tokens from the authorization-code flow (0.310.0): the purposes the person (on_behalf_of) granted this app at sign-in and that are still active when the token is issued, the claim network.consent-claim@1 defines. Present when the sign-in asked for consent:<purpose> scopes, [] when none is granted, absent otherwise.
    *
@@ -160,7 +164,25 @@ export interface ServiceManifest {
   repository: string;
   domains: string[];
   publicOrigin?: string;
+  /**
+   * Public service routes whose access comes from a person's session or token, rather than a service capability.
+   */
+  apiRoutes?: {
+    method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+    path: string;
+    responseSchema?: string;
+  }[];
   health?: string;
+  /**
+   * Public HTTP routes implemented by this service, with their response contract where one exists.
+   */
+  routes?: {
+    method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+    path: string;
+    contract?: string;
+    cacheSeconds?: number;
+    cors?: string;
+  }[];
   ready?: string;
   /**
    * Where the service answers on its host (loopback only): the address the registry polls health and readiness from. A host inventory or an OV_<ID>_INTERNAL_URL loopback override may replace it; a service with nothing to run has none.
@@ -2871,4 +2893,119 @@ export interface ToolsJobRequest {
    * 8-200 printable ASCII characters. The Idempotency-Key header is used when both are present.
    */
   idempotency_key?: string;
+}
+
+/** quest.daily@1.0.0 (owner: quest) */
+/**
+ * quest.daily@1: one quest shared by everyone on this UTC date. Progress is private and is not in this answer.
+ */
+export interface QuestDaily {
+  date: string;
+  title: string;
+  story: string;
+  /**
+   * @minItems 3
+   * @maxItems 3
+   */
+  steps: [QuestStepType, QuestStepType, QuestStepType];
+  source: "ai" | "rotation";
+  finished_today: number;
+}
+
+/** quest.daily-progress@1.0.0 (owner: quest) */
+/**
+ * quest.daily-progress@1: the caller's own progress, counted from Events in their IANA time zone.
+ */
+export interface QuestDailyProgress {
+  date: string;
+  title: string;
+  story: string;
+  /**
+   * @minItems 3
+   * @maxItems 3
+   */
+  steps: [
+    {
+      id: string;
+      event_type: string;
+      site: string;
+      sentence: string;
+      href: string;
+      weight: number;
+      count: 1;
+      verification: string;
+      status: "approved";
+      source: string;
+      progress: number;
+      done: boolean;
+    },
+    {
+      id: string;
+      event_type: string;
+      site: string;
+      sentence: string;
+      href: string;
+      weight: number;
+      count: 1;
+      verification: string;
+      status: "approved";
+      source: string;
+      progress: number;
+      done: boolean;
+    },
+    {
+      id: string;
+      event_type: string;
+      site: string;
+      sentence: string;
+      href: string;
+      weight: number;
+      count: 1;
+      verification: string;
+      status: "approved";
+      source: string;
+      progress: number;
+      done: boolean;
+    }
+  ];
+  source: "ai" | "rotation";
+  finished_today: number;
+  progress: number;
+  completed: boolean;
+  completed_at?: string | null;
+  streak: number;
+  time_zone: string;
+}
+
+/** quest.step-type@1.0.0 (owner: quest) */
+/**
+ * quest.step-type@1: a verified Events action that may be selected for a daily quest. A contributed type stays pending until staff review.
+ */
+export interface QuestStepType {
+  id: string;
+  event_type: string;
+  site: string;
+  sentence: string;
+  href: string;
+  weight: number;
+  count?: 1;
+  verification?: string;
+  status: "pending" | "approved" | "rejected";
+  source?: string;
+  project_id?: string;
+  created_at?: string;
+  reviewed_at?: string | null;
+}
+
+/** quest.step-type-request@1.0.0 (owner: quest) */
+/**
+ * A developer app's proposed daily step. Quest accepts only topics in its known Events catalog, verifies the site's host and queues the proposal for staff review.
+ */
+export interface QuestStepTypeRequest {
+  id: string;
+  event_type: string;
+  site: string;
+  sentence: string;
+  href: string;
+  weight?: number;
 }

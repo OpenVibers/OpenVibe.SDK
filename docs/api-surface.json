@@ -58,6 +58,16 @@
         "createBotClient"
       ]
     },
+    "cam": {
+      "object": [
+        "CAM_KIT_SRC",
+        "CAM_KIT_SRI",
+        "OV_CAMERA_SRC",
+        "defineOvCamera",
+        "loadCamKit",
+        "open"
+      ]
+    },
     "chat": {
       "object": [
         "createChatClient",
@@ -153,6 +163,11 @@
     "geo": {
       "object": [
         "createGeoClient"
+      ]
+    },
+    "homeFeed": {
+      "object": [
+        "createHomeFeedClient"
       ]
     },
     "host": {
@@ -288,6 +303,12 @@
     "registry": {
       "object": [
         "createRegistryClient"
+      ]
+    },
+    "report": {
+      "object": [
+        "REPORT_URL",
+        "createReportClient"
       ]
     },
     "resources": {
@@ -496,8 +517,12 @@
     "createCache": "function"
   },
   "openvibe-sdk/cam": {
+    "CAM_KIT_SRC": "string",
+    "CAM_KIT_SRI": "string",
     "OV_CAMERA_SRC": "string",
-    "defineOvCamera": "function"
+    "defineOvCamera": "function",
+    "loadCamKit": "function",
+    "open": "function"
   },
   "openvibe-sdk/chat": {
     "createChatClient": "function",
@@ -717,6 +742,9 @@
     },
     "createGovernor": "function"
   },
+  "openvibe-sdk/home-feed": {
+    "createHomeFeedClient": "function"
+  },
   "openvibe-sdk/host": {
     "createHostClient": "function"
   },
@@ -926,6 +954,10 @@
   },
   "openvibe-sdk/registry": {
     "createRegistryClient": "function"
+  },
+  "openvibe-sdk/report": {
+    "REPORT_URL": "string",
+    "createReportClient": "function"
   },
   "openvibe-sdk/reports": {
     "cleanReport": "function",

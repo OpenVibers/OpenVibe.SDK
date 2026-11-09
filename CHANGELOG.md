@@ -1,8 +1,20 @@
 # Changelog
 
+## 0.108.0 — 2026-11-09
+
+- Add daily quest reads, progress, step type listings and reviewable step contributions to `openvibe-sdk/quest`.
+
+## 0.107.0 — 2026-11-09
+
+- Add `ov.cam.open()` for the Cam recorder, with typed modes, options and file results across Node and browser exports.
+
+## 0.106.0 (2026-11-09)
+
+- Add `openvibe-sdk/home-feed` and `homeFeed` to the top-level and browser exports, with home layout, Today frame, and personal feed methods.
+
 ## 0.105.0 (2026-11-09)
 
-- Add `chat.ask({ message, models })`, `chat.pick()` and `chat.prefer()` for Vibe model comparison.
+- Add Report AI leaderboard, model, provider, comparison and picks reads, plus Exchange Arena start and vote methods.
 
 ## 0.104.0 (2026-11-08)
 

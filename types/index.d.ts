@@ -1,5 +1,7 @@
 export * from './core';
 export * as auth from './auth';
+export * as report from './report';
+export * as report from './report';
 export * as registry from './registry';
 export * as identity from './identity';
 export * as trust from './trust';
@@ -7,7 +9,9 @@ export * as modules from './modules';
 export * as events from './events';
 export * as realtime from './realtime';
 export * as media from './media';
+export * as cam from './cam';
 export * as community from './community';
+export * as homeFeed from './home-feed';
 export * as bot from './bot';
 export * as search from './search';
 export * as bench from './bench';
