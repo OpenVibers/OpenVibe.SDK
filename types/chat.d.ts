@@ -3,6 +3,10 @@ import type { OpenVibeClient } from './core';
 type Opts = { signal?: AbortSignal };
 type Json = Record<string, unknown>;
 export interface ChatClient {
+    /** Ask Vibe using Auto, one catalogue model, or two to three models side by side. */
+    ask(input: { message: string; models?: string[]; slug?: string; fresh?: boolean; system_prompt?: string; temperature?: number }, opts?: Opts): Promise<{ chat: Json; message: Json }>;
+    pick(messageId: number, model: string, opts?: Opts): Promise<{ chat: Json; model: string }>;
+    prefer(messageId: number, model: string, opts?: Opts): Promise<{ recorded: boolean; model: string }>;
     global: {
         history(query?: { limit?: number; after_id?: number }, opts?: Opts): Promise<Json>;
         send(message: string, extra?: { reply_to_id?: number; auto_delete_minutes?: number }, opts?: Opts): Promise<Json>;

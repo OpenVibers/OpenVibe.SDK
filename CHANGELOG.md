@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.105.0 (2026-11-09)
+
+- Add `chat.ask({ message, models })`, `chat.pick()` and `chat.prefer()` for Vibe model comparison.
+
 ## 0.104.0 (2026-11-08)
 
 - Add `createAccountEmailsClient` to `openvibe-sdk/identity` for managing the signed-in person's verified Network email addresses.
