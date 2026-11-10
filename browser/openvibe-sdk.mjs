@@ -4816,6 +4816,9 @@ function createChatClient(client, defaults = {}) {
             list: (o = {}) => call({ path: '/api/chat/rooms' }, o),
             create: (input, o = {}) => call({ method: 'POST', path: '/api/chat/rooms', json: input, ...once }, o),
             get: (slug, o = {}) => orNull(call({ path: room(slug) }, o)),
+            /** The room's public AI insight (chat.room-insight-result@1): { overview, timeline, state } | null.
+             *  `id` is a room slug or `global`; a room the rollout does not cover answers null (404). */
+            insight: (id, o = {}) => orNull(call({ path: `/api/v1/rooms/${enc(id)}/insight` }, o)),
             update: (slug, patch, o = {}) => call({ method: 'PATCH', path: room(slug), json: patch, ...once }, o),
             /** query: before | after (message id), limit */
             messages: (slug, query = {}, o = {}) => call({ path: `${room(slug)}/messages`, query }, o),
