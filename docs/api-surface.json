@@ -792,6 +792,7 @@
     "frameConfig": "function",
     "frameTags": "function",
     "mountFrame": "function",
+    "online": "function",
     "scriptUrls": "function"
   },
   "openvibe-sdk/front-page": {

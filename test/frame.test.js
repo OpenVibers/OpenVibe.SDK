@@ -2,7 +2,7 @@
 // openvibe-sdk/frame: any app mounts the network's shared navbar, footer, shipped line and themes,
 // with its own session endpoints; server-rendered apps get the same markup as strings.
 const assert = require('node:assert/strict');
-const { mountFrame, frameTags, frameConfig, scriptUrls } = require('../src/frame');
+const { mountFrame, frameTags, frameConfig, scriptUrls, online } = require('../src/frame');
 
 const opts = {
     service: 'myapp',
@@ -80,5 +80,24 @@ function fakeDom() {
     const r2 = await mountFrame({ document: d2.doc, window: d2.win });
     assert.deepEqual(r2, { navbar: null, footer: null });
     await assert.rejects(() => mountFrame({ document: null, window: null }), /browser/);
+
+    // The online read: the footer strip's data, asked for this site so its own items come back.
+    {
+        const calls = [];
+        const answer = { members: 3, guests: 4, total: 7, people: [], more: 0, live: null, counts: [], items: [], sites: 56, views_7d: 1200 };
+        const fakeFetch = async (url, init) => { calls.push({ url, init }); return { ok: true, status: 200, json: async () => answer }; };
+        assert.deepEqual(await online({ site: 'live', fetch: fakeFetch }), answer);
+        assert.equal(calls[0].url, 'https://openvibe.network/api/frame/online?site=live');
+        assert.equal(calls[0].init.credentials, 'omit');
+        assert.equal(calls[0].init.headers.accept, 'application/json');
+        await online({ site: 'not a site!', fetch: fakeFetch });
+        assert.equal(calls[1].url, 'https://openvibe.network/api/frame/online', 'an invalid id asks as no site, never in the query');
+        await online({ base: 'https://openvibe.network/', site: 'games', fetch: fakeFetch });
+        assert.equal(calls[2].url, 'https://openvibe.network/api/frame/online?site=games');
+        await assert.rejects(() => online({ fetch: async () => ({ ok: false, status: 503 }) }), /answered 503/);
+        await assert.rejects(() => online({ fetch: null }), /needs a fetch/, 'no fetch: a clear error');
+        await assert.rejects(() => online({ base: 'http://evil.example', fetch: fakeFetch }), /https origin/);
+    }
+
     console.log('frame: all checks passed');
 })().catch((e) => { console.error(e); process.exit(1); });
