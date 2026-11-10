@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.136.0 (2026-11-10)
+
+- `chat.activity`: what happened to the token's person in OpenVibe.Chat — mentions, replies to their messages, reactions, server invites, accepted friend requests and roles given — newest first with a cursor and a kind filter, the unread count, and marking one or all read (`/api/v1/activity`). `rooms.react()` and `reply_to_id` on `rooms.send()`/`dms.send()` come with it.
+
 ## 0.135.0 (2026-11-10)
 
 - `ov.ai.files`: attach files through Media, list/read/remove them, and expose typed `ai.file@1` and conversational turn shapes.

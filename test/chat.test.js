@@ -108,6 +108,30 @@ run([
         assert.equal(srv.requests[6].headers.authorization, undefined, 'a feed is read without the person\'s token');
         await srv.close();
     }],
+    ['activity: the person\'s feed, its unread count and marking read; replies and reactions', async () => {
+        const srv = await chatStub();
+        const chat = createChatClient(createClient({ baseUrls: { chat: srv.url }, token: 'person-token' }));
+        await chat.activity.list({ limit: 2, before: 9, kind: 'mention' });
+        await chat.activity.unread();
+        await chat.activity.readOne(7);
+        await chat.activity.read([1, 2]);
+        await chat.activity.read();
+        await chat.rooms.send('builders', 'first!', { reply_to_id: 5 });
+        await chat.rooms.react('builders', 9, 'heart');
+        await chat.dms.send(7, 'hi', { reply_to_id: 3 });
+        const got = srv.requests.map((r) => [r.method, r.url, r.body && String(r.body).length ? JSON.parse(String(r.body)) : null]);
+        assert.deepEqual(got, [
+            ['GET', '/api/v1/activity?limit=2&before=9&kind=mention', null],
+            ['GET', '/api/v1/activity/unread', null],
+            ['POST', '/api/v1/activity/7/read', null],
+            ['POST', '/api/v1/activity/read', { ids: [1, 2] }],
+            ['POST', '/api/v1/activity/read', { all: true }],
+            ['POST', '/api/chat/rooms/builders/messages', { message: 'first!', reply_to_id: 5 }],
+            ['POST', '/api/chat/rooms/builders/messages/9/react', { reaction: 'heart' }],
+            ['POST', '/api/dm/conversations/7/messages', { message: 'hi', reply_to_id: 3 }],
+        ]);
+        await srv.close();
+    }],
     ['an inbox visitor needs no account and keeps its token; a feed publisher sends the key', async () => {
         const INBOX = `inb_${'A'.repeat(26)}`; const FEED = `fed_${'B'.repeat(26)}`; const KEY = `ovf_${'k'.repeat(32)}`;
         let fails = 1;

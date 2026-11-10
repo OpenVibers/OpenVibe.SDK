@@ -3,6 +3,16 @@ import type { OpenVibeClient } from './core';
 type Opts = { signal?: AbortSignal };
 type Json = Record<string, unknown>;
 export type ChatMessageView = 'bubbles' | 'room';
+export type ActivityKind = 'mention' | 'reply' | 'reaction' | 'server_invite' | 'friend_accept' | 'role';
+export interface ActivityItem {
+    id: number;
+    kind: ActivityKind;
+    actor: { id: number | null; username: string | null; display_name: string | null; avatar_url: string | null };
+    where: { kind: 'room' | 'dm' | 'global' | 'server' | 'friends'; label: string; href: string; room?: string | null; server?: string | null; conversation?: number };
+    what: { excerpt: string | null; reaction: string | null; role: string | null };
+    at: string;
+    read: boolean;
+}
 export interface ChatClient {
     /** Ask Vibe using Auto, one catalogue model, or two to three models side by side. */
     ask(input: { message: string; models?: string[]; slug?: string; fresh?: boolean; system_prompt?: string; temperature?: number }, opts?: Opts): Promise<{ chat: Json; message: Json }>;
@@ -19,7 +29,8 @@ export interface ChatClient {
         get(slug: string, opts?: Opts): Promise<Json | null>;
         update(slug: string, patch: { name?: string; topic?: string; visibility?: 'public' | 'private'; slow_seconds?: number }, opts?: Opts): Promise<Json>;
         messages(slug: string, query?: { before?: number; after?: number; limit?: number }, opts?: Opts): Promise<Json>;
-        send(slug: string, message: string, opts?: Opts): Promise<Json>;
+        send(slug: string, message: string, extra?: { reply_to_id?: number }, opts?: Opts): Promise<Json>;
+        react(slug: string, messageId: number | string, reaction: 'thumbsup' | 'thumbsdown' | 'heart' | 'laugh' | 'surprised' | 'sad', opts?: Opts): Promise<{ ok: boolean; reaction: string | null }>;
         deleteMessage(slug: string, id: number | string, opts?: Opts): Promise<Json>;
         join(slug: string, opts?: Opts): Promise<Json>;
         leave(slug: string, opts?: Opts): Promise<Json>;
@@ -32,7 +43,7 @@ export interface ChatClient {
         create(userIds: number[], extra?: { name?: string }, opts?: Opts): Promise<Json>;
         get(id: number | string, opts?: Opts): Promise<Json | null>;
         messages(id: number | string, query?: { limit?: number; before?: number }, opts?: Opts): Promise<Json>;
-        send(id: number | string, message: string, opts?: Opts): Promise<Json>;
+        send(id: number | string, message: string, extra?: { reply_to_id?: number }, opts?: Opts): Promise<Json>;
         deleteMessage(id: number | string, msgId: number | string, opts?: Opts): Promise<Json>;
         read(id: number | string, opts?: Opts): Promise<Json>;
         unread(opts?: Opts): Promise<{ unread: number }>;
@@ -43,6 +54,12 @@ export interface ChatClient {
         setViewPreference(id: number | string, view: ChatMessageView, opts?: Opts): Promise<{ view: ChatMessageView; conversation_id: number }>;
     };
     exportMine(opts?: Opts): Promise<{ username: string; exported_at: string; total: number; truncated: boolean; messages: Json[] }>;
+    activity: {
+        list(query?: { limit?: number; before?: number; kind?: string }, opts?: Opts): Promise<{ items: ActivityItem[]; next_before: number | null; unread: number }>;
+        unread(opts?: Opts): Promise<{ unread: number }>;
+        readOne(id: number | string, opts?: Opts): Promise<{ ok: boolean; read: number; unread: number }>;
+        read(ids?: number[] | null, opts?: Opts): Promise<{ ok: boolean; read: number; unread: number }>;
+    };
     vibe: {
         list(opts?: Opts): Promise<{ chats: Json[]; allowance?: Json }>;
         conversations(opts?: Opts): Promise<{ conversations: Array<{ slug: string; name: string; last_message_at: string; created_at: string; last_line: string | null; last_answer_at: string | null; site: string | null }>; count: number }>;
