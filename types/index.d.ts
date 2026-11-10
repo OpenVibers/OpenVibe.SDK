@@ -60,6 +60,7 @@ export * as openre from './openre';
 export * as geo from './geo';
 export * as usage from './usage';
 export * as commerce from './commerce';
+export * as moneyReasons from './money-reasons';
 export * as telemetry from './telemetry';
 export const share: typeof import('./share').share;
 export * as locker from './locker';

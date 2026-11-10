@@ -70,5 +70,6 @@ module.exports = {
     geo: require('./src/geo'),
     usage: require('./src/usage'),
     commerce: require('./src/commerce'),
+    moneyReasons: require('./src/money-reasons'),
     telemetry: require('./src/telemetry'),
 };
