@@ -37,6 +37,33 @@ export interface ChatHistoryHelper {
     }): { load(): Promise<void>; readonly loading: boolean; readonly more: boolean; dispose(): void };
 }
 export const history: ChatHistoryHelper;
+/** One thing a room remembers (server/rooms/memory.js): its words, confidence and where it came from. */
+export interface MemoryEntry {
+    id: number;
+    kind: 'topic' | 'fact' | 'decision' | 'request';
+    text: string;
+    confidence: number;
+    learned_at: string | null;
+    learned_by: string;
+    updated_at: string | null;
+    updated_by: string | null;
+    mine: boolean;
+    sources: { id: number; author: string; at: string | null; text: string }[];
+}
+export interface MemoryInput {
+    text: string;
+    kind?: 'topic' | 'fact' | 'decision' | 'request';
+    confidence?: number;
+    source_message_ids?: number[];
+}
+export interface RoomMemory {
+    room: { slug: string; name: string };
+    entries: MemoryEntry[];
+    kinds: string[];
+    can_edit: boolean;
+    me: string | null;
+}
+
 export interface ChatClient {
     history: ChatHistoryHelper;
     /** Ask Vibe using Auto, one catalogue model, or two to three models side by side. */
@@ -53,6 +80,11 @@ export interface ChatClient {
         create(input: { name: string; slug?: string; topic?: string; visibility?: 'public' | 'private' }, opts?: Opts): Promise<Json>;
         get(slug: string, opts?: Opts): Promise<Json | null>;
         insight(id: string, opts?: Opts): Promise<RoomInsight | null>;
+        memory(id: string, opts?: Opts): Promise<RoomMemory>;
+        addMemory(id: string, input: MemoryInput, opts?: Opts): Promise<{ entry: MemoryEntry }>;
+        correctMemory(id: string, entryId: number | string, patch: Partial<MemoryInput>, opts?: Opts): Promise<{ entry: MemoryEntry }>;
+        removeMemory(id: string, entryId: number | string, opts?: Opts): Promise<{ removed: boolean }>;
+        forgetMyMemory(id: string, opts?: Opts): Promise<{ removed: number }>;
         update(slug: string, patch: { name?: string; topic?: string; visibility?: 'public' | 'private'; slow_seconds?: number }, opts?: Opts): Promise<Json>;
         messages(slug: string, query?: { before?: number; after?: number; limit?: number }, opts?: Opts): Promise<Json>;
         send(slug: string, message: string, opts?: Opts): Promise<Json>;
