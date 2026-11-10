@@ -17,13 +17,34 @@ export interface RoomInsight {
     state: 'ready' | 'quiet' | 'off';
 }
 export type ChatMessageView = 'bubbles' | 'room';
+export interface ChatHistoryPage<T extends { id: number | string } = { id: number | string; [field: string]: unknown }> { messages: T[]; more: boolean; [field: string]: unknown; }
+export interface ChatHistoryOptions { limit?: number; before?: number | string | null; signal?: AbortSignal; }
+export interface ChatHistoryHelper {
+    /** Yield newest-first pages, following each page's oldest message ID until `more` is false. */
+    pages<T extends { id: number | string } = { id: number | string; [field: string]: unknown }>(
+        readPage: (query: { limit: number; before?: number | string }, opts: { signal?: AbortSignal }) => Promise<ChatHistoryPage<T>>,
+        options?: ChatHistoryOptions,
+    ): AsyncIterable<ChatHistoryPage<T>>;
+    /** Load older pages near the feed top, prepend in display order and preserve the visible anchor. */
+    attach<T extends { id: number | string }>(options: {
+        feed: HTMLElement;
+        status?: HTMLElement | null;
+        fetchPage: (before: number) => Promise<ChatHistoryPage<T>>;
+        render: (message: T) => HTMLElement;
+        hasMore?: boolean;
+        threshold?: number;
+        scrollToBottom?: boolean;
+    }): { load(): Promise<void>; readonly loading: boolean; readonly more: boolean; dispose(): void };
+}
+export const history: ChatHistoryHelper;
 export interface ChatClient {
+    history: ChatHistoryHelper;
     /** Ask Vibe using Auto, one catalogue model, or two to three models side by side. */
     ask(input: { message: string; models?: string[]; slug?: string; fresh?: boolean; system_prompt?: string; temperature?: number }, opts?: Opts): Promise<{ chat: Json; message: Json }>;
     pick(messageId: number, model: string, opts?: Opts): Promise<{ chat: Json; model: string }>;
     prefer(messageId: number, model: string, opts?: Opts): Promise<{ recorded: boolean; model: string }>;
     global: {
-        history(query?: { limit?: number; after_id?: number }, opts?: Opts): Promise<Json>;
+        history(query?: { limit?: number; before?: number; after_id?: number }, opts?: Opts): Promise<Json>;
         send(message: string, extra?: { reply_to_id?: number; auto_delete_minutes?: number }, opts?: Opts): Promise<Json>;
         search(query?: { q?: string; user_id?: number; stream_id?: number; limit?: number; offset?: number }, opts?: Opts): Promise<{ messages: Json[]; total?: number }>;
     };

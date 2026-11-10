@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.139.0 — 2026-11-10
+
+- `chat.history.pages()` asynchronously iterates newest-first cursor pages; `chat.history.attach()` loads older pages on scroll while preserving the visible message anchor. The same helper is available to Live and Dock.
+
 ## 0.138.0 (2026-11-10)
 
 - **`chat.rooms.insight(id)`**: a room's public AI insight (`chat.room-insight-result@1`), as `GET /api/v1/rooms/:id/insight` answers it: `{ overview: { text, topics, people, messages, from, to, updated_at }, timeline: [{ at, kind, title, text, message_id }], state: 'ready' | 'quiet' | 'off' }`. `id` is a room slug or `global`; a room the rollout does not cover answers `null` (404 like `rooms.get`). No account is needed, so an anonymous client reads it too. Typed as `RoomInsight` in `types/chat.d.ts`.
