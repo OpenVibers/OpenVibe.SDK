@@ -181,6 +181,11 @@
         "createGitClient"
       ]
     },
+    "history": {
+      "object": [
+        "createHistoryClient"
+      ]
+    },
     "homeFeed": {
       "object": [
         "createHomeFeedClient"
@@ -795,6 +800,9 @@
       ]
     },
     "createGovernor": "function"
+  },
+  "openvibe-sdk/history": {
+    "createHistoryClient": "function"
   },
   "openvibe-sdk/home-feed": {
     "createHomeFeedClient": "function"
