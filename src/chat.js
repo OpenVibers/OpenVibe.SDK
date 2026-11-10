@@ -29,6 +29,7 @@
 const { isOpenVibeError } = require('./core/errors');
 
 const enc = encodeURIComponent;
+const history = require('./chat-history');
 
 function createChatClient(client, defaults = {}) {
     const { baseUrl } = defaults;
@@ -41,12 +42,14 @@ function createChatClient(client, defaults = {}) {
     const feed = (id) => `/api/chat/feeds/${enc(id)}`;
 
     return {
+        /** Shared async page iterator and scroll-preserving DOM history controller. */
+        history,
         /** Vibe's model comparison API, authenticated as the person. */
         ask: (input, o = {}) => call({ method: 'POST', path: '/api/vibe/ask', json: input, ...once }, o),
         pick: (messageId, model, o = {}) => call({ method: 'POST', path: '/api/vibe/pick', json: { message_id: messageId, model }, ...once }, o),
         prefer: (messageId, model, o = {}) => call({ method: 'POST', path: '/api/vibe/prefer', json: { message_id: messageId, model }, ...once }, o),
         global: {
-            /** { messages, … } — the global feed; query: limit, after_id (a delta after a message id). */
+            /** { messages, more } — newest-first page; query: limit, before (exclusive ID), after_id (live delta). */
             history: (query = {}, o = {}) => call({ path: '/api/chat/global/history', query }, o),
             /** Post to global chat as the token's person. { message: string, reply_to_id?, auto_delete_minutes? } */
             send: (message, extra = {}, o = {}) => call({ method: 'POST', path: '/api/chat/send', json: { message, ...extra }, ...once }, o),
@@ -248,4 +251,4 @@ function createFeedPublisher(client, { feed, key, baseUrl } = {}) {
     };
 }
 
-module.exports = { createChatClient, createInboxVisitor, createFeedPublisher };
+module.exports = { createChatClient, createInboxVisitor, createFeedPublisher, history };

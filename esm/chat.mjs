@@ -2,6 +2,6 @@
 import cjs from '../src/chat.js';
 
 export const {
-    createChatClient, createInboxVisitor, createFeedPublisher,
+    createChatClient, createInboxVisitor, createFeedPublisher, history,
 } = cjs;
 export default cjs;

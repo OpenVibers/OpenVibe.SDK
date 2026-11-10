@@ -7,7 +7,7 @@
 const assert = require('node:assert/strict');
 const { stubServer, send, run } = require('./helpers');
 const { createClient } = require('../src/core');
-const { createChatClient, createInboxVisitor, createFeedPublisher } = require('../src/chat');
+const { createChatClient, createInboxVisitor, createFeedPublisher, history } = require('../src/chat');
 
 async function chatStub() {
     let busy = 0;
@@ -20,6 +20,36 @@ async function chatStub() {
 }
 
 run([
+    ['the ESM chat entry exports the shared history helper', async () => {
+        const esm = await import('../esm/chat.mjs');
+        assert.equal(typeof esm.history.pages, 'function');
+        assert.equal(typeof esm.history.attach, 'function');
+    }],
+    ['history pages iterate backward from newest-first reads and the controller preserves its anchor', async () => {
+        const requests = [];
+        const iterator = history.pages(async (query) => {
+            requests.push(query);
+            return query.before == null
+                ? { messages: [{ id: 4 }, { id: 3 }], more: true }
+                : { messages: [{ id: 2 }, { id: 1 }], more: false };
+        }, { limit: 2 });
+        const pages = [];
+        for await (const page of iterator) pages.push(page.messages.map((m) => m.id));
+        assert.deepEqual(pages, [[4, 3], [2, 1]]);
+        assert.deepEqual(requests, [{ limit: 2 }, { limit: 2, before: 3 }]);
+
+        const feed = { children: [], scrollTop: 0, scrollHeight: 0, handlers: {}, get firstChild() { return this.children[0]; }, addEventListener(name, fn) { this.handlers[name] = fn; }, removeEventListener(name) { delete this.handlers[name]; }, querySelector(selector) { const match = /^\[data-id="(\d+)"\]$/.exec(selector); return match ? this.children.find((x) => x.dataset && x.dataset.id === match[1]) : selector === '[data-id]' ? this.children.find((x) => x.dataset && x.dataset.id) : null; }, insertBefore(item, anchor) { this.children.splice(this.children.indexOf(anchor), 0, item); this.scrollHeight = this.children.length * 20; } };
+        const message = (id) => { const item = { dataset: { id: String(id) }, getBoundingClientRect: () => ({ top: feed.children.indexOf(item) * 20 }) }; return item; };
+        const status = { hidden: true, textContent: '', nextSibling: null };
+        const anchor = message(3), newest = message(4); feed.children = [status, anchor, newest]; feed.scrollHeight = 60;
+        const ctl = history.attach({ feed, status, fetchPage: async () => ({ messages: [{ id: 2 }, { id: 1 }], more: false }), render: (m) => message(m.id), hasMore: true });
+        feed.scrollTop = 100; const viewportTop = anchor.getBoundingClientRect().top - feed.scrollTop; await ctl.load();
+        assert.deepEqual(feed.children.filter((x) => x.dataset).map((x) => Number(x.dataset.id)), [1, 2, 3, 4]);
+        assert.equal(anchor.getBoundingClientRect().top - feed.scrollTop, viewportTop, 'the prior top item stays at the same viewport position');
+        assert.equal(ctl.more, false);
+        assert.equal(status.textContent, 'The start of the chat');
+        ctl.dispose();
+    }],
     ['Vibe comparison sends models and records a pick and preference', async () => {
         const srv = await chatStub();
         const chat = createChatClient(createClient({ baseUrls: { chat: srv.url }, token: 'person-token' }));

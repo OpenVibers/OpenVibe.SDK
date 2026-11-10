@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.140.0 — 2026-11-10
+
+- `chat.history.pages()` asynchronously iterates newest-first cursor pages; `chat.history.attach()` loads older pages on scroll while preserving the visible message anchor. The same helper is available to Live and Dock.
+
 ## 0.139.0 (2026-11-10)
 
 - `community.comments`: shared comment thread resolve/read/write/edit/delete and visibility methods, including ordered pages and paged replies.

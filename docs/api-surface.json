@@ -73,7 +73,8 @@
       "object": [
         "createChatClient",
         "createFeedPublisher",
-        "createInboxVisitor"
+        "createInboxVisitor",
+        "history"
       ]
     },
     "chatApps": {
@@ -587,7 +588,13 @@
   "openvibe-sdk/chat": {
     "createChatClient": "function",
     "createFeedPublisher": "function",
-    "createInboxVisitor": "function"
+    "createInboxVisitor": "function",
+    "history": {
+      "object": [
+        "attach",
+        "pages"
+      ]
+    }
   },
   "openvibe-sdk/chat-apps": {
     "APP_LIMITS": {
