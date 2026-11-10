@@ -63,6 +63,16 @@ function createChatClient(client, defaults = {}) {
             /** The room's public AI insight (chat.room-insight-result@1): { overview, timeline, state } | null.
              *  `id` is a room slug or `global`; a room the rollout does not cover answers null (404). */
             insight: (id, o = {}) => orNull(call({ path: `/api/v1/rooms/${enc(id)}/insight` }, o)),
+            /** What the room remembers between summaries (plan 2026-11-10, part 3): { entries, kinds, can_edit, me }. */
+            memory: (id, o = {}) => call({ path: `/api/v1/rooms/${enc(id)}/memory` }, o),
+            /** A moderator adds an entry: { text, kind?: topic|fact|decision|request, confidence?, source_message_ids? } */
+            addMemory: (id, input, o = {}) => call({ method: 'POST', path: `/api/v1/rooms/${enc(id)}/memory`, json: input, ...once }, o),
+            /** A moderator corrects an entry: { text?, kind?, confidence? } */
+            correctMemory: (id, entryId, patch, o = {}) => call({ method: 'PATCH', path: `/api/v1/rooms/${enc(id)}/memory/${enc(entryId)}`, json: patch, ...once }, o),
+            /** A moderator removes any entry, or a person removes one learned from their own messages. */
+            removeMemory: (id, entryId, o = {}) => call({ method: 'DELETE', path: `/api/v1/rooms/${enc(id)}/memory/${enc(entryId)}`, ...once }, o),
+            /** A person forgets everything the room learned from their own messages. */
+            forgetMyMemory: (id, o = {}) => call({ method: 'DELETE', path: `/api/v1/rooms/${enc(id)}/memory`, query: { mine: 1 }, ...once }, o),
             update: (slug, patch, o = {}) => call({ method: 'PATCH', path: room(slug), json: patch, ...once }, o),
             /** query: before | after (message id), limit */
             messages: (slug, query = {}, o = {}) => call({ path: `${room(slug)}/messages`, query }, o),

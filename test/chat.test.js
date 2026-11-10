@@ -77,6 +77,11 @@ run([
         await chat.dms.setViewPreference(7, 'bubbles');
         await chat.global.history({ after_id: 5 });
         await chat.rooms.insight('global');
+        await chat.rooms.memory('builders');
+        await chat.rooms.addMemory('builders', { text: 'The stream is on Fridays', kind: 'fact' });
+        await chat.rooms.correctMemory('builders', 5, { text: 'The stream is on Friday nights' });
+        await chat.rooms.removeMemory('builders', 5);
+        await chat.rooms.forgetMyMemory('builders');
         const got = srv.requests.map((r) => [r.method, r.url, r.body && String(r.body).length ? JSON.parse(String(r.body)) : null]);
         assert.deepEqual(got, [
             ['POST', '/api/chat/rooms', { name: 'Builders' }],
@@ -90,6 +95,11 @@ run([
             ['PUT', '/api/dm/conversations/7/view', { view: 'bubbles' }],
             ['GET', '/api/chat/global/history?after_id=5', null],
             ['GET', '/api/v1/rooms/global/insight', null],
+            ['GET', '/api/v1/rooms/builders/memory', null],
+            ['POST', '/api/v1/rooms/builders/memory', { text: 'The stream is on Fridays', kind: 'fact' }],
+            ['PATCH', '/api/v1/rooms/builders/memory/5', { text: 'The stream is on Friday nights' }],
+            ['DELETE', '/api/v1/rooms/builders/memory/5', null],
+            ['DELETE', '/api/v1/rooms/builders/memory?mine=1', null],
         ]);
         assert.equal(srv.requests[0].headers.authorization, 'Bearer user-jwt');
         await srv.close();
