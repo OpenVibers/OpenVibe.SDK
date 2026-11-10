@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.136.0 (2026-11-09)
+
+- `quest.today()` reads the signed-in person's guided Quest today response.
+
 ## 0.135.0 (2026-11-10)
 
 - `ov.ai.files`: attach files through Media, list/read/remove them, and expose typed `ai.file@1` and conversational turn shapes.
