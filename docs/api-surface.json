@@ -280,6 +280,17 @@
         "createModulesClient"
       ]
     },
+    "moneyReasons": {
+      "object": [
+        "KINDS",
+        "SITES",
+        "describe",
+        "describeRow",
+        "siteName",
+        "titleFromSlug",
+        "unknownText"
+      ]
+    },
     "newEventId": "function",
     "newIdempotencyKey": "function",
     "news": {
