@@ -23,6 +23,16 @@ export interface BenchJudgementInput {
     pair?: { left: string; right: string }; outcome?: 'left' | 'right' | 'tie' | 'both_bad' | 'draw'; score?: number;
 }
 export interface BenchBoard { kind_id: string; type: 'elo' | 'pareto' | 'cost'; category: string; period: string; rows: Array<Record<string, unknown>>; }
+export interface BenchRating {
+    kind_id: string; category: string; subject: string; elo: number; games: number;
+    wins: number; losses: number; ties: number; win_rate: number; provisional: boolean;
+    ci_lower: number | null; ci_upper: number | null;
+    rank: number | null; rank_lo: number | null; rank_hi: number | null;
+}
+export interface BenchSharedRatings {
+    schema: 'bench.ratings@1'; kind_id: string; category: string; type: 'elo'; adult: false;
+    minimum_samples: 20; source: string; methodology: string; rows: BenchRating[];
+}
 export interface BenchEval { id: string; owner: string; kind_id: string; name: string; test_suite: unknown[]; created_at: string; }
 export interface BenchEvalRun { id: string; eval_id: string; offers: BenchOffer[]; status: string; created_at: string; [field: string]: unknown; }
 export type BenchDatasetLine = ({ type: 'task' } & BenchTask) | ({ type: 'round' } & BenchRound) | ({ type: 'entry' } & BenchEntry) | ({ type: 'judgement' | 'rating' } & Record<string, unknown>);
@@ -49,7 +59,9 @@ export interface BenchClient {
         cast(roundId: string, judgement: BenchJudgementInput, opts?: BenchOptions): Promise<{ judgement: Record<string, unknown>; revealed: { left: BenchEntry; right: BenchEntry } | null }>;
     };
     boards: { get(kind: string, query?: { type?: 'elo' | 'pareto' | 'cost'; category?: string; period?: string } & BenchOptions): Promise<{ board: BenchBoard }> };
-    models: { get(model: string, opts?: BenchOptions): Promise<{ model: string; ratings: Array<Record<string, unknown>>; entries: BenchEntry[]; total_cost_usd: number }> };
+    /** Public fitted ratings. Models below twenty eligible games are omitted. No identity is sent. */
+    ratings: { get(kind: string, query?: { category?: string; signal?: AbortSignal }): Promise<{ board: BenchSharedRatings }> };
+    models: { get(model: string, opts?: BenchOptions): Promise<{ model: string; ratings: BenchRating[]; ratings_minimum_samples?: number; entries: BenchEntry[]; total_cost_usd: number }> };
     datasets: {
         /** Raw application/x-ndjson text. */
         get(kind: string, opts?: BenchOptions): Promise<string>;

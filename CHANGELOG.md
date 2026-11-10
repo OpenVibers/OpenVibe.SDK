@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.145.0 — 2026-11-10
+
+- `bench.ratings.get`: shared fitted ratings and confidence intervals with a twenty-game floor. Browser-safe, anonymous and typed; pairs with `ai.metrics` across sites.
+
 ## 0.144.0 — 2026-11-10
 
 - `ai.metrics`: public daily model series, up-to-six-model comparisons, task leaderboards, listed price history and hourly provider health. Typed sample counts and nullable measurements; available in browser and server clients without credentials.
