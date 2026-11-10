@@ -121,8 +121,21 @@ function createCommunityClient(client, defaults = {}) {
         create: (input = {}, o = {}) => call({ method: 'POST', path: '/api/v1/posts', json: input, ...once }, o),
     };
 
+    const comments = {
+        /** Resolve an EntityRef to its shared thread (created by the first write). */
+        resolve: (ref, o = {}) => call({ method: 'POST', path: '/api/v1/comments/threads/resolve', json: { ref }, ...once }, o),
+        /** Read a page; sort is old|new, or parent pages replies after the first page. */
+        get: (id, query = {}, o = {}) => call({ path: `/api/v1/comments/threads/${enc(id)}`, query }, o),
+        /** Add a comment or reply; replies to replies are filed under their first comment. */
+        create: (id, input, o = {}) => call({ method: 'POST', path: `/api/v1/comments/threads/${enc(id)}/comments`, json: input, ...once }, o),
+        edit: (commentId, input, o = {}) => call({ method: 'PATCH', path: `/api/v1/comments/${enc(commentId)}`, json: input }, o),
+        delete: (commentId, o = {}) => call({ method: 'DELETE', path: `/api/v1/comments/${enc(commentId)}` }, o),
+        visibility: (id, visibility, o = {}) => call({ method: 'PUT', path: `/api/v1/comments/threads/${enc(id)}/visibility`, json: { visibility } }, o),
+    };
+
     return {
         pastes,
+        comments,
         feed,
         posts,
         /** The same client acting for someone else: as('usr_…') or as({ actingSubject, origin, sourceRef, staff }). */
