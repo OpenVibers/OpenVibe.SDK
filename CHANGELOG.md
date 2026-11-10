@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.145.0 — 2026-11-10
+
+- `frame.online()`: the network's "who is online" read (`GET /api/frame/online`), the data the shared footer strip draws — members seen in the last thirty minutes (named only when their presence lets others see them), guests as a count and nothing else, the live channels, counts that open what they count, and, with `site`, that site's own strip items. Public, cached 30 seconds at the edge; types `FrameOnline`, `FrameOnlinePerson` and `FrameOnlineItem`, and the ESM entry.
+
 ## 0.144.0 — 2026-11-10
 
 - `ai.metrics`: public daily model series, up-to-six-model comparisons, task leaderboards, listed price history and hourly provider health. Typed sample counts and nullable measurements; available in browser and server clients without credentials.
