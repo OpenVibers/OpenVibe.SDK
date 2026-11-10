@@ -66,3 +66,5 @@ export const share: typeof import('./share').share;
 export * as locker from './locker';
 
 export const createWalletClient: typeof import('./wallet').createWalletClient;
+
+export * as levels from './levels';

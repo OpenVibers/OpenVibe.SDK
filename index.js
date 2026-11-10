@@ -16,6 +16,7 @@ module.exports = {
     registry: require('./src/registry'),
     identity: require('./src/identity'),
     trust: require('./src/trust'),
+    levels: require('./src/levels'),
     modules: require('./src/modules'),
     events: require('./src/events'),
     realtime: require('./src/realtime'),

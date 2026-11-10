@@ -211,6 +211,11 @@
         "isTerminal"
       ]
     },
+    "levels": {
+      "object": [
+        "createLevelsClient"
+      ]
+    },
     "live": {
       "object": [
         "createLiveClient"
@@ -813,6 +818,9 @@
     "TERMINAL_STATES": "array",
     "createJobsClient": "function",
     "isTerminal": "function"
+  },
+  "openvibe-sdk/levels": {
+    "createLevelsClient": "function"
   },
   "openvibe-sdk/limits": {
     "WINDOWS": {
