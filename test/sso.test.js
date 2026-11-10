@@ -65,6 +65,20 @@ run([
         const res = fakeRes();
         await sso.handlers.login({ query: { next: '//evil.example' }, headers: {} }, res);
         const u = new URL(res.location);
+        // Quiet first (0.143.0): a plain sign-in asks the Network without a page, and marks the flow as a first try.
+        assert.equal(u.searchParams.get('prompt'), 'none', 'a plain sign-in is quiet first');
+        assert.equal(res.cookies.ov_oauth_silent.v, '2');
+        // The chooser at once: the second try, and a person who signed out here.
+        const second = fakeRes();
+        await sso.handlers.login({ query: { ask: '1', next: '/deals' }, headers: {} }, second);
+        assert.equal(new URL(second.location).searchParams.get('prompt'), null, '?ask=1 shows the chooser');
+        assert.ok(second.cleared.includes('ov_oauth_silent') && second.cookies.ov_oauth_next.v === '/deals');
+        const guest = fakeRes();
+        await sso.handlers.login({ query: {}, headers: { cookie: cookieHeader({ ov_sso_hint: 'guest' }) } }, guest);
+        assert.equal(new URL(guest.location).searchParams.get('prompt'), null, 'signed out here: the chooser, never a quiet sign-in');
+        const known = fakeRes();
+        await sso.handlers.login({ query: {}, headers: { cookie: cookieHeader({ ov_sso_hint: 'account' }) } }, known);
+        assert.equal(new URL(known.location).searchParams.get('prompt'), 'none');
         assert.equal(u.origin + u.pathname, `${ISS}/oauth/authorize`);
         assert.deepEqual([u.searchParams.get('client_id'), u.searchParams.get('redirect_uri'), u.searchParams.get('code_challenge_method')], ['trade', 'https://openvibe.trade/auth/callback', 'S256']);
         assert.equal(u.searchParams.get('state'), res.cookies.ov_oauth_state.v);
@@ -120,6 +134,16 @@ run([
         const quiet = fakeRes();
         await sso.handlers.callback({ query: { error: 'login_required' }, headers: { cookie: cookieHeader({ ov_oauth_silent: '1', ov_oauth_next: '/x' }) } }, quiet);
         assert.equal(quiet.location, '/x?sso=none', 'a silent sign-in with no Network session goes back quietly');
+        // A plain sign-in's quiet first try that found nobody goes on to the chooser, and keeps where it was going.
+        const first = fakeRes();
+        await sso.handlers.callback({ query: { error: 'login_required' }, headers: { cookie: cookieHeader({ ov_oauth_silent: '2', ov_oauth_next: '/you' }) } }, first);
+        assert.equal(first.location, '/auth/login?next=%2Fyou&ask=1');
+        const always = fakeRes();
+        await sso.handlers.callback({ query: { error: 'interaction_required' }, headers: { cookie: cookieHeader({ ov_oauth_silent: '2' }) } }, always);
+        assert.equal(always.location, '/auth/login?ask=1', 'an app the Network always asks for: the chooser');
+        const refused = fakeRes();
+        await sso.handlers.callback({ query: { error: 'access_denied' }, headers: { cookie: cookieHeader({ ov_oauth_silent: '2' }) } }, refused);
+        assert.equal(refused.location, '/?auth_error=access_denied', 'any other error is reported as it is for a sign-in the person started');
     }],
 
     ['a client the Network refuses: the page says it is our problem, logs what to check, and /auth/health reports it', async () => {

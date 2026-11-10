@@ -18,7 +18,11 @@
  * Routes (mounted at /auth; the redirect URI is <baseUrl>/auth/callback unless `redirectUri` says otherwise):
  *   GET  /login     → Network /oauth/authorize with state and PKCE (S256); ?silent=1: prompt=none; ?prompt=select_account
  *                     (the chooser) or login (the sign-in form) and ?login_hint=<username> pass through; ?next= a same-site
- *                     path, this site's https origin or the Network's (control characters and backslashes go home)
+ *                     path, this site's https origin or the Network's (control characters and backslashes go home).
+ *                     A plain sign-in is quiet first (0.143.0): it asks the Network with prompt=none, so a browser signed
+ *                     in at openvibe.network comes back signed in with no chooser; when the Network knows nobody the
+ *                     callback starts the chooser by itself (?ask=1). A person who signed out here (hint=guest), and
+ *                     ?prompt / ?login_hint, get the chooser at once.
  *   GET  /callback  → the state is required and compared in constant time; the code is exchanged server-side with the
  *                     client secret and the PKCE verifier; cookies are set; back to `next`
  *   POST /fedcm     → the shared navbar's FedCM assertion (nonce pre-checked) swapped for tokens (jwt-bearer grant)
@@ -53,6 +57,9 @@ const HINT_COOKIE = 'ov_sso_hint';
 const STATE_COOKIE = 'ov_oauth_state';
 const NEXT_COOKIE = 'ov_oauth_next';
 const SILENT_COOKIE = 'ov_oauth_silent';
+// The silent cookie's value for a plain sign-in's quiet first try: its failure goes on to the chooser, where a silent
+// sign-in ('1', the navbar's own) goes back to the page as a guest.
+const QUIET_FIRST = '2';
 const VERIFIER_COOKIE = 'ov_oauth_verifier';
 const FLOW_COOKIES = [STATE_COOKIE, NEXT_COOKIE, SILENT_COOKIE, VERIFIER_COOKIE];
 const RETRY_COOKIE = 'ov_oauth_retry';
@@ -283,7 +290,14 @@ function createSsoClient(opts = {}) {
     const handlers = {
         async login(req, res) {
             const q = req.query || {};
-            const silent = !!q.silent && q.silent !== '0';
+            const asked = !!q.silent && q.silent !== '0';
+            // Quiet first: a plain sign-in (a page that needs a person, the bar's Sign in) asks the Network without a
+            // page before it shows one. A link from another site's Dock landed on the chooser every time (2026-11-10),
+            // though the browser was signed in at openvibe.network. The chooser comes at once for a person who signed
+            // out here (the guest hint), for "switch" and "add an account" (prompt, login_hint), and for ?ask=1, which
+            // the callback sends when the quiet try found nobody.
+            const first = !asked && !q.prompt && !q.login_hint && q.ask !== '1' && parseCookies(req)[HINT_COOKIE] !== 'guest';
+            const silent = asked || first;
             // Already signed in here? A silent round trip would only hand back the session we have.
             if (silent && await verify(readAccess(req))) { clearFlow(res); return res.redirect(next(q.next)); }
             const { url, state, verifier } = authorizeUrl({ silent, prompt: String(q.prompt || ''), loginHint: q.login_hint });
@@ -291,7 +305,7 @@ function createSsoClient(opts = {}) {
             res.cookie(VERIFIER_COOKIE, verifier, flowOpts());
             const target = next(q.next);
             if (target !== '/') res.cookie(NEXT_COOKIE, target, flowOpts()); else res.clearCookie(NEXT_COOKIE, { path: '/auth' });
-            if (silent) res.cookie(SILENT_COOKIE, '1', flowOpts()); else res.clearCookie(SILENT_COOKIE, { path: '/auth' });
+            if (silent) res.cookie(SILENT_COOKIE, first ? QUIET_FIRST : '1', flowOpts()); else res.clearCookie(SILENT_COOKIE, { path: '/auth' });
             return res.redirect(url);
         },
 
@@ -302,6 +316,8 @@ function createSsoClient(opts = {}) {
             const silent = c[SILENT_COOKIE] === '1';
             if (q.error) {
                 clearFlow(res);
+                // The quiet first try found nobody at the Network (or this app always asks): now the chooser, once.
+                if (c[SILENT_COOKIE] === QUIET_FIRST && (q.error === 'login_required' || q.error === 'interaction_required')) return res.redirect(withParam(loginHref(target), 'ask', '1'));
                 // Silent sign-in found no Network session: back quietly as a guest (?sso=none stops the navbar retrying).
                 if (silent || q.error === 'login_required') return res.redirect(withParam(target, 'sso', 'none'));
                 return res.redirect(withParam('/', 'auth_error', String(q.error)));

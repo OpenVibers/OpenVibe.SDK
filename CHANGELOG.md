@@ -4,6 +4,11 @@
 
 - **`search.code(text, opts)` and `search.codeIterate(text, opts)`**: merged, de-duplicated public code search from OpenVibe.Search (`GET /api/v1/search/code`), with `lang`, `repo`, `licence`, `limit` and a cursor; `code(text, { deep: true })` asks the signed-in cited answer (`POST /api/v1/search/code/deep`) and returns `{ answer, citations, queries, route }`. Typed as `CodeResult`, `CodePage`, `CodeCitation` and `CodeDeepAnswer` in `types/search.d.ts`. Not released yet.
 
+## 0.143.0 (2026-11-10)
+
+- **`sso`: a plain sign-in is quiet first.** `GET /auth/login` with no `silent`, `prompt` or `login_hint` now asks the Network with `prompt=none` before it shows a page: a browser signed in at openvibe.network comes back signed in, with no chooser. Before, a page that needs a person (and every link to one from another site, such as "Open" in the Dock) landed on the chooser although the Network knew the browser. When the Network knows nobody (`login_required`), or always asks for this app (`interaction_required`), the callback goes on to the chooser by itself (`/auth/login?ask=1`, the new way to ask for the chooser outright). A person who signed out on this site (`ov_sso_hint=guest`) gets the chooser at once, as do "switch" and "add an account" (`prompt`, `login_hint`). The navbar's own silent sign-in (`?silent=1`) is unchanged: with nobody at the Network it returns to the page with `?sso=none`.
+
+
 ## 0.142.0 (2026-11-10)
 
 - **`chat.rooms.memory(id)` and the moderator/person writes**: what a room remembers between summaries (`GET /api/v1/rooms/:id/memory`). `memory()` answers `{ room, entries, kinds, can_edit, me }`, each entry with its `kind`, `text`, `confidence`, when it was learned and its `sources` (the message it came from). `addMemory(id, { text, kind?, confidence?, source_message_ids? })` and `correctMemory(id, entryId, patch)` are a moderator's; `removeMemory(id, entryId)` removes any for a moderator and one learned from the caller's own messages for anyone; `forgetMyMemory(id)` forgets everything learned from the caller's messages in that room. Typed as `RoomMemory`, `MemoryEntry` and `MemoryInput` in `types/chat.d.ts`.
