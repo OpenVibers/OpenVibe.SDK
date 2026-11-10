@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.147.0 — Unreleased
+
+- Add `tools.run(tool, input, { prefer })` for worker placement preferences, plus execution receipt types and job receipt retrieval coverage.
+
 ## 0.146.0 — 2026-11-10
 
 - #183: add the private history reader for cursor reads, search, summaries, agent recent reads, settings and owner-scoped deletes.
