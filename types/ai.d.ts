@@ -1,3 +1,5 @@
+import type { AiMetrics } from './ai-metrics';
+export type * from './ai-metrics';
 import type { OpenVibeClient } from './core';
 
 export interface AiRun { id: string; status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | string; workflow?: { key: string; version: number }; output?: unknown; error?: unknown; latency_class?: LatencyClass; service_tier?: ServiceTier | null; latency_clamped?: { asked: LatencyClass; used: LatencyClass } | null; [field: string]: unknown; }
@@ -70,7 +72,7 @@ export interface AiBatches {
     cancel(id: string, opts?: { signal?: AbortSignal }): Promise<{ batch: AiBatch }>;
 }
 type Op = (input?: Record<string, unknown>, opts?: Omit<RunOptions, 'version' | 'onBehalfOf'>) => Promise<RunResponse>;
-export interface AiClient { tasks(opts?: {signal?: AbortSignal}): Promise<{tasks: AiTask[]}>; creations(opts?: {signal?: AbortSignal}): Promise<AiCreationList>; run(task: string, input?: Record<string, unknown>, opts?: RunOptions): Promise<RunResponse>; choices: { get(task: string, opts?: {signal?: AbortSignal}): Promise<{task: AiTask; choice: AiChoice; why: string; options: Record<string, unknown[]>}>; set(task: string, choice: AiChoice, opts?: {signal?: AbortSignal}): Promise<{choice: AiChoice}> }; admin: { defaults(value?: {defaults: Array<{task: string; value: AiTaskDefaults}>}, opts?: {signal?: AbortSignal}): Promise<{tasks?: AiTask[]; defaults: Record<string, AiTaskDefaults>}> }; runs: AiRuns; batches: AiBatches; files: AiFiles; TERMINAL: Set<string>; CLASSES: string[]; chat: Op; generate: Op; summarize: Op; classify: Op; extract: Op; enrich: Op; embed: Op; }
+export interface AiClient { metrics: AiMetrics; tasks(opts?: {signal?: AbortSignal}): Promise<{tasks: AiTask[]}>; creations(opts?: {signal?: AbortSignal}): Promise<AiCreationList>; run(task: string, input?: Record<string, unknown>, opts?: RunOptions): Promise<RunResponse>; choices: { get(task: string, opts?: {signal?: AbortSignal}): Promise<{task: AiTask; choice: AiChoice; why: string; options: Record<string, unknown[]>}>; set(task: string, choice: AiChoice, opts?: {signal?: AbortSignal}): Promise<{choice: AiChoice}> }; admin: { defaults(value?: {defaults: Array<{task: string; value: AiTaskDefaults}>}, opts?: {signal?: AbortSignal}): Promise<{tasks?: AiTask[]; defaults: Record<string, AiTaskDefaults>}> }; runs: AiRuns; batches: AiBatches; files: AiFiles; TERMINAL: Set<string>; CLASSES: string[]; chat: Op; generate: Op; summarize: Op; classify: Op; extract: Op; enrich: Op; embed: Op; }
 export function createAiClient(client: OpenVibeClient, defaults?: { baseUrl?: string; media?: Record<string, unknown> & { app: string; subject?: string }; objectsClient?: { upload: Function; list: Function; signedUrl: Function; get: Function; delete: Function }; fetch?: typeof fetch }): AiClient;
 export const TERMINAL: Set<string>;
 export const OPS: string[];

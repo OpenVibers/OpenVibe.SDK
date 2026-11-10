@@ -174,7 +174,8 @@ function createAiClient(client, defaults = {}) {
         remove(id) { requireFiles('remove'); return fileObjects.delete(id); },
     };
 
-    const api = { tasks, creations, choices, run, admin, runs, batches, files, TERMINAL, CLASSES };
+    const metrics = require('./ai-metrics').createMetricsClient(call);
+    const api = { tasks, creations, choices, run, admin, runs, batches, files, metrics, TERMINAL, CLASSES };
     // Direct operations: a run of workflow ai.<op> with the input as the body, waited for by AI.
     for (const op of OPS) {
         api[op] = (input = {}, o = {}) => call({ method: 'POST', path: `/api/v1/${op}`, query: waitQuery(o),
