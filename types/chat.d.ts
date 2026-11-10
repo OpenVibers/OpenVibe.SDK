@@ -2,6 +2,24 @@ import type { OpenVibeClient } from './core';
 
 type Opts = { signal?: AbortSignal };
 type Json = Record<string, unknown>;
+/** The kinds chat.embed@1 names. */
+export type ChatEmbedKind = 'link' | 'video' | 'image' | 'live' | 'picture' | 'design' | 'post' | 'profile' | 'game';
+/** chat.embed@1: one address preview under a chat message, the shape every client draws. Plain data; escape it. */
+export interface ChatEmbed {
+    kind: ChatEmbedKind;
+    url: string;
+    site_name: string;
+    title: string;
+    description: string;
+    /** An OpenVibe.Media address, or null (another site's picture is never hot-linked). */
+    image: string | null;
+    width: number;
+    height: number;
+    /** On OpenVibe's own kinds, the person or channel the thing belongs to. */
+    by?: string;
+    /** On a Live channel, whether it is broadcasting now. */
+    live?: boolean;
+}
 /** chat.room-insight-result@1: a room's public AI insight (see the contract in openvibe-contracts). */
 export interface RoomInsight {
     overview: {
@@ -16,6 +34,8 @@ export interface RoomInsight {
     timeline: { at: string; kind: string; title: string; text: string; message_id: number | null }[];
     state: 'ready' | 'quiet' | 'off';
 }
+/** The typed address previews a message carries (chat.embed@1): [] when it has none. */
+export function readEmbeds(message?: { embeds?: unknown } | null): ChatEmbed[];
 export type ChatMessageView = 'bubbles' | 'room';
 export interface ChatHistoryPage<T extends { id: number | string } = { id: number | string; [field: string]: unknown }> { messages: T[]; more: boolean; [field: string]: unknown; }
 export interface ChatHistoryOptions { limit?: number; before?: number | string | null; signal?: AbortSignal; }
@@ -65,6 +85,8 @@ export interface RoomMemory {
 }
 
 export interface ChatClient {
+    /** The typed address previews a message carries (chat.embed@1): [] when it has none. */
+    embeds(message?: { embeds?: unknown } | null): ChatEmbed[];
     history: ChatHistoryHelper;
     /** Ask Vibe using Auto, one catalogue model, or two to three models side by side. */
     ask(input: { message: string; models?: string[]; slug?: string; fresh?: boolean; system_prompt?: string; temperature?: number }, opts?: Opts): Promise<{ chat: Json; message: Json }>;

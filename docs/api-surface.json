@@ -74,7 +74,8 @@
         "createChatClient",
         "createFeedPublisher",
         "createInboxVisitor",
-        "history"
+        "history",
+        "readEmbeds"
       ]
     },
     "chatApps": {
@@ -600,7 +601,8 @@
         "attach",
         "pages"
       ]
-    }
+    },
+    "readEmbeds": "function"
   },
   "openvibe-sdk/chat-apps": {
     "APP_LIMITS": {

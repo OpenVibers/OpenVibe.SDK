@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.147.0 (2026-11-10)
+
+- **`openvibe-sdk/chat`: the typed address previews of `chat.embed@1`.** `chat.embeds(message)` reads the `embeds` a Chat message carries (empty until the background job finishes) and returns `ChatEmbed[]` typed: `kind` (`link`, `video`, `image`, `live`, `picture`, `design`, `post`, `profile`, `game`), `url`, `site_name`, `title`, `description`, `image` (an OpenVibe.Media address or null), `width`, `height`, and on OpenVibe's own kinds `by` and, for Live, `live`. Fields that are not a real embed are dropped, unknown fields are not passed through, and the returned objects are plain data for the client to escape. Live's chat and the Dock can draw the same card from the same reader; the reader is also exported as `readEmbeds` for a server-side renderer.
+
 ## 0.146.0 — 2026-11-10
 
 - #183: add the private history reader for cursor reads, search, summaries, agent recent reads, settings and owner-scoped deletes.

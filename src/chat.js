@@ -31,6 +31,32 @@ const { isOpenVibeError } = require('./core/errors');
 const enc = encodeURIComponent;
 const history = require('./chat-history');
 
+/** The kinds chat.embed@1 names; anything else is not a preview this SDK returns. */
+const EMBED_KINDS = new Set(['link', 'video', 'image', 'live', 'picture', 'design', 'post', 'profile', 'game']);
+
+/** One chat.embed@1 object as the typed shape, or null when it is not one. Data only: never markup. */
+function embedOf(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    if (!EMBED_KINDS.has(value.kind)) return null;
+    if (typeof value.url !== 'string' || !value.url) return null;
+    if (typeof value.site_name !== 'string' || typeof value.title !== 'string' || !value.title || typeof value.description !== 'string') return null;
+    if (!(value.image === null || typeof value.image === 'string')) return null;
+    if (!Number.isInteger(value.width) || !Number.isInteger(value.height) || value.width < 0 || value.height < 0) return null;
+    const embed = {
+        kind: value.kind, url: value.url, site_name: value.site_name, title: value.title,
+        description: value.description, image: value.image, width: value.width, height: value.height,
+    };
+    if (typeof value.by === 'string' && value.by) embed.by = value.by;
+    if (typeof value.live === 'boolean') embed.live = value.live;
+    return embed;
+}
+
+/** The address previews a message carries (chat.embed@1), typed: [] when there are none. */
+function readEmbeds(message) {
+    if (!message || !Array.isArray(message.embeds)) return [];
+    return message.embeds.map(embedOf).filter(Boolean);
+}
+
 function createChatClient(client, defaults = {}) {
     const { baseUrl } = defaults;
     const call = (opts, o = {}) => client.json({ service: 'chat', baseUrl, audience: 'openvibe.chat', ...opts, signal: o.signal });
@@ -44,6 +70,8 @@ function createChatClient(client, defaults = {}) {
     return {
         /** Shared async page iterator and scroll-preserving DOM history controller. */
         history,
+        /** The typed address previews on a message (chat.embed@1): [] when it has none. */
+        embeds: (message) => readEmbeds(message),
         /** Vibe's model comparison API, authenticated as the person. */
         ask: (input, o = {}) => call({ method: 'POST', path: '/api/vibe/ask', json: input, ...once }, o),
         pick: (messageId, model, o = {}) => call({ method: 'POST', path: '/api/vibe/pick', json: { message_id: messageId, model }, ...once }, o),
@@ -261,4 +289,4 @@ function createFeedPublisher(client, { feed, key, baseUrl } = {}) {
     };
 }
 
-module.exports = { createChatClient, createInboxVisitor, createFeedPublisher, history };
+module.exports = { createChatClient, createInboxVisitor, createFeedPublisher, history, readEmbeds };

@@ -7,7 +7,7 @@
 const assert = require('node:assert/strict');
 const { stubServer, send, run } = require('./helpers');
 const { createClient } = require('../src/core');
-const { createChatClient, createInboxVisitor, createFeedPublisher, history } = require('../src/chat');
+const { createChatClient, createInboxVisitor, createFeedPublisher, history, readEmbeds } = require('../src/chat');
 
 async function chatStub() {
     let busy = 0;
@@ -20,6 +20,17 @@ async function chatStub() {
 }
 
 run([
+    ['embeds reads chat.embed@1 and returns the typed shape, dropping what is not one', async () => {
+        const chat = createChatClient(createClient({ baseUrls: { chat: 'http://127.0.0.1:9' }, token: 'person-token' }));
+        const link = { kind: 'link', url: 'https://example.com/a', site_name: 'Example', title: 'A story', description: 'What happened', image: null, width: 640, height: 360 };
+        const live = { kind: 'live', url: 'https://openvibe.live/@streamer', site_name: 'OpenVibe.Live', title: 'The Streamer', description: '', image: 'https://openvibe.media/avatars/s.jpg', width: 0, height: 0, by: 'streamer', live: true };
+        assert.deepEqual(chat.embeds({ embeds: [link, live] }), [link, live]);
+        assert.deepEqual(chat.embeds({ embeds: [link, { ...link, kind: 'article' }, { ...link, title: '' }, null, 'x'] }), [link], 'only real embeds come back');
+        assert.deepEqual(Object.keys(chat.embeds({ embeds: [{ ...link, extra: 'dropped' }] })[0]).sort(), Object.keys(link).sort());
+        assert.deepEqual(chat.embeds({}), []);
+        assert.deepEqual(chat.embeds(null), []);
+        assert.deepEqual(readEmbeds({ embeds: [live] }), [live], 'the reader is exported too');
+    }],
     ['the ESM chat entry exports the shared history helper', async () => {
         const esm = await import('../esm/chat.mjs');
         assert.equal(typeof esm.history.pages, 'function');
