@@ -26,6 +26,7 @@ const ENTRIES = {
     'registry.mjs': '../src/registry.js',
     'identity.mjs': '../src/identity.js',
     'trust.mjs': '../src/trust.js',
+    'levels.mjs': '../src/levels.js',
     'notifications.mjs': '../src/notifications.js',
     'modules.mjs': '../src/modules.js',
     'events.mjs': '../src/events.js',

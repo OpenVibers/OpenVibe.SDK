@@ -12,6 +12,7 @@ module.exports = {
     locker: require('./src/locker'),
     registry: require('./src/registry'),
     trust: require('./src/trust'),
+    levels: require('./src/levels'),
     modules: require('./src/modules'),
     realtime: require('./src/realtime'),
     media: require('./src/media'),
