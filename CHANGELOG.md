@@ -1,8 +1,13 @@
 # Changelog
 
-## 0.134.0 (2026-11-10)
+## 0.135.0 (2026-11-10)
 
-- `ov.ai.files`: attach private files through Media, list/read/remove them, and expose typed `ai.file@1` and turn shapes.
+- `ov.ai.files`: attach files through Media, list/read/remove them, and expose typed `ai.file@1` and conversational turn shapes.
+
+## 0.134.0 (2026-11-09)
+
+- `ov.ai.creations()`: the public catalogue of everything AI can make on OpenVibe (`GET /api/v1/creations`, `ai.creation-list@1`) — id, product, a plain name, what you give it and what comes back, the workflow or registered task behind it, who may use it (guest, signed-in, 18+ floor), whether it can cost coins, and where to start. Cached five minutes and CORS open; no token is sent. Types: `AiCreation`, `AiCreationList`.
+
 
 ## 0.133.0 (2026-11-09)
 

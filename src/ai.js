@@ -97,6 +97,8 @@ function createAiClient(client, defaults = {}) {
     };
 
     const tasks = (o = {}) => call({ path: '/api/v1/tasks' }, o);
+    /** What AI can make (GET /api/v1/creations; public, cached, CORS open) → { creations, count, generated_at } */
+    const creations = (o = {}) => call({ path: '/api/v1/creations', auth: false }, o);
     const choices = {
         get: (task, o = {}) => call({ path: '/api/v1/choices', query: { task } }, o),
         set: (task, choice, o = {}) => call({ method: 'PUT', path: `/api/v1/me/choices/${enc(task)}`, json: choice, idempotencyKey: false }, o),
@@ -137,7 +139,10 @@ function createAiClient(client, defaults = {}) {
             requireFiles('attach');
             const owner = subject || (defaults.media && defaults.media.subject);
             if (!owner) throw new TypeError('ai.files.attach: subject (the person who may read this file) is required');
-            const obj = await fileObjects.upload(data, { kind: 'file', visibility: 'private', filename, mimeType: mediaType, subject: owner, signal, ...options });
+            // Unlisted, not listed anywhere, and readable by its (unguessable) Media id: the AI service reads a
+            // turn's file by reference from Media's public bytes URL, which a private object would refuse. A caller
+            // that has a Media read path of its own may pass visibility: 'private' and send the read result instead.
+            const obj = await fileObjects.upload(data, { kind: 'file', visibility: 'unlisted', filename, mimeType: mediaType, subject: owner, signal, ...options });
             return { id: obj.id, name: obj.filename || filename || 'file', media_type: obj.mime_type || mediaType || 'application/octet-stream', size: obj.size_bytes,
                 storage: { provider: 'media', key: obj.id }, access: { readers: [owner] },
                 read: { method: 'not_readable', reason: 'File is attached; AI has not read it yet.' }, role: 'input' };
@@ -151,15 +156,25 @@ function createAiClient(client, defaults = {}) {
         },
         async read(id, { ttl = 300, signal } = {}) {
             requireFiles('read');
-            const signed = await fileObjects.signedUrl(id, { ttl });
-            const response = await (defaults.fetch || globalThis.fetch)(signed.url, { signal });
+            const fetchImpl = defaults.fetch || globalThis.fetch;
+            // A signed URL is the private read path. An unlisted object (an attached file, or an artifact in
+            // another tenant's namespace) is also served by its public bytes URL, so a caller without a Media
+            // read grant for that tenant can still read it by its unguessable med_… id.
+            let url = null;
+            try { url = (await fileObjects.signedUrl(id, { ttl })).url; } catch { url = null; }
+            let response = url ? await fetchImpl(url, { signal }) : null;
+            if (!response || !response.ok) {
+                const base = String((defaults.media && defaults.media.baseUrl) || (typeof fileObjects.baseUrl === 'function' ? await fileObjects.baseUrl() : '')).replace(/\/+$/, '');
+                if (!base) throw new Error(`ai.files.read: Media answered ${response ? response.status : 'no signed URL'}`);
+                response = await fetchImpl(`${base}/o/${enc(id)}`, { signal });
+            }
             if (!response.ok) throw new Error(`ai.files.read: Media answered ${response.status}`);
             return { file: await fileObjects.get(id), bytes: new Uint8Array(await response.arrayBuffer()) };
         },
         remove(id) { requireFiles('remove'); return fileObjects.delete(id); },
     };
 
-    const api = { tasks, choices, run, admin, runs, batches, files, TERMINAL, CLASSES };
+    const api = { tasks, creations, choices, run, admin, runs, batches, files, TERMINAL, CLASSES };
     // Direct operations: a run of workflow ai.<op> with the input as the body, waited for by AI.
     for (const op of OPS) {
         api[op] = (input = {}, o = {}) => call({ method: 'POST', path: `/api/v1/${op}`, query: waitQuery(o),
