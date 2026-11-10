@@ -2,6 +2,20 @@ import type { OpenVibeClient } from './core';
 
 type Opts = { signal?: AbortSignal };
 type Json = Record<string, unknown>;
+/** chat.room-insight-result@1: a room's public AI insight (see the contract in openvibe-contracts). */
+export interface RoomInsight {
+    overview: {
+        text: string;
+        topics: { label: string; count: number }[];
+        people: number;
+        messages: number;
+        from: string | null;
+        to: string | null;
+        updated_at: string | null;
+    };
+    timeline: { at: string; kind: string; title: string; text: string; message_id: number | null }[];
+    state: 'ready' | 'quiet' | 'off';
+}
 export type ChatMessageView = 'bubbles' | 'room';
 export interface ChatClient {
     /** Ask Vibe using Auto, one catalogue model, or two to three models side by side. */
@@ -17,6 +31,7 @@ export interface ChatClient {
         list(opts?: Opts): Promise<Json>;
         create(input: { name: string; slug?: string; topic?: string; visibility?: 'public' | 'private' }, opts?: Opts): Promise<Json>;
         get(slug: string, opts?: Opts): Promise<Json | null>;
+        insight(id: string, opts?: Opts): Promise<RoomInsight | null>;
         update(slug: string, patch: { name?: string; topic?: string; visibility?: 'public' | 'private'; slow_seconds?: number }, opts?: Opts): Promise<Json>;
         messages(slug: string, query?: { before?: number; after?: number; limit?: number }, opts?: Opts): Promise<Json>;
         send(slug: string, message: string, opts?: Opts): Promise<Json>;
