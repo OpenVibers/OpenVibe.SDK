@@ -58,6 +58,34 @@ export interface ProviderOffer {
     available: boolean; reason?: string | null; daily_cap?: number | null; used_today?: number | null;
     latency_ms_p50?: number | null; answered_rate?: number | null; terms_url?: string | null; checked_at: string;
 }
+export interface CodeLine { number: number | null; text: string; match: boolean; }
+export interface CodeResult {
+    source: string; sources?: string[]; repo: string; repo_url?: string | null; path: string; ref?: string | null;
+    line_start: number | null; line_end: number | null; lines: CodeLine[];
+    language?: string | null; stars: number; licence?: string | null;
+    last_commit_at?: string | null; last_commit_source?: string | null; fetched_at?: string | null;
+    permalink: string; exact_identifier?: boolean;
+}
+export interface CodeSource {
+    id: string; kind: 'code'; label: string; cost: string;
+    key?: { name: string; required: boolean; configured: boolean };
+    quota?: { per_minute: number | null; window: string };
+    enabled: boolean; health: string; order: number; calls: number; failures: number;
+    last_ok_at?: string | null; last_error_at?: string | null; last_error?: string | null; last_latency_ms?: number | null;
+}
+export interface CodePage { query: Record<string, unknown>; results: CodeResult[]; sources: CodeSource[]; next_cursor: string | null; took_ms?: number; }
+export interface CodeOptions {
+    lang?: string; repo?: string; licence?: string; limit?: number; cursor?: string | null;
+    actingSubject?: string; signal?: AbortSignal;
+}
+export interface CodeCitation {
+    n: number; repo: string; path: string; line_start: number | null; line_end: number | null;
+    permalink: string; language?: string | null; stars?: number; licence?: string | null;
+}
+export interface CodeDeepAnswer {
+    query: Record<string, unknown>; queries: string[]; answer: string;
+    citations: CodeCitation[]; results: CodeResult[]; route: Record<string, unknown>;
+}
 export interface SearchClient {
     query(text: string, opts?: SearchOptions): Promise<SearchPage>;
     /** With scopes: the Search Fabric. */
@@ -67,7 +95,13 @@ export interface SearchClient {
     iterate(text: string, opts?: SearchOptions & { max?: number }): AsyncGenerator<SearchDocument, void, unknown>;
     suggest(text: string, opts?: Pick<SearchOptions, 'owner' | 'type' | 'limit' | 'actingSubject' | 'signal'>): Promise<{ suggestions: Array<{ owner: string; type: string; id: string; title: string; canonical_url?: string }> }>;
     document(owner: string, type: string, id: string, opts?: Pick<SearchOptions, 'actingSubject' | 'signal'>): Promise<SearchDocument | null>;
+    /** Merged, de-duplicated public code from the hosted sources; one page per call. */
+    code(text: string, opts: CodeOptions & { deep: true }): Promise<CodeDeepAnswer>;
+    code(text: string, opts?: CodeOptions): Promise<CodePage>;
+    /** Every code result, page after page. Deep mode is not a page stream. */
+    codeIterate(text: string, opts?: CodeOptions & { max?: number }): AsyncGenerator<CodeResult, void, unknown>;
 }
 export function createSearchClient(client: OpenVibeClient, defaults?: { baseUrl?: string; actingSubject?: string }): SearchClient;
 export function queryOf(text: string, opts?: SearchOptions): Record<string, string | string[] | number>;
 export function fabricOf(text: string, opts?: FabricOptions): Record<string, string | number>;
+export function codeOf(text: string, opts?: CodeOptions): Record<string, string | number>;
