@@ -33,6 +33,17 @@ function createInventoryClient(client, { baseUrl, subject } = {}) {
         return enc(String(v));
     };
     const person = (s) => check(SUBJECT_RE, s, 'a person is a usr_ subject id');
+    const bool = (value) => typeof value === 'boolean' ? String(value) : value;
+    const holdingsQuery = ({ issuer, site, kind, rarity, equipped, tradable, text, sort, cursor, limit } = {}) =>
+        ({ issuer, site, kind, rarity, equipped: bool(equipped), tradable: bool(tradable), text, sort, cursor, limit });
+    const holdingPages = async function* (path, options = {}) {
+        let cursor = options.cursor;
+        do {
+            const page = await call({ path, query: holdingsQuery({ ...options, cursor }), signal: options.signal });
+            yield page;
+            cursor = page.next_cursor;
+        } while (cursor);
+    };
 
     const kinds = {
         /** Every kind: its schema, slots and the surfaces that render it. */
@@ -50,6 +61,10 @@ function createInventoryClient(client, { baseUrl, subject } = {}) {
     const people = {
         /** A person's owned items (public), newest first: { items, next }. */
         items: (s, { kind, cursor, limit, signal } = {}) => call({ path: `/api/v1/people/${person(s)}/items`, query: { kind, cursor, limit }, signal }),
+        /** Stacked holdings; one entry per definition, with count and representative instance. */
+        holdings: (s, options = {}) => call({ path: `/api/v1/people/${person(s)}/holdings`, query: holdingsQuery(options), signal: options.signal }),
+        holdingsCount: (s, options = {}) => call({ path: `/api/v1/people/${person(s)}/holdings/count`, query: holdingsQuery(options), signal: options.signal }),
+        holdingPages: (s, options = {}) => holdingPages(`/api/v1/people/${person(s)}/holdings`, options),
         /** What a person wears: { subject, slots: { '<kind>:<slot>': { instance_id, definition_id, token?, media_id? } } }. */
         equipped: (s, { signal } = {}) => call({ path: `/api/v1/people/${person(s)}/equipped`, signal }),
     };
@@ -63,6 +78,9 @@ function createInventoryClient(client, { baseUrl, subject } = {}) {
     const me = {
         /** The caller's own items, every state (owned, consumed, revoked). */
         items: ({ kind, cursor, limit, signal } = {}) => call({ path: '/api/v1/me/items', query: { kind, cursor, limit }, signal }),
+        holdings: (options = {}) => call({ path: '/api/v1/me/holdings', query: holdingsQuery(options), signal: options.signal }),
+        holdingsCount: (options = {}) => call({ path: '/api/v1/me/holdings/count', query: holdingsQuery(options), signal: options.signal }),
+        holdingPages: (options = {}) => holdingPages('/api/v1/me/holdings', options),
         /** Wear an item in a slot, or clear the slot with instance_id: null (inventory.equip-request@1). */
         equip: ({ kind, slot, instance_id: instanceId }, { signal } = {}) => {
             if (instanceId !== null) check(ID_RE.instance, instanceId, 'instance_id is an inv_ id, or null to clear the slot');
