@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.136.0 (2026-11-10)
+
+- Extend `openvibe-sdk/machines`'s `Machine` type with Network's safe picker metadata: `system` and `can_run`.
+
 ## 0.135.0 (2026-11-10)
 
 - `ov.ai.files`: attach files through Media, list/read/remove them, and expose typed `ai.file@1` and conversational turn shapes.
