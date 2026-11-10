@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.134.0 (2026-11-09)
+
+- `ov.ai.creations()`: the public catalogue of everything AI can make on OpenVibe (`GET /api/v1/creations`, `ai.creation-list@1`) — id, product, a plain name, what you give it and what comes back, the workflow or registered task behind it, who may use it (guest, signed-in, 18+ floor), whether it can cost coins, and where to start. Cached five minutes and CORS open; no token is sent. Types: `AiCreation`, `AiCreationList`.
+
 ## 0.133.0 (2026-11-09)
 
 - ov.blog.changelog({ service, kind, area, q, limit, before }): the network changelog's blog.changelog-entry@2 rows, newest first

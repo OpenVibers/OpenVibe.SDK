@@ -8,6 +8,20 @@ export type ServiceTier = 'standard' | 'flex' | 'batch' | 'offpeak' | 'local';
 export interface AiChoice { model: string; source: "openvibe" | "keys" | "machines"; machine?: string; }
 export interface AiTask { name: string; kind: "text" | "code" | "vision" | "image" | "search"; sentence: string; default: AiChoice; workflow?: string; service?: string; }
 export interface AiTaskDefaults { signed_out: AiChoice; signed_in: AiChoice; fallbacks: AiChoice[]; image_model: AiChoice | null; search_engines: Array<{ engine: string; enabled: boolean }>; max_cost_usd: number | null; }
+/** One thing AI can make, as GET /api/v1/creations lists it (ai.creation@1). */
+export interface AiCreation {
+    id: string;
+    product: 'ai' | 'blog' | 'codes' | 'community' | 'design' | 'food' | 'games' | 'live' | 'media' | 'meme' | 'news' | 'pics' | 'quest' | 'rent' | 'reviews' | 'space' | 'tools' | 'trade' | 'wiki' | string;
+    name: string;
+    gives: string;
+    returns: string;
+    workflow: string | null;
+    task: string | null;
+    access: { guest: boolean; signed_in: boolean; floor_18: boolean };
+    costs_coins: boolean;
+    start_url: string;
+}
+export interface AiCreationList { creations: AiCreation[]; count: number; generated_at: string; }
 export interface RunOptions { choice?: AiChoice; task?: string; wait?: number; version?: number; idempotencyKey?: string; target?: unknown; attribution?: unknown; onBehalfOf?: unknown; /** The class the caller asks for. A slower class than the workflow allows is honoured; a faster one is clamped by the service. */ latency?: LatencyClass; /** For a batch run: how long the answer may take, in hours (1 to 72). */ deadlineHours?: number; options?: Record<string, unknown>; signal?: AbortSignal; }
 export interface RunResponse { run: AiRun; replayed?: boolean }
 export interface AiRuns {
@@ -51,7 +65,7 @@ export interface AiBatches {
     cancel(id: string, opts?: { signal?: AbortSignal }): Promise<{ batch: AiBatch }>;
 }
 type Op = (input?: Record<string, unknown>, opts?: Omit<RunOptions, 'version' | 'onBehalfOf'>) => Promise<RunResponse>;
-export interface AiClient { tasks(opts?: {signal?: AbortSignal}): Promise<{tasks: AiTask[]}>; run(task: string, input?: Record<string, unknown>, opts?: RunOptions): Promise<RunResponse>; choices: { get(task: string, opts?: {signal?: AbortSignal}): Promise<{task: AiTask; choice: AiChoice; why: string; options: Record<string, unknown[]>}>; set(task: string, choice: AiChoice, opts?: {signal?: AbortSignal}): Promise<{choice: AiChoice}> }; admin: { defaults(value?: {defaults: Array<{task: string; value: AiTaskDefaults}>}, opts?: {signal?: AbortSignal}): Promise<{tasks?: AiTask[]; defaults: Record<string, AiTaskDefaults>}> }; runs: AiRuns; batches: AiBatches; TERMINAL: Set<string>; CLASSES: string[]; chat: Op; generate: Op; summarize: Op; classify: Op; extract: Op; enrich: Op; embed: Op; }
+export interface AiClient { tasks(opts?: {signal?: AbortSignal}): Promise<{tasks: AiTask[]}>; creations(opts?: {signal?: AbortSignal}): Promise<AiCreationList>; run(task: string, input?: Record<string, unknown>, opts?: RunOptions): Promise<RunResponse>; choices: { get(task: string, opts?: {signal?: AbortSignal}): Promise<{task: AiTask; choice: AiChoice; why: string; options: Record<string, unknown[]>}>; set(task: string, choice: AiChoice, opts?: {signal?: AbortSignal}): Promise<{choice: AiChoice}> }; admin: { defaults(value?: {defaults: Array<{task: string; value: AiTaskDefaults}>}, opts?: {signal?: AbortSignal}): Promise<{tasks?: AiTask[]; defaults: Record<string, AiTaskDefaults>}> }; runs: AiRuns; batches: AiBatches; TERMINAL: Set<string>; CLASSES: string[]; chat: Op; generate: Op; summarize: Op; classify: Op; extract: Op; enrich: Op; embed: Op; }
 export function createAiClient(client: OpenVibeClient, defaults?: { baseUrl?: string }): AiClient;
 export const TERMINAL: Set<string>;
 export const OPS: string[];

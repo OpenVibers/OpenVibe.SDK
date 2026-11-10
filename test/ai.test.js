@@ -17,6 +17,7 @@ async function aiStub() {
         if (u.pathname === '/api/v1/runs/run_1') return send(res, 200, { run: { id: 'run_1', status: ++polls >= 3 ? 'succeeded' : 'running', output: polls >= 3 ? { ok: true } : undefined } });
         if (u.pathname === '/api/v1/runs/missing') return send(res, 404, { code: 'run.not_found' });
         if (u.pathname === '/api/v1/summarize') return send(res, 201, { run: { id: 'run_2', status: 'succeeded' } });
+        if (u.pathname === '/api/v1/creations') return send(res, 200, { creations: [{ id: 'blog-post', product: 'blog', name: 'Write a blog post' }], count: 1, generated_at: '2026-11-09T22:15:00.000Z' });
         return send(res, 404, {});
     });
 }
@@ -35,6 +36,16 @@ run([
         const done = await ai.runs.waitFor('run_1', { intervalMs: 5 });
         assert.equal(done.status, 'succeeded');
         assert.equal(await ai.runs.get('missing'), null);
+        await srv.close();
+    }],
+    ['creations reads the public catalogue without a token', async () => {
+        const srv = await aiStub();
+        const ai = createAiClient(createClient({ baseUrls: { ai: srv.url }, token: 't', retries: 2 }));
+        const list = await ai.creations();
+        assert.equal(list.count, 1);
+        assert.equal(list.creations[0].id, 'blog-post');
+        assert.equal(srv.requests[0].url, '/api/v1/creations');
+        assert.equal(srv.requests[0].headers.authorization, undefined, 'public: no token is sent');
         await srv.close();
     }],
     ['a create without a key is not retried; direct ops post the input as the body', async () => {
