@@ -1,3 +1,7 @@
+## 0.136.0 — 2026-11-09
+
+- Network levels client: public person, batch and board reads, and service awards.
+
 # Changelog
 
 ## 0.135.0 (2026-11-10)
