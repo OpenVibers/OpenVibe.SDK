@@ -97,6 +97,8 @@ function createAiClient(client, defaults = {}) {
     };
 
     const tasks = (o = {}) => call({ path: '/api/v1/tasks' }, o);
+    /** What AI can make (GET /api/v1/creations; public, cached, CORS open) → { creations, count, generated_at } */
+    const creations = (o = {}) => call({ path: '/api/v1/creations', auth: false }, o);
     const choices = {
         get: (task, o = {}) => call({ path: '/api/v1/choices', query: { task } }, o),
         set: (task, choice, o = {}) => call({ method: 'PUT', path: `/api/v1/me/choices/${enc(task)}`, json: choice, idempotencyKey: false }, o),
@@ -129,7 +131,7 @@ function createAiClient(client, defaults = {}) {
         cancel: (id, o = {}) => call({ method: 'POST', path: `/api/v1/batches/${enc(id)}/cancel`, idempotencyKey: false }, o),
     };
 
-    const api = { tasks, choices, run, admin, runs, batches, TERMINAL, CLASSES };
+    const api = { tasks, creations, choices, run, admin, runs, batches, TERMINAL, CLASSES };
     // Direct operations: a run of workflow ai.<op> with the input as the body, waited for by AI.
     for (const op of OPS) {
         api[op] = (input = {}, o = {}) => call({ method: 'POST', path: `/api/v1/${op}`, query: waitQuery(o),
