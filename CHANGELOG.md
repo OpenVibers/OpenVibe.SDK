@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.141.0 — 2026-11-10
+
+- `community.comments.upload(ref, file)` uploads a Community paste comment attachment through Community; `comments.create()` accepts typed attachment references.
+
 ## 0.140.0 — 2026-11-10
 
 - `chat.history.pages()` asynchronously iterates newest-first cursor pages; `chat.history.attach()` loads older pages on scroll while preserving the visible message anchor. The same helper is available to Live and Dock.

@@ -14,8 +14,8 @@
  * Community ignores X-OV-* headers from browsers.
  *
  * The Feed and status posts are here too: feed() reads GET /api/v1/feed (one stream from Pulse across every
- * OpenVibe site) and posts.create() posts text with up to four pictures. Comments on other content, the rest of
- * the forum and Pulse's service API are not wrapped yet; paste comments are.
+ * OpenVibe site) and posts.create() posts text with up to four pictures. Shared typed comment threads are exposed
+ * as comments.*, including the owner-service attachment upload for Community paste comments.
  */
 const { isOpenVibeError } = require('./core/errors');
 const { isActingSubjectId } = require('./core/ids');
@@ -126,6 +126,14 @@ function createCommunityClient(client, defaults = {}) {
         resolve: (ref, o = {}) => call({ method: 'POST', path: '/api/v1/comments/threads/resolve', json: { ref }, ...once }, o),
         /** Read a page; sort is old|new, or parent pages replies after the first page. */
         get: (id, query = {}, o = {}) => call({ path: `/api/v1/comments/threads/${enc(id)}`, query }, o),
+        /** Upload bytes to the service that owns a Community paste, before passing the returned ref to create(). */
+        upload: (ref, file, o = {}) => {
+            const form = new FormData();
+            form.set('ref', JSON.stringify(ref));
+            const blob = file instanceof Blob ? file : new Blob([file], { type: o.mediaType || 'application/octet-stream' });
+            form.set('file', blob, o.filename || file.name || 'file');
+            return call({ method: 'POST', path: '/api/v1/comments/attachments', body: form, ...once }, o);
+        },
         /** Add a comment or reply; replies to replies are filed under their first comment. */
         create: (id, input, o = {}) => call({ method: 'POST', path: `/api/v1/comments/threads/${enc(id)}/comments`, json: input, ...once }, o),
         edit: (commentId, input, o = {}) => call({ method: 'PATCH', path: `/api/v1/comments/${enc(commentId)}`, json: input }, o),

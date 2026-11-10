@@ -94,19 +94,27 @@ run([
     ['shared comment threads support resolving, ordered paging, replies and edits', async () => {
         const srv = await echo();
         const community = createCommunityClient(createClient({ baseUrls: { community: srv.url } }));
+        const ref = { service: 'community', type: 'paste', id: 'paste-42' };
         await community.comments.resolve({ service: 'live', type: 'vod', id: '42' });
+        await community.comments.upload(ref, new Blob(['picture'], { type: 'image/png' }), { filename: 'look.png' });
         await community.comments.get('cth_test', { sort: 'new', limit: 2 });
         await community.comments.get('cth_test', { parent: 7, after: 12, limit: 50 });
         await community.comments.create('cth_test', { message: 'reply', parent_id: 7 });
         await community.comments.edit(8, { message: 'edited' });
         assert.deepEqual(srv.requests.map((r) => `${r.method} ${r.url}`), [
             'POST /api/v1/comments/threads/resolve',
+            'POST /api/v1/comments/attachments',
             'GET /api/v1/comments/threads/cth_test?sort=new&limit=2',
             'GET /api/v1/comments/threads/cth_test?parent=7&after=12&limit=50',
             'POST /api/v1/comments/threads/cth_test/comments',
             'PATCH /api/v1/comments/8',
         ]);
-        assert.deepEqual(JSON.parse(srv.requests[3].body), { message: 'reply', parent_id: 7 });
+        const upload = srv.requests[1];
+        assert.match(upload.headers['content-type'], /^multipart\/form-data/);
+        assert.match(upload.body.toString('latin1'), /name="ref"/);
+        assert.match(upload.body.toString('latin1'), /community.*paste-42/);
+        assert.match(upload.body.toString('latin1'), /name="file"; filename="look.png"/);
+        assert.deepEqual(JSON.parse(srv.requests[4].body), { message: 'reply', parent_id: 7 });
         await srv.close();
     }],
 
