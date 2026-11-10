@@ -50,6 +50,8 @@ function createQuestClient(client, { baseUrl } = {}) {
         appQuests, eventType, projectKey,
         /** The network-wide quest for today, or a past YYYY-MM-DD date (quest.daily@1). */
         daily: ({ date, signal } = {}) => call({ path: date ? `/api/v1/daily/${enc(date)}` : '/api/v1/daily', signal }),
+        /** This signed-in person's guided quest for today (requires a person token). */
+        today: ({ signal } = {}) => call({ path: '/api/v1/quests/today', signal }),
         /** The person token's own checklist, completion and streak (quest.daily-progress@1). */
         myDaily: ({ signal } = {}) => call({ path: '/api/v1/me/daily', signal }),
         /** Approved event-backed step types (quest.step-type@1). */
