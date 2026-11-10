@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.144.0 — 2026-11-10
+
+- `ai.metrics`: public daily model series, up-to-six-model comparisons, task leaderboards, listed price history and hourly provider health. Typed sample counts and nullable measurements; available in browser and server clients without credentials.
+
 ## 0.143.0 (2026-11-10)
 
 - **`sso`: a plain sign-in is quiet first.** `GET /auth/login` with no `silent`, `prompt` or `login_hint` now asks the Network with `prompt=none` before it shows a page: a browser signed in at openvibe.network comes back signed in, with no chooser. Before, a page that needs a person (and every link to one from another site, such as "Open" in the Dock) landed on the chooser although the Network knew the browser. When the Network knows nobody (`login_required`), or always asks for this app (`interaction_required`), the callback goes on to the chooser by itself (`/auth/login?ask=1`, the new way to ask for the chooser outright). A person who signed out on this site (`ov_sso_hint=guest`) gets the chooser at once, as do "switch" and "add an account" (`prompt`, `login_hint`). The navbar's own silent sign-in (`?silent=1`) is unchanged: with nobody at the Network it returns to the page with `?sso=none`.
