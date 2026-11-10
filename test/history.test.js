@@ -3,6 +3,8 @@ const assert = require('assert');
 const { createHistoryClient } = require('../src/history');
 
 (async () => {
+    const esm = await import('../esm/history.mjs');
+    assert.strictEqual(esm.createHistoryClient, createHistoryClient, 'the ESM subpath matches CommonJS');
     const calls = [];
     const history = createHistoryClient({ json: async (args) => { calls.push(args); return args; } }, { baseUrl: 'https://network.test' });
     await history.list({ limit: 12, kind: 'video', cursor: 'next' });
