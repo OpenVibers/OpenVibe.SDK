@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.143.0 — 2026-11-10
+
+- `ai.metrics`: public daily model series, up-to-six-model comparisons, task leaderboards, listed price history and hourly provider health. Typed sample counts and nullable measurements; available in browser and server clients without credentials.
+
 ## 0.142.0 (2026-11-10)
 
 - **`chat.rooms.memory(id)` and the moderator/person writes**: what a room remembers between summaries (`GET /api/v1/rooms/:id/memory`). `memory()` answers `{ room, entries, kinds, can_edit, me }`, each entry with its `kind`, `text`, `confidence`, when it was learned and its `sources` (the message it came from). `addMemory(id, { text, kind?, confidence?, source_message_ids? })` and `correctMemory(id, entryId, patch)` are a moderator's; `removeMemory(id, entryId)` removes any for a moderator and one learned from the caller's own messages for anyone; `forgetMyMemory(id)` forgets everything learned from the caller's messages in that room. Typed as `RoomMemory`, `MemoryEntry` and `MemoryInput` in `types/chat.d.ts`.
