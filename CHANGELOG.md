@@ -1,8 +1,29 @@
 # Changelog
 
-## 0.142.0 — 2026-11-10
+## 0.146.0 — 2026-11-10
 
-- `bot.embedUrl(robotId, mode)` returns the embeddable panel's address for a robot and a view: `panel` (the full panel), `overlay` (only the live controls, transparent, for a video) or `compact` (one row for a narrow card). It makes no request; the page that frames it must be in Bot's `BOT_EMBED_ORIGINS`.
+- #183: add the private history reader for cursor reads, search, summaries, agent recent reads, settings and owner-scoped deletes.
+- #184: add `frame.online()` with member presence, anonymous guest counts and live channel/site items.
+- #186: add `quest.today()` for the authenticated daily Quest response.
+- #195: add `bot.embedUrl(robotId, mode)` for panel, overlay and compact embeds.
+- #196: add merged code search, cited deep answers and cursor iteration to Search.
+- #197: add filtered, paged Inventory holdings reads and counts, plus async holding pages.
+
+## 0.145.0 — 2026-11-10
+
+- `bench.ratings.get`: shared fitted ratings and confidence intervals with a twenty-game floor. Browser-safe, anonymous and typed; pairs with `ai.metrics` across sites.
+
+## 0.144.0 — 2026-11-10
+
+- `ai.metrics`: public daily model series, up-to-six-model comparisons, task leaderboards, listed price history and hourly provider health. Typed sample counts and nullable measurements; available in browser and server clients without credentials.
+
+## 0.143.0 (2026-11-10)
+
+- **`sso`: a plain sign-in is quiet first.** `GET /auth/login` with no `silent`, `prompt` or `login_hint` now asks the Network with `prompt=none` before it shows a page: a browser signed in at openvibe.network comes back signed in, with no chooser. Before, a page that needs a person (and every link to one from another site, such as "Open" in the Dock) landed on the chooser although the Network knew the browser. When the Network knows nobody (`login_required`), or always asks for this app (`interaction_required`), the callback goes on to the chooser by itself (`/auth/login?ask=1`, the new way to ask for the chooser outright). A person who signed out on this site (`ov_sso_hint=guest`) gets the chooser at once, as do "switch" and "add an account" (`prompt`, `login_hint`). The navbar's own silent sign-in (`?silent=1`) is unchanged: with nobody at the Network it returns to the page with `?sso=none`.
+
+## 0.142.0 (2026-11-10)
+
+- **`chat.rooms.memory(id)` and the moderator/person writes**: what a room remembers between summaries (`GET /api/v1/rooms/:id/memory`). `memory()` answers `{ room, entries, kinds, can_edit, me }`, each entry with its `kind`, `text`, `confidence`, when it was learned and its `sources` (the message it came from). `addMemory(id, { text, kind?, confidence?, source_message_ids? })` and `correctMemory(id, entryId, patch)` are a moderator's; `removeMemory(id, entryId)` removes any for a moderator and one learned from the caller's own messages for anyone; `forgetMyMemory(id)` forgets everything learned from the caller's messages in that room. Typed as `RoomMemory`, `MemoryEntry` and `MemoryInput` in `types/chat.d.ts`.
 
 ## 0.141.0 — 2026-11-10
 

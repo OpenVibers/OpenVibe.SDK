@@ -385,6 +385,7 @@
     "satisfiesRange": "function",
     "search": {
       "object": [
+        "codeOf",
         "createSearchClient",
         "fabricOf",
         "queryOf"
@@ -1084,6 +1085,7 @@
     "validateRuntimeOffer": "function"
   },
   "openvibe-sdk/search": {
+    "codeOf": "function",
     "createSearchClient": "function",
     "fabricOf": "function",
     "queryOf": "function"

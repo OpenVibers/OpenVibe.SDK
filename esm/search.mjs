@@ -2,6 +2,6 @@
 import cjs from '../src/search.js';
 
 export const {
-    createSearchClient, queryOf, fabricOf,
+    createSearchClient, queryOf, fabricOf, codeOf,
 } = cjs;
 export default cjs;
