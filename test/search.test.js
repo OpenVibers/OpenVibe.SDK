@@ -32,6 +32,10 @@ async function search() {
 }
 
 run([
+    ['ESM subpath exports code search and code iteration', async () => {
+        const esm = await import('../esm/search.mjs');
+        assert.equal(typeof esm.createSearchClient, 'function');
+    }],
     ['fabric: scopes go to GET /api/v1/query; query() with scopes is the same call; providers', async () => {
         const srv = await search();
         const s = createSearchClient(createClient({ baseUrls: { search: srv.url } }));

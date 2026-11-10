@@ -66,6 +66,9 @@ function fakeDom() {
 }
 
 (async () => {
+    const frameEsm = await import('../esm/frame.mjs');
+    assert.equal(typeof frameEsm.online, 'function', 'the frame ESM subpath exports the online reader');
+
     const d = fakeDom();
     const r = await mountFrame({ ...opts, document: d.doc, window: d.win });
     assert.ok(r.navbar && r.footer);
