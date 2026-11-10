@@ -3,7 +3,7 @@
 const assert = require('node:assert/strict');
 const { stubServer, send, run } = require('./helpers');
 const { createClient } = require('../src/core');
-const { createSearchClient, queryOf, fabricOf } = require('../src/search');
+const { createSearchClient, queryOf, fabricOf, codeOf } = require('../src/search');
 
 const USR = 'usr_01JAB2C3D4E5F6G7H8J9K0MNPQ';
 
@@ -15,7 +15,14 @@ async function search() {
             if (!cursor) return send(res, 200, { results: [{ owner: 'live', type: 'vod', id: '1' }, { owner: 'live', type: 'vod', id: '2' }], next_cursor: 'c2' });
             return send(res, 200, { results: [{ owner: 'live', type: 'vod', id: '3' }], next_cursor: null });
         }
-        if (u.pathname === '/api/v1/query') return send(res, 200, { results: [{ scope: 'web', kind: 'page', title: 'A', url: 'https://example.org/a', provider: 'wikipedia' }], groups: { web: 1 }, answer: null, citations: [], route: { explain: [{ scope: 'web', step: 'wikipedia', ok: true, count: 1 }], cost_usd: 0 }, next_cursor: null });
+        if (u.pathname === '/api/v1/search/code') {
+            const cursor = u.searchParams.get('cursor');
+            const hit = { source: 'github', repo: 'OpenVibers/OpenVibe.Search', path: 'server/api/query.js', ref: 'abc123', line_start: 5, line_end: 5, lines: [{ number: 5, text: 'function createSearcher() {', match: true }], language: 'JavaScript', stars: 12, licence: 'AGPL-3.0', last_commit_at: '2026-11-09T10:00:00Z', permalink: 'https://github.com/OpenVibers/OpenVibe.Search/blob/abc123/server/api/query.js#L5' };
+            if (!cursor) return send(res, 200, { query: { q: u.searchParams.get('q') }, results: [hit], sources: [{ id: 'github', kind: 'code', label: 'GitHub code search', enabled: true, health: 'ok', order: 10, calls: 1, failures: 0 }], next_cursor: 'c2' });
+            return send(res, 200, { query: { q: u.searchParams.get('q') }, results: [{ ...hit, path: 'second.js' }], sources: [], next_cursor: null });
+        }
+        if (u.pathname === '/api/v1/search/code/deep') return send(res, 200, { query: { q: 'x' }, queries: ['createSearcher'], answer: 'It is here [1].', citations: [{ n: 1, repo: 'OpenVibers/OpenVibe.Search', path: 'server/api/query.js', line_start: 5, line_end: 5, permalink: 'https://github.com/OpenVibers/OpenVibe.Search/blob/abc123/server/api/query.js#L5' }], results: [], route: { budget: { max_model_calls: 2 } } });
+        if (u.pathname === '/api/v1/query') return send(res, 200,  { results: [{ scope: 'web', kind: 'page', title: 'A', url: 'https://example.org/a', provider: 'wikipedia' }], groups: { web: 1 }, answer: null, citations: [], route: { explain: [{ scope: 'web', step: 'wikipedia', ok: true, count: 1 }], cost_usd: 0 }, next_cursor: null });
         if (u.pathname === '/api/v1/query/providers') return send(res, 200, { providers: [{ provider: 'deepseek', scopes: ['web'], price_usd_per_call: 0.00075, available: true, checked_at: '2026-10-28T12:00:00Z' }] });
         if (u.pathname === '/api/v1/suggest') return send(res, 200, { suggestions: [{ owner: 'live', type: 'channel', id: '327', title: 'JapaneseOldGuy' }] });
         if (u.pathname.startsWith('/api/v1/documents/live/channel/404')) return send(res, 404, { type: 'about:blank', code: 'search.not_found', status: 404 });
@@ -25,6 +32,10 @@ async function search() {
 }
 
 run([
+    ['ESM subpath exports code search and code iteration', async () => {
+        const esm = await import('../esm/search.mjs');
+        assert.equal(typeof esm.createSearchClient, 'function');
+    }],
     ['fabric: scopes go to GET /api/v1/query; query() with scopes is the same call; providers', async () => {
         const srv = await search();
         const s = createSearchClient(createClient({ baseUrls: { search: srv.url } }));
@@ -83,6 +94,31 @@ run([
         assert.equal(r.headers.authorization, 'Bearer svc-openvibe.search');
         assert.equal(r.headers['x-ov-subject'], USR);
         assert.throws(() => createSearchClient(createClient({ baseUrls: { search: srv.url } })).query('x', { actingSubject: 'nope' }), /actingSubject/);
+        await srv.close();
+    }],
+    ['code: a filter query, pages via codeIterate, and the cited deep answer', async () => {
+        const srv = await search();
+        const s = createSearchClient(createClient({ baseUrls: { search: srv.url } }));
+        const page = await s.code('createSearcher', { repo: 'OpenVibers/OpenVibe.Search', licence: 'AGPL-3.0', limit: 1 });
+        const u = new URL(srv.requests[0].url, 'http://x');
+        assert.equal(u.pathname, '/api/v1/search/code');
+        assert.equal(u.searchParams.get('q'), 'createSearcher');
+        assert.equal(u.searchParams.get('repo'), 'OpenVibers/OpenVibe.Search');
+        assert.equal(u.searchParams.get('licence'), 'AGPL-3.0');
+        assert.equal(u.searchParams.get('limit'), '1');
+        assert.equal(page.results[0].permalink, 'https://github.com/OpenVibers/OpenVibe.Search/blob/abc123/server/api/query.js#L5');
+        const paths = [];
+        for await (const r of s.codeIterate('createSearcher')) paths.push(r.path);
+        assert.deepEqual(paths, ['server/api/query.js', 'second.js']);
+        assert.equal(new URL(srv.requests[2].url, 'http://x').searchParams.get('cursor'), 'c2');
+        const deep = await s.code('Where?', { deep: true, repo: 'OpenVibers/OpenVibe.Search' });
+        assert.equal(deep.answer, 'It is here [1].');
+        const post = srv.requests[3];
+        assert.equal(post.method, 'POST');
+        assert.equal(JSON.parse(post.body.toString()).q, 'Where?');
+        assert.equal(JSON.parse(post.body.toString()).repo, 'OpenVibers/OpenVibe.Search');
+        assert.equal(post.headers['idempotency-key'], undefined, 'a paid run is not retried under an idempotency key');
+        assert.deepEqual(codeOf('x', { lang: 'js', limit: 2 }), { q: 'x', lang: 'js', limit: 2 });
         await srv.close();
     }],
 ]);

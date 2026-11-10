@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.146.0 — 2026-11-10
+
+- #183: add the private history reader for cursor reads, search, summaries, agent recent reads, settings and owner-scoped deletes.
+- #184: add `frame.online()` with member presence, anonymous guest counts and live channel/site items.
+- #186: add `quest.today()` for the authenticated daily Quest response.
+- #195: add `bot.embedUrl(robotId, mode)` for panel, overlay and compact embeds.
+- #196: add merged code search, cited deep answers and cursor iteration to Search.
+- #197: add filtered, paged Inventory holdings reads and counts, plus async holding pages.
+
 ## 0.145.0 — 2026-11-10
 
 - `bench.ratings.get`: shared fitted ratings and confidence intervals with a twenty-game floor. Browser-safe, anonymous and typed; pairs with `ai.metrics` across sites.

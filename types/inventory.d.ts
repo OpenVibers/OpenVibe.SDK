@@ -9,6 +9,9 @@ export interface Definition {
 }
 export interface DefinitionRequest { kind: string; name: string; description?: string; rarity?: Rarity; art?: Definition['art']; attributes?: Record<string, unknown>; supply_cap?: number; [k: string]: unknown }
 export interface Instance { id: string; definition_id: string; owner_subject?: string; state?: 'owned' | 'consumed' | 'revoked'; serial?: number | null; [k: string]: unknown }
+export interface Holding { definition: Definition; instance: Instance; count: number; equipped: boolean; tradable: boolean; kind_slots: string[] }
+export interface HoldingsPage { subject: string; holdings: Holding[]; next_cursor: string | null }
+export type HoldingsOptions = Opts & { issuer?: string; site?: string; kind?: string; rarity?: Rarity; equipped?: boolean; tradable?: boolean; text?: string; sort?: 'newest' | 'name' | 'rarity' | 'count'; cursor?: string; limit?: number };
 export interface EquippedSet { subject: string; slots: Record<string, { instance_id: string; definition_id: string; token?: string; media_id?: string }>; updated_at: string | null }
 export interface InventoryClient {
     kinds: { list(opts?: Opts): Promise<{ kinds: Kind[] }>; get(kindId: string, opts?: Opts): Promise<{ kind: Kind }> };
@@ -19,12 +22,18 @@ export interface InventoryClient {
         update(id: string, patch: Partial<DefinitionRequest>, opts?: Opts): Promise<{ definition: Definition }>;
     };
     people: {
-        items(subject: string, opts?: Opts & { kind?: string; cursor?: string; limit?: number }): Promise<{ items: Instance[]; next: string | null; [k: string]: unknown }>;
+        items(subject: string, opts?: Opts & { kind?: string; cursor?: string; limit?: number }): Promise<{ subject: string; instances: Instance[]; definitions: Record<string, Definition>; next_cursor: string | null }>;
+        holdings(subject: string, opts?: HoldingsOptions): Promise<HoldingsPage>;
+        holdingsCount(subject: string, opts?: HoldingsOptions): Promise<{ subject: string; count: number }>;
+        holdingPages(subject: string, opts?: HoldingsOptions): AsyncIterable<HoldingsPage>;
         equipped(subject: string, opts?: Opts): Promise<EquippedSet>;
     };
     equipped(subjects: string[], opts?: Opts): Promise<{ equipped: EquippedSet[] }>;
     me: {
-        items(opts?: Opts & { kind?: string; cursor?: string; limit?: number }): Promise<{ items: Instance[]; next: string | null; [k: string]: unknown }>;
+        items(opts?: Opts & { kind?: string; cursor?: string; limit?: number }): Promise<{ subject: string; instances: Instance[]; definitions: Record<string, Definition>; next_cursor: string | null }>;
+        holdings(opts?: HoldingsOptions): Promise<HoldingsPage>;
+        holdingsCount(opts?: HoldingsOptions): Promise<{ subject: string; count: number }>;
+        holdingPages(opts?: HoldingsOptions): AsyncIterable<HoldingsPage>;
         equip(req: { kind: string; slot: string; instance_id: string | null }, opts?: Opts): Promise<EquippedSet>;
     };
     grants: { create(req: { definition_id: string; subject: string; idempotency_key: string; [k: string]: unknown }, opts?: Opts): Promise<{ instance: Instance; created: boolean }> };

@@ -40,6 +40,23 @@ function fabricOf(text, o = {}) {
     if (o.answer) q.answer = 'true';
     return q;
 }
+const CODE_KEYS = ['lang', 'repo', 'licence', 'limit', 'cursor'];
+const CODE_BODY_KEYS = ['lang', 'repo', 'licence'];
+
+/** The query string of GET /api/v1/search/code. */
+function codeOf(text, o = {}) {
+    const q = { q: String(text == null ? '' : text) };
+    for (const k of CODE_KEYS) if (o[k] !== undefined && o[k] !== null && o[k] !== '') q[k] = o[k];
+    return q;
+}
+
+/** The body of POST /api/v1/search/code/deep; q is required, the filters are optional. */
+function codeBody(text, o = {}) {
+    const body = { q: String(text == null ? '' : text) };
+    for (const k of CODE_BODY_KEYS) if (o[k] !== undefined && o[k] !== null && o[k] !== '') body[k] = o[k];
+    return body;
+}
+
 const FACET_KEY = /^[a-z][a-z0-9_]{0,39}$/;
 
 function queryOf(text, o = {}) {
@@ -104,7 +121,23 @@ function createSearchClient(client, defaults = {}) {
         suggest: (text, o = {}) => call({ path: pathWith('/api/v1/suggest', queryOf(text, { owner: o.owner, type: o.type, limit: o.limit })) }, o),
         /** One document by exact id, or null (a document you may not see answers the same as a missing one). */
         document: (owner, type, id, o = {}) => orNull(call({ path: `/api/v1/documents/${enc(owner)}/${enc(type)}/${enc(id)}` }, o)),
+        /** { results, sources, next_cursor } — merged public code; `deep: true` asks the cited answer (signed in). */
+        code: (text, o = {}) => (o.deep
+            ? call({ method: 'POST', path: '/api/v1/search/code/deep', json: codeBody(text, o), idempotencyKey: false }, o)
+            : call({ path: pathWith('/api/v1/search/code', codeOf(text, o)) }, o)),
+        /** Every merged code result, page after page (cursor). Deep mode is one answer, not a page stream. */
+        async *codeIterate(text, o = {}) {
+            if (o.deep) throw new TypeError('codeIterate is for pages; use code(text, { deep: true }) for an answer');
+            let cursor = o.cursor || null;
+            let seen = 0;
+            const max = Number.isFinite(o.max) ? o.max : Infinity;
+            do {
+                const page = await call({ path: pathWith('/api/v1/search/code', codeOf(text, { ...o, cursor })) }, o);
+                for (const r of page.results || []) { if (seen++ >= max) return; yield r; }
+                cursor = page.next_cursor || null;
+            } while (cursor);
+        },
     };
 }
 
-module.exports = { createSearchClient, queryOf, fabricOf };
+module.exports = { createSearchClient, queryOf, fabricOf, codeOf };

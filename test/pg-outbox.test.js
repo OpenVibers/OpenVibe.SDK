@@ -89,7 +89,9 @@ function cases(label, open) {
                     outbox.kick();
                     await new Promise((r) => setTimeout(r, 80));
                 });
-                await new Promise((r) => setTimeout(r, 120));
+                // PGlite's claim can take longer than a fixed sleep on loaded CI hosts.
+                const deadline = Date.now() + 2000;
+                while ((inTx.length < 3 || platform.state.events.length < 1) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 20));
                 await outbox.stop();
                 assert.equal(platform.state.events.length, 1, 'the event went out');
                 assert.ok(inTx.length >= 3, `the relay kept ticking (${inTx.length} claims)`);

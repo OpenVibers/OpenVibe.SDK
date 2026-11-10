@@ -16,6 +16,7 @@ export interface AppQuest {
 }
 export interface QuestClient {
     daily(opts?: { date?: string; signal?: AbortSignal }): Promise<DailyQuest>;
+    today(opts?: { signal?: AbortSignal }): Promise<DailyProgress>;
     myDaily(opts?: { signal?: AbortSignal }): Promise<DailyProgress>;
     stepTypes(opts?: { signal?: AbortSignal }): Promise<{ step_types: QuestStepType[] }>;
     contributeStepType(stepType: DailyStepTypeRequest, opts?: { signal?: AbortSignal }): Promise<QuestStepType>;

@@ -69,6 +69,7 @@ module.exports = {
     download: require('./src/download'),
     openre: require('./src/openre'),
     geo: require('./src/geo'),
+    history: require('./src/history'),
     usage: require('./src/usage'),
     commerce: require('./src/commerce'),
     moneyReasons: require('./src/money-reasons'),

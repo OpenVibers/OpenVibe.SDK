@@ -22,6 +22,8 @@ const { createInventoryClient } = require('../src/inventory');
                 return json(201, { instance: { id: 'inv_01JAB2C3D4E5F6G7H8J9K0MNPQ' }, created: true });
             }
             if (req.url === '/api/v1/definitions' && req.method === 'POST') return json(409, { type: 'about:blank', title: 'exhausted', status: 409, code: 'inventory.supply_exhausted' });
+            if (req.url.includes('/holdings/count')) return json(200, { subject: 'test', count: 2 });
+            if (req.url.includes('/holdings')) return json(200, { subject: 'test', holdings: [{ count: 1 }], next_cursor: req.url.includes('cursor=next') ? null : 'next' });
             return json(200, { ok: true });
         });
     });
@@ -56,6 +58,15 @@ const { createInventoryClient } = require('../src/inventory');
         assert.deepStrictEqual(seen[9].body, { kind: 'live.hat', slot: 'head', instance_id: null }, 'null clears the slot');
         assert.deepStrictEqual(seen[12].body, { reason: 'refund' });
         assert.ok(seen.every((s) => s.subject === null), 'a person\'s own client names nobody');
+
+        seen.length = 0;
+        assert.strictEqual((await inv.me.holdingsCount({ rarity: 'rare' })).count, 2);
+        assert.strictEqual((await inv.people.holdings(U1, { sort: 'name', limit: 60, equipped: false, tradable: true })).holdings.length, 1);
+        const pages = [];
+        for await (const page of inv.me.holdingPages({ issuer: 'service:live', limit: 1 })) pages.push(page);
+        assert.strictEqual(pages.length, 2);
+        assert(seen.some((s) => s.url.includes('/me/holdings?') && s.url.includes('cursor=next')));
+        assert(seen.some((s) => s.url.includes(`/people/${U1}/holdings?equipped=false&tradable=true&sort=name&limit=60`)));
 
         // Grants: the body's idempotency_key makes a retry safe, so a 503 is retried and the item is granted once.
         seen.length = 0;

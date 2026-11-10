@@ -58,6 +58,7 @@ export * as play from './play';
 export * as download from './download';
 export * as openre from './openre';
 export * as geo from './geo';
+export * as history from './history';
 export * as usage from './usage';
 export * as commerce from './commerce';
 export * as moneyReasons from './money-reasons';
