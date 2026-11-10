@@ -4,6 +4,10 @@
 
 # Changelog
 
+## 0.137.0 (2026-11-10)
+
+- Add `moneyReasons` (`billing.money-reason@1`): the plain words for a movement of OpenCoins, Vibes or Balance, for a service that holds the raw `reason` row. It re-exports `openvibe-contracts`' list when the installed package has it, otherwise the same list copied at Contracts 0.392.0: `describe(key, { site, resolve, subject })` answers `{ key, text, subject: { name, url } | null, site, known }`, and `describeRow(row)` reads `{ reason, app_id }`. An undeclared key reads "for something on <site>" with `known: false`.
+
 ## 0.136.0 (2026-11-10)
 
 - Add `moneyReasons` (`billing.money-reason@1`): the plain words for a movement of OpenCoins, Vibes or Balance, for a service that holds the raw `reason` row. It re-exports `openvibe-contracts`' list when the installed package has it, otherwise the same list copied at Contracts 0.390.0: `describe(key, { site, resolve, subject })` answers `{ key, text, subject: { name, url } | null, site, known }`, and `describeRow(row)` reads `{ reason, app_id }`. An undeclared key reads "for something on <site>" with `known: false`.
