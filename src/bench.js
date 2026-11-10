@@ -8,7 +8,7 @@ const path = (part, id) => `/api/v1/${part}/${enc(id)}`;
 
 function createBenchClient(client, defaults = {}) {
     function options(opts = {}, perCall = {}) {
-        const acting = perCall.actingSubject !== undefined ? perCall.actingSubject : defaults.actingSubject;
+        const acting = opts.auth === false ? null : perCall.actingSubject !== undefined ? perCall.actingSubject : defaults.actingSubject;
         const headers = { ...opts.headers };
         if (acting) {
             if (!isActingSubjectId(acting)) throw new TypeError('actingSubject must be a usr_… or gst_… subject id');
@@ -42,6 +42,13 @@ function createBenchClient(client, defaults = {}) {
         },
         boards: {
             get: (kind, { type, category, period, ...o } = {}) => json({ path: path('boards', kind), query: { type, category, period } }, o),
+        },
+        ratings: {
+            get(kind, { category, signal } = {}) {
+                if (typeof kind !== 'string' || !/^[a-zA-Z0-9_.:-]{1,100}$/.test(kind)) throw new TypeError('Use a Bench kind id');
+                if (category !== undefined && (typeof category !== 'string' || !/^[a-zA-Z0-9_.:-]{1,80}$/.test(category))) throw new TypeError('Use a task category of at most 80 characters');
+                return json({ method: 'GET', auth: false, path: path('ratings', kind), query: { category } }, { signal });
+            },
         },
         models: {
             get: (model, o = {}) => json({ path: path('models', model) }, o),
