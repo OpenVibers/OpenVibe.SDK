@@ -4,6 +4,9 @@
 
 **Open source JavaScript/TypeScript SDK and API clients for the OpenVibe network** — docs at [openvibe.services](https://openvibe.services).
 
+**Docs:** https://openvibe.services · **For AI:** https://openvibe.services/llms.txt
+**Install and test:** `npm ci && npm test` (Node 20 or newer)
+
 ```bash
 npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.108.0
 ```
@@ -660,7 +663,7 @@ Nothing at runtime. `openvibe-contracts` and `@electric-sql/pglite` are devDepen
 Part of the [OpenVibe network](https://openvibe.network). Built in the open by [OpenVibers](https://github.com/OpenVibers).
 
 <!-- versions:start -->
-- openvibe-contracts: v0.338.0
+- openvibe-contracts: v0.384.0
 <!-- versions:end -->
 
 ### Network-wide sharing (Node)
