@@ -465,6 +465,11 @@
         "validateUsageSample"
       ]
     },
+    "userCard": {
+      "object": [
+        "createUserCardClient"
+      ]
+    },
     "video": {
       "object": [
         "createVideoClient"
@@ -1254,6 +1259,9 @@
     "usageKey": "function",
     "usageSample": "function",
     "validateUsageSample": "function"
+  },
+  "openvibe-sdk/user-card": {
+    "createUserCardClient": "function"
   },
   "openvibe-sdk/valkey": {
     "createValkey": "function"

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.147.0 — 2026-11-10
+
+- Add the browser-safe, typed `userCard.createUserCardClient(core).get(username)` public Network aggregate. Hidden or unavailable fields remain optional; reads omit credentials.
+
 ## 0.146.0 — 2026-11-10
 
 - #183: add the private history reader for cursor reads, search, summaries, agent recent reads, settings and owner-scoped deletes.
