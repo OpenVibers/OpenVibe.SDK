@@ -1,4 +1,5 @@
 import type { OpenVibeClient, EntityRef } from './core';
+import type { AiFile } from './ai';
 
 export interface ActingOptions {
     /** usr_… or gst_… (services only). */
@@ -10,12 +11,14 @@ export interface ActingOptions {
 export type CallOptions = ActingOptions & { signal?: AbortSignal };
 
 export interface CommentQuery { after?: string | number; sort?: 'old' | 'new'; limit?: number; parent?: string | number; }
-export interface Comment { id: number; thread_id: number | string; parent_id: number | null; message: string | null; reply_count?: number | null; replies?: Comment[]; [field: string]: unknown; }
+export type CommentAttachment = AiFile & { url?: string };
+export interface Comment { id: number; thread_id: number | string; parent_id: number | null; message: string | null; reply_count?: number | null; replies?: Comment[]; attachments?: CommentAttachment[]; [field: string]: unknown; }
 export interface CommentPage { thread: Record<string, unknown>; comments: Comment[]; next_cursor: string | null; viewer: Record<string, boolean>; }
 export interface CommentsApi {
     resolve(ref: EntityRef, opts?: CallOptions): Promise<{ thread: Record<string, unknown>; created: boolean }>;
     get(id: string, query?: CommentQuery, opts?: CallOptions): Promise<CommentPage>;
-    create(id: string, input: { message: string; parent_id?: number | string | null; anon_name?: string }, opts?: CallOptions): Promise<{ comment: Comment }>;
+    upload(ref: EntityRef, file: Blob | ArrayBuffer | ArrayBufferView, opts?: CallOptions & { filename?: string; mediaType?: string }): Promise<{ attachment: CommentAttachment }>;
+    create(id: string, input: { message: string; parent_id?: number | string | null; anon_name?: string; attachments?: CommentAttachment[] }, opts?: CallOptions): Promise<{ comment: Comment }>;
     edit(commentId: number | string, input: { message: string }, opts?: CallOptions): Promise<{ comment: Comment }>;
     delete(commentId: number | string, opts?: CallOptions): Promise<{ ok: true; id: number }>;
     visibility(id: string, visibility: 'public' | 'hidden' | 'locked', opts?: CallOptions): Promise<{ thread: Record<string, unknown> }>;
