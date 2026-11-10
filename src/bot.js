@@ -37,6 +37,10 @@ const { isActingSubjectId } = require('./core/ids');
 const { paginate } = require('./core/paginate');
 
 const enc = encodeURIComponent;
+const DEFAULT_BOT_URL = 'https://openvibe.bot';
+// The three views OpenVibe.Bot's embeddable panel renders (docs/controls-embed.md there).
+const EMBED_MODES = ['panel', 'overlay', 'compact'];
+const ROBOT_ID = /^rob_[A-Za-z0-9_-]{4,60}$/;
 const DESK_NAME = /^desk-[a-z0-9][a-z0-9-]{0,23}$/;
 const randomDesk = () => `desk-${Math.random().toString(36).slice(2, 12).padEnd(10, '0')}`;
 
@@ -65,6 +69,19 @@ function createBotClient(client, defaults = {}) {
     }
     const orNull = (p) => p.catch((err) => { if (isOpenVibeError(err) && err.status === 404) return null; throw err; });
     const once = { idempotencyKey: false };     // a one-time code is its own idempotency: never repeat the call
+
+    /**
+     * The address of a robot's embeddable panel, for a page that frames or links it:
+     * `https://openvibe.bot/panel/<rob_…>/embed?mode=panel|overlay|compact`. `panel` is the full panel,
+     * `overlay` only the live controls (transparent; over a video) and `compact` one row for a narrow card.
+     * No request is made; the host page's origin must be in Bot's BOT_EMBED_ORIGINS to frame it.
+     */
+    function embedUrl(robotId, mode = 'panel') {
+        if (typeof robotId !== 'string' || !ROBOT_ID.test(robotId)) throw new TypeError('robotId must be a Bot robot id (rob_…)');
+        if (!EMBED_MODES.includes(mode)) throw new TypeError(`mode must be one of ${EMBED_MODES.join(', ')}`);
+        const base = String(baseUrl || DEFAULT_BOT_URL).replace(/\/+$/, '');
+        return `${base}/panel/${enc(robotId)}/embed?mode=${mode}`;
+    }
 
     const robots = {
         /** { robots } — a person's own robots; a service must name owner (or act as them). */
@@ -207,6 +224,8 @@ function createBotClient(client, defaults = {}) {
         },
         /** The agent redeems a one-time pairing code (the code is the credential; never retried) -> the pair result. */
         pair: (input = {}, o = {}) => call({ method: 'POST', path: '/api/v1/pair', json: input, ...once }, o),
+        /** The embeddable panel's address for a robot and view (no request; see the doc comment above). */
+        embedUrl,
         /** The same client acting for someone else: as('usr_…') or as({ actingSubject }). */
         as(who) {
             const next = typeof who === 'string' ? { actingSubject: who } : { ...who };

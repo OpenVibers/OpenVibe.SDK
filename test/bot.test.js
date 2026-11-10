@@ -242,6 +242,18 @@ run([
         await srv.close();
     }],
 
+    ['embedUrl: the panel address for a robot and view, from the client\'s Bot origin', async () => {
+        const bot = createBotClient(createClient({ baseUrls: { bot: 'https://openvibe.bot' } }));
+        assert.equal(bot.embedUrl(ROB), `https://openvibe.bot/panel/${ROB}/embed?mode=panel`);
+        assert.equal(bot.embedUrl(ROB, 'overlay'), `https://openvibe.bot/panel/${ROB}/embed?mode=overlay`);
+        assert.equal(bot.embedUrl(ROB, 'compact'), `https://openvibe.bot/panel/${ROB}/embed?mode=compact`);
+        const custom = createBotClient(createClient({ baseUrls: { bot: 'https://bot.example' } }), { baseUrl: 'https://bot.example/' });
+        assert.equal(custom.embedUrl(ROB, 'overlay'), `https://bot.example/panel/${ROB}/embed?mode=overlay`, 'a trailing slash is trimmed');
+        assert.equal(custom.as(USR).embedUrl(ROB), `https://bot.example/panel/${ROB}/embed?mode=panel`, 'as() keeps the origin');
+        assert.throws(() => bot.embedUrl('not-a-robot'), TypeError);
+        assert.throws(() => bot.embedUrl(ROB, 'huge'), TypeError);
+    }],
+
     ['browser mode: cookie credentials, no Authorization and no X-OV headers', async () => {
         const srv = await server();
         const seen = [];

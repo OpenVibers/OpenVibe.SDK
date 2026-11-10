@@ -116,12 +116,15 @@ export interface MachinesApi {
     chat(id: string, input: MachineChatInput, opts?: CallOptions & { ms?: number }): Promise<MachineChatResult>;
     aiModels(id: string, on: boolean, opts?: CallOptions): Promise<{ machine: Machine }>;
 }
+export type BotEmbedMode = 'panel' | 'overlay' | 'compact';
 export interface BotClient {
     robots: RobotsApi;
     machines: MachinesApi;
     devices: DevicesApi;
     profiles: ProfilesApi;
     kits: KitsApi;
+    /** The embeddable panel's address for a robot and view (no request): https://openvibe.bot/panel/<rob_…>/embed?mode=… */
+    embedUrl(robotId: string, mode?: BotEmbedMode): string;
     pair(input: PairInput, opts?: CallOptions): Promise<{ device_id: string; credential?: string; robot_id?: string; profile?: Record<string, unknown> | null; [field: string]: unknown }>;
     as(who: string | ActingOptions): BotClient;
     headers(): Record<string, string>;

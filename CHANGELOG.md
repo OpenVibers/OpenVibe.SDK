@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.142.0 — 2026-11-10
+
+- `bot.embedUrl(robotId, mode)` returns the embeddable panel's address for a robot and a view: `panel` (the full panel), `overlay` (only the live controls, transparent, for a video) or `compact` (one row for a narrow card). It makes no request; the page that frames it must be in Bot's `BOT_EMBED_ORIGINS`.
+
 ## 0.141.0 — 2026-11-10
 
 - `community.comments.upload(ref, file)` uploads a Community paste comment attachment through Community; `comments.create()` accepts typed attachment references.
