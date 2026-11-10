@@ -72,6 +72,7 @@ const ENTRIES = {
     'tools.mjs': '../src/tools.js',
     'projects.mjs': '../src/projects.js',
     'geo.mjs': '../src/geo.js',
+    'history.mjs': '../src/history.js',
     'openre.mjs': '../src/openre.js',
     'play.mjs': '../src/play.js',
     'download.mjs': '../src/download.js',

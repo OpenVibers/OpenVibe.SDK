@@ -35,4 +35,5 @@ module.exports = {
     tools: require('./src/tools'),
     projects: require('./src/projects'),
     geo: require('./src/geo'),
+    history: require('./src/history'),
 };

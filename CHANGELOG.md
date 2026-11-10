@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.136.0 — 2026-11-10
+
+**Private cross-site history reader.** `openvibe-sdk/history` exposes the signed-in person's paged list, title
+search, day/week summary, opt-in agent read, settings and owner-scoped delete controls over Network's API.
+
 ## 0.135.0 (2026-11-10)
 
 - `ov.ai.files`: attach files through Media, list/read/remove them, and expose typed `ai.file@1` and conversational turn shapes.

@@ -14,7 +14,7 @@ export const {
     tips, blog, reviews, wiki, coupons, deals,
     shoes, trade, space, host, news, food,
     actor, run, video, pics, work, zone,
-    git, play, download, openre, geo, usage,
-    commerce, telemetry,
+    git, play, download, openre, geo, history,
+    usage, commerce, telemetry,
 } = cjs;
 export default cjs;
