@@ -13,6 +13,7 @@ async function chatStub() {
     let busy = 0;
     return stubServer((req, res) => {
         if (req.url.startsWith('/api/chat/rooms/private-one')) return send(res, 404, { error: 'Room not found' });
+        if (req.url === '/api/v1/rooms/missing/insight') return send(res, 404, { error: 'Room insight not found' });
         if (req.url === '/api/chat/send' && busy++ === 0) return send(res, 503, { error: 'busy' });
         return send(res, 200, { ok: true, url: req.url });
     });
@@ -45,6 +46,7 @@ run([
         await chat.dms.viewPreference(7);
         await chat.dms.setViewPreference(7, 'bubbles');
         await chat.global.history({ after_id: 5 });
+        await chat.rooms.insight('global');
         const got = srv.requests.map((r) => [r.method, r.url, r.body && String(r.body).length ? JSON.parse(String(r.body)) : null]);
         assert.deepEqual(got, [
             ['POST', '/api/chat/rooms', { name: 'Builders' }],
@@ -57,6 +59,7 @@ run([
             ['GET', '/api/dm/conversations/7/view', null],
             ['PUT', '/api/dm/conversations/7/view', { view: 'bubbles' }],
             ['GET', '/api/chat/global/history?after_id=5', null],
+            ['GET', '/api/v1/rooms/global/insight', null],
         ]);
         assert.equal(srv.requests[0].headers.authorization, 'Bearer user-jwt');
         await srv.close();
@@ -67,6 +70,7 @@ run([
         await assert.rejects(chat.global.send('hello'), (e) => e.status === 503);
         assert.equal(srv.requests.filter((r) => r.url === '/api/chat/send').length, 1, 'one attempt only');
         assert.equal(await chat.rooms.get('private-one'), null);
+        assert.equal(await chat.rooms.insight('missing'), null, 'a room without an insight is null');
         await srv.close();
     }],
     ['inboxes, feeds and Vibe go to their paths', async () => {
