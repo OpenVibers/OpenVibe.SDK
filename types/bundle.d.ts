@@ -27,6 +27,7 @@ import * as geo from './geo';
 import * as history from './history';
 import * as locker from './locker';
 import * as trust from './trust';
+import * as levels from './levels';
 import * as core from './core';
 export const createWalletClient: typeof import('./wallet').createWalletClient;
 
@@ -59,6 +60,7 @@ export * as geo from './geo';
 export * as history from './history';
 export * as locker from './locker';
 export * as trust from './trust';
+export * as levels from './levels';
 
 declare const sdk: typeof core & {
     createWalletClient: typeof createWalletClient;
