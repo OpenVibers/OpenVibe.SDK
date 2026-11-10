@@ -1,6 +1,11 @@
 import type { OpenVibeClient } from './core';
 
 export interface AiRun { id: string; status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | string; workflow?: { key: string; version: number }; output?: unknown; error?: unknown; latency_class?: LatencyClass; service_tier?: ServiceTier | null; latency_clamped?: { asked: LatencyClass; used: LatencyClass } | null; [field: string]: unknown; }
+export interface AiFile { id: string; name: string; media_type: string; size: number; storage: { provider: 'media'; key: string }; access: { readers: string[] }; read: { method: 'text' | 'pages' | 'image' | 'audio_transcript' | 'not_readable'; content?: string; pages?: string[]; reason?: string }; role?: 'input' | 'artifact'; }
+export interface AiTurnMessage { role: 'user' | 'assistant'; content: string; files?: AiFile[]; }
+export interface AiTurnRequest { messages: AiTurnMessage[]; files?: AiFile[]; }
+export interface AiTurnResult { content: string; artifacts: AiFile[]; }
+export interface AiFiles { attach(data: Blob | ArrayBuffer | ArrayBufferView | string, opts?: { filename?: string; mediaType?: string; subject?: string; signal?: AbortSignal; [option: string]: unknown }): Promise<AiFile>; list(opts?: Record<string, unknown>): Promise<{ files: AiFile[]; [field: string]: unknown }>; read(id: string, opts?: { ttl?: number; signal?: AbortSignal }): Promise<{ file: unknown; bytes: Uint8Array }>; remove(id: string): Promise<boolean>; }
 /** How long the caller may wait: interactive (as soon as the provider can), background (minutes, priced on the cheapest tier that can wait), batch (hours, answered through the provider's own batch API). */
 export type LatencyClass = 'interactive' | 'background' | 'batch';
 /** The tier a run was priced on: the one the provider served (standard, flex, batch) or the one the router chose (offpeak, local). */
@@ -51,8 +56,8 @@ export interface AiBatches {
     cancel(id: string, opts?: { signal?: AbortSignal }): Promise<{ batch: AiBatch }>;
 }
 type Op = (input?: Record<string, unknown>, opts?: Omit<RunOptions, 'version' | 'onBehalfOf'>) => Promise<RunResponse>;
-export interface AiClient { tasks(opts?: {signal?: AbortSignal}): Promise<{tasks: AiTask[]}>; run(task: string, input?: Record<string, unknown>, opts?: RunOptions): Promise<RunResponse>; choices: { get(task: string, opts?: {signal?: AbortSignal}): Promise<{task: AiTask; choice: AiChoice; why: string; options: Record<string, unknown[]>}>; set(task: string, choice: AiChoice, opts?: {signal?: AbortSignal}): Promise<{choice: AiChoice}> }; admin: { defaults(value?: {defaults: Array<{task: string; value: AiTaskDefaults}>}, opts?: {signal?: AbortSignal}): Promise<{tasks?: AiTask[]; defaults: Record<string, AiTaskDefaults>}> }; runs: AiRuns; batches: AiBatches; TERMINAL: Set<string>; CLASSES: string[]; chat: Op; generate: Op; summarize: Op; classify: Op; extract: Op; enrich: Op; embed: Op; }
-export function createAiClient(client: OpenVibeClient, defaults?: { baseUrl?: string }): AiClient;
+export interface AiClient { tasks(opts?: {signal?: AbortSignal}): Promise<{tasks: AiTask[]}>; run(task: string, input?: Record<string, unknown>, opts?: RunOptions): Promise<RunResponse>; choices: { get(task: string, opts?: {signal?: AbortSignal}): Promise<{task: AiTask; choice: AiChoice; why: string; options: Record<string, unknown[]>}>; set(task: string, choice: AiChoice, opts?: {signal?: AbortSignal}): Promise<{choice: AiChoice}> }; admin: { defaults(value?: {defaults: Array<{task: string; value: AiTaskDefaults}>}, opts?: {signal?: AbortSignal}): Promise<{tasks?: AiTask[]; defaults: Record<string, AiTaskDefaults>}> }; runs: AiRuns; batches: AiBatches; files: AiFiles; TERMINAL: Set<string>; CLASSES: string[]; chat: Op; generate: Op; summarize: Op; classify: Op; extract: Op; enrich: Op; embed: Op; }
+export function createAiClient(client: OpenVibeClient, defaults?: { baseUrl?: string; media?: Record<string, unknown> & { app: string; subject?: string }; objectsClient?: { upload: Function; list: Function; signedUrl: Function; get: Function; delete: Function }; fetch?: typeof fetch }): AiClient;
 export const TERMINAL: Set<string>;
 export const OPS: string[];
 export const CLASSES: string[];
