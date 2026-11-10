@@ -1972,6 +1972,79 @@ export interface ServiceManifest {
      * The room's launcher group in OpenVibe.Shared rooms.js and OpenVibe.Network frame/sites.js; optional so older manifests retain their meaning.
      */
     neighbourhood?: "streams" | "games" | "answers" | "make" | "shop" | "people" | "build";
+    /**
+     * This site's own items on the network's footer strip, read with the rest of it at openvibe.network GET /api/frame/online?site=<id>: a label, an icon from the shared glyph set, an https link on an OpenVibe domain (any openvibe.* host), and either a count the site reports or a fixed line. Network checks every field again before it reaches a page.
+     *
+     * @maxItems 3
+     */
+    strip?:
+      | []
+      | [
+          (
+            | {
+                [k: string]: unknown | undefined;
+              }
+            | {
+                [k: string]: unknown | undefined;
+              }
+          ) & {
+            [k: string]: unknown | undefined;
+          }
+        ]
+      | [
+          (
+            | {
+                [k: string]: unknown | undefined;
+              }
+            | {
+                [k: string]: unknown | undefined;
+              }
+          ) & {
+            [k: string]: unknown | undefined;
+          },
+          (
+            | {
+                [k: string]: unknown | undefined;
+              }
+            | {
+                [k: string]: unknown | undefined;
+              }
+          ) & {
+            [k: string]: unknown | undefined;
+          }
+        ]
+      | [
+          (
+            | {
+                [k: string]: unknown | undefined;
+              }
+            | {
+                [k: string]: unknown | undefined;
+              }
+          ) & {
+            [k: string]: unknown | undefined;
+          },
+          (
+            | {
+                [k: string]: unknown | undefined;
+              }
+            | {
+                [k: string]: unknown | undefined;
+              }
+          ) & {
+            [k: string]: unknown | undefined;
+          },
+          (
+            | {
+                [k: string]: unknown | undefined;
+              }
+            | {
+                [k: string]: unknown | undefined;
+              }
+          ) & {
+            [k: string]: unknown | undefined;
+          }
+        ];
   };
   capabilities: string[];
   eventsProduced: string[];
