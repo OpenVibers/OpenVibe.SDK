@@ -14,6 +14,19 @@ export interface AppQuest {
     title: string; why: string | null; steps: AppQuestStep[]; badge: { id: string; name: string }; url: string | null;
     status: 'active' | 'retired'; created_at: string; updated_at: string; completions: number;
 }
+export interface QuestCardData {
+    signed_in: boolean;
+    quest: QuestDaily;
+    more: {
+        quests?: number;
+        sites?: number;
+        mine?: { badges: number; in_progress: number; completed: number };
+    };
+}
+export interface QuestCardOptions {
+    token?: string | null;
+    timeZone?: string;
+}
 export interface QuestClient {
     daily(opts?: { date?: string; signal?: AbortSignal }): Promise<DailyQuest>;
     today(opts?: { signal?: AbortSignal }): Promise<DailyProgress>;
@@ -25,6 +38,7 @@ export interface QuestClient {
         list(opts?: { signal?: AbortSignal }): Promise<{ project_id: string; max: number; quests: AppQuest[] }>;
         retire(slug: string, opts?: { signal?: AbortSignal }): Promise<AppQuest>;
     };
+    cardData(opts?: QuestCardOptions): Promise<QuestCardData | null>;
     eventType(projectId: string, name: string): string;
     projectKey(projectId: string): string;
 }
