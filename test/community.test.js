@@ -91,6 +91,25 @@ run([
         await srv.close();
     }],
 
+    ['shared comment threads support resolving, ordered paging, replies and edits', async () => {
+        const srv = await echo();
+        const community = createCommunityClient(createClient({ baseUrls: { community: srv.url } }));
+        await community.comments.resolve({ service: 'live', type: 'vod', id: '42' });
+        await community.comments.get('cth_test', { sort: 'new', limit: 2 });
+        await community.comments.get('cth_test', { parent: 7, after: 12, limit: 50 });
+        await community.comments.create('cth_test', { message: 'reply', parent_id: 7 });
+        await community.comments.edit(8, { message: 'edited' });
+        assert.deepEqual(srv.requests.map((r) => `${r.method} ${r.url}`), [
+            'POST /api/v1/comments/threads/resolve',
+            'GET /api/v1/comments/threads/cth_test?sort=new&limit=2',
+            'GET /api/v1/comments/threads/cth_test?parent=7&after=12&limit=50',
+            'POST /api/v1/comments/threads/cth_test/comments',
+            'PATCH /api/v1/comments/8',
+        ]);
+        assert.deepEqual(JSON.parse(srv.requests[3].body), { message: 'reply', parent_id: 7 });
+        await srv.close();
+    }],
+
     ['routes: fork, copy, versions, by-user, config, comments, screenshot multipart, iterate', async () => {
         const srv = await echo();
         const p = createCommunityClient(createClient({ baseUrls: { community: srv.url } })).pastes;
