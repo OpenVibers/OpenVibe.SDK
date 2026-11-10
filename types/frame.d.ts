@@ -39,8 +39,29 @@ export interface FrameOptions {
 export interface FrameConfig { navbar: Record<string, unknown>; footer: Record<string, unknown> | null }
 export interface FrameUrls { theme: string; navbar: string; footer: string; shipped: string }
 
+/** One person the network may name: only when their presence setting lets others see them online. */
+export interface FrameOnlinePerson { name: string; username: string; avatar: string | null; site: string | null }
+/** A count that opens what it counts, or a site's own strip item (a number or a fixed line). */
+export interface FrameOnlineItem { label: string; icon: string; link: string; value?: number; line?: string }
+/** GET <base>/api/frame/online — who was on the network in the last thirty minutes. A guest is a number only. */
+export interface FrameOnline {
+    updated: string | null;
+    members: number | null;
+    guests: number | null;
+    total: number | null;
+    people: FrameOnlinePerson[];
+    more: number;
+    live: { channels: number; watching: number; first: Array<{ name: string; url: string }> } | null;
+    counts: Array<{ id?: string; label: string; value: number; icon: string; url: string }>;
+    items: FrameOnlineItem[];
+    sites: number | null;
+    views_7d: number | null;
+}
+
 export const DEFAULT_BASE: string;
 export function scriptUrls(opts?: { base?: string }): FrameUrls;
 export function frameConfig(opts?: FrameOptions): FrameConfig;
 export function frameTags(opts?: FrameOptions): { head: string; bodyStart: string; bodyEnd: string; config: FrameConfig; urls: FrameUrls };
 export function mountFrame(opts?: FrameOptions): Promise<{ navbar: unknown | null; footer: unknown | null }>;
+/** The footer strip's read; `site` (the calling site's Frame id) brings that site's own items. */
+export function online(opts?: { base?: string; site?: string; signal?: AbortSignal; fetch?: typeof fetch }): Promise<FrameOnline>;

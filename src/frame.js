@@ -147,4 +147,25 @@ async function mountFrame(opts = {}) {
     return { navbar, footer };
 }
 
-module.exports = { mountFrame, frameTags, frameConfig, scriptUrls, DEFAULT_BASE };
+/**
+ * The network's "who is online" read, the data the shared footer strip draws: GET <base>/api/frame/online
+ * (openvibe.network). `site` is the calling site's id (its Frame service id), so the answer carries that
+ * site's own strip items; omit it and `items` is empty. The answer is returned as it is:
+ *
+ *   { members, guests, total, people: [{ name, username, avatar, site }], more,
+ *     live: { channels, watching, first: [{ name, url }] }, counts: [{ label, value, icon, url }],
+ *     items: [{ label, icon, link, value? , line? }], sites, views_7d }
+ *
+ * A guest is a number only: the read never says who they are, where they are or what made them distinct.
+ * Public and CORS-open, cached 30 seconds at the edge. Throws on a non-2xx answer or when fetch is missing.
+ */
+async function online({ base = DEFAULT_BASE, site = '', signal, fetch: fetchImpl = (typeof fetch === 'function' ? fetch : null) } = {}) {
+    const b = baseOf(base);
+    if (typeof fetchImpl !== 'function') throw new TypeError('openvibe-sdk/frame: online needs a fetch implementation');
+    const q = /^[a-z0-9][a-z0-9-]{0,39}$/.test(String(site || '')) ? `?site=${encodeURIComponent(String(site))}` : '';
+    const res = await fetchImpl(`${b}/api/frame/online${q}`, { headers: { accept: 'application/json' }, credentials: 'omit', signal });
+    if (!res || !res.ok) throw new Error(`openvibe-sdk/frame: online answered ${res ? res.status : 'nothing'}`);
+    return await res.json();
+}
+
+module.exports = { mountFrame, frameTags, frameConfig, scriptUrls, online, DEFAULT_BASE };
