@@ -25,4 +25,8 @@ run([
             assert.equal(listeners.size, 0);
         } finally { global.window = old; }
     }],
+    ['player ESM subpath exposes handoff', async () => {
+        const esm = await import('../esm/player.mjs');
+        assert.equal(typeof esm.handoff, 'function');
+    }],
 ]);
