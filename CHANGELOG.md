@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.149.0 — 2026-11-11
+
+- Extend the existing `codes` client with `modelPlans.get/put/presets()` and `tasks.create({ plan | preset })`, typed for `codes.model-plan@1` on Contracts 0.406.0.
+
 ## 0.148.0 — 2026-11-11
 
 - #208: add `openvibe-sdk/composer`, the shared composer's client: `attachments.upload(file, { onProgress, signal })` (multipart through `XMLHttpRequest`, real browser progress), `attachments.remove(id)`, `composer.prefs.get()/put(prefs, rev)` and `mentions.search(q, kinds)`, typed by `composer.attachment@1`, `composer.prefs@1` and `composer.mention@1`.
