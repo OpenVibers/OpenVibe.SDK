@@ -169,6 +169,22 @@
         "createDownloadClient"
       ]
     },
+    "elements": {
+      "object": [
+        "ACTION_KINDS",
+        "ACTION_SET",
+        "PRODUCTS",
+        "ROBOT_ACTIONS",
+        "ROLES",
+        "ROLE_RANK",
+        "TRIGGER_KINDS",
+        "TRIGGER_SET",
+        "isValidValue",
+        "reduce",
+        "run",
+        "validate"
+      ]
+    },
     "events": {
       "object": [
         "appSource",
@@ -801,6 +817,57 @@
   "openvibe-sdk/download": {
     "contentTypeOf": "function",
     "createDownloadClient": "function"
+  },
+  "openvibe-sdk/elements": {
+    "ACTION_KINDS": "array",
+    "ACTION_SET": "object",
+    "PRODUCTS": {
+      "object": [
+        "actor.task",
+        "ai.ask",
+        "chat.message",
+        "chat.pin",
+        "chat.poll",
+        "money.tip_goal",
+        "robot.drive_pulse",
+        "robot.head_preset",
+        "robot.headlight",
+        "robot.macro",
+        "robot.say",
+        "screen.alert",
+        "screen.animation",
+        "screen.confetti",
+        "screen.counter",
+        "screen.scene",
+        "screen.sound",
+        "screen.state",
+        "screen.tts",
+        "screen.visibility",
+        "stream.category",
+        "stream.clip",
+        "stream.moment",
+        "stream.title",
+        "webhook.call"
+      ]
+    },
+    "ROBOT_ACTIONS": "array",
+    "ROLES": "array",
+    "ROLE_RANK": {
+      "object": [
+        "everyone",
+        "follower",
+        "operator",
+        "owner",
+        "subscriber",
+        "vip"
+      ]
+    },
+    "TRIGGER_KINDS": "array",
+    "TRIGGER_SET": "object",
+    "isValidValue": "function",
+    "reduce": "function",
+    "run": "function",
+    "validate": "function"
   },
   "openvibe-sdk/events": {
     "appSource": "function",

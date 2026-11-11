@@ -34,6 +34,7 @@ module.exports = {
     meme: require('./src/meme'),
     vision: require('./src/vision'),
     themes: require('./src/themes'),
+    elements: require('./src/elements'),
     design: require('./src/design'),
     redact: require('./src/redact'),
     chat: require('./src/chat'),

@@ -76,3 +76,4 @@ export * as composer from './composer';
 export * as userCard from './user-card';
 export * as player from './player';
 export * as agentSheet from './agent-sheet';
+export * as elements from './elements';

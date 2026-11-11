@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.151.0 — 2026-11-11
+
+- Add `openvibe-sdk/elements`, the element runtime: `validate(element)` (look, recipe, declared capabilities and an
+  optional mod reference; plain reasons), `run(recipe, trigger, ctx)` (role, live-only, robot turn, chance, cooldowns,
+  daily caps, the channel-points owner, then each action sent to the product that authorises it, with a refund when a
+  product refuses) and `reduce(state, actions)` for the element's own store. Also `PRODUCTS`, `ACTION_KINDS`,
+  `TRIGGER_KINDS`, `ROLES` and `ROLE_RANK`; no network calls of its own, so both entries and every host share it.
+  Shapes follow `ui.element@1`, `ui.trigger@1`, `ui.action@1` and `ui.element-state@1` (openvibe-contracts 0.411.0,
+  still in release); the runtime does not require the package.
+
 ## 0.150.0 — 2026-11-11
 
 - Add `ai.turn(input, options)` for file-capable `ai.complete` runs. Its typed `output_file` option stores a text, Markdown, CSV or JSON answer in Media and returns private `ai.file` artifact references; existing `ai.files.read()` reads a returned object.
