@@ -69,3 +69,4 @@ export * as locker from './locker';
 export const createWalletClient: typeof import('./wallet').createWalletClient;
 
 export * as levels from './levels';
+export * as composer from './composer';

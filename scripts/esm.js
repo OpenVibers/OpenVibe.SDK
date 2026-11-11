@@ -35,6 +35,7 @@ const ENTRIES = {
     'cam.mjs': '../src/cam/index.js',
     'realtime.mjs': '../src/realtime.js',
     'media.mjs': '../src/media.js',
+    'composer.mjs': '../src/composer.js',
     'media-upload.mjs': '../src/media-upload.js',
     'ui.mjs': '../src/ui.js',
     'community.mjs': '../src/community.js',

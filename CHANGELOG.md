@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Add `openvibe-sdk/composer`: the shared composer's client. `attachments.upload(file, { onProgress, signal })` POSTs one multipart file to `POST /api/v1/attachments` on Media through **XMLHttpRequest**, so progress is the browser's real upload progress; `attachments.remove(id)`; `composer.prefs.get()/put(prefs, rev)` against `GET/PUT /api/v1/me/composer` on Network (a stale revision is 409 `composer.rev_conflict`, `err.problem.current` is the other tab's copy); `mentions.search(q, kinds)` against `GET /api/v1/mentions`. Typed by `composer.attachment@1`, `composer.prefs@1` and `composer.mention@1`; `test/composer.test.js` runs every call against a stub server.
+
 ## 0.146.0 — 2026-11-10
 
 - #183: add the private history reader for cursor reads, search, summaries, agent recent reads, settings and owner-scoped deletes.

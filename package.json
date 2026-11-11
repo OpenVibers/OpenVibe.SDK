@@ -84,6 +84,11 @@
       "import": "./esm/media.mjs",
       "default": "./src/media.js"
     },
+    "./composer": {
+      "types": "./types/composer.d.ts",
+      "import": "./esm/composer.mjs",
+      "default": "./src/composer.js"
+    },
     "./media-upload": {
       "types": "./types/media-upload.d.ts",
       "import": "./esm/media-upload.mjs",

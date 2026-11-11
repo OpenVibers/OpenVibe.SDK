@@ -21,6 +21,7 @@ module.exports = {
     events: require('./src/events'),
     realtime: require('./src/realtime'),
     media: require('./src/media'),
+    composer: require('./src/composer'),
     cam: require('./src/cam'),
     mediaUpload: require('./src/media-upload'),
     ui: require('./src/ui'),
