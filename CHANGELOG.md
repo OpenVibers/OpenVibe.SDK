@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.148.0 — 2026-11-11
+
+- Add `community.feed.list({ kind, cursor })` as a named form of the existing Feed reader and type preview video media.
+
 ## 0.147.0 — 2026-11-10
 
 - #181: add `chat.activity` (the person's feed: mentions, replies, reactions, server invites, accepted friend requests and roles), `rooms.react()` and `reply_to_id` on room and DM sends.
