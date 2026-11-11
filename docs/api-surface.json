@@ -508,6 +508,14 @@
         "progress"
       ]
     },
+    "uiLayout": {
+      "object": [
+        "PRESSED_PX",
+        "applyDefaults",
+        "merge",
+        "validate"
+      ]
+    },
     "ulid": "function",
     "usage": {
       "object": [
@@ -1383,6 +1391,12 @@
   },
   "openvibe-sdk/ui": {
     "progress": "function"
+  },
+  "openvibe-sdk/ui-layout": {
+    "PRESSED_PX": "number",
+    "applyDefaults": "function",
+    "merge": "function",
+    "validate": "function"
   },
   "openvibe-sdk/usage": {
     "createUsageReporter": "function",

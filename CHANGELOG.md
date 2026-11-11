@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.153.0 — 2026-11-11
+
+- Add `openvibe-sdk/ui-layout` (also `sdk.uiLayout` in both entries): `validate(catalog, layout)` is the one
+  check the server, the editor and the AI answer use, returning `{ ok, reasons[] }` in plain words. It refuses a
+  missing, hidden or undersized required part, anything pressed under 44 px (and any part under the catalog's own
+  pixel minimum, e.g. Stop at 64), a part covering a required part or breaking a `never_covers` rule, a tint that
+  is not a catalog theme token or a style/binding the part does not allow, a part the catalog does not have, and
+  any URL, markup or code. `applyDefaults(catalog, device?)` builds the valid default arrangement (required parts
+  first, every part visible, 44 px met) and `merge(layout, patch)` applies a patch by part id without mutating
+  the layout. Browser-safe, no dependencies; exhaustive tests.
+
 ## 0.151.0 — 2026-11-11
 
 - Add related-origin passkey sign-in to `openvibe-sdk/sso` (opt-in `relatedPasskeys: true`): `POST /auth/passkey/options`

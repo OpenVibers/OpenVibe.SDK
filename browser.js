@@ -20,6 +20,7 @@ module.exports = {
     cam: require('./src/cam'),
     mediaUpload: require('./src/media-upload'),
     ui: require('./src/ui'),
+    uiLayout: require('./src/ui-layout'),
     community: require('./src/community'),
     homeFeed: require('./src/home-feed'),
     feed: require('./src/feed'),

@@ -72,7 +72,7 @@ run([
                 })().catch((err) => { console.error(err); process.exit(1); });`;
             const res = execFileSync(process.execPath, ['-e', script], { cwd: app, encoding: 'utf8' });
             assert.match(res, new RegExp(`consumer ok: ${subpaths.length} subpaths \\+ the browser bundle`));
-            assert.equal(subpaths.length, 110);   // composer, feed and agents add the 104th-106th after user-card; the 0.148.0 train's codes, player and the rest bring 109; elements brings 110.
+            assert.equal(subpaths.length, 111);   // 0.152.0 train: elements (#227) and ui-layout (#226) add the 110th and 111th;   // composer, feed and agents add the 104th-106th after user-card; the 0.148.0 train's codes, player and the rest bring 109; elements brings 110.
             assert.ok(!fs.existsSync(path.join(app, 'node_modules/openvibe-contracts')), 'the optional peer is not installed');
         } finally {
             fs.rmSync(tmp, { recursive: true, force: true });

@@ -40,6 +40,7 @@ const ENTRIES = {
     'composer.mjs': '../src/composer.js',
     'media-upload.mjs': '../src/media-upload.js',
     'ui.mjs': '../src/ui.js',
+    'ui-layout.mjs': '../src/ui-layout.js',
     'community.mjs': '../src/community.js',
     'bot.mjs': '../src/bot.js',
     'machines.mjs': '../src/machines.js',

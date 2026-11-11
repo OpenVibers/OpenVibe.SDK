@@ -13,6 +13,7 @@ export * as media from './media';
 export * as cam from './cam';
 export * as mediaUpload from './media-upload';
 export * as ui from './ui';
+export * as uiLayout from './ui-layout';
 export * as community from './community';
 export * as homeFeed from './home-feed';
 export * as feed from './feed';
