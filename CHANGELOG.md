@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.149.0 — 2026-11-11
+
+- Add `wallet.changes()` for the owner-scoped Vibes, OpenCoins and channel-points gain/loss window, and `wallet.markRead()` for each currency's own read cursor. The Network route composes Billing and Live ledger reads; the SDK sends only the person's bearer token and never accepts a subject override.
+
 ## 0.147.0 — 2026-11-10
 
 - #181: add `chat.activity` (the person's feed: mentions, replies, reactions, server invites, accepted friend requests and roles), `rooms.react()` and `reply_to_id` on room and DM sends.
