@@ -13,6 +13,7 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..');
 const ENTRIES = {
     'user-card.mjs': '../src/user-card.js',
+    'agent-sheet.mjs': '../src/agent-sheet.js',
     'wallet.mjs': '../src/wallet.js',
     'compute.mjs': '../src/compute/index.js',
     'share.mjs': '../src/share.js',

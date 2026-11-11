@@ -622,6 +622,12 @@
       "browser": null,
       "import": "./esm/codes.mjs",
       "default": "./src/codes.js"
+    },
+    "./agent-sheet": {
+      "types": "./types/agent-sheet.d.ts",
+      "browser": "./src/agent-sheet.js",
+      "import": "./esm/agent-sheet.mjs",
+      "default": "./src/agent-sheet.js"
     }
   },
   "bin": {

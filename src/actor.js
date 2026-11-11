@@ -109,6 +109,7 @@ function createActorClient(client, { baseUrl } = {}) {
                 /** A personal agent: name, instructions, mode, budget_per_run_usd, daily_runs_max, schedule, … */
                 create: (agent, { signal } = {}) => once({ method: 'POST', path: '/api/v1/me/agents', json: agent, signal }),
                 get: (agent, { signal } = {}) => call({ path: agentPath(agent), signal }),
+                sheet: (agent, { signal } = {}) => call({ path: agentPath(agent), query: { view: 'sheet' }, signal }),
                 update: (agent, patch, { signal } = {}) => call({ method: 'PATCH', path: agentPath(agent), json: patch, idempotent: true, signal }),
                 remove: (agent, { signal } = {}) => call({ method: 'DELETE', path: agentPath(agent), signal }),
                 /** Run it now with an input → the task it started (follow it with tasks.events). */

@@ -42,4 +42,5 @@ module.exports = {
     history: require('./src/history'),
     userCard: require('./src/user-card'),
     player: require('./src/player'),
+    agentSheet: require('./src/agent-sheet'),
 };

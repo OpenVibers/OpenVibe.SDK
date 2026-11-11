@@ -80,4 +80,5 @@ module.exports = {
     telemetry: require('./src/telemetry'),
     userCard: require('./src/user-card'),
     player: require('./src/player'),
+    agentSheet: require('./src/agent-sheet'),
 };
