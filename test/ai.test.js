@@ -48,6 +48,18 @@ run([
         assert.equal(srv.requests[0].headers.authorization, undefined, 'public: no token is sent');
         await srv.close();
     }],
+    ['turn sends Media file references and the requested output file through ai.complete', async () => {
+        const srv = await aiStub();
+        const ai = createAiClient(createClient({ baseUrls: { ai: srv.url }, token: 't' }));
+        await ai.turn({ messages: [{ role: 'user', content: 'Summarize this file' }], files: [{ id: 'med_example' }],
+            output_file: { name: 'answer.md', media_type: 'text/markdown' } },
+        { wait: 1000, onBehalfOf: { type: 'user', id: 'usr_example' } });
+        assert.deepEqual(JSON.parse(String(srv.requests[0].body)), {
+            workflow: 'ai.complete', input: { messages: [{ role: 'user', content: 'Summarize this file' }], files: [{ id: 'med_example' }],
+                output_file: { name: 'answer.md', media_type: 'text/markdown' } }, on_behalf_of: { type: 'user', id: 'usr_example' },
+        });
+        await srv.close();
+    }],
     ['a create without a key is not retried; direct ops post the input as the body', async () => {
         const srv = await aiStub();
         const ai = createAiClient(createClient({ baseUrls: { ai: srv.url }, token: 't', retries: 2 }));

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.150.0 — 2026-11-11
+
+- Add `ai.turn(input, options)` for file-capable `ai.complete` runs. Its typed `output_file` option stores a text, Markdown, CSV or JSON answer in Media and returns private `ai.file` artifact references; existing `ai.files.read()` reads a returned object.
+- Type the image task's owner daily cap and guest find switch in `AiTaskDefaults`.
+
 ## 0.149.0 — 2026-11-11
 
 - Extend the existing `codes` client with `modelPlans.get/put/presets()` and `tasks.create({ plan | preset })`, typed for `codes.model-plan@1` on Contracts 0.406.0.
