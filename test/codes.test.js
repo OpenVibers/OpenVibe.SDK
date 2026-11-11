@@ -21,6 +21,9 @@ const summary = (over = {}) => ({
             seen.push({ method: req.method, url: req.url, auth: req.headers.authorization || null, body });
             const json = (status, obj) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); };
             if (req.url === '/api/v1/me/tasks?limit=8' && req.method === 'GET') return json(200, { tasks: [summary()] });
+            if (req.url === '/api/v1/model-plans/presets' && req.method === 'GET') return json(200, { presets: { Fast: { mode: 'single' } } });
+            if (req.url.startsWith('/api/v1/model-plans') && req.method === 'GET') return json(200, { account: { mode: 'pair' }, effective: { mode: 'pair' } });
+            if (req.url.startsWith('/api/v1/model-plans') && req.method === 'PUT') return json(200, { resolved: JSON.parse(body).plan });
             if (req.url === '/api/v1/tasks' && req.method === 'POST') {
                 const b = JSON.parse(body);
                 if (b.mode === 'create') return json(200, { id: null, url: 'https://openvibe.space/auth/login?next=%2Fspaces%2Fnew' });
@@ -42,6 +45,16 @@ const summary = (over = {}) => ({
         assert.strictEqual(space.id, null);
         assert.ok(space.url.startsWith('https://openvibe.space'));
         assert.deepStrictEqual(await codes.tasks.stop(TASK), { ok: true });
+        const plan = { mode: 'single', roles: [{ role: 'builder', model: 'auto', effort: 'low' }], checks: { tests: true, lint: false, reviewer: false } };
+        assert.equal((await codes.modelPlans.get()).effective.mode, 'pair');
+        assert.equal((await codes.modelPlans.get({ project: 'prj_example' })).account.mode, 'pair');
+        assert.deepStrictEqual(await codes.modelPlans.put(plan, { project: 'prj_example' }), { resolved: plan });
+        assert.equal((await codes.modelPlans.presets()).presets.Fast.mode, 'single');
+        await codes.tasks.create({ text: 'Use a preset', mode: 'repo', preset: 'Deep' });
+        await codes.tasks.create({ text: 'Use a plan', mode: 'repo', plan });
+        assert.equal(JSON.parse(seen.find((s) => s.url === '/api/v1/tasks' && JSON.parse(s.body).preset === 'Deep').body).preset, 'Deep');
+        assert.deepStrictEqual(JSON.parse(seen.find((s) => s.url === '/api/v1/tasks' && JSON.parse(s.body).plan).body).plan, plan);
+        assert.deepStrictEqual(JSON.parse(seen.find((s) => s.url === '/api/v1/model-plans?project=prj_example' && s.method === 'PUT').body), { plan });
 
         const posted = JSON.parse(seen.find((s) => s.url === '/api/v1/tasks' && JSON.parse(s.body).mode === 'repo').body);
         assert.deepStrictEqual(posted, { text: 'Add a test.', mode: 'repo', repo: 'octocat/Hello-World' });
@@ -52,6 +65,10 @@ const summary = (over = {}) => ({
         assert.throws(() => codes.tasks.create({ text: 'Hi', mode: 'repo', repo: '  ' }), /repo is a repository/);
         assert.throws(() => codes.tasks.create({ text: 'Hi', mode: 'repo', attachments: [42] }), /attachment ids/);
         assert.throws(() => codes.tasks.stop('nope'), /tsk_/);
+        assert.throws(() => codes.tasks.create({ text: 'Hi', mode: 'repo', plan, preset: 'Fast' }), /choose plan or preset/);
+        assert.throws(() => codes.tasks.create({ text: 'Hi', mode: 'repo', preset: 'Unknown' }), /preset is Fast/);
+        assert.throws(() => codes.tasks.create({ text: 'Hi', mode: 'create', preset: 'Fast' }), /coding tasks/);
+        assert.throws(() => codes.modelPlans.put(null), /plan is a model plan/);
         console.log('  ok  codes tasks: list, create (repo and create), stop, and every validation');
     } finally {
         await new Promise((r) => server.close(r));
