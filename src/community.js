@@ -113,6 +113,8 @@ function createCommunityClient(client, defaults = {}) {
         query: { kind: query.kind, site: query.site, q: query.q, cursor: query.cursor, limit: query.limit,
             following: query.following === true || query.following === 1 ? '1' : undefined },
     }, o);
+    // Named form used by new integrations; the callable form remains for existing SDK consumers.
+    feed.list = feed;
     const posts = {
         /**
          * A status post in the Feed at once: { text, pictures?: [{ media_id, alt }] } (at most four, alt required,

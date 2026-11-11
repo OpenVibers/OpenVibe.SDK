@@ -12,7 +12,7 @@ export type CallOptions = ActingOptions & { signal?: AbortSignal };
 
 export interface CommentQuery { after?: string | number; sort?: 'old' | 'new'; limit?: number; parent?: string | number; }
 export type CommentAttachment = AiFile & { url?: string };
-export interface Comment { id: number; thread_id: number | string; parent_id: number | null; message: string | null; reply_count?: number | null; replies?: Comment[]; attachments?: CommentAttachment[]; [field: string]: unknown; }
+export interface Comment { id: number; thread_id: number | string; parent_id: number | null; reply_to_id: number | null; reply_to: { id: number; display_name: string } | null; message: string | null; reply_count?: number | null; replies?: Comment[]; attachments?: CommentAttachment[]; [field: string]: unknown; }
 export interface CommentPage { thread: Record<string, unknown>; comments: Comment[]; next_cursor: string | null; viewer: Record<string, boolean>; }
 export interface CommentsApi {
     resolve(ref: EntityRef, opts?: CallOptions): Promise<{ thread: Record<string, unknown>; created: boolean }>;
@@ -60,7 +60,7 @@ export interface FeedItem {
     site: string;
     site_name: string;
     actor: { name: string | null; avatar: string | null } | null;
-    media: { thumb: string; ratio: number; length?: number } | null;
+    media: { thumb: string; preview?: string; ratio: number; length?: number } | null;
     counts: { views?: number; likes?: number; comments?: number };
     /** True while on air; false on an ended stream. Absent for other kinds. */
     live_now?: boolean;
@@ -76,10 +76,14 @@ export interface PostsApi {
 export interface CommunityClient {
     pastes: PastesApi;
     comments: CommentsApi;
-    feed(query?: FeedQuery, opts?: CallOptions): Promise<{ items: FeedItem[]; next_cursor: string | null }>;
+    feed: FeedReader;
     posts: PostsApi;
     as(who: string | ActingOptions): CommunityClient;
     headers(): Record<string, string>;
+}
+export interface FeedReader {
+    (query?: FeedQuery, opts?: CallOptions): Promise<{ items: FeedItem[]; next_cursor: string | null }>;
+    list(query?: Pick<FeedQuery, 'kind' | 'cursor'>, opts?: CallOptions): Promise<{ items: FeedItem[]; next_cursor: string | null }>;
 }
 export declare function createCommunityClient(client: OpenVibeClient, defaults?: ActingOptions & { baseUrl?: string }): CommunityClient;
 export declare function actingHeaders(opts?: ActingOptions): Record<string, string>;

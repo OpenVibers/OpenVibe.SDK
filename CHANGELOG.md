@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.148.0 — 2026-11-11
+
+- #208: add `openvibe-sdk/composer`, the shared composer's client: `attachments.upload(file, { onProgress, signal })` (multipart through `XMLHttpRequest`, real browser progress), `attachments.remove(id)`, `composer.prefs.get()/put(prefs, rev)` and `mentions.search(q, kinds)`, typed by `composer.attachment@1`, `composer.prefs@1` and `composer.mention@1`.
+- #210: add `feed.list({ kind, cursor })` for the cross-site Community Feed, keep the existing Community reader callable, and type preview video media.
+- #211: add the `openvibe-sdk/sso` one-time cross-site sign-in handoff: `POST /auth/handoff` mints a 60 s ticket and `sso.handoff()` arrival middleware redeems it before the page renders.
+- #212: add `agents` SDK methods to fetch run snapshots, follow resumable AG-UI event streams and post approvals.
+- #213: add `wallet.changes()` for the owner-scoped Vibes, OpenCoins and channel-points gain and loss window, and
+  `wallet.markRead()` for each currency's own read cursor.
+- #214: add browser-safe `player.current()`, `player.handoff(url)` and `player.on(listener)` for a live stream carried
+  between OpenVibe sites by Shared's floating player.
+- #215: add typed Chat readers for a person's compacted day, week and month memory, plus personal erase and opt-out.
+- #216: add `exchange.createCatalogSearchClient().search(q, filters)` for public model and provider offers (prices,
+  measured speed and Bench quality when available), and type the image search filters and source metadata.
+- #217: add the owner-only agent sheet reader and Actor pause, resume and memory controls through Network's relay.
+- #219: the app sign-in test checks a token's shape, not the letters "eyJ" (a macOS flake).
+- #220: `homeFeed.network.popular({ limit })` (the signed-out front door's five things people do now) and
+  `homeFeed.network.tryNext({ limit })` (the signed-in person's own suggestions).
+- #222: type the exact reply target and its display name on a Community comment; a thread's first page includes two
+  replies and the rest use the parent cursor.
+- #207: add `codes.tasks` for the Dock's Code tab: `list({ limit })`, `create({ text, mode, repo?, attachments? })` and
+  `stop(id)` (`codes.task-summary@1`).
+- openvibe-contracts pinned at v0.406.0.
+
 ## 0.147.0 — 2026-11-10
 
 - #181: add `chat.activity` (the person's feed: mentions, replies, reactions, server invites, accepted friend requests and roles), `rooms.react()` and `reply_to_id` on room and DM sends.

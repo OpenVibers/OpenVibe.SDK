@@ -13,6 +13,7 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..');
 const ENTRIES = {
     'user-card.mjs': '../src/user-card.js',
+    'agent-sheet.mjs': '../src/agent-sheet.js',
     'wallet.mjs': '../src/wallet.js',
     'compute.mjs': '../src/compute/index.js',
     'share.mjs': '../src/share.js',
@@ -36,6 +37,7 @@ const ENTRIES = {
     'cam.mjs': '../src/cam/index.js',
     'realtime.mjs': '../src/realtime.js',
     'media.mjs': '../src/media.js',
+    'composer.mjs': '../src/composer.js',
     'media-upload.mjs': '../src/media-upload.js',
     'ui.mjs': '../src/ui.js',
     'community.mjs': '../src/community.js',
@@ -71,6 +73,7 @@ const ENTRIES = {
     'chat-apps.mjs': '../src/chat-apps.js',
     'ai.mjs': '../src/ai.js',
     'jobs.mjs': '../src/jobs.js',
+    'agents.mjs': '../src/agents.js',
     'tools.mjs': '../src/tools.js',
     'projects.mjs': '../src/projects.js',
     'geo.mjs': '../src/geo.js',
@@ -80,6 +83,7 @@ const ENTRIES = {
     'download.mjs': '../src/download.js',
     'quest.mjs': '../src/quest.js',
     'live.mjs': '../src/live.js',
+    'player.mjs': '../src/player.js',
     'streams.mjs': '../src/streams.js',
     'reports.mjs': '../src/reports.js',
     'inventory.mjs': '../src/inventory.js',
@@ -101,6 +105,7 @@ const ENTRIES = {
     'front-page.mjs': '../src/front-page.js',
     'food.mjs': '../src/food.js',
     'actor.mjs': '../src/actor.js',
+    'codes.mjs': '../src/codes.js',
     'run.mjs': '../src/run.js',
     'video.mjs': '../src/video.js',
     'pics.mjs': '../src/pics.js',
@@ -111,6 +116,7 @@ const ENTRIES = {
     'frame.mjs': '../src/frame.js',
     'menu.mjs': '../src/menu/index.js',
     'home-feed.mjs': '../src/home-feed.js',
+    'feed.mjs': '../src/feed.js',
     'service.mjs': '../src/service/index.js',
     'testing.mjs': '../src/testing/index.js',
 };

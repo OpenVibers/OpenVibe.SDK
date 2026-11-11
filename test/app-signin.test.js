@@ -117,8 +117,11 @@ run([
         assert.equal(me.body.user.subject, USER);
         assert.deepEqual(me.body.user.capabilities, ['media.object.read']);
         assert.equal(me.body.user.app, `app:${APP}`);
-        assert.ok(!JSON.stringify(me.body).includes('eyJ'), 'no token in the answer');
-        assert.ok(!JSON.stringify(ok.cookies).includes('eyJ'), 'no token in the cookie');
+        // A token is a JWT's shape (three base64url parts, the first "eyJ…"), not the letters "eyJ": a random session id
+        // can hold those three letters, and the bare substring failed now and then on the slow macOS runners (2026-11-11).
+        const JWT = /eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/;
+        assert.ok(!JWT.test(JSON.stringify(me.body)), 'no token in the answer');
+        assert.ok(!JWT.test(JSON.stringify(ok.cookies)), 'no token in the cookie');
 
         // Signed out: no user.
         const out = fakeRes();

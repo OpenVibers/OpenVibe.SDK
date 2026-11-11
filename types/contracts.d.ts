@@ -1969,9 +1969,21 @@ export interface ServiceManifest {
       statusApi?: string;
     };
     /**
-     * The room's launcher group in OpenVibe.Shared rooms.js and OpenVibe.Network frame/sites.js; optional so older manifests retain their meaning.
+     * The site's launcher group: the eight current groups are watch, talk, play, read, shop, tools, make and build (OpenVibe.Network frame/sites.js GROUPS), whose order and labels the menu, the footer and the home pages show (OpenVibe.Shared rooms.js repeats the ids for its rooms). The pre-0.400.0 ids streams, games, answers and people stay accepted for older manifests.
      */
-    neighbourhood?: "streams" | "games" | "answers" | "make" | "shop" | "people" | "build";
+    neighbourhood?:
+      | "watch"
+      | "talk"
+      | "play"
+      | "read"
+      | "shop"
+      | "tools"
+      | "make"
+      | "build"
+      | "streams"
+      | "games"
+      | "answers"
+      | "people";
     /**
      * This site's own items on the network's footer strip, read with the rest of it at openvibe.network GET /api/frame/online?site=<id>: a label, an icon from the shared glyph set, an https link on an OpenVibe domain (any openvibe.* host), and either a count the site reports or a fixed line. Network checks every field again before it reaches a page.
      *

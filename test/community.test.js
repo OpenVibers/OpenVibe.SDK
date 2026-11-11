@@ -161,7 +161,7 @@ run([
             const sdk = require('..');
             const community = sdk.community.createCommunityClient(sdk.createClient({ baseUrls: { community: srv.url } }));
             const query = { kind: 'stream', site: 'live', q: 'broadcast', following: 1, limit: 1 };
-            const first = await community.feed(query);
+            const first = await community.feed.list(query);
             assert.deepEqual(first, { items: [], next_cursor: 'opaque-cursor' });
             const second = await community.feed({ ...query, cursor: first.next_cursor });
             assert.deepEqual(second, { items: [item], next_cursor: null });
