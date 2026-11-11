@@ -3761,12 +3761,13 @@ module.exports = { createCommunityClient, actingHeaders };
 // ── 33: src/home-feed.js ────────────────────────────────────────────
 function (module, exports) {
 'use strict';
-/** The menu's portable Home layout, network day counts and personal wall. Pass a user-token core client;
- * contribute() needs an app token with the person's community.pulse.contribute grant. */
+/** The menu's portable Home layout, network day counts, what people do now and personal wall. Pass a user-token core
+ * client; contribute() needs an app token with the person's community.pulse.contribute grant. */
 function createHomeFeedClient(client, { networkBaseUrl, communityBaseUrl } = {}) {
     if (!client || typeof client.json !== 'function') throw new TypeError('createHomeFeedClient: pass an openvibe-sdk/core client');
     const network = (opts) => client.json({ service: 'network', baseUrl: networkBaseUrl, audience: 'openvibe.network', ...opts });
     const community = (opts) => client.json({ service: 'community', baseUrl: communityBaseUrl, audience: 'openvibe.community', ...opts });
+    const limitQuery = (limit) => (limit == null ? undefined : { limit });
     return {
         home: {
             get: ({ signal } = {}) => network({ path: '/api/v1/me/home-screen', signal }),
@@ -3774,6 +3775,10 @@ function createHomeFeedClient(client, { networkBaseUrl, communityBaseUrl } = {})
         },
         network: {
             today: ({ signal } = {}) => network({ path: '/api/v1/frame/today', auth: false, signal }),
+            // The signed-out front door's list: Report's public aggregate, no credentials sent.
+            popular: ({ limit, signal } = {}) => network({ path: '/api/v1/home/popular', query: limitQuery(limit), auth: false, signal }),
+            // The signed-in person's own suggestions; Network computes them in the caller's request.
+            tryNext: ({ limit, signal } = {}) => network({ path: '/api/v1/me/try-next', query: limitQuery(limit), signal }),
         },
         feed: {
             list: ({ for: audience = 'me', cursor, signal } = {}) => community({ path: '/api/v1/pulse', query: { for: audience, cursor }, signal }),
