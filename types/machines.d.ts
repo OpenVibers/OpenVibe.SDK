@@ -18,6 +18,10 @@ export interface Machine {
     name?: string;
     /** The operating system the machine reports. */
     os?: string;
+    /** Safe display label for the operating system or machine kind. */
+    system?: string;
+    /** Human-readable work classes the Link machine can run (worker, browser, models, robot). */
+    can_run?: string[];
     /** When the machine was last seen. */
     last_seen_at?: string;
     /** The OpenVibe Link version the machine reports. */

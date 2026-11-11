@@ -74,4 +74,5 @@ module.exports = {
     commerce: require('./src/commerce'),
     moneyReasons: require('./src/money-reasons'),
     telemetry: require('./src/telemetry'),
+    userCard: require('./src/user-card'),
 };
