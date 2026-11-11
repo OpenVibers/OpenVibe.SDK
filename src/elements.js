@@ -78,9 +78,9 @@ const isNum = (v, min = -Infinity, max = Infinity) => typeof v === 'number' && N
 // a product. A drift is a bug found here or in a consumer's contract check, never a power.
 const ACTIONS = {
     'robot.drive_pulse': (a) => (['forward', 'back', 'left', 'right', 'spin_left', 'spin_right'].includes(a.direction) && isInt(a.ms, 50, 3000) && (a.speed === undefined || isNum(a.speed, 0.1, 1))) || 'direction and ms (50–3000) are required',
-    'robot.head_preset': (a) => isText(a.preset, 40) || 'preset is required',
-    'robot.headlight': (a) => (typeof a.on === 'boolean' && (a.brightness === undefined || isNum(a.brightness, 0, 1)) && (a.colour === undefined || /^#[0-9a-fA-F]{6}$/.test(String(a.colour)))) || 'on is required; brightness and colour must be valid',
-    'robot.say': (a) => (isText(a.text, 300) && (a.voice === undefined || isText(a.voice, 40))) || 'text (300 characters at most) is required',
+    'robot.head_preset': (a) => ['up', 'center', 'down'].includes(a.preset) || 'preset is up, center or down',
+    'robot.headlight': (a) => typeof a.on === 'boolean' || 'on is required (true or false)',
+    'robot.say': (a) => isText(a.text, 300) || 'text (300 characters at most) is required',
     'robot.macro': (a) => isText(a.macro, 40) || 'macro is required',
     'chat.message': (a) => isText(a.text, 400) || 'text (400 characters at most) is required',
     'chat.pin': (a) => ['trigger', 'latest'].includes(a.source) || 'source is trigger or latest',
