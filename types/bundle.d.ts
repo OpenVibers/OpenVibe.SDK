@@ -1,4 +1,5 @@
 import * as userCard from './user-card';
+import * as agentSheet from './agent-sheet';
 /** browser/openvibe-sdk.mjs: one self-contained ES module with the browser-safe subpaths (same shape as the package's browser entry). */
 import * as auth from './auth-browser';
 import * as registry from './registry';
@@ -33,6 +34,7 @@ import * as core from './core';
 export const createWalletClient: typeof import('./wallet').createWalletClient;
 
 export * from './core';
+export * as agentSheet from './agent-sheet';
 export * as auth from './auth-browser';
 export * as registry from './registry';
 export * as modules from './modules';
