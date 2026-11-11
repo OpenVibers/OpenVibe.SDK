@@ -47,6 +47,7 @@ const crypto = require('node:crypto');
 const EXCHANGE_BASE_URL = 'https://api.openvibe.exchange';
 /** The Network's origin: the user-owned AI offers live there. */
 const NETWORK_BASE_URL = 'https://api.openvibe.network';
+const CATALOG_SEARCH_URL = 'https://openvibe.exchange';
 /** How far a signed webhook's timestamp may be from this server's clock, in seconds. */
 const SIGNATURE_TOLERANCE_SEC = 300;
 
@@ -664,6 +665,7 @@ function createExchangeClient({
 }
 
 module.exports = {
+    createCatalogSearchClient,
     createExchangeClient,
     ExchangeError,
     verifyWebhook,
@@ -673,3 +675,18 @@ module.exports = {
     DEFAULT_PATHS,
     RETRY_STATUS,
 };
+
+/** A public, keyless reader for Exchange's model and provider search. */
+function createCatalogSearchClient({ baseUrl = CATALOG_SEARCH_URL, fetchImpl = globalThis.fetch } = {}) {
+    return {
+        async search(q, filters = {}, { signal } = {}) {
+            if (typeof q !== 'string' || q.length > 200) throw new TypeError('q must be a string of at most 200 characters');
+            const url = new URL('/api/v1/search', baseUrl);
+            for (const [key, value] of Object.entries({ ...filters, q })) if (value != null && value !== '') url.searchParams.set(key, String(value));
+            const res = await fetchImpl(url, { headers: { Accept: 'application/json' }, signal });
+            const body = await res.json();
+            if (!res.ok) throw new ExchangeError(body?.detail || body?.error || `Search answered ${res.status}`, { status: res.status, body });
+            return body;
+        },
+    };
+}
