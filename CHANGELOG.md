@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.151.0 — 2026-11-11
+## 0.152.0 — 2026-11-11
 
 - Add `openvibe-sdk/ui-layout` (also `sdk.uiLayout` in both entries): `validate(catalog, layout)` is the one
   check the server, the editor and the AI answer use, returning `{ ok, reasons[] }` in plain words. It refuses a
@@ -11,6 +11,13 @@
   first, every part visible, 44 px met) and `merge(layout, patch)` applies a patch by part id without mutating
   the layout. Browser-safe, no dependencies; exhaustive tests.
 
+## 0.151.0 — 2026-11-11
+
+- Add related-origin passkey sign-in to `openvibe-sdk/sso` (opt-in `relatedPasskeys: true`): `POST /auth/passkey/options`
+  and `POST /auth/passkey/verify` broker a WebAuthn ceremony for this site's exact origin through OpenVibe.Network as
+  its OAuth client. The random browser binding stays in the site's own `__Host-` cookie; Network verifies the exact
+  origin and RP ID and returns a single-use result that becomes the site's ordinary session. Browsers without
+  `PublicKeyCredential.getClientCapabilities().relatedOrigins` keep the existing OAuth/passkey path.
 
 ## 0.150.0 — 2026-11-11
 
