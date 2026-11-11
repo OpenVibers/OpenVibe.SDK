@@ -13,8 +13,8 @@ export const {
     tools, projects, resources, vip, quest, live,
     inventory, tips, blog, reviews, wiki, coupons,
     deals, shoes, trade, space, host, news,
-    food, actor, run, video, pics, work,
-    zone, git, play, download, openre, geo,
-    history, usage, commerce, moneyReasons, telemetry,
+    food, actor, codes, run, video, pics,
+    work, zone, git, play, download, openre,
+    geo, history, usage, commerce, moneyReasons, telemetry,
 } = cjs;
 export default cjs;

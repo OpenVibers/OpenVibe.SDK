@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.147.0 — 2026-11-11
+
+- Add `codes.tasks` for the Dock's Code tab (OpenVibe.Codes): `list({ limit })` answers the person's latest tasks running first (`codes.task-summary@1`); `create({ text, mode, repo?, attachments? })` starts one the Dock's way (→ `{ id, url }`, `id` null for a `create` handover to OpenVibe Space); `stop(id)` stops the running attempt (→ `{ ok }`). Validates ids, modes and limits client-side; creates and stops are never retried on their own.
+
 ## 0.146.0 — 2026-11-10
 
 - #183: add the private history reader for cursor reads, search, summaries, agent recent reads, settings and owner-scoped deletes.
