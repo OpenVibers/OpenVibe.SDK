@@ -42,7 +42,9 @@ function skipsIn(output) {
 function runOne(file) {
     return new Promise((resolve) => {
         const started = Date.now();
-        const child = spawn(process.execPath, [path.join(__dirname, file)], {
+        // PGlite's revocation schema can exhaust the default Windows V8 stack during WASM init.
+        const stack = process.platform === 'win32' && file === 'revocations.test.js' ? ['--stack_size=4096'] : [];
+        const child = spawn(process.execPath, [...stack, path.join(__dirname, file)], {
             cwd: path.join(__dirname, '..'),
             env: { ...process.env, NODE_ENV: 'test' },
             stdio: ['ignore', 'pipe', 'pipe'],
