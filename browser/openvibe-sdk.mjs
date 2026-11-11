@@ -5079,6 +5079,14 @@ function createChatClient(client, defaults = {}) {
         history,
         /** The typed address previews on a message (chat.embed@1): [] when it has none. */
         embeds: (message) => readEmbeds(message),
+        /** Compacted day, week or month memory for a person (chat.person-memory-result@1). */
+        people: {
+            memory: (username, { channel, level = 'day' } = {}, o = {}) => call({ path: `/api/v1/people/${enc(String(username))}/memory`, query: { channel, level } }, o),
+            /** Erase the signed-in person's memory and opt out. */
+            forget: (username, o = {}) => call({ method: 'DELETE', path: `/api/v1/people/${enc(String(username))}/memory`, ...once }, o),
+            /** Set the signed-in person's opt-out preference. */
+            preferences: (username, optedOut, o = {}) => call({ method: 'PUT', path: `/api/v1/people/${enc(String(username))}/memory/preferences`, json: { opted_out: !!optedOut }, ...once }, o),
+        },
         /** Vibe's model comparison API, authenticated as the person. */
         ask: (input, o = {}) => call({ method: 'POST', path: '/api/vibe/ask', json: input, ...once }, o),
         pick: (messageId, model, o = {}) => call({ method: 'POST', path: '/api/vibe/pick', json: { message_id: messageId, model }, ...once }, o),

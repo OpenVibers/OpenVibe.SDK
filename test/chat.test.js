@@ -20,6 +20,20 @@ async function chatStub() {
 }
 
 run([
+    ['person memory reader and privacy controls use the person API', async () => {
+        const srv = await chatStub();
+        const chat = createChatClient(createClient({ baseUrls: { chat: srv.url }, token: 'person-token' }));
+        await chat.people.memory('alice', { channel: 'streamer', level: 'week' });
+        await chat.people.forget('alice');
+        await chat.people.preferences('alice', false);
+        assert.deepEqual(srv.requests.map(r => [r.method, r.url]), [
+            ['GET', '/api/v1/people/alice/memory?channel=streamer&level=week'],
+            ['DELETE', '/api/v1/people/alice/memory'],
+            ['PUT', '/api/v1/people/alice/memory/preferences'],
+        ]);
+        assert.deepEqual(JSON.parse(String(srv.requests[2].body)), { opted_out: false });
+        await srv.close();
+    }],
     ['embeds reads chat.embed@1 and returns the typed shape, dropping what is not one', async () => {
         const chat = createChatClient(createClient({ baseUrls: { chat: 'http://127.0.0.1:9' }, token: 'person-token' }));
         const link = { kind: 'link', url: 'https://example.com/a', site_name: 'Example', title: 'A story', description: 'What happened', image: null, width: 640, height: 360 };
