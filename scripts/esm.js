@@ -104,6 +104,7 @@ const ENTRIES = {
     'front-page.mjs': '../src/front-page.js',
     'food.mjs': '../src/food.js',
     'actor.mjs': '../src/actor.js',
+    'codes.mjs': '../src/codes.js',
     'run.mjs': '../src/run.js',
     'video.mjs': '../src/video.js',
     'pics.mjs': '../src/pics.js',

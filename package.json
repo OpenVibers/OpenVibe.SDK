@@ -616,6 +616,12 @@
       "browser": "./src/player.js",
       "import": "./esm/player.mjs",
       "default": "./src/player.js"
+    },
+    "./codes": {
+      "types": "./types/codes.d.ts",
+      "browser": null,
+      "import": "./esm/codes.mjs",
+      "default": "./src/codes.js"
     }
   },
   "bin": {

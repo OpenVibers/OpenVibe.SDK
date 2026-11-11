@@ -50,6 +50,7 @@ export * as host from './host';
 export * as news from './news';
 export * as food from './food';
 export * as actor from './actor';
+export * as codes from './codes';
 export * as run from './run';
 export * as video from './video';
 export * as pics from './pics';

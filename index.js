@@ -62,6 +62,7 @@ module.exports = {
     news: require('./src/news'),
     food: require('./src/food'),
     actor: require('./src/actor'),
+    codes: require('./src/codes'),
     run: require('./src/run'),
     video: require('./src/video'),
     pics: require('./src/pics'),
