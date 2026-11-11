@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.148.0 — 2026-11-11
+
+- **`openvibe-sdk/sso`: one-time cross-site sign-in handoff (arrival part 3).**
+  - `POST /auth/handoff` mints a 60 s ticket for a link to another OpenVibe site (the caller's
+    session proves the person; body: the destination's `client_id` + `redirect_uri`).
+  - `sso.handoff()` arrival middleware (mount early): an arrival carrying `?ov_handoff=` redeems for
+    this site's session before the page renders — no extra round trip, never switches a live session,
+    never wakes a guest, and always scrubs the ticket from the address bar, even on failure.
+
 ## 0.147.0 — 2026-11-10
 
 - #181: add `chat.activity` (the person's feed: mentions, replies, reactions, server invites, accepted friend requests and roles), `rooms.react()` and `reply_to_id` on room and DM sends.

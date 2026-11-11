@@ -11,7 +11,8 @@
  *       networkUrl: 'https://openvibe.network', networkInternalUrl: 'http://127.0.0.1:4000',
  *       secureCookies: true,
  *   });
- *   app.use('/auth', sso.router(express));               // /login /callback /fedcm /logout /me /refresh
+ *   app.use('/auth', sso.router(express));               // /login /callback /fedcm /logout /me /refresh /health /handoff
+ *   app.use(sso.handoff());                                // ?ov_handoff= arrival: redeem before the page renders
  *   app.use(sso.optionalAuth());                         // req.user, req.token when a valid session is presented
  *   app.get('/private', sso.requireAuth(), handler);     // 401 JSON without a session
  *
@@ -35,6 +36,10 @@
  *   GET  /health    → { ok, client: 'ok' | 'invalid' | 'unknown' }: does the Network accept this site's OAuth client?
  *                     (a token request with a code that cannot exist: invalid_grant means the client is fine,
  *                     invalid_client means its id or secret is wrong; cached 10 minutes; 503 only for 'invalid')
+ *   POST /handoff   → { ticket, expires_in }: a one-time 60 s ticket for a link to another OpenVibe site
+ *                     (the caller's session proves the person; body: the destination's client_id + redirect_uri).
+ *                     Mount sso.handoff() early: an arrival carrying ?ov_handoff= redeems for this site's session
+ *                     before the page renders — no extra round trip, never switches a live session, never wakes a guest.
  *
  * When a sign-in cannot finish (0.73.0): a lost or expired flow (the state cookie is gone or does not match) and a code
  * the Network no longer accepts (invalid_grant: used twice, or too old) start the sign-in once more by themselves, with
@@ -105,6 +110,24 @@ function withParam(target, key, value) {
     const hash = hashAt >= 0 ? target.slice(hashAt) : '';
     const base = hashAt >= 0 ? target.slice(0, hashAt) : target;
     return `${base}${base.includes('?') ? '&' : '?'}${encodeURIComponent(key)}=${encodeURIComponent(value)}${hash}`;
+}
+
+/**
+ * The cross-site handoff ticket arrives as ?ov_handoff=<ticket> on a plain link (Shared's handoffLinks
+ * carries it; the source minted it at its own /auth/handoff). It is single-use and short-lived, so the
+ * first thing a redeem does is scrub it from the address bar with a same-site redirect.
+ */
+const HANDOFF_PARAM = 'ov_handoff';
+const TICKET_RE = /^ovh_[A-Za-z0-9_-]{20,200}$/;
+
+/** Remove the handoff ticket from a path+query URL, keeping everything else. Never throws. */
+function stripHandoffParam(target) {
+    try {
+        const u = new URL(String(target || '/'), 'https://site.invalid');
+        u.searchParams.delete(HANDOFF_PARAM);
+        const q = u.searchParams.toString();
+        return `${u.pathname}${q ? `?${q}` : ''}${u.hash}`;
+    } catch { return '/'; }
 }
 
 /** A JWT's payload WITHOUT checking its signature: only to pre-check a FedCM nonce before the Network verifies it. */
@@ -237,6 +260,32 @@ function createSsoClient(opts = {}) {
         return res.status(status).send(failurePage({ siteName, title, text, retryHref: loginHref(target), backHref: target || '/' }));
     }
     const SIGN_IN_AGAIN = { title: 'Sign-in didn\'t finish', text: 'It took too long, or it started in another tab or app. Start it again and it will go through; your account is fine.' };
+
+    /** A JSON POST to the Network: the internal URL first, the public one if it cannot be reached. */
+    async function networkPost(path, body, bearer) {
+        let lastErr = null;
+        for (const base of [...new Set([networkInternalUrl, networkUrl])]) {
+            try {
+                const res = await fetchImpl(`${base}${path}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}) },
+                    body: JSON.stringify(body),
+                    signal: AbortSignal.timeout(10_000),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    throw Object.assign(new Error(data.error_description || data.error || `request failed (${res.status})`), {
+                        status: res.status, error: data.error || 'invalid_grant', error_description: data.error_description || null,
+                    });
+                }
+                return data;
+            } catch (err) {
+                lastErr = err;
+                if (err.status && err.status < 500) throw err;   // the request itself is bad: another base will not help
+            }
+        }
+        throw lastErr || new Error('Network unreachable');
+    }
 
     /** A token grant at the Network: the internal URL first, the public one if it cannot be reached. */
     async function tokenGrant(body) {
@@ -403,6 +452,31 @@ function createSsoClient(opts = {}) {
                 return res.status(502).json({ error: 'OpenVibe.Network could not be reached' });
             }
         },
+
+        /**
+         * Mint a one-time cross-site handoff ticket for a link to another OpenVibe site. The caller's
+         * session proves the person (Bearer or cookie); the ticket is bound to the destination the caller
+         * names and lives 60 seconds. Shared's handoffLinks calls this same-origin on intent.
+         */
+        async handoffMint(req, res) {
+            const token = extractToken(req);
+            if (!await verify(token)) return res.status(401).json({ error: 'Sign in required' });
+            const { client_id, redirect_uri } = (req.body || {});
+            if (typeof client_id !== 'string' || !client_id || typeof redirect_uri !== 'string' || !redirect_uri) {
+                return res.status(400).json({ error: 'invalid_request', error_description: 'client_id and redirect_uri are required' });
+            }
+            try {
+                const data = await networkPost('/api/v1/handoff/tickets', { client_id, redirect_uri }, token);
+                if (!data || typeof data.ticket !== 'string' || !TICKET_RE.test(data.ticket)) {
+                    throw Object.assign(new Error('Network issued no ticket'), { status: 502 });
+                }
+                return res.json({ ticket: data.ticket, expires_in: data.expires_in || 60 });
+            } catch (err) {
+                if (err.status && err.status < 500) return res.status(err.status).json({ error: err.error || 'invalid_request', error_description: err.error_description || err.message });
+                log.error(`[${site} auth] handoff mint failed: ${err.message}`);
+                return res.status(502).json({ error: 'OpenVibe.Network could not be reached' });
+            }
+        },
     };
 
     let health = null;   // { client, at }: the last check, or the last sign-in's verdict
@@ -442,6 +516,7 @@ function createSsoClient(opts = {}) {
         r.get('/me', wrap(handlers.me));
         r.post('/refresh', wrap(handlers.refresh));
         r.get('/health', wrap(handlers.health));
+        r.post('/handoff', json, badJson, wrap(handlers.handoffMint));
         return r;
     }
 
@@ -460,10 +535,45 @@ function createSsoClient(opts = {}) {
         return (req, res, nextFn) => opt(req, res, () => (req.user ? nextFn() : res.status(401).json({ error: 'Sign in required' })));
     }
 
-    return { router, handlers, optionalAuth, requireAuth, verify, extractToken, authorizeUrl, tokenGrant, checkClient, redirectUri, audience };
+    /**
+     * Arrival with ?ov_handoff=<ticket>: redeem it for this site's session before the page renders, so a
+     * link from another OpenVibe site lands signed in with no extra round trip. Mount early (before your
+     * pages): `app.use(sso.handoff())`. Rules, all enforced here, never in the page:
+     * - GET navigations only, and only when this browser has NO session here (never switch an account);
+     * - never when the browser carries this site's guest hint (a guest stays a guest, no Network call);
+     * - any redeem or exchange failure renders the page as a guest; the ticket is always scrubbed from
+     *   the address bar with a same-site redirect, so a bearer ticket never sits in history.
+     */
+    function handoff() {
+        return (req, res, nextFn) => {
+            (async () => {
+                const ticket = (req.query || {})[HANDOFF_PARAM];
+                if (req.method !== 'GET' || typeof ticket !== 'string' || !TICKET_RE.test(ticket)) return nextFn();
+                if (parseCookies(req)[HINT_COOKIE] === 'guest') return nextFn();
+                if (await verify(extractToken(req))) return nextFn();
+                const target = req.originalUrl || req.url || '/';
+                const clean = stripHandoffParam(target);
+                try {
+                    const data = await networkPost('/api/v1/handoff/redeem', {
+                        ticket, client_id: opts.clientId, client_secret: opts.clientSecret, redirect_uri: redirectUri,
+                    });
+                    if (!data || typeof data.code !== 'string' || !data.code) throw new Error('Network issued no code');
+                    const tokens = await tokenGrant({ grant_type: 'authorization_code', redirect_uri: redirectUri, code: data.code });
+                    if (!tokens || typeof tokens.access_token !== 'string' || !tokens.access_token) throw new Error('Network issued no session');
+                    setSession(res, tokens.access_token, tokens.refresh_token);
+                } catch (err) {
+                    log.warn(`[${site} auth] handoff arrival failed: ${err.message}`);
+                }
+                return res.redirect(clean);
+            })().catch(nextFn);
+        };
+    }
+
+    return { router, handlers, handoff, optionalAuth, requireAuth, verify, extractToken, authorizeUrl, tokenGrant, checkClient, redirectUri, audience };
 }
 
 module.exports = {
-    createSsoClient, sanitizeNext, withParam, decodeJwtPayload, fedcmNonceMatches, claimsToUser, parseCookies, failurePage,
+    createSsoClient, sanitizeNext, withParam, stripHandoffParam, decodeJwtPayload, fedcmNonceMatches, claimsToUser, parseCookies, failurePage,
+    HANDOFF_PARAM,
     COOKIES: Object.freeze({ access: ACCESS_COOKIE, refresh: REFRESH_COOKIE, hint: HINT_COOKIE }),
 };
