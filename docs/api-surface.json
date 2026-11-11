@@ -9,6 +9,11 @@
         "createActorClient"
       ]
     },
+    "agents": {
+      "object": [
+        "createAgentsClient"
+      ]
+    },
     "ai": {
       "object": [
         "CLASSES",
@@ -116,6 +121,14 @@
       ]
     },
     "compareVersions": "function",
+    "composer": {
+      "object": [
+        "ATTACHMENT_MAX",
+        "MEDIA_ORIGIN",
+        "NETWORK_ORIGIN",
+        "createComposerClient"
+      ]
+    },
     "contextFromHeaders": "function",
     "coupons": {
       "object": [
@@ -163,6 +176,11 @@
         "signDeliveryV2",
         "verifyDelivery",
         "verifyDeliveryV2"
+      ]
+    },
+    "feed": {
+      "object": [
+        "createFeedClient"
       ]
     },
     "food": {
@@ -516,6 +534,9 @@
   "openvibe-sdk/actor": {
     "createActorClient": "function"
   },
+  "openvibe-sdk/agents": {
+    "createAgentsClient": "function"
+  },
   "openvibe-sdk/ai": {
     "CLASSES": "array",
     "OPS": "array",
@@ -645,6 +666,12 @@
   "openvibe-sdk/community": {
     "actingHeaders": "function",
     "createCommunityClient": "function"
+  },
+  "openvibe-sdk/composer": {
+    "ATTACHMENT_MAX": "number",
+    "MEDIA_ORIGIN": "string",
+    "NETWORK_ORIGIN": "string",
+    "createComposerClient": "function"
   },
   "openvibe-sdk/compute": {
     "STRATEGIES": "array",
@@ -796,6 +823,9 @@
   },
   "openvibe-sdk/explicit": {
     "isExplicit": "function"
+  },
+  "openvibe-sdk/feed": {
+    "createFeedClient": "function"
   },
   "openvibe-sdk/food": {
     "createFoodClient": "function"
@@ -1176,6 +1206,7 @@
         "refresh"
       ]
     },
+    "HANDOFF_PARAM": "string",
     "claimsToUser": "function",
     "createSsoClient": "function",
     "decodeJwtPayload": "function",
@@ -1183,6 +1214,7 @@
     "fedcmNonceMatches": "function",
     "parseCookies": "function",
     "sanitizeNext": "function",
+    "stripHandoffParam": "function",
     "withParam": "function"
   },
   "openvibe-sdk/storage": {

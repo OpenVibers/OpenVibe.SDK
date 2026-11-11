@@ -15,6 +15,7 @@ export * as mediaUpload from './media-upload';
 export * as ui from './ui';
 export * as community from './community';
 export * as homeFeed from './home-feed';
+export * as feed from './feed';
 export * as bot from './bot';
 export * as search from './search';
 export * as bench from './bench';
@@ -27,6 +28,7 @@ export * as chatApps from './chat-apps';
 export * as ai from './ai';
 export * as credentials from './credentials';
 export * as jobs from './jobs';
+export * as agents from './agents';
 export * as tools from './tools';
 export * as projects from './projects';
 export * as resources from './resources';
@@ -69,5 +71,5 @@ export * as locker from './locker';
 export const createWalletClient: typeof import('./wallet').createWalletClient;
 
 export * as levels from './levels';
-
+export * as composer from './composer';
 export * as userCard from './user-card';

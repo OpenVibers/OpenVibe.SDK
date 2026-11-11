@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.148.0 — 2026-11-11
+
+- #208: add `openvibe-sdk/composer`, the shared composer's client: `attachments.upload(file, { onProgress, signal })` (multipart through `XMLHttpRequest`, real browser progress), `attachments.remove(id)`, `composer.prefs.get()/put(prefs, rev)` and `mentions.search(q, kinds)`, typed by `composer.attachment@1`, `composer.prefs@1` and `composer.mention@1`.
+- #210: add `feed.list({ kind, cursor })` for the cross-site Community Feed, keep the existing Community reader callable, and type preview video media.
+- #211: add the `openvibe-sdk/sso` one-time cross-site sign-in handoff: `POST /auth/handoff` mints a 60 s ticket and `sso.handoff()` arrival middleware redeems it before the page renders.
+- #212: add `agents` SDK methods to fetch run snapshots, follow resumable AG-UI event streams and post approvals.
+
 ## 0.147.0 — 2026-11-10
 
 - #181: add `chat.activity` (the person's feed: mentions, replies, reactions, server invites, accepted friend requests and roles), `rooms.react()` and `reply_to_id` on room and DM sends.
