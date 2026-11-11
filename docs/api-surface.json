@@ -9,6 +9,11 @@
         "createActorClient"
       ]
     },
+    "agents": {
+      "object": [
+        "createAgentsClient"
+      ]
+    },
     "ai": {
       "object": [
         "CLASSES",
@@ -515,6 +520,9 @@
   },
   "openvibe-sdk/actor": {
     "createActorClient": "function"
+  },
+  "openvibe-sdk/agents": {
+    "createAgentsClient": "function"
   },
   "openvibe-sdk/ai": {
     "CLASSES": "array",
