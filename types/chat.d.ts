@@ -93,11 +93,30 @@ export interface RoomMemory {
     can_edit: boolean;
     me: string | null;
 }
+/** chat.person-memory-result@1. Private fields appear only for the person and channel owner. */
+export interface PersonMemoryResult {
+    username: string;
+    level: 'day' | 'week' | 'month';
+    channel: string | null;
+    opted_out: boolean;
+    enabled: boolean;
+    entries: {
+        level: 'day' | 'week' | 'month'; period_start: string; channel_user_id: number;
+        summary: string; topics: string[];
+        highlights: { detail: string; stream_id: number | null; at: string | null }[];
+        message_count: number; tone?: string; catchphrases?: string[]; people?: string[];
+    }[];
+}
 
 export interface ChatClient {
     /** The typed address previews a message carries (chat.embed@1): [] when it has none. */
     embeds(message?: { embeds?: unknown } | null): ChatEmbed[];
     history: ChatHistoryHelper;
+    people: {
+        memory(username: string, query?: { channel?: string; level?: 'day' | 'week' | 'month' }, opts?: Opts): Promise<PersonMemoryResult>;
+        forget(username: string, opts?: Opts): Promise<{ deleted: boolean; opted_out: boolean }>;
+        preferences(username: string, optedOut: boolean, opts?: Opts): Promise<{ opted_out: boolean }>;
+    };
     /** Ask Vibe using Auto, one catalogue model, or two to three models side by side. */
     ask(input: { message: string; models?: string[]; slug?: string; fresh?: boolean; system_prompt?: string; temperature?: number }, opts?: Opts): Promise<{ chat: Json; message: Json }>;
     pick(messageId: number, model: string, opts?: Opts): Promise<{ chat: Json; model: string }>;
