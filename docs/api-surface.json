@@ -1176,6 +1176,7 @@
         "refresh"
       ]
     },
+    "HANDOFF_PARAM": "string",
     "claimsToUser": "function",
     "createSsoClient": "function",
     "decodeJwtPayload": "function",
@@ -1183,6 +1184,7 @@
     "fedcmNonceMatches": "function",
     "parseCookies": "function",
     "sanitizeNext": "function",
+    "stripHandoffParam": "function",
     "withParam": "function"
   },
   "openvibe-sdk/storage": {

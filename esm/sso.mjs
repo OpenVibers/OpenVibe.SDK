@@ -2,7 +2,7 @@
 import cjs from '../src/sso/index.js';
 
 export const {
-    createSsoClient, sanitizeNext, withParam, decodeJwtPayload, fedcmNonceMatches, claimsToUser,
-    parseCookies, failurePage, COOKIES,
+    createSsoClient, sanitizeNext, withParam, stripHandoffParam, decodeJwtPayload, fedcmNonceMatches,
+    claimsToUser, parseCookies, failurePage, HANDOFF_PARAM, COOKIES,
 } = cjs;
 export default cjs;

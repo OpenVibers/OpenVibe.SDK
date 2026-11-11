@@ -151,4 +151,9 @@ run([
         }
         server.close();
     }],
+    ['the ESM subpath exports the public handoff helpers', async () => {
+        const esm = await import('../esm/sso.mjs');
+        assert.equal(esm.HANDOFF_PARAM, 'ov_handoff');
+        assert.equal(esm.stripHandoffParam('/deals?ov_handoff=ovh_x&sort=top#list'), '/deals?sort=top#list');
+    }],
 ]);

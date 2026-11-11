@@ -41,9 +41,11 @@ export interface SsoClientOptions {
 export type SsoUser = Omit<UserTokenClaims, 'iat' | 'exp' | 'aud' | 'iss' | 'nbf' | 'jti'> & Record<string, unknown>;
 
 export interface SsoClient {
-    /** GET /login /callback /logout /me /health, POST /fedcm /refresh; mount at /auth. */
+    /** GET /login /callback /logout /me /health, POST /fedcm /refresh /handoff; mount at /auth. */
     router(express: any): any;
-    handlers: { login: Handler; callback: Handler; fedcm: Handler; logout: Handler; me: Handler; refresh: Handler; health: Handler };
+    handlers: { login: Handler; callback: Handler; fedcm: Handler; logout: Handler; me: Handler; refresh: Handler; health: Handler; handoffMint: Handler };
+    /** Redeems a single-use cross-site ticket before the page renders; never replaces an existing session. */
+    handoff(): (req: Req, res: Res, next: Next) => void;
     /** Sets req.user and req.token when a valid session is presented. */
     optionalAuth(): (req: Req, res: Res, next: Next) => void;
     /** 401 JSON without a valid session. */
@@ -64,6 +66,8 @@ export declare function createSsoClient(opts: SsoClientOptions): SsoClient;
 /** A same-site path, this site's https origin or the Network's; anything else (control characters, backslashes) is '/'. */
 export declare function sanitizeNext(next: unknown, opts?: { baseUrl?: string; networkUrl?: string }): string;
 export declare function withParam(target: string, key: string, value: string): string;
+/** Remove the one-time handoff ticket from a path+query URL, preserving all other parameters and the fragment. */
+export declare function stripHandoffParam(target: string): string;
 /** The self-contained page a sign-in that cannot finish shows (text is escaped). */
 export declare function failurePage(o: { siteName: string; title: string; text: string; retryHref: string; backHref: string }): string;
 /** The payload of a JWT, unverified; null when it does not parse. */
@@ -72,3 +76,4 @@ export declare function fedcmNonceMatches(token: string, nonce: string): boolean
 export declare function claimsToUser(claims: Record<string, any> | null): SsoUser | null;
 export declare function parseCookies(req: { headers?: Record<string, any> }): Record<string, string>;
 export declare const COOKIES: Readonly<{ access: string; refresh: string; hint: string }>;
+export declare const HANDOFF_PARAM: 'ov_handoff';
