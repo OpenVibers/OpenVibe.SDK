@@ -42,6 +42,7 @@ export interface UiLayoutPart {
 export interface UiLayout {
     id?: string;
     revision?: number;
+    active?: boolean;
     surface: string;
     surface_version: number;
     device: 'phone' | 'tablet' | 'computer';
