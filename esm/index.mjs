@@ -13,9 +13,9 @@ export const {
     credentials, jobs, agents, tools, projects, resources,
     vip, quest, live, inventory, tips, blog,
     reviews, wiki, coupons, deals, shoes, trade,
-    space, host, news, food, actor, run,
-    video, pics, work, zone, git, play,
-    download, openre, geo, history, usage, commerce,
-    moneyReasons, telemetry, userCard,
+    space, host, news, food, actor, codes,
+    run, video, pics, work, zone, git,
+    play, download, openre, geo, history, usage,
+    commerce, moneyReasons, telemetry, userCard, player, agentSheet,
 } = cjs;
 export default cjs;

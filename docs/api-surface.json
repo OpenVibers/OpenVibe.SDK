@@ -9,6 +9,11 @@
         "createActorClient"
       ]
     },
+    "agentSheet": {
+      "object": [
+        "createAgentSheetClient"
+      ]
+    },
     "agents": {
       "object": [
         "createAgentsClient"
@@ -545,6 +550,9 @@
   },
   "openvibe-sdk/actor": {
     "createActorClient": "function"
+  },
+  "openvibe-sdk/agent-sheet": {
+    "createAgentSheetClient": "function"
   },
   "openvibe-sdk/agents": {
     "createAgentsClient": "function"
