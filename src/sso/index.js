@@ -36,6 +36,8 @@
  *   GET  /health    → { ok, client: 'ok' | 'invalid' | 'unknown' }: does the Network accept this site's OAuth client?
  *                     (a token request with a code that cannot exist: invalid_grant means the client is fine,
  *                     invalid_client means its id or secret is wrong; cached 10 minutes; 503 only for 'invalid')
+ *   POST /passkey/options → { state, options }: a related-origin passkey ceremony (opt-in relatedPasskeys)
+ *   POST /passkey/verify  → the browser's assertion, exchanged for this site's ordinary session
  *   POST /handoff   → { ticket, expires_in }: a one-time 60 s ticket for a link to another OpenVibe site
  *                     (the caller's session proves the person; body: the destination's client_id + redirect_uri).
  *                     Mount sso.handoff() early: an arrival carrying ?ov_handoff= redeems for this site's session
@@ -68,6 +70,7 @@ const QUIET_FIRST = '2';
 const VERIFIER_COOKIE = 'ov_oauth_verifier';
 const FLOW_COOKIES = [STATE_COOKIE, NEXT_COOKIE, SILENT_COOKIE, VERIFIER_COOKIE];
 const RETRY_COOKIE = 'ov_oauth_retry';
+const PASSKEY_BIND_COOKIE = '__Host-ov_passkey_bind';
 // A code no sign-in can ever have: the health check presents it and reads which way the Network refuses it.
 const HEALTH_CODE = 'ov_health_check_never_issued';
 
@@ -194,6 +197,8 @@ function createSsoClient(opts = {}) {
     const fetchImpl = opts.fetch || globalThis.fetch;
     const log = opts.log || console;
     const accessMaxAgeMs = opts.accessMaxAgeMs || 24 * 3600e3;
+    // Related-origin passkeys are opt-in per site (the well-known list and the Network decide the rest).
+    const relatedPasskeys = opts.relatedPasskeys === true;
     if (!baseUrl || !opts.clientId) throw new TypeError('createSsoClient: baseUrl and clientId are required');
     const next = (value) => sanitizeNext(value, { baseUrl, networkUrl });
     const siteName = String(opts.siteName || `OpenVibe.${site.charAt(0).toUpperCase()}${site.slice(1)}`);
@@ -312,6 +317,24 @@ function createSsoClient(opts = {}) {
         throw lastErr || new Error('Network unreachable');
     }
 
+    /** A related-passkey POST to Network as this site's OAuth client. */
+    async function networkClientPost(path, body) {
+        return networkPost(path, { client_id: opts.clientId, client_secret: opts.clientSecret, ...body });
+    }
+
+    /** Only this site's own page may start or finish a passkey ceremony. */
+    function sameOrigin(req) {
+        let origin;
+        try { origin = new URL(baseUrl).origin; } catch { return false; }
+        const given = req.headers && req.headers.origin;
+        if (given) return given === origin;
+        return !!(req.headers && req.headers['sec-fetch-site'] === 'same-origin');
+    }
+
+    function passkeyUnavailable(res) {
+        return res.status(404).json({ error: 'not_found' });
+    }
+
     /** The authorize URL for a sign-in (pure; exported for tests). → { url, state, verifier } */
     function authorizeUrl({ silent = false, prompt = '', loginHint = '' } = {}) {
         const verifier = crypto.randomBytes(32).toString('base64url');
@@ -410,6 +433,49 @@ function createSsoClient(opts = {}) {
             } catch (err) {
                 if (err.status && err.status < 500) return res.status(401).json({ error: err.error || 'invalid_grant', error_description: err.error_description || err.message });
                 log.error(`[${site} auth] FedCM exchange failed: ${err.message}`);
+                return res.status(502).json({ error: 'server_error', error_description: 'OpenVibe.Network could not be reached' });
+            }
+        },
+
+        /**
+         * A related-origin passkey ceremony: Network issues the options for this exact origin, and the
+         * product keeps the random browser binding in its own __Host- cookie (Network only stores its hash).
+         */
+        async passkeyOptions(req, res) {
+            if (!relatedPasskeys) return passkeyUnavailable(res);
+            if (!sameOrigin(req)) return res.status(403).json({ error: 'forbidden', error_description: 'Same-origin request required' });
+            const binding = crypto.randomBytes(32).toString('base64url');
+            try {
+                const data = await networkClientPost('/api/auth/passkeys/related/options', { origin: new URL(baseUrl).origin, purpose: 'login', binding });
+                if (!data || !data.state || !data.options) throw new Error('Network issued no ceremony');
+                res.cookie(PASSKEY_BIND_COOKIE, binding, { httpOnly: true, secure, sameSite: 'strict', path: '/', maxAge: 5 * 60e3 });
+                return res.json({ state: data.state, options: data.options });
+            } catch (err) {
+                if (err.status && err.status < 500) return res.status(401).json({ error: err.error || 'invalid_request', error_description: err.error_description || 'Passkey sign-in is not available' });
+                log.error(`[${site} auth] passkey options failed: ${err.message}`);
+                return res.status(502).json({ error: 'server_error', error_description: 'OpenVibe.Network could not be reached' });
+            }
+        },
+
+        /** The assertion is verified by Network; only its single-use result becomes this site's session. */
+        async passkeyVerify(req, res) {
+            if (!relatedPasskeys) return passkeyUnavailable(res);
+            if (!sameOrigin(req)) return res.status(403).json({ error: 'forbidden', error_description: 'Same-origin request required' });
+            const binding = parseCookies(req)[PASSKEY_BIND_COOKIE];
+            const body = req.body || {};
+            if (!binding || typeof body.state !== 'string' || !body.response) return res.status(401).json({ error: 'invalid_request', error_description: 'Passkey sign-in expired; try again' });
+            try {
+                const verified = await networkClientPost('/api/auth/passkeys/related/verify', { origin: new URL(baseUrl).origin, binding, state: body.state, response: body.response });
+                if (!verified || typeof verified.result !== 'string') throw new Error('Network issued no result');
+                const tokens = await networkClientPost('/api/auth/passkeys/related/redeem', { origin: new URL(baseUrl).origin, result: verified.result });
+                if (!tokens || typeof tokens.access_token !== 'string') throw new Error('Network issued no session');
+                setSession(res, tokens.access_token, tokens.refresh_token);
+                res.clearCookie(PASSKEY_BIND_COOKIE, { path: '/' });
+                return res.json({ ok: true, user: tokens.user || claimsToUser(await verify(tokens.access_token)) });
+            } catch (err) {
+                res.clearCookie(PASSKEY_BIND_COOKIE, { path: '/' });
+                if (err.status && err.status < 500) return res.status(401).json({ error: err.error || 'invalid_grant', error_description: err.error_description || 'Passkey sign-in failed' });
+                log.error(`[${site} auth] passkey verify failed: ${err.message}`);
                 return res.status(502).json({ error: 'server_error', error_description: 'OpenVibe.Network could not be reached' });
             }
         },
@@ -515,6 +581,8 @@ function createSsoClient(opts = {}) {
         r.get('/logout', wrap(handlers.logout));
         r.get('/me', wrap(handlers.me));
         r.post('/refresh', wrap(handlers.refresh));
+        r.post('/passkey/options', json, badJson, wrap(handlers.passkeyOptions));
+        r.post('/passkey/verify', json, badJson, wrap(handlers.passkeyVerify));
         r.get('/health', wrap(handlers.health));
         r.post('/handoff', json, badJson, wrap(handlers.handoffMint));
         return r;
@@ -569,7 +637,7 @@ function createSsoClient(opts = {}) {
         };
     }
 
-    return { router, handlers, handoff, optionalAuth, requireAuth, verify, extractToken, authorizeUrl, tokenGrant, checkClient, redirectUri, audience };
+    return { router, handlers, handoff, optionalAuth, requireAuth, verify, extractToken, authorizeUrl, tokenGrant, checkClient, redirectUri, audience, relatedPasskeys };
 }
 
 module.exports = {

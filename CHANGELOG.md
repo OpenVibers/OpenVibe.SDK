@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.151.0 — 2026-11-11
+
+- Add related-origin passkey sign-in to `openvibe-sdk/sso` (opt-in `relatedPasskeys: true`): `POST /auth/passkey/options`
+  and `POST /auth/passkey/verify` broker a WebAuthn ceremony for this site's exact origin through OpenVibe.Network as
+  its OAuth client. The random browser binding stays in the site's own `__Host-` cookie; Network verifies the exact
+  origin and RP ID and returns a single-use result that becomes the site's ordinary session. Browsers without
+  `PublicKeyCredential.getClientCapabilities().relatedOrigins` keep the existing OAuth/passkey path.
+
 ## 0.150.0 — 2026-11-11
 
 - Add `ai.turn(input, options)` for file-capable `ai.complete` runs. Its typed `output_file` option stores a text, Markdown, CSV or JSON answer in Media and returns private `ai.file` artifact references; existing `ai.files.read()` reads a returned object.
