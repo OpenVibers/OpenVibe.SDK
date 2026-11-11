@@ -791,6 +791,7 @@
     "NETWORK_BASE_URL": "string",
     "RETRY_STATUS": "object",
     "SIGNATURE_TOLERANCE_SEC": "number",
+    "createCatalogSearchClient": "function",
     "createExchangeClient": "function",
     "verifyWebhook": "function"
   },
