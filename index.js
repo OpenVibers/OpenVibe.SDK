@@ -75,4 +75,5 @@ module.exports = {
     moneyReasons: require('./src/money-reasons'),
     telemetry: require('./src/telemetry'),
     userCard: require('./src/user-card'),
+    agentSheet: require('./src/agent-sheet'),
 };

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.149.0 — 2026-11-11
+
+- Add the owner-only agent sheet reader and Actor pause, resume and memory controls through Network's cross-site relay (ask 306).
+
 ## 0.147.0 — 2026-11-10
 
 - #181: add `chat.activity` (the person's feed: mentions, replies, reactions, server invites, accepted friend requests and roles), `rooms.react()` and `reply_to_id` on room and DM sends.

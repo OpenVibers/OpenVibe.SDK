@@ -44,6 +44,7 @@ export interface ActorClient {
             list(opts?: Opts): Promise<{ agents: ActorJson[] }>;
             create(agent: Record<string, unknown>, opts?: Opts): Promise<ActorJson>;
             get(id: string, opts?: Opts): Promise<ActorJson>;
+            sheet(id: string, opts?: Opts): Promise<import('./agent-sheet').AgentSheet>;
             update(id: string, patch: Record<string, unknown>, opts?: Opts): Promise<ActorJson>;
             remove(id: string, opts?: Opts): Promise<ActorJson>;
             run(id: string, req?: { input?: string }, opts?: Opts): Promise<ActorJson>;
