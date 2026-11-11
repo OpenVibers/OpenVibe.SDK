@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.152.0 — 2026-11-11
+## 0.153.0 — 2026-11-11
 
 - Add `openvibe-sdk/ui-layout` (also `sdk.uiLayout` in both entries): `validate(catalog, layout)` is the one
   check the server, the editor and the AI answer use, returning `{ ok, reasons[] }` in plain words. It refuses a
