@@ -10,7 +10,7 @@ export interface CodesModelPlan {
     roles: Array<{ role: 'planner' | 'builder' | 'reviewer' | 'verifier'; model: string; effort: CodesModelEffort;
         samples?: number; budget?: { tokens?: number; minutes?: number; dollars?: number } }>;
     ladder?: string[];
-    checks: { tests: boolean; lint: boolean; reviewer: boolean };
+    checks: { tests?: boolean; lint?: boolean; reviewer?: boolean };
 }
 export interface CodesTaskSummary {
     id: string; title: string; status: CodesTaskStatus; mode: CodesTaskMode; repo: string;
@@ -27,8 +27,8 @@ export interface CodesClient {
         stop(id: string, opts?: Opts): Promise<{ ok: true }>;
     };
     modelPlans: {
-        get(opts?: Opts & { project?: string }): Promise<{ account: CodesModelPlan; project?: CodesModelPlan; effective: CodesModelPlan }>;
-        put(plan: CodesModelPlan, opts?: Opts & { project?: string }): Promise<{ resolved: CodesModelPlan; fallbacks?: unknown[] }>;
+        get(opts?: Opts & { project?: string }): Promise<{ account: CodesModelPlan; project: CodesModelPlan | null; effective: CodesModelPlan; source: 'account' | 'project' }>;
+        put(plan: CodesModelPlan, opts?: Opts & { project?: string }): Promise<{ plan: CodesModelPlan; resolved: CodesModelPlan; fallbacks: unknown[]; prices: unknown[] }>;
         presets(opts?: Opts): Promise<{ presets: Record<CodesModelPreset, CodesModelPlan> }>;
     };
 }

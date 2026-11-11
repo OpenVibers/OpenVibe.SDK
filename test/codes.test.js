@@ -67,6 +67,7 @@ const summary = (over = {}) => ({
         assert.throws(() => codes.tasks.stop('nope'), /tsk_/);
         assert.throws(() => codes.tasks.create({ text: 'Hi', mode: 'repo', plan, preset: 'Fast' }), /choose plan or preset/);
         assert.throws(() => codes.tasks.create({ text: 'Hi', mode: 'repo', preset: 'Unknown' }), /preset is Fast/);
+        assert.throws(() => codes.tasks.create({ text: 'Hi', mode: 'create', preset: 'Fast' }), /coding tasks/);
         assert.throws(() => codes.modelPlans.put(null), /plan is a model plan/);
         console.log('  ok  codes tasks: list, create (repo and create), stop, and every validation');
     } finally {

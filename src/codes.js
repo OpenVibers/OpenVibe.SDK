@@ -46,6 +46,7 @@ function createCodesClient(client, { baseUrl } = {}) {
                 if (plan != null && (typeof plan !== 'object' || Array.isArray(plan))) throw new TypeError('codes.tasks.create: plan is a model plan object');
                 if (preset != null && !PRESETS.includes(preset)) throw new TypeError('codes.tasks.create: preset is Fast, Balanced, Deep or Council');
                 if (plan != null && preset != null) throw new TypeError('codes.tasks.create: choose plan or preset');
+                if (mode === 'create' && (plan != null || preset != null)) throw new TypeError('codes.tasks.create: model plans apply to coding tasks, not Space handoffs');
                 return once({
                     method: 'POST', path: '/api/v1/tasks',
                     json: { text, mode, ...(repo ? { repo } : {}), ...(attachments ? { attachments } : {}),
