@@ -116,6 +116,14 @@
       ]
     },
     "compareVersions": "function",
+    "composer": {
+      "object": [
+        "ATTACHMENT_MAX",
+        "MEDIA_ORIGIN",
+        "NETWORK_ORIGIN",
+        "createComposerClient"
+      ]
+    },
     "contextFromHeaders": "function",
     "coupons": {
       "object": [
@@ -645,6 +653,12 @@
   "openvibe-sdk/community": {
     "actingHeaders": "function",
     "createCommunityClient": "function"
+  },
+  "openvibe-sdk/composer": {
+    "ATTACHMENT_MAX": "number",
+    "MEDIA_ORIGIN": "string",
+    "NETWORK_ORIGIN": "string",
+    "createComposerClient": "function"
   },
   "openvibe-sdk/compute": {
     "STRATEGIES": "array",
