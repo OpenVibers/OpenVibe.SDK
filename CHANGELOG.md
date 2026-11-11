@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.148.0 — 2026-11-11
+
+- Type the exact reply target and its display name returned with a Community comment; the initial thread page includes two replies and the rest use the parent cursor.
+
 ## 0.147.0 — 2026-11-10
 
 - #181: add `chat.activity` (the person's feed: mentions, replies, reactions, server invites, accepted friend requests and roles), `rooms.react()` and `reply_to_id` on room and DM sends.
