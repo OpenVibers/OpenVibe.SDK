@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.148.0 — 2026-11-11
+
+- `homeFeed.network.popular({ limit })` reads the signed-out front door's five things people do now (`GET /api/v1/home/popular`, no credentials) and `homeFeed.network.tryNext({ limit })` the signed-in person's own suggestions (`GET /api/v1/me/try-next`). Both answer the typed destination shape, with the Report numbers and the one-line reason each destination is there.
+
 ## 0.147.0 — 2026-11-10
 
 - #181: add `chat.activity` (the person's feed: mentions, replies, reactions, server invites, accepted friend requests and roles), `rooms.react()` and `reply_to_id` on room and DM sends.
