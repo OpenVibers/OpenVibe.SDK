@@ -15,6 +15,7 @@ export * as mediaUpload from './media-upload';
 export * as ui from './ui';
 export * as community from './community';
 export * as homeFeed from './home-feed';
+export * as feed from './feed';
 export * as bot from './bot';
 export * as search from './search';
 export * as bench from './bench';

@@ -315,6 +315,12 @@
       "import": "./esm/home-feed.mjs",
       "default": "./src/home-feed.js"
     },
+    "./feed": {
+      "types": "./types/feed.d.ts",
+      "browser": "./src/feed.js",
+      "import": "./esm/feed.mjs",
+      "default": "./src/feed.js"
+    },
     "./geo": {
       "types": "./types/geo.d.ts",
       "import": "./esm/geo.mjs",

@@ -2,7 +2,7 @@
 
 ## 0.148.0 — 2026-11-11
 
-- Add `community.feed.list({ kind, cursor })` as a named form of the existing Feed reader and type preview video media.
+- Add `feed.list({ kind, cursor })` for the cross-site Community Feed, keep the existing Community reader callable, and type preview video media.
 
 ## 0.147.0 — 2026-11-10
 

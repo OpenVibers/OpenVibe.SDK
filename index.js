@@ -26,6 +26,7 @@ module.exports = {
     ui: require('./src/ui'),
     community: require('./src/community'),
     homeFeed: require('./src/home-feed'),
+    feed: require('./src/feed'),
     bot: require('./src/bot'),
     search: require('./src/search'),
     bench: require('./src/bench'),
