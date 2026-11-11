@@ -15,6 +15,7 @@ const session = (over = {}) => sign({ sub: 7, id: 7, username: 'ana', iss: ISS, 
 
 // A stub Network: /oauth/token (code, refresh, jwt-bearer), /oauth/revoke, the JWKS.
 const net = { grants: [], revoked: [], refuseRefresh: false };
+const passkey = { options: [], verify: [], redeem: [] };
 const server = http.createServer((req, res) => {
     let raw = ''; req.on('data', (c) => { raw += c; });
     req.on('end', () => {
@@ -22,6 +23,19 @@ const server = http.createServer((req, res) => {
         if (req.url === '/api/.well-known/jwks') return send(200, { keys: [{ ...keys.publicKey.export({ format: 'jwk' }), kid: 'k1', use: 'sig', alg: 'RS256' }] });
         const body = raw ? JSON.parse(raw) : {};
         if (req.url === '/oauth/revoke') { net.revoked.push(body.token); return send(200, { revoked: true }); }
+        if (req.url === '/api/auth/passkeys/related/options') {
+            passkey.options.push(body);
+            if (body.client_secret !== 'secret') return send(401, { error: 'invalid_client' });
+            return send(200, { state: 'pk_state', options: { challenge: 'pk_challenge', rp: { id: 'openvibe.network' }, allowCredentials: [] } });
+        }
+        if (req.url === '/api/auth/passkeys/related/verify') {
+            passkey.verify.push(body);
+            return send(200, { result: 'pk_result' });
+        }
+        if (req.url === '/api/auth/passkeys/related/redeem') {
+            passkey.redeem.push(body);
+            return send(200, { access_token: session(), refresh_token: 'rt_pk', user: { username: 'ana' } });
+        }
         if (req.url === '/oauth/token') {
             net.grants.push(body);
             if (body.client_secret !== 'secret') return send(401, { error: 'invalid_client' });
@@ -224,6 +238,38 @@ run([
         await sso.handlers.fedcm({ body: { token: assertion, nonce: 'n-123' }, headers: {} }, ok);
         assert.equal(ok.body.ok, true); assert.equal(net.grants.at(-1).grant_type, 'urn:ietf:params:oauth:grant-type:jwt-bearer');
         assert.ok(ok.cookies.ov_token);
+    }],
+
+    ['passkeys: the related-origin ceremony is same-origin, bound in a __Host- cookie, and only its result becomes a session', async () => {
+        const pk = createSsoClient({ site: 'trade', baseUrl: 'https://openvibe.trade', clientId: 'trade', clientSecret: 'secret', networkUrl: ISS, networkInternalUrl: base, issuer: ISS, relatedPasskeys: true, log: { warn() {}, error() {}, info() {} } });
+        const off = createSsoClient({ site: 'trade', baseUrl: 'https://openvibe.trade', clientId: 'trade', clientSecret: 'secret', networkUrl: ISS, networkInternalUrl: base, issuer: ISS, log: { warn() {}, error() {}, info() {} } });
+        const disabled = fakeRes();
+        await off.handlers.passkeyOptions({ headers: { origin: 'https://openvibe.trade' }, body: {} }, disabled);
+        assert.equal(disabled.statusCode, 404, 'related passkeys are opt-in');
+        const cross = fakeRes();
+        await pk.handlers.passkeyOptions({ headers: { origin: 'https://evil.example' }, body: {} }, cross);
+        assert.equal(cross.statusCode, 403, 'only this origin starts a ceremony');
+        const before = passkey.options.length;
+        const start = fakeRes();
+        await pk.handlers.passkeyOptions({ headers: { origin: 'https://openvibe.trade' }, body: {} }, start);
+        assert.equal(start.statusCode, 200); assert.equal(start.body.state, 'pk_state');
+        const bind = start.cookies['__Host-ov_passkey_bind'];
+        assert.ok(bind && bind.v); assert.deepEqual([bind.o.httpOnly, bind.o.secure, bind.o.sameSite, bind.o.path], [true, true, 'strict', '/']);
+        const asked = passkey.options.at(-1);
+        assert.deepEqual([asked.origin, asked.purpose, asked.binding, asked.client_id, asked.client_secret], ['https://openvibe.trade', 'login', bind.v, 'trade', 'secret']);
+        const missing = fakeRes();
+        await pk.handlers.passkeyVerify({ headers: { origin: 'https://openvibe.trade' }, body: { state: 'pk_state', response: { id: 'x' } } }, missing);
+        assert.equal(missing.statusCode, 401, 'a missing browser binding never reaches Network');
+        assert.equal(passkey.verify.length, 0);
+        const crossVerify = fakeRes();
+        await pk.handlers.passkeyVerify({ headers: { origin: 'https://evil.example', cookie: cookieHeader({ '__Host-ov_passkey_bind': bind.v }) }, body: { state: 'pk_state', response: { id: 'x' } } }, crossVerify);
+        assert.equal(crossVerify.statusCode, 403);
+        const done = fakeRes();
+        await pk.handlers.passkeyVerify({ headers: { origin: 'https://openvibe.trade', cookie: cookieHeader({ '__Host-ov_passkey_bind': bind.v }) }, body: { state: 'pk_state', response: { id: 'x' } } }, done);
+        assert.equal(done.statusCode, 200); assert.equal(done.body.ok, true);
+        assert.deepEqual([passkey.verify.at(-1).origin, passkey.verify.at(-1).binding], ['https://openvibe.trade', bind.v]);
+        assert.deepEqual([passkey.redeem.at(-1).origin, passkey.redeem.at(-1).result, passkey.redeem.at(-1).client_secret], ['https://openvibe.trade', 'pk_result', 'secret']);
+        assert.ok(done.cookies.ov_token.v); assert.equal(done.cookies.ov_sso_hint.v, 'account'); assert.ok(done.cleared.includes('__Host-ov_passkey_bind'));
     }],
 
     ['refresh rotates; a refused refresh ends the session; logout revokes and hints guest', async () => {
