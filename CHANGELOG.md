@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.152.0 — 2026-11-11
+
+A train of two pull requests: `openvibe-sdk/elements` (#227) and `openvibe-sdk/ui-layout` (#226).
+
+- Reserved for `openvibe-sdk/ui-layout` in OpenVibers/OpenVibe.SDK#226. That module is not released by this entry; it
+  keeps the changelog's minor sequence while that pull request is open, and its own entry replaces this one at merge. (#227)
+- Add `openvibe-sdk/ui-layout` (also `sdk.uiLayout` in both entries): `validate(catalog, layout)` is the one
+  check the server, the editor and the AI answer use, returning `{ ok, reasons[] }` in plain words. It refuses a
+  missing, hidden or undersized required part, anything pressed under 44 px (and any part under the catalog's own
+  pixel minimum, e.g. Stop at 64), a part covering a required part or breaking a `never_covers` rule, a tint that
+  is not a catalog theme token or a style/binding the part does not allow, a part the catalog does not have, and
+  any URL, markup or code. `applyDefaults(catalog, device?)` builds the valid default arrangement (required parts
+  first, every part visible, 44 px met) and `merge(layout, patch)` applies a patch by part id without mutating
+  the layout. Browser-safe, no dependencies; exhaustive tests. (#226)
+
 ## 0.151.0 — 2026-11-11
 
 - Add related-origin passkey sign-in to `openvibe-sdk/sso` (opt-in `relatedPasskeys: true`): `POST /auth/passkey/options`
