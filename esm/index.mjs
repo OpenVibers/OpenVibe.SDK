@@ -10,11 +10,12 @@ export const {
     cam, mediaUpload, ui, community, homeFeed, bot,
     search, bench, meme, vision, themes, design,
     redact, chat, chatApps, ai, credentials, jobs,
-    tools, projects, resources, vip, quest, live,
-    inventory, tips, blog, reviews, wiki, coupons,
-    deals, shoes, trade, space, host, news,
-    food, actor, run, video, pics, work,
-    zone, git, play, download, openre, geo,
-    history, usage, commerce, moneyReasons, telemetry, userCard,
+    agents, tools, projects, resources, vip, quest,
+    live, inventory, tips, blog, reviews, wiki,
+    coupons, deals, shoes, trade, space, host,
+    news, food, actor, run, video, pics,
+    work, zone, git, play, download, openre,
+    geo, history, usage, commerce, moneyReasons, telemetry,
+    userCard,
 } = cjs;
 export default cjs;

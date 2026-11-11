@@ -71,6 +71,7 @@ const ENTRIES = {
     'chat-apps.mjs': '../src/chat-apps.js',
     'ai.mjs': '../src/ai.js',
     'jobs.mjs': '../src/jobs.js',
+    'agents.mjs': '../src/agents.js',
     'tools.mjs': '../src/tools.js',
     'projects.mjs': '../src/projects.js',
     'geo.mjs': '../src/geo.js',

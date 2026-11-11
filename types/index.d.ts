@@ -27,6 +27,7 @@ export * as chatApps from './chat-apps';
 export * as ai from './ai';
 export * as credentials from './credentials';
 export * as jobs from './jobs';
+export * as agents from './agents';
 export * as tools from './tools';
 export * as projects from './projects';
 export * as resources from './resources';

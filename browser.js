@@ -33,6 +33,7 @@ module.exports = {
     ai: require('./src/ai'),
     credentials: require('./src/credentials'),
     jobs: require('./src/jobs'),
+    agents: require('./src/agents'),
     tools: require('./src/tools'),
     projects: require('./src/projects'),
     geo: require('./src/geo'),
