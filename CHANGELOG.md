@@ -1,6 +1,11 @@
 # Changelog
 
-## 0.151.0 — 2026-11-11
+## 0.151.0 — 2026-11-11 (reserved, not released)
+
+- Reserved for `openvibe-sdk/ui-layout` in OpenVibers/OpenVibe.SDK#226. That module is not released by this entry; it
+  keeps the changelog's minor sequence while that pull request is open, and its own entry replaces this one at merge.
+
+## 0.152.0 — 2026-11-11
 
 - Add `openvibe-sdk/elements`, the element runtime: `validate(element)` (look, recipe, declared capabilities and an
   optional mod reference; plain reasons), `run(recipe, trigger, ctx)` (role, live-only, robot turn, chance, cooldowns,
