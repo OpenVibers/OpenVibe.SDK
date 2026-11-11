@@ -333,12 +333,12 @@ export type ExchangeEarnings = {
 };
 
 export type ExchangeKey = { id: string; name: string; prefix: string; monthly_cap_usd: number; allowed_models: string[]; created_at: string; revoked_at: string | null };
-export type ExchangeSearchOptions = { engine?: string; limit?: number; license?: string; commercial?: boolean; format?: string; orientation?: string; size?: string; style?: 'line' | 'solid' | 'any'; set?: string; signal?: AbortSignal };
+export type ExchangeSearchOptions = { engine?: string; limit?: number; license?: string; commercial?: boolean; format?: string; orientation?: string; size?: 'small' | 'medium' | 'large'; color?: 'black_and_white' | 'black' | 'white' | 'yellow' | 'orange' | 'red' | 'purple' | 'magenta' | 'green' | 'teal' | 'blue'; type?: 'icon' | 'photo' | 'illustration' | 'vector'; after?: string; safe_search?: 'strict'; style?: 'line' | 'solid' | 'any'; set?: string; signal?: AbortSignal };
 export interface CatalogSearchFilters { provider?: string; capability?: string; min_price?: number; max_price?: number; max_speed_ms?: number; sort?: 'relevance' | 'price' | 'speed' | 'quality'; rating_kind?: string; }
 export interface CatalogModelResult { model: string; name: string; family: string | null; capabilities: Record<string, boolean>; provider: string; price: { in: number; out: number; cached?: number; per?: string; currency?: string } | null; speed: { p50_ms?: number; p95_ms?: number; tokens_per_second?: number } | null; quality: { elo: number; games: number; kind: string } | null; offers: number; task_match: string | null; score: number; }
 export interface CatalogSearchResponse { q: string; count: number; results: CatalogModelResult[]; quality_unavailable: boolean; }
 export declare function createCatalogSearchClient(options?: { baseUrl?: string; fetchImpl?: typeof fetch }): { search(q: string, filters?: CatalogSearchFilters, options?: { signal?: AbortSignal }): Promise<CatalogSearchResponse> };
-export type ExchangeSearchResult = { results: Array<{ title: string; url: string; snippet: string; engine: string; published: string | null; thumbnail?: string | null; license?: string | null; author?: string | null; source_page?: string | null; attribution?: string | null }>; receipt: { engine: string; cost_usd: number; time_ms: number } };
+export type ExchangeSearchResult = { results: Array<{ title: string; url: string; snippet: string; engine: string; published: string | null; indexed_on?: string | null; type?: string | null; thumbnail?: string | null; license?: string | null; license_url?: string | null; author?: string | null; author_url?: string | null; source_page?: string | null; attribution?: string | null; width?: number | null; height?: number | null }>; receipt: { engine: string; cost_usd: number; time_ms: number } };
 export type ExchangeClient = {
     keys: {
         list(opts?: { signal?: AbortSignal }): Promise<{ keys: ExchangeKey[] }>;

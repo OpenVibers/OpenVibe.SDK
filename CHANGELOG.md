@@ -2,7 +2,7 @@
 
 ## 0.148.0 — 2026-11-10
 
-- Add `exchange.createCatalogSearchClient().search(q, filters)` for public model and provider offers, with prices, measured speed and Bench quality when available.
+- Add `exchange.createCatalogSearchClient().search(q, filters)` for public model and provider offers, with prices, measured speed and Bench quality when available. Type the image search filters and source metadata returned by `exchange.images()`.
 
 ## 0.147.0 — 2026-11-10
 
