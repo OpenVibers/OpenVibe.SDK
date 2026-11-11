@@ -7,7 +7,7 @@ const pause = (ms, signal) => new Promise((resolve) => {
     const t = setTimeout(resolve, ms);
     if (signal) signal.addEventListener('abort', () => { clearTimeout(t); resolve(); }, { once: true });
 });
-function createAgentsClient(client, { baseUrl, service = 'actor', audience = 'openvibe.actor' } = {}) {
+function createAgentsClient(client, { baseUrl, service = 'network', audience = 'openvibe.network' } = {}) {
     const call = (opts) => client.request({ service, baseUrl, audience, ...opts });
     async function run(id, { signal } = {}) {
         if (!id) throw new TypeError('agents.run: id is required');
