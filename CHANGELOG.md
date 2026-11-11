@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.149.0 — 2026-11-11
+
+- Add `ai.turn(input, options)` for file-capable `ai.complete` runs. Its typed `output_file` option stores a text, Markdown, CSV or JSON answer in Media and returns private `ai.file` artifact references; existing `ai.files.read()` reads a returned object.
+
 ## 0.148.0 — 2026-11-11
 
 - #208: add `openvibe-sdk/composer`, the shared composer's client: `attachments.upload(file, { onProgress, signal })` (multipart through `XMLHttpRequest`, real browser progress), `attachments.remove(id)`, `composer.prefs.get()/put(prefs, rev)` and `mentions.search(q, kinds)`, typed by `composer.attachment@1`, `composer.prefs@1` and `composer.mention@1`.

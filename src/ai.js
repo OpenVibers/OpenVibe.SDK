@@ -107,6 +107,8 @@ function createAiClient(client, defaults = {}) {
         const body = { task, input, ...(o.choice ? { choice: o.choice } : {}), ...(o.onBehalfOf ? { on_behalf_of: o.onBehalfOf } : {}), ...(runOptions(o) ? { options: runOptions(o) } : {}) };
         return call({ method: 'POST', path: '/api/v1/runs', query: waitQuery(o), json: body, ...writeOpts(o) }, o);
     };
+    /** A typed file-capable turn through the ai.complete workflow; output_file stores the answer in Media. */
+    const turn = (input, o = {}) => runs.create('ai.complete', input, o);
     const admin = { defaults: (value, o = {}) => call({ path: '/api/v1/admin/task-defaults', ...(value === undefined ? {} : { method: 'PUT', json: value, idempotencyKey: false }) }, o) };
 
     const batches = {
@@ -175,7 +177,7 @@ function createAiClient(client, defaults = {}) {
     };
 
     const metrics = require('./ai-metrics').createMetricsClient(call);
-    const api = { tasks, creations, choices, run, admin, runs, batches, files, metrics, TERMINAL, CLASSES };
+    const api = { tasks, creations, choices, run, turn, admin, runs, batches, files, metrics, TERMINAL, CLASSES };
     // Direct operations: a run of workflow ai.<op> with the input as the body, waited for by AI.
     for (const op of OPS) {
         api[op] = (input = {}, o = {}) => call({ method: 'POST', path: `/api/v1/${op}`, query: waitQuery(o),
