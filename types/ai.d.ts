@@ -16,7 +16,7 @@ export type LatencyClass = 'interactive' | 'background' | 'batch';
 export type ServiceTier = 'standard' | 'flex' | 'batch' | 'offpeak' | 'local';
 export interface AiChoice { model: string; source: "openvibe" | "keys" | "machines"; machine?: string; }
 export interface AiTask { name: string; kind: "text" | "code" | "vision" | "image" | "search"; sentence: string; default: AiChoice; workflow?: string; service?: string; }
-export interface AiTaskDefaults { signed_out: AiChoice; signed_in: AiChoice; fallbacks: AiChoice[]; image_model: AiChoice | null; search_engines: Array<{ engine: string; enabled: boolean }>; max_cost_usd: number | null; }
+export interface AiTaskDefaults { signed_out: AiChoice; signed_in: AiChoice; fallbacks: AiChoice[]; image_model: AiChoice | null; search_engines: Array<{ engine: string; enabled: boolean }>; max_cost_usd: number | null; daily_cap?: number | null; guest_find?: boolean; effort?: 'low' | 'medium' | 'high' | 'max'; }
 /** One thing AI can make, as GET /api/v1/creations lists it (ai.creation@1). */
 export interface AiCreation {
     id: string;
