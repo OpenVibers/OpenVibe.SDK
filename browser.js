@@ -41,4 +41,5 @@ module.exports = {
     geo: require('./src/geo'),
     history: require('./src/history'),
     userCard: require('./src/user-card'),
+    player: require('./src/player'),
 };

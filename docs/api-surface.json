@@ -341,6 +341,13 @@
         "createPlayClient"
       ]
     },
+    "player": {
+      "object": [
+        "current",
+        "handoff",
+        "on"
+      ]
+    },
     "projects": {
       "object": [
         "createProjectsClient"
@@ -1061,6 +1068,11 @@
   },
   "openvibe-sdk/play": {
     "createPlayClient": "function"
+  },
+  "openvibe-sdk/player": {
+    "current": "function",
+    "handoff": "function",
+    "on": "function"
   },
   "openvibe-sdk/projects": {
     "createProjectsClient": "function"

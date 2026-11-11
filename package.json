@@ -610,6 +610,12 @@
       "types": "./types/user-card.d.ts",
       "import": "./esm/user-card.mjs",
       "default": "./src/user-card.js"
+    },
+    "./player": {
+      "types": "./types/player.d.ts",
+      "browser": "./src/player.js",
+      "import": "./esm/player.mjs",
+      "default": "./src/player.js"
     }
   },
   "bin": {

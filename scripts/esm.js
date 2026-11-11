@@ -82,6 +82,7 @@ const ENTRIES = {
     'download.mjs': '../src/download.js',
     'quest.mjs': '../src/quest.js',
     'live.mjs': '../src/live.js',
+    'player.mjs': '../src/player.js',
     'streams.mjs': '../src/streams.js',
     'reports.mjs': '../src/reports.js',
     'inventory.mjs': '../src/inventory.js',
