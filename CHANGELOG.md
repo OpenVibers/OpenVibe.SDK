@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.148.0 — 2026-11-10
+
+- Add `exchange.createCatalogSearchClient().search(q, filters)` for public model and provider offers, with prices, measured speed and Bench quality when available.
+
 ## 0.147.0 — 2026-11-10
 
 - #181: add `chat.activity` (the person's feed: mentions, replies, reactions, server invites, accepted friend requests and roles), `rooms.react()` and `reply_to_id` on room and DM sends.
