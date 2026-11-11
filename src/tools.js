@@ -212,8 +212,9 @@ function createToolsClient(client, { baseUrl, service = 'tools', audience = 'ope
      * A request refused before the tool ran (404 tools.tool.not_found | not_runnable, 422
      * tools.input.invalid, 403 capability.denied, 503 tools.tool.unavailable…) throws OpenVibeError.
      */
-    async function run(id, input = {}, { files, waitMs, idempotencyKey, signal, timeoutMs } = {}) {
+    async function run(id, input = {}, { files, waitMs, idempotencyKey, signal, timeoutMs, prefer } = {}) {
         checkId(id, 'tools.run');
+        if (prefer != null && !['auto', 'home', 'host'].includes(prefer)) throw new TypeError('tools.run: prefer must be auto, home or host');
         if (input == null) input = {};
         if (typeof input !== 'object' || Array.isArray(input)) throw new TypeError('tools.run: input must be an object');
         if (waitMs != null && (!Number.isInteger(waitMs) || waitMs < 0 || waitMs > MAX_WAIT_MS)) throw new TypeError(`tools.run: waitMs is an integer, 0..${MAX_WAIT_MS}`);
@@ -232,6 +233,7 @@ function createToolsClient(client, { baseUrl, service = 'tools', audience = 'ope
         const key = idempotencyKey || newIdempotencyKey();
 
         const opts = { method: 'POST', path: `/api/v1/tools/${enc(id)}/run`, idempotencyKey: key, signal };
+        if (prefer != null) opts.headers = { 'X-Tools-Prefer': prefer };
         if (uploads.length) {
             const form = new FormData();
             form.append('input', JSON.stringify(input));

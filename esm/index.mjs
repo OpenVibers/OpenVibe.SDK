@@ -16,5 +16,6 @@ export const {
     news, food, actor, run, video, pics,
     work, zone, git, play, download, openre,
     geo, history, usage, commerce, moneyReasons, telemetry,
+    userCard,
 } = cjs;
 export default cjs;

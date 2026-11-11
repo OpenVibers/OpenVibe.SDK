@@ -31,7 +31,17 @@ export interface ToolListQuery {
     signal?: AbortSignal;
 }
 
+/** Durable job execution receipt at result.data.execution, or error.execution on failure/cancellation. */
+export interface ToolsExecutionReceipt {
+    worker: string;
+    location: 'home' | 'host';
+    took_ms: number;
+    attempts: Array<{ worker: string; location: 'home' | 'host'; took_ms: number; state: 'succeeded' | 'failed' | 'cancelled' | 'disconnected' }>;
+}
+
 export interface ToolRunOptions {
+    /** host keeps work on the host; home is advisory and respects owner order. Default auto. */
+    prefer?: 'auto' | 'home' | 'host';
     /** Uploads first, then references, in order; the count must fit the descriptor's files.min..max. */
     files?: ToolRunFile | ToolRunFile[];
     /** Job tools: wait up to this long (0..60000 ms) before answering; 200 finished, else 202. */

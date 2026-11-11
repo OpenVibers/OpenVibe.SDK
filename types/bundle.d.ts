@@ -1,3 +1,4 @@
+import * as userCard from './user-card';
 /** browser/openvibe-sdk.mjs: one self-contained ES module with the browser-safe subpaths (same shape as the package's browser entry). */
 import * as auth from './auth-browser';
 import * as registry from './registry';
@@ -64,8 +65,11 @@ export * as locker from './locker';
 export * as trust from './trust';
 export * as levels from './levels';
 
+export * as userCard from './user-card';
+
 declare const sdk: typeof core & {
     createWalletClient: typeof createWalletClient;
+    userCard: typeof userCard;
     auth: typeof auth; registry: typeof registry; modules: typeof modules; realtime: typeof realtime;
     media: typeof media; composer: typeof composer; cam: typeof cam; mediaUpload: typeof mediaUpload; ui: typeof ui; community: typeof community; homeFeed: typeof homeFeed; bot: typeof bot; search: typeof search; bench: typeof bench; meme: typeof meme; vision: typeof vision; themes: typeof themes; design: typeof design; redact: typeof redact; chat: typeof chat; ai: typeof ai; credentials: typeof credentials; jobs: typeof jobs; tools: typeof tools; projects: typeof projects; geo: typeof geo; history: typeof history; locker: typeof locker; trust: typeof trust; levels: typeof levels;
 };

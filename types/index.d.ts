@@ -70,3 +70,4 @@ export const createWalletClient: typeof import('./wallet').createWalletClient;
 
 export * as levels from './levels';
 export * as composer from './composer';
+export * as userCard from './user-card';

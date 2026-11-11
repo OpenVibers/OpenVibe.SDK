@@ -74,7 +74,8 @@
         "createChatClient",
         "createFeedPublisher",
         "createInboxVisitor",
-        "history"
+        "history",
+        "readEmbeds"
       ]
     },
     "chatApps": {
@@ -465,6 +466,11 @@
         "validateUsageSample"
       ]
     },
+    "userCard": {
+      "object": [
+        "createUserCardClient"
+      ]
+    },
     "video": {
       "object": [
         "createVideoClient"
@@ -600,7 +606,8 @@
         "attach",
         "pages"
       ]
-    }
+    },
+    "readEmbeds": "function"
   },
   "openvibe-sdk/chat-apps": {
     "APP_LIMITS": {
@@ -1254,6 +1261,9 @@
     "usageKey": "function",
     "usageSample": "function",
     "validateUsageSample": "function"
+  },
+  "openvibe-sdk/user-card": {
+    "createUserCardClient": "function"
   },
   "openvibe-sdk/valkey": {
     "createValkey": "function"

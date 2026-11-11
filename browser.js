@@ -38,4 +38,5 @@ module.exports = {
     projects: require('./src/projects'),
     geo: require('./src/geo'),
     history: require('./src/history'),
+    userCard: require('./src/user-card'),
 };

@@ -4,6 +4,15 @@
 
 - Add `openvibe-sdk/composer`: the shared composer's client. `attachments.upload(file, { onProgress, signal })` POSTs one multipart file to `POST /api/v1/attachments` on Media through **XMLHttpRequest**, so progress is the browser's real upload progress; `attachments.remove(id)`; `composer.prefs.get()/put(prefs, rev)` against `GET/PUT /api/v1/me/composer` on Network (a stale revision is 409 `composer.rev_conflict`, `err.problem.current` is the other tab's copy); `mentions.search(q, kinds)` against `GET /api/v1/mentions`. Typed by `composer.attachment@1`, `composer.prefs@1` and `composer.mention@1`; `test/composer.test.js` runs every call against a stub server.
 
+## 0.147.0 — 2026-11-10
+
+- #181: add `chat.activity` (the person's feed: mentions, replies, reactions, server invites, accepted friend requests and roles), `rooms.react()` and `reply_to_id` on room and DM sends.
+- #182: add the `system` and `can_run` machine metadata to the machine reader type.
+- #201: add `quest.cardData({ token, timeZone })` for the shared quest card: today's quest, the public catalog kept ten minutes and the person's badges and quest log.
+- #202: add `chat.embeds(message)` and `readEmbeds()` for the typed `chat.embed@1` address previews on a chat message.
+- #204: add `tools.run(tool, input, { prefer })` for worker placement (`auto`, `home`, `host`) over JSON and multipart requests, with execution receipt types and `tools.jobs.get(id)` examples.
+- #205: add the browser-safe, typed `userCard.createUserCardClient(core).get(username)` public Network aggregate; hidden or unavailable fields stay optional and the read sends no credentials.
+
 ## 0.146.0 — 2026-11-10
 
 - #183: add the private history reader for cursor reads, search, summaries, agent recent reads, settings and owner-scoped deletes.

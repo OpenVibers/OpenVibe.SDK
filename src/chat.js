@@ -31,6 +31,32 @@ const { isOpenVibeError } = require('./core/errors');
 const enc = encodeURIComponent;
 const history = require('./chat-history');
 
+/** The kinds chat.embed@1 names; anything else is not a preview this SDK returns. */
+const EMBED_KINDS = new Set(['link', 'video', 'image', 'live', 'picture', 'design', 'post', 'profile', 'game']);
+
+/** One chat.embed@1 object as the typed shape, or null when it is not one. Data only: never markup. */
+function embedOf(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    if (!EMBED_KINDS.has(value.kind)) return null;
+    if (typeof value.url !== 'string' || !value.url) return null;
+    if (typeof value.site_name !== 'string' || typeof value.title !== 'string' || !value.title || typeof value.description !== 'string') return null;
+    if (!(value.image === null || typeof value.image === 'string')) return null;
+    if (!Number.isInteger(value.width) || !Number.isInteger(value.height) || value.width < 0 || value.height < 0) return null;
+    const embed = {
+        kind: value.kind, url: value.url, site_name: value.site_name, title: value.title,
+        description: value.description, image: value.image, width: value.width, height: value.height,
+    };
+    if (typeof value.by === 'string' && value.by) embed.by = value.by;
+    if (typeof value.live === 'boolean') embed.live = value.live;
+    return embed;
+}
+
+/** The address previews a message carries (chat.embed@1), typed: [] when there are none. */
+function readEmbeds(message) {
+    if (!message || !Array.isArray(message.embeds)) return [];
+    return message.embeds.map(embedOf).filter(Boolean);
+}
+
 function createChatClient(client, defaults = {}) {
     const { baseUrl } = defaults;
     const call = (opts, o = {}) => client.json({ service: 'chat', baseUrl, audience: 'openvibe.chat', ...opts, signal: o.signal });
@@ -44,6 +70,8 @@ function createChatClient(client, defaults = {}) {
     return {
         /** Shared async page iterator and scroll-preserving DOM history controller. */
         history,
+        /** The typed address previews on a message (chat.embed@1): [] when it has none. */
+        embeds: (message) => readEmbeds(message),
         /** Vibe's model comparison API, authenticated as the person. */
         ask: (input, o = {}) => call({ method: 'POST', path: '/api/vibe/ask', json: input, ...once }, o),
         pick: (messageId, model, o = {}) => call({ method: 'POST', path: '/api/vibe/pick', json: { message_id: messageId, model }, ...once }, o),
@@ -76,7 +104,10 @@ function createChatClient(client, defaults = {}) {
             update: (slug, patch, o = {}) => call({ method: 'PATCH', path: room(slug), json: patch, ...once }, o),
             /** query: before | after (message id), limit */
             messages: (slug, query = {}, o = {}) => call({ path: `${room(slug)}/messages`, query }, o),
-            send: (slug, message, o = {}) => call({ method: 'POST', path: `${room(slug)}/messages`, json: { message }, ...once }, o),
+            /** extra: { reply_to_id } answers one of the room's messages. */
+            send: (slug, message, extra = {}, o = {}) => call({ method: 'POST', path: `${room(slug)}/messages`, json: { message, ...extra }, ...once }, o),
+            /** reaction: thumbsup | thumbsdown | heart | laugh | surprised | sad. The same one again takes it back. */
+            react: (slug, messageId, reaction, o = {}) => call({ method: 'POST', path: `${room(slug)}/messages/${enc(messageId)}/react`, json: { reaction }, ...once }, o),
             deleteMessage: (slug, id, o = {}) => call({ method: 'DELETE', path: `${room(slug)}/messages/${enc(id)}`, ...once }, o),
             join: (slug, o = {}) => call({ method: 'POST', path: `${room(slug)}/join`, ...once }, o),
             leave: (slug, o = {}) => call({ method: 'POST', path: `${room(slug)}/leave`, ...once }, o),
@@ -92,7 +123,8 @@ function createChatClient(client, defaults = {}) {
             get: (id, o = {}) => orNull(call({ path: conv(id) }, o)),
             /** query: limit, before */
             messages: (id, query = {}, o = {}) => call({ path: `${conv(id)}/messages`, query }, o),
-            send: (id, message, o = {}) => call({ method: 'POST', path: `${conv(id)}/messages`, json: { message }, ...once }, o),
+            /** extra: { reply_to_id } answers one of the conversation's messages. */
+            send: (id, message, extra = {}, o = {}) => call({ method: 'POST', path: `${conv(id)}/messages`, json: { message, ...extra }, ...once }, o),
             deleteMessage: (id, msgId, o = {}) => call({ method: 'DELETE', path: `${conv(id)}/messages/${enc(msgId)}`, ...once }, o),
             read: (id, o = {}) => call({ method: 'POST', path: `${conv(id)}/read`, ...once }, o),
             unread: (o = {}) => call({ path: '/api/dm/unread' }, o),
@@ -102,6 +134,21 @@ function createChatClient(client, defaults = {}) {
             /** Saved view for one conversation: { view: 'bubbles' | 'room' }. */
             viewPreference: (id, o = {}) => call({ path: `${conv(id)}/view` }, o),
             setViewPreference: (id, view, o = {}) => call({ method: 'PUT', path: `${conv(id)}/view`, json: { view }, ...once }, o),
+        },
+        /**
+         * What happened to you in Chat, newest first (server/chat/activity.js in OpenVibe.Chat): mentions, replies to
+         * your messages, reactions to them, server invites, accepted friend requests and roles given to you.
+         * query: { limit, before (the last row's id), kind: 'mention' | … | 'mention,reply' }
+         */
+        activity: {
+            /** → { items, next_before, unread } */
+            list: (query = {}, o = {}) => call({ path: '/api/v1/activity', query }, o),
+            /** → { unread } */
+            unread: (o = {}) => call({ path: '/api/v1/activity/unread' }, o),
+            /** One row: POST /api/v1/activity/:id/read → { ok, read, unread } */
+            readOne: (id, o = {}) => call({ method: 'POST', path: `/api/v1/activity/${enc(id)}/read`, ...once }, o),
+            /** No ids: all of it. → { ok, read, unread } */
+            read: (ids = null, o = {}) => call({ method: 'POST', path: '/api/v1/activity/read', json: ids == null ? { all: true } : { ids: [].concat(ids) }, ...once }, o),
         },
         /** Every message you sent that is still visible: { username, total, truncated, messages } (JSON). */
         exportMine: (o = {}) => call({ path: '/api/chat/me/export' }, o),
@@ -261,4 +308,4 @@ function createFeedPublisher(client, { feed, key, baseUrl } = {}) {
     };
 }
 
-module.exports = { createChatClient, createInboxVisitor, createFeedPublisher, history };
+module.exports = { createChatClient, createInboxVisitor, createFeedPublisher, history, readEmbeds };

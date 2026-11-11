@@ -1,0 +1,30 @@
+'use strict';
+const assert = require('node:assert/strict');
+const { createClient } = require('../src/core');
+const { createUserCardClient } = require('../src/user-card');
+(async () => {
+    const calls = [];
+    const hidden = { username: 'Example', profile_url: 'https://openvibe.network/@Example' };
+    const signal = new AbortController().signal;
+    const reader = createUserCardClient({ json: async options => { calls.push(options); return hidden; } }, { baseUrl: 'https://network.example' });
+    assert.deepEqual(await reader.get('Example', { signal }), hidden);
+    assert.deepEqual(calls[0], { service: 'network', audience: 'openvibe.network', baseUrl: 'https://network.example', path: '/api/v1/people/Example/card', signal, auth: false, credentials: 'omit' });
+    for (const bad of ['../admin', '', 'ab', '@Example', 'x'.repeat(25), null, ['Example']]) assert.throws(() => reader.get(bad), TypeError);
+    assert.throws(() => createUserCardClient({}), TypeError);
+    let sent, count = 0;
+    const core = createClient({ network: 'https://network.example', token: 'test-only', credentials: 'include', retries: 0, autoDiscover: false,
+        fetch: async (url, options) => { sent = { url, options }; count++; return new Response(JSON.stringify(hidden), { headers: { 'Content-Type': 'application/json' } }); } });
+    assert.deepEqual(await createUserCardClient(core).get('Example'), hidden);
+    assert.equal(count, 1, 'one HTTP aggregate read');
+    assert.equal(sent.url, 'https://network.example/api/v1/people/Example/card');
+    assert.equal(new Headers(sent.options.headers).get('authorization'), null);
+    assert.equal(sent.options.credentials, 'omit');
+    const disabled = createUserCardClient({ json: async () => { throw Object.assign(new Error('user_card.disabled'), { status: 503 }); } });
+    await assert.rejects(disabled.get('Example'), { status: 503 });
+    const esm = await import('../esm/user-card.mjs');
+    const browser = await import('../browser/openvibe-sdk.mjs');
+    assert.equal(esm.createUserCardClient, createUserCardClient);
+    assert.equal(typeof browser.userCard.createUserCardClient, 'function');
+    assert.equal(require('../index').userCard.createUserCardClient, createUserCardClient);
+    console.log('user-card: one public read, omitted fields preserved, credentials omitted, validation, errors and browser/ESM exports passed');
+})().catch(e => { console.error(e); process.exitCode = 1; });
