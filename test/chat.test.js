@@ -7,7 +7,7 @@
 const assert = require('node:assert/strict');
 const { stubServer, send, run } = require('./helpers');
 const { createClient } = require('../src/core');
-const { createChatClient, createInboxVisitor, createFeedPublisher, history } = require('../src/chat');
+const { createChatClient, createInboxVisitor, createFeedPublisher, history, readEmbeds } = require('../src/chat');
 
 async function chatStub() {
     let busy = 0;
@@ -20,6 +20,17 @@ async function chatStub() {
 }
 
 run([
+    ['embeds reads chat.embed@1 and returns the typed shape, dropping what is not one', async () => {
+        const chat = createChatClient(createClient({ baseUrls: { chat: 'http://127.0.0.1:9' }, token: 'person-token' }));
+        const link = { kind: 'link', url: 'https://example.com/a', site_name: 'Example', title: 'A story', description: 'What happened', image: null, width: 640, height: 360 };
+        const live = { kind: 'live', url: 'https://openvibe.live/@streamer', site_name: 'OpenVibe.Live', title: 'The Streamer', description: '', image: 'https://openvibe.media/avatars/s.jpg', width: 0, height: 0, by: 'streamer', live: true };
+        assert.deepEqual(chat.embeds({ embeds: [link, live] }), [link, live]);
+        assert.deepEqual(chat.embeds({ embeds: [link, { ...link, kind: 'article' }, { ...link, title: '' }, null, 'x'] }), [link], 'only real embeds come back');
+        assert.deepEqual(Object.keys(chat.embeds({ embeds: [{ ...link, extra: 'dropped' }] })[0]).sort(), Object.keys(link).sort());
+        assert.deepEqual(chat.embeds({}), []);
+        assert.deepEqual(chat.embeds(null), []);
+        assert.deepEqual(readEmbeds({ embeds: [live] }), [live], 'the reader is exported too');
+    }],
     ['the ESM chat entry exports the shared history helper', async () => {
         const esm = await import('../esm/chat.mjs');
         assert.equal(typeof esm.history.pages, 'function');
@@ -150,6 +161,30 @@ run([
             ['POST', '/api/chat/inboxes/inb_X/actions/3/test', { arguments: { order_id: '42' } }],
         ]);
         assert.equal(srv.requests[6].headers.authorization, undefined, 'a feed is read without the person\'s token');
+        await srv.close();
+    }],
+    ['activity: the person\'s feed, its unread count and marking read; replies and reactions', async () => {
+        const srv = await chatStub();
+        const chat = createChatClient(createClient({ baseUrls: { chat: srv.url }, token: 'person-token' }));
+        await chat.activity.list({ limit: 2, before: 9, kind: 'mention' });
+        await chat.activity.unread();
+        await chat.activity.readOne(7);
+        await chat.activity.read([1, 2]);
+        await chat.activity.read();
+        await chat.rooms.send('builders', 'first!', { reply_to_id: 5 });
+        await chat.rooms.react('builders', 9, 'heart');
+        await chat.dms.send(7, 'hi', { reply_to_id: 3 });
+        const got = srv.requests.map((r) => [r.method, r.url, r.body && String(r.body).length ? JSON.parse(String(r.body)) : null]);
+        assert.deepEqual(got, [
+            ['GET', '/api/v1/activity?limit=2&before=9&kind=mention', null],
+            ['GET', '/api/v1/activity/unread', null],
+            ['POST', '/api/v1/activity/7/read', null],
+            ['POST', '/api/v1/activity/read', { ids: [1, 2] }],
+            ['POST', '/api/v1/activity/read', { all: true }],
+            ['POST', '/api/chat/rooms/builders/messages', { message: 'first!', reply_to_id: 5 }],
+            ['POST', '/api/chat/rooms/builders/messages/9/react', { reaction: 'heart' }],
+            ['POST', '/api/dm/conversations/7/messages', { message: 'hi', reply_to_id: 3 }],
+        ]);
         await srv.close();
     }],
     ['an inbox visitor needs no account and keeps its token; a feed publisher sends the key', async () => {

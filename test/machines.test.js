@@ -10,7 +10,7 @@ const assert = require('node:assert/strict');
 const { stubServer, send, run, sleep } = require('./helpers');
 const { createMachines, DEFAULT_TIMEOUT_MS } = require('../src/machines');
 
-const MACHINE = { id: 'dev_01ARZ3NDEKTSV4RRFFQ69G5FAV', kind: 'server', online: true, roles: ['codes.worker'], running: [] };
+const MACHINE = { id: 'dev_01ARZ3NDEKTSV4RRFFQ69G5FAV', kind: 'server', online: true, roles: ['codes.worker'], running: [], system: 'Linux', can_run: ['worker'] };
 
 async function hub(answer) {
     const state = { requests: [], token: 'person-token' };
@@ -58,6 +58,8 @@ run([
             const list = await machines.list();
             assert.equal(list.machines.length, 1);
             assert.equal(list.machines[0].id, MACHINE.id);
+            assert.equal(list.machines[0].system, 'Linux');
+            assert.deepEqual(list.machines[0].can_run, ['worker']);
             assert.equal((await machines.get(MACHINE.id)).machine.kind, 'server');
             assert.equal((await machines.catalogue()).roles[0].id, 'codes.worker');
             assert.equal((await machines.pair()).pairing.code, 'ABCD-EFGH');

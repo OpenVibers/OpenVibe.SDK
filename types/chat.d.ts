@@ -2,6 +2,24 @@ import type { OpenVibeClient } from './core';
 
 type Opts = { signal?: AbortSignal };
 type Json = Record<string, unknown>;
+/** The kinds chat.embed@1 names. */
+export type ChatEmbedKind = 'link' | 'video' | 'image' | 'live' | 'picture' | 'design' | 'post' | 'profile' | 'game';
+/** chat.embed@1: one address preview under a chat message, the shape every client draws. Plain data; escape it. */
+export interface ChatEmbed {
+    kind: ChatEmbedKind;
+    url: string;
+    site_name: string;
+    title: string;
+    description: string;
+    /** An OpenVibe.Media address, or null (another site's picture is never hot-linked). */
+    image: string | null;
+    width: number;
+    height: number;
+    /** On OpenVibe's own kinds, the person or channel the thing belongs to. */
+    by?: string;
+    /** On a Live channel, whether it is broadcasting now. */
+    live?: boolean;
+}
 /** chat.room-insight-result@1: a room's public AI insight (see the contract in openvibe-contracts). */
 export interface RoomInsight {
     overview: {
@@ -16,7 +34,19 @@ export interface RoomInsight {
     timeline: { at: string; kind: string; title: string; text: string; message_id: number | null }[];
     state: 'ready' | 'quiet' | 'off';
 }
+/** The typed address previews a message carries (chat.embed@1): [] when it has none. */
+export function readEmbeds(message?: { embeds?: unknown } | null): ChatEmbed[];
 export type ChatMessageView = 'bubbles' | 'room';
+export type ActivityKind = 'mention' | 'reply' | 'reaction' | 'server_invite' | 'friend_accept' | 'role';
+export interface ActivityItem {
+    id: number;
+    kind: ActivityKind;
+    actor: { id: number | null; username: string | null; display_name: string | null; avatar_url: string | null };
+    where: { kind: 'room' | 'dm' | 'global' | 'server' | 'friends'; label: string; href: string; room?: string | null; server?: string | null; conversation?: number };
+    what: { excerpt: string | null; reaction: string | null; role: string | null };
+    at: string;
+    read: boolean;
+}
 export interface ChatHistoryPage<T extends { id: number | string } = { id: number | string; [field: string]: unknown }> { messages: T[]; more: boolean; [field: string]: unknown; }
 export interface ChatHistoryOptions { limit?: number; before?: number | string | null; signal?: AbortSignal; }
 export interface ChatHistoryHelper {
@@ -65,6 +95,8 @@ export interface RoomMemory {
 }
 
 export interface ChatClient {
+    /** The typed address previews a message carries (chat.embed@1): [] when it has none. */
+    embeds(message?: { embeds?: unknown } | null): ChatEmbed[];
     history: ChatHistoryHelper;
     /** Ask Vibe using Auto, one catalogue model, or two to three models side by side. */
     ask(input: { message: string; models?: string[]; slug?: string; fresh?: boolean; system_prompt?: string; temperature?: number }, opts?: Opts): Promise<{ chat: Json; message: Json }>;
@@ -87,7 +119,8 @@ export interface ChatClient {
         forgetMyMemory(id: string, opts?: Opts): Promise<{ removed: number }>;
         update(slug: string, patch: { name?: string; topic?: string; visibility?: 'public' | 'private'; slow_seconds?: number }, opts?: Opts): Promise<Json>;
         messages(slug: string, query?: { before?: number; after?: number; limit?: number }, opts?: Opts): Promise<Json>;
-        send(slug: string, message: string, opts?: Opts): Promise<Json>;
+        send(slug: string, message: string, extra?: { reply_to_id?: number }, opts?: Opts): Promise<Json>;
+        react(slug: string, messageId: number | string, reaction: 'thumbsup' | 'thumbsdown' | 'heart' | 'laugh' | 'surprised' | 'sad', opts?: Opts): Promise<{ ok: boolean; reaction: string | null }>;
         deleteMessage(slug: string, id: number | string, opts?: Opts): Promise<Json>;
         join(slug: string, opts?: Opts): Promise<Json>;
         leave(slug: string, opts?: Opts): Promise<Json>;
@@ -100,7 +133,7 @@ export interface ChatClient {
         create(userIds: number[], extra?: { name?: string }, opts?: Opts): Promise<Json>;
         get(id: number | string, opts?: Opts): Promise<Json | null>;
         messages(id: number | string, query?: { limit?: number; before?: number }, opts?: Opts): Promise<Json>;
-        send(id: number | string, message: string, opts?: Opts): Promise<Json>;
+        send(id: number | string, message: string, extra?: { reply_to_id?: number }, opts?: Opts): Promise<Json>;
         deleteMessage(id: number | string, msgId: number | string, opts?: Opts): Promise<Json>;
         read(id: number | string, opts?: Opts): Promise<Json>;
         unread(opts?: Opts): Promise<{ unread: number }>;
@@ -111,6 +144,12 @@ export interface ChatClient {
         setViewPreference(id: number | string, view: ChatMessageView, opts?: Opts): Promise<{ view: ChatMessageView; conversation_id: number }>;
     };
     exportMine(opts?: Opts): Promise<{ username: string; exported_at: string; total: number; truncated: boolean; messages: Json[] }>;
+    activity: {
+        list(query?: { limit?: number; before?: number; kind?: string }, opts?: Opts): Promise<{ items: ActivityItem[]; next_before: number | null; unread: number }>;
+        unread(opts?: Opts): Promise<{ unread: number }>;
+        readOne(id: number | string, opts?: Opts): Promise<{ ok: boolean; read: number; unread: number }>;
+        read(ids?: number[] | null, opts?: Opts): Promise<{ ok: boolean; read: number; unread: number }>;
+    };
     vibe: {
         list(opts?: Opts): Promise<{ chats: Json[]; allowance?: Json }>;
         conversations(opts?: Opts): Promise<{ conversations: Array<{ slug: string; name: string; last_message_at: string; created_at: string; last_line: string | null; last_answer_at: string | null; site: string | null }>; count: number }>;
