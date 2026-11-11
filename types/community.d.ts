@@ -12,7 +12,7 @@ export type CallOptions = ActingOptions & { signal?: AbortSignal };
 
 export interface CommentQuery { after?: string | number; sort?: 'old' | 'new'; limit?: number; parent?: string | number; }
 export type CommentAttachment = AiFile & { url?: string };
-export interface Comment { id: number; thread_id: number | string; parent_id: number | null; message: string | null; reply_count?: number | null; replies?: Comment[]; attachments?: CommentAttachment[]; [field: string]: unknown; }
+export interface Comment { id: number; thread_id: number | string; parent_id: number | null; reply_to_id: number | null; reply_to: { id: number; display_name: string } | null; message: string | null; reply_count?: number | null; replies?: Comment[]; attachments?: CommentAttachment[]; [field: string]: unknown; }
 export interface CommentPage { thread: Record<string, unknown>; comments: Comment[]; next_cursor: string | null; viewer: Record<string, boolean>; }
 export interface CommentsApi {
     resolve(ref: EntityRef, opts?: CallOptions): Promise<{ thread: Record<string, unknown>; created: boolean }>;
