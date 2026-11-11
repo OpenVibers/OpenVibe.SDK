@@ -16,4 +16,9 @@ run([
      assert.deepEqual(got,[['5','STEP_STARTED'],['6','RUN_FINISHED']]); assert.equal(srv.requests[3].headers['last-event-id'],'5');
    } finally { await srv.close(); }
  }],
+ ['reconnect retries use exponential backoff', async () => {
+   let calls=0; const srv=await stubServer((req,res)=>{ calls++; if(calls<4) return send(res,503,{code:'temporarily.unavailable'}); res.writeHead(200,{'Content-Type':'text/event-stream'}); res.end(`id: 1\nevent: RUN_FINISHED\ndata: ${JSON.stringify({type:'RUN_FINISHED',timestamp:1794355200000})}\n\n`); });
+   try { const agents=createAgentsClient(createClient({baseUrls:{actor:srv.url},token:'t'})); const start=Date.now(); const got=[]; for await(const e of agents.events('run_a',{reconnectDelayMs:10,maxReconnects:5})) got.push(e.id); assert.deepEqual(got,['1']); assert.ok(Date.now()-start>=65,`backoff elapsed ${Date.now()-start}ms`); assert.equal(calls,4); }
+   finally { await srv.close(); }
+ }],
 ]);
