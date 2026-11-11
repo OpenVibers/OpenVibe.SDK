@@ -101,6 +101,11 @@
         "verifyTelegram"
       ]
     },
+    "codes": {
+      "object": [
+        "createCodesClient"
+      ]
+    },
     "commerce": {
       "object": [
         "CommerceError",
@@ -635,6 +640,9 @@
     "verifyDiscord": "function",
     "verifySlack": "function",
     "verifyTelegram": "function"
+  },
+  "openvibe-sdk/codes": {
+    "createCodesClient": "function"
   },
   "openvibe-sdk/commerce": {
     "CommerceError": "class",

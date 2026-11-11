@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.148.0 — 2026-11-11
+
+- Add the browser-safe `codes` client: model plan get, put and presets, and task creation with a plan or preset.
+
 ## 0.147.0 — 2026-11-10
 
 - #181: add `chat.activity` (the person's feed: mentions, replies, reactions, server invites, accepted friend requests and roles), `rooms.react()` and `reply_to_id` on room and DM sends.
