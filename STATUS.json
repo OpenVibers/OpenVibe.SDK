@@ -7,7 +7,7 @@
   "plan": "OpenVibe End-to-End Realignment & Implementation Plan, revision 3 (20 Sep 2026), §3.2; roadmap §30",
   "deployed": false,
   "deployment": "none: a package released as git tags; services and apps pin a tag",
-  "contracts": "openvibe-contracts v0.417.0",
+  "contracts": "openvibe-contracts v0.419.0",
   "features": [
     "design.icons.suggest: the best glyphs for a button's words by meaning, with rank:true asking a small model when the words are new; design.icons.get/search are public and draft keeps its token (0.155.0)",
     "ui-layout (openvibe-sdk/ui-layout, also sdk.uiLayout): validate(catalog, layout) returns { ok, reasons[] } in plain words for required parts, 44 px pressed targets, coverage, theme-token tints, styles, bindings and data-only content; applyDefaults(catalog, device?) and merge(layout, patch) build and patch an arrangement without mutating it",
