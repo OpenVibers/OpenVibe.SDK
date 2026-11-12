@@ -8,12 +8,12 @@
 **Install and test:** `npm ci && npm test` (Node 20 or newer)
 
 ```bash
-npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.156.0
+npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.157.0
 ```
 
 > Supported browser and server clients for the OpenVibe platform.
 
-**Status:** alpha, v0.156.0 (the five 1.0 core entries — `core`, `auth`, `events`, `db` and `media` — are frozen: their exported names change only with a major release; roadmap Wave 2; developer apps from Wave 20; Media objects v2 from Wave 4; the Tools platform API; Search, Chat, AI, Vision and consent clients; sign-in with recovery and a client health check). Every release is tagged (see [CHANGELOG.md](CHANGELOG.md)). Tested against local stub servers and the built-in mock platform only, never against the live platform. Services pin release tags; each repository's `STATUS.json` names the one it uses.
+**Status:** alpha, v0.157.0 (the five 1.0 core entries — `core`, `auth`, `events`, `db` and `media` — are frozen: their exported names change only with a major release; roadmap Wave 2; developer apps from Wave 20; Media objects v2 from Wave 4; the Tools platform API; Search, Chat, AI, Vision and consent clients; sign-in with recovery and a client health check). Every release is tagged (see [CHANGELOG.md](CHANGELOG.md)). Tested against local stub servers and the built-in mock platform only, never against the live platform. Services pin release tags; each repository's `STATUS.json` names the one it uses.
 **Plan:** OpenVibe End-to-End Realignment & Implementation Plan, revision 3 (20 Sep 2026), §3.2; roadmap §30.  
 **License:** MIT ([LICENSE](LICENSE)). This package is a library that apps outside the network embed, so it uses MIT. The OpenVibe services themselves stay AGPL-3.0.
 
@@ -22,7 +22,7 @@ npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags
 After v0.97.1 is tagged:
 
 ```bash
-npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.156.0
+npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.157.0
 ```
 
 It has no runtime dependencies. It needs Node ≥ 20, or any browser with `fetch`, Web Crypto and `TextDecoder`. There is no build step. The package is CommonJS with ESM entry points (`import` works). Each subpath has its own `.d.ts`. For a page with no bundler, `browser/openvibe-sdk.mjs` is one self-contained ES module of the browser-safe subpaths (see [Browser without a bundler](#browser-without-a-bundler)). It does not depend on `openvibe-contracts` at runtime: it copies the contract types it uses (from the temporary Contracts sharing branch, a devDependency the tests check them against).
@@ -208,6 +208,7 @@ Until OpenVibe.Tools serves the gateway facade (Tools S6), point the jobs client
 | `openvibe-sdk/history` | both | Private history reads: cursor pages, title search, day/week summaries, recent agent reads, settings and owner-scoped deletes. |
 | `openvibe-sdk/home-feed` | both | `createHomeFeedClient(client)` gives `ov.home.get()/set(layout)`, `ov.network.today()`, `ov.feed.list({ for: 'me', cursor })`, `ov.feed.post(text)`, and `ov.feed.contribute({ id, text, url })`. Personal calls need a user Bearer token; contribution needs an app token granted `community.pulse.contribute`. Today is public and cached by Network for five minutes. |
 | `openvibe-sdk/feed` | both | `createFeedClient(client)` gives `ov.feed.list({ kind, cursor })` for the public cross-site Community Feed. Pass the returned `next_cursor` as `cursor` to read the next page. |
+| `openvibe-sdk/views` | both | `createViewsClient(client)`: `record(event \| [events])` (up to 20 per call) sends a preview, watch or live heartbeat for `{ service, kind, id }` to `POST /api/v1/views`; `counts(ref)` reads `{ views, engaged, previews, preview_share, peak_concurrent }`. A signed-out viewer keeps an opaque session id; the service stores no IP or user agent and counts a preview from 1 s. |
 | `openvibe-sdk/bot` | both | `createBotClient(client, {actingSubject?})`: OpenVibe.Bot robots. `robots.list/get/create/update/delete/pairingCode`, `robots.operators.list/add/remove`, `robots.devices`, `robots.streaming.get/set`, `robots.audit`/`iterateAudit`, `robots.estop`/`clearEstop`, `robots.command` (`bot.command@1`), `embedUrl(robotId, mode)` (panel, overlay or compact), `devices.rotate/revoke`, public `profiles.list/get` and `kits.list/get`, `pair` (the agent's one-time code, never retried), `as(subject)`; a service acts for a person with `X-OV-Subject` (capabilities `bot.robot.read`/`manage`/`control`, `bot.device.connect`) |
 | `openvibe-sdk/themes` | both | `createThemesClient(client)`: `catalog({mode, search, sort, limit})` (seasonal themes carry `season`), `get(idOrSlug)` (null when missing), `export(idOrSlug)`, `active()` (`{theme_id, custom_variables, display}`), `set(themeId, {custom})`, `setDisplay({motion, text, seasonal})`, `seasons({date})`, `submissions()`, `submit(theme)`, `import(file)`. In the browser: `followTheme(fn)` calls back now and on every theme, display or season change with `readTheme()` (`{id, mode, tokens, display: {motion, text, textScale, seasonal, calm}, season, seasonMark}`) and returns `stop()`, for a canvas or game to keep up; `applyTheme(vars, {root})`, `seasonOn(date, seasons)`, `onColor(hex)`, `DISPLAY_OPTIONS`, `TOKENS` |
 | `openvibe-sdk/bench` | both | `createBenchClient(client, {actingSubject?})`: `kinds.list/get`, `tasks.create/get`, `rounds.create/get`, `entries.submit`, `judgements.next/cast`, `boards.get`, `ratings.get` (public, at least twenty games), `models.get`, `datasets.get/iterate`, `evals.create/get/run/results`, `mcpTools()`. Audience `openvibe.bench`; service id `bench`. |

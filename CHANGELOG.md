@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.157.0 — 2026-11-12
+
+- **`openvibe-sdk/views`: one view API for every content kind** (Contracts `media.view-request@1`, the `media.viewed`
+  and `media.engaged` events).
+  - `createViewsClient(client).record(event | [events])` posts a preview, watch or live heartbeat for
+    `ref: { service, kind, id }` to Media's `POST /api/v1/views`, up to 20 at once. `seconds` is cumulative for the
+    session and item, so a retry does not count twice; a signed-out viewer keeps an opaque session id.
+  - `.counts(ref)` reads one item's `{ views, engaged, previews, preview_share, peak_concurrent }` from
+    `GET /api/v1/views/counts`. Media never stores an IP address or a user agent with a view, and a preview counts
+    from 1 second.
+
 ## 0.156.0 — 2026-11-12
 
 - **`openvibe-sdk/exchange`: reviewed compute prices, keyless.**
