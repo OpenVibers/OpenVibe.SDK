@@ -9,9 +9,9 @@ JavaScript/TypeScript client library, not a service: it owns no database, no por
 - **Entry points:** `index.js` (Node, CommonJS), `browser.js` (browser-safe), `esm/*.mjs` (generated
   ESM shims for every subpath), `types/*.d.ts`, and `browser/openvibe-sdk.mjs` (one self-contained
   browser bundle, checked in).
-- **Source:** one module or directory per capability under `src/` (`src/core/`, `src/auth.js`,
-  `src/events.js`, `src/db.js`, `src/valkey.js`, `src/media.js`, `src/community.js`, `src/chat.js`,
-  `src/ai.js`, `src/tools.js`, …), each exposing a `create*Client` factory.
+- **Source:** one module or directory per capability under `src/` (`src/core/`, `src/auth/`,
+  `src/db/`, `src/service/`, `src/events.js`, `src/valkey.js`, `src/media.js`, `src/community.js`,
+  `src/chat.js`, `src/ai.js`, `src/tools.js`, …), each exposing a `create*Client` factory.
 - **Contract types:** `openvibe-contracts` is a dev dependency used by the tests; at runtime the SDK
   copies the types and shapes it needs, so consumers install the SDK alone.
 - **Docs:** `README.md` is the API reference, `docs/` holds capability guides
