@@ -30,6 +30,7 @@ export * as ai from './ai';
 export * as credentials from './credentials';
 export * as jobs from './jobs';
 export * as agents from './agents';
+export * as frame from './frame';
 export * as tools from './tools';
 export * as projects from './projects';
 export * as resources from './resources';
