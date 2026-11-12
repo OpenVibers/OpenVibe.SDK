@@ -2,6 +2,7 @@
 import cjs from '../src/frame.js';
 
 export const {
-    mountFrame, frameTags, frameConfig, scriptUrls, online, DEFAULT_BASE,
+    mountFrame, frameTags, frameConfig, scriptUrls, online, createFrameClient,
+    DEFAULT_BASE,
 } = cjs;
 export default cjs;
