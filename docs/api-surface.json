@@ -16,7 +16,15 @@
     },
     "agents": {
       "object": [
-        "createAgentsClient"
+        "END_STATUSES",
+        "KINDS",
+        "STATUSES",
+        "createAgentsClient",
+        "createFrameAgentsClient",
+        "isEnd",
+        "needsPerson",
+        "parseRef",
+        "refOf"
       ]
     },
     "ai": {
@@ -600,7 +608,15 @@
     "createAgentSheetClient": "function"
   },
   "openvibe-sdk/agents": {
-    "createAgentsClient": "function"
+    "END_STATUSES": "array",
+    "KINDS": "array",
+    "STATUSES": "array",
+    "createAgentsClient": "function",
+    "createFrameAgentsClient": "function",
+    "isEnd": "function",
+    "needsPerson": "function",
+    "parseRef": "function",
+    "refOf": "function"
   },
   "openvibe-sdk/ai": {
     "CLASSES": "array",
