@@ -6671,6 +6671,15 @@ const pause = (ms, signal) => new Promise((resolve) => {
 });
 function createAgentsClient(client, { baseUrl, service = 'network', audience = 'openvibe.network' } = {}) {
     const call = (opts) => client.request({ service, baseUrl, audience, ...opts });
+    const runId = (run) => {
+        const id = typeof run === 'string' ? run : run && run.id;
+        if (!id) throw new TypeError('agents: a run (or its id) is required');
+        return enc(id);
+    };
+    const deskId = (desk) => {
+        if (typeof desk !== 'string' || !desk) throw new TypeError('agents: a desk id is required');
+        return enc(desk);
+    };
     async function run(id, { signal } = {}) {
         if (!id) throw new TypeError('agents.run: id is required');
         try { return (await call({ path: `/api/v1/runs/${enc(id)}`, signal })).data; }
@@ -6709,7 +6718,26 @@ function createAgentsClient(client, { baseUrl, service = 'network', audience = '
             await pause(waitMs, signal);
         }
     }
-    return { run, events, post };
+    /**
+     * See it work (W1): the desks a run may show, the person's control of one, and the finished run's replay. The
+     * shapes match Actor's own until these routes are released here: desks → [{ desk, view, still }], replay → the
+     * steps with their stills. A run is an id or an object with an id.
+     */
+    async function desks(run, { signal } = {}) {
+        return (await call({ path: `/api/v1/runs/${runId(run)}/desks`, signal })).data;
+    }
+    async function takeOver(run, desk, { signal } = {}) {
+        return (await call({ method: 'POST', path: `/api/v1/runs/${runId(run)}/desks/${deskId(desk)}/take-over`, signal })).data;
+    }
+    async function handBack(run, desk, note = '', { signal } = {}) {
+        if (note != null && typeof note !== 'string') throw new TypeError('agents.handBack: note is a string');
+        return (await call({ method: 'POST', path: `/api/v1/runs/${runId(run)}/desks/${deskId(desk)}/hand-back`, json: { note: String(note || '').slice(0, 1000) }, signal })).data;
+    }
+    async function replay(run, { signal } = {}) {
+        return (await call({ path: `/api/v1/runs/${runId(run)}/replay`, signal })).data;
+    }
+
+    return { run, events, post, desks, takeOver, handBack, replay };
 }
 module.exports = { createAgentsClient };
 },
