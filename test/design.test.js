@@ -38,7 +38,7 @@ run([
         const signed = createDesignClient({ baseUrl: srv.url, accessToken: 'user-jwt' });
         await signed.components();
         assert.equal(srv.requests[3].headers.authorization, 'Bearer user-jwt', 'a token, when given, goes along');
-        await assert.rejects(() => d.icons.get('heart'), /needs accessToken/, 'the icon API still needs a token');
+        await assert.rejects(() => d.icons.draft({ name: 'hot-tub' }), /needs accessToken/, 'a glyph draft still needs a token');
         await srv.close();
     }],
     ['a bad name is refused before a request; a server error still throws', async () => {
