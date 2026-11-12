@@ -2,6 +2,7 @@
 import cjs from '../src/agents.js';
 
 export const {
-    createAgentsClient,
+    createAgentsClient, createFrameAgentsClient, KINDS, STATUSES, END_STATUSES, isEnd,
+    refOf, parseRef, needsPerson,
 } = cjs;
 export default cjs;

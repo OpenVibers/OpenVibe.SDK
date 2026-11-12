@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.159.0 — 2026-11-12
+
+The agent engine's client (Contracts 0.414.0: everything a person asks an AI to do is a run with a thread of steps).
+
+- **`openvibe-sdk/agents` runs:** `runs.list({ kind, status, q, limit, cursor, before, agent, parentRun })`,
+  `runs.get(run)` (null on 404), `runs.steps(run, { after, limit })`, `runs.start(text | agents.run-start@1,
+  { idempotencyKey })`, `runs.say(run, text | { text, attachments })` (continue a conversation or steer work),
+  `runs.stop(run, { reason })`, `runs.events(run, { after })` and `runs.follow(run, { onRun, onStep, onDelta,
+  onApproval, onEvent })`, which resolves with the end status.
+- **`approvals.answer(run, approval, answer)`** by the approval's id, its object, or the step seq that asked.
+- **`createFrameAgentsClient(client)`:** every product's runs through the Frame (`/api/frame/runs…`), where a run is
+  named by its ref (`<product>:<id>`); `createAgentsClient(client, { prefix })` for any product's Run API.
+- **Helpers:** `refOf`, `parseRef`, `isEnd`, `needsPerson` (a run waiting for a message is a conversation between
+  turns, not something that needs its person), `KINDS`, `STATUSES`, `END_STATUSES`.
+- **The stream:** the engine's events (`run`, `step`, `delta`, `approval`, `end`) are read beside AG-UI's; only a
+  step advances the resume cursor, so a snapshot or more text that shares a step's id is never skipped.
+- **The plugin interfaces** (model adapter, tool, sandbox, memory, planner, reviewer) stay as JSDoc types; the loop
+  that calls them is the next release.
+- `run`, `post`, `events`, `desks`, `takeOver`, `handBack` and `replay` are unchanged.
+
 ## 0.158.0 — 2026-11-12
 
 - **`openvibe-sdk/views`: one view API for every content kind** (Contracts `media.view-request@1`, the `media.viewed`
