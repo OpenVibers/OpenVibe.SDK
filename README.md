@@ -544,6 +544,16 @@ if (result) await upload(result.file);
 Closing Cam resolves to `null`. The calling site owns the file and upload. `openvibe-sdk/cam` also exports
 `open`, `loadCamKit`, `CAM_KIT_SRC` and `CAM_KIT_SRI` for direct use.
 
+`capture(options)` is the direct camera stream, on OpenVibe's one shared capture core: it loads the calling
+site's own `/shared/ov-capture.js` once (every OpenVibe site serves it) and calls `OVCapture.open(options)`,
+so `facing`, `lens`, `mic`, `resolution`, `audio` and `video` behave the same as Live's go-live page:
+
+```js
+import { capture } from 'openvibe-sdk/cam';
+const stream = await capture({ mode: 'camera', facing: 'environment', resolution: '1080' });
+video.srcObject = stream;
+```
+
 `openvibe-sdk/cam` loads the camera app's framework-free `<ov-camera>` element from OpenVibe.Cam and types its
 attributes, events and methods. It injects the embed script once and resolves to the element class:
 

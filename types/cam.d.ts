@@ -44,6 +44,27 @@ export declare function loadCamKit(): Promise<{ open(options?: CamKitOptions): P
 /** Open Cam on this page and return a file after Use this; cancellation resolves to null. */
 export declare function open(options?: CamKitOptions): Promise<CamKitResult | null>;
 
+/** `camera` (video and microphone), `camera_only`, or `mic_only`; the default is `camera`. */
+export type CaptureMode = 'camera' | 'camera_only' | 'mic_only';
+/** What to open through the site's own OVCapture; every choice is optional. */
+export interface CaptureOptions {
+    mode?: CaptureMode;
+    /** The front (`user`) or back (`environment`) camera. */
+    facing?: 'user' | 'environment';
+    /** A camera's id from `OVCapture.devices()`; it is asked for exactly. */
+    lens?: string;
+    /** A microphone's id from `OVCapture.devices()`; it is asked for exactly. */
+    mic?: string;
+    resolution?: '480' | '720' | '1080' | number;
+    audio?: boolean;
+    video?: boolean;
+}
+/**
+ * Load the calling site's own `/shared/ov-capture.js` once and call `OVCapture.open(options)`.
+ * The site must serve the shared capture core (every OpenVibe site does).
+ */
+export declare function capture(options?: CaptureOptions): Promise<MediaStream>;
+
 /** The front camera (`user`) or the back camera (`environment`). */
 export type OvCameraFacing = 'user' | 'environment';
 

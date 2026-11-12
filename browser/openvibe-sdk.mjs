@@ -3517,12 +3517,15 @@ function (module, exports) {
 const OV_CAMERA_SRC = 'https://openvibe.cam/embed/ov-camera.js';
 // The kit at its versioned URL (the query names the version), so Cloudflare never hands the integrity check an older
 // copy cached under the plain URL (Cam #116, 11-09). A Cam release that changes the kit ships with these two lines.
-const CAM_KIT_SRC = 'https://openvibe.cam/embed/cam-kit.js?v=yqqjh1FiP7a4';
-const CAM_KIT_SRI = 'sha384-yqqjh1FiP7a4l9uelJHaryd8Y5IwnHVbqjt1d0AXbgCcytI9Z5MMmItFqbwB4YZG';
+const CAM_KIT_SRC = 'https://openvibe.cam/embed/cam-kit.js?v=6D72Zg6MS9RC';
+const CAM_KIT_SRI = 'sha384-6D72Zg6MS9RCQAiXgnP8R8iz/criDdCCgY48Jb87HRjzkVTvCDCCCmDs0E0RLE3s';
+// The shared capture core, from the calling site's own /shared/, never another origin.
+const CAPTURE_PATH = '/shared/ov-capture.js';
 
 // One promise per src: a second call while the script is in flight gets the same load, never a second tag.
 const pending = new Map();
 let kitPending = null;
+let capturePending = null;
 
 /** Load Cam's in-page recorder once. The pinned script gives the calling site a File. */
 function loadCamKit() {
@@ -3547,6 +3550,40 @@ function loadCamKit() {
 
 /** Open Cam on this page. Resolves to a File and metadata after Use this, or null on cancel. */
 function open(options = {}) { return loadCamKit().then((kit) => kit.open(options)); }
+
+/**
+ * Load the site's own capture core once (the page may already include it) and open a camera through it.
+ * Resolves to a MediaStream; the options are OVCapture's: mode, facing, lens, mic, resolution, audio, video.
+ */
+function loadCapture() {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return Promise.reject(new Error('openvibe-sdk/cam: capture() needs a browser.'));
+    if (window.OVCapture && typeof window.OVCapture.open === 'function') return Promise.resolve(window.OVCapture);
+    if (capturePending) return capturePending;
+    let src = CAPTURE_PATH;
+    try { src = new URL(CAPTURE_PATH, window.location.href).href; } catch { /* a page without a location */ }
+    capturePending = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = src;
+        script.async = true;
+        script.dataset.ovCapture = '';
+        script.addEventListener('load', () => {
+            if (window.OVCapture && typeof window.OVCapture.open === 'function') resolve(window.OVCapture);
+            else {
+                script.remove();
+                reject(new Error(`openvibe-sdk/cam: ${src} loaded but did not define OVCapture.`));
+            }
+        });
+        script.addEventListener('error', () => {
+            script.remove();
+            reject(new Error(`openvibe-sdk/cam: could not load ${src}`));
+        });
+        (document.head || document.documentElement).appendChild(script);
+    }).finally(() => { capturePending = null; });
+    return capturePending;
+}
+
+/** Open a camera through the site's own OVCapture. Resolves to a MediaStream. */
+function capture(options = {}) { return loadCapture().then((core) => core.open(options)); }
 
 async function cameraSettings(token, method, body) {
     if (typeof token !== 'string' || !token) throw new TypeError('A person’s Network token is required.');
@@ -3601,7 +3638,7 @@ function defineOvCamera(options = {}) {
     return load;
 }
 
-module.exports = { defineOvCamera, OV_CAMERA_SRC, CAM_KIT_SRC, CAM_KIT_SRI, loadCamKit, open, settings };
+module.exports = { defineOvCamera, OV_CAMERA_SRC, CAM_KIT_SRC, CAM_KIT_SRI, loadCamKit, open, capture, settings };
 },
 // ── 30: src/media-upload.js ─────────────────────────────────────────
 function (module, exports) {
