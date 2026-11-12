@@ -23,6 +23,7 @@ export type ExchangePaths = {
     sellerOffers?: string;
     offerReport?: string;
     offerList?: string;
+    computePrices?: string;
 };
 
 export type ExchangeOptions = {
@@ -34,6 +35,8 @@ export type ExchangeOptions = {
     baseUrl?: string;
     /** The Network's origin, where the user-owned AI offers live; default https://api.openvibe.network. */
     networkUrl?: string;
+    /** Exchange's public site, where the compute price book lives; default https://openvibe.exchange. */
+    siteUrl?: string;
     fetchImpl?: typeof fetch;
     /** Per request, default 60000. */
     timeoutMs?: number;
@@ -47,6 +50,42 @@ export type ExchangeOptions = {
     /** The User-Agent the calls carry. */
     agent?: string;
 };
+
+export type ComputePriceKind = 'cpu' | 'gpu';
+export interface ComputePrice {
+    id: string;
+    provider: string;
+    region?: string | null;
+    kind: ComputePriceKind;
+    cpu?: number | null;
+    ram_mb?: number | null;
+    gpu?: string | null;
+    gpu_mb?: number | null;
+    currency: string;
+    hourly: number;
+    per_second: number;
+    billing_seconds?: number | null;
+    promotion?: string | null;
+    promotion_expires?: string | null;
+    interruptible?: boolean;
+    checked_at: string;
+    /** Epoch milliseconds. */
+    expires_at: number;
+    source: string;
+    [field: string]: unknown;
+}
+export interface ComputePriceBook {
+    checked_at: string;
+    prices: ComputePrice[];
+    [field: string]: unknown;
+}
+export interface ComputePriceOptions {
+    /** Only this kind: a computer (cpu) or a GPU. */
+    kind?: ComputePriceKind;
+}
+export interface ComputePriceClient {
+    computePrices(query?: ComputePriceOptions, opts?: { signal?: AbortSignal }): Promise<ComputePriceBook>;
+}
 
 export type ExchangeChatRequest = {
     model: string;
@@ -367,6 +406,8 @@ export type ExchangeClient = {
     offers(model: string, opts?: { signal?: AbortSignal }): Promise<ExchangeOffer[]>;
     /** The whole public catalog. */
     catalog(opts?: { signal?: AbortSignal }): Promise<ExchangeCatalog>;
+    /** The reviewed compute tariffs, keyless from the public site; `kind` filters the list. */
+    computePrices(query?: ComputePriceOptions, opts?: { signal?: AbortSignal }): Promise<ComputePriceBook>;
     presets: {
         list(opts?: { signal?: AbortSignal }): Promise<ExchangePreset[]>;
         create(input: { name: string; policy: ExchangePresetPolicy }, opts?: { signal?: AbortSignal }): Promise<ExchangePreset>;
@@ -404,6 +445,7 @@ export type ExchangeClient = {
 };
 
 export declare function createExchangeClient(options?: ExchangeOptions): ExchangeClient;
+export declare function createComputePriceClient(options?: { baseUrl?: string; fetchImpl?: typeof fetch; timeoutMs?: number; maxRetries?: number; retryBaseMs?: number; agent?: string }): ComputePriceClient;
 /** The same check as exchange.webhooks.verify, for a receiver that only verifies webhooks. */
 export declare function verifyWebhook(rawBody: string | Uint8Array | ArrayBufferView, signatureHeader: string, secret: string, opts?: { toleranceSec?: number; now?: number }): boolean;
 export declare const SIGNATURE_TOLERANCE_SEC: number;

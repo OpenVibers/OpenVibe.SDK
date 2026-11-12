@@ -5,6 +5,8 @@
  *
  * The buyer side speaks the Exchange's v1 API (https://api.openvibe.exchange) with a Network developer key:
  * chat() (streaming and not, the OpenAI shape), models(), offers(model), presets(), usage() and receipt(id).
+ * computePrices({ kind }) reads the reviewed compute tariffs from the public site (https://openvibe.exchange),
+ * keyless; createComputePriceClient() is that reader on its own, for an app that holds no Exchange key.
  * Every answered request carries a receipt; a request may name a preset, a saved routing profile.
  *
  *   const exchange = createExchangeClient({ developerKey: process.env.OPENVIBE_DEVELOPER_KEY });
@@ -69,6 +71,7 @@ const DEFAULT_PATHS = {
     sellerOffers: '/api/v1/exchange/seller/offers',
     offerReport: '/internal/ai/offers/report',
     offerList: '/internal/ai/offers',
+    computePrices: '/api/compute/prices',
 };
 
 class ExchangeError extends Error {
@@ -290,6 +293,7 @@ function createExchangeClient({
     networkKey = null,
     baseUrl = EXCHANGE_BASE_URL,
     networkUrl = NETWORK_BASE_URL,
+    siteUrl = CATALOG_SEARCH_URL,
     fetchImpl = globalThis.fetch,
     timeoutMs = 60000,
     maxRetries = 3,
@@ -308,8 +312,10 @@ function createExchangeClient({
     if (!Number.isFinite(retryBaseMs) || retryBaseMs < 0) throw new TypeError('createExchangeClient: retryBaseMs must be 0 or more');
     const exchange = trimSlash(baseUrl);
     const network = trimSlash(networkUrl);
+    const site = trimSlash(siteUrl);
     if (!/^https?:\/\/[^/]+/i.test(exchange)) throw new TypeError('createExchangeClient: baseUrl is an http(s) origin');
     if (!/^https?:\/\/[^/]+/i.test(network)) throw new TypeError('createExchangeClient: networkUrl is an http(s) origin');
+    if (!/^https?:\/\/[^/]+/i.test(site)) throw new TypeError('createExchangeClient: siteUrl is an http(s) origin');
     const paths = { ...DEFAULT_PATHS, ...pathOptions };
     const key = developerKey || networkKey;
     const networkBearer = networkKey || developerKey;
@@ -319,7 +325,7 @@ function createExchangeClient({
         const url = `${base}${path}${queryOf(query)}`;
         const send = {
             method,
-            headers: { Accept: accept, Authorization: `Bearer ${bearer}`, ...(json !== undefined ? { 'Content-Type': 'application/json' } : {}), ...(agent ? { 'User-Agent': agent } : {}), ...headers },
+            headers: { Accept: accept, ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}), ...(json !== undefined ? { 'Content-Type': 'application/json' } : {}), ...(agent ? { 'User-Agent': agent } : {}), ...headers },
             body: json !== undefined ? JSON.stringify(json) : undefined,
         };
         const mayRetry = SAFE_METHODS.has(method) || idempotent;
@@ -601,6 +607,17 @@ function createExchangeClient({
             return await jsonCall('GET', paths.catalog, { signal });
         },
 
+        /**
+         * The reviewed compute tariffs: per provider and region, the GPU or computer, its hourly and per-second
+         * price, the date it was checked and the date it must be reviewed again. Keyless and public; `kind`
+         * ('cpu' or 'gpu') filters the list. → { checked_at, prices }
+         */
+        async computePrices({ kind = null } = {}, { signal } = {}) {
+            computeKind(kind);
+            const book = await jsonCall('GET', paths.computePrices, { base: site, bearer: null, signal });
+            return computeBook(book, kind);
+        },
+
         /** The routing presets: the five built-in ones and the caller's own. */
         presets: {
             /** The presets the caller may name. */
@@ -666,6 +683,7 @@ function createExchangeClient({
 
 module.exports = {
     createCatalogSearchClient,
+    createComputePriceClient,
     createExchangeClient,
     ExchangeError,
     verifyWebhook,
@@ -675,6 +693,57 @@ module.exports = {
     DEFAULT_PATHS,
     RETRY_STATUS,
 };
+
+/** The book's own fields stay; `kind` filters its prices when asked. */
+function computeBook(book, kind) {
+    const prices = book && Array.isArray(book.prices) ? book.prices : [];
+    return { ...(book && typeof book === 'object' ? book : {}), prices: kind ? prices.filter((price) => price && price.kind === kind) : prices };
+}
+function computeKind(kind) {
+    if (kind != null && kind !== 'cpu' && kind !== 'gpu') throw new TypeError("computePrices: kind must be 'cpu' or 'gpu'");
+}
+
+/**
+ * The keyless compute price reader: one public GET, no key and no account.
+ *
+ *   const compute = createComputePriceClient();
+ *   const { checked_at, prices } = await compute.computePrices({ kind: 'gpu' });
+ *
+ * baseUrl is Exchange's public site (default https://openvibe.exchange), not the API host. A 429 or a 5xx is
+ * retried with the module's jittered backoff; every call takes an AbortSignal.
+ */
+function createComputePriceClient({ baseUrl = CATALOG_SEARCH_URL, fetchImpl = globalThis.fetch, timeoutMs = 15000, maxRetries = 2, retryBaseMs = 250, random = Math.random, agent = null } = {}) {
+    if (typeof fetchImpl !== 'function') throw new TypeError('createComputePriceClient: no fetch available; pass fetchImpl');
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new TypeError('createComputePriceClient: timeoutMs must be a positive number');
+    if (!Number.isInteger(maxRetries) || maxRetries < 0) throw new TypeError('createComputePriceClient: maxRetries must be 0 or more');
+    const site = trimSlash(baseUrl);
+    if (!/^https?:\/\/[^/]+/i.test(site)) throw new TypeError('createComputePriceClient: baseUrl is an http(s) origin');
+    return {
+        async computePrices({ kind = null } = {}, { signal } = {}) {
+            computeKind(kind);
+            const url = `${site}${DEFAULT_PATHS.computePrices}`;
+            let attempt = 0;
+            for (;;) {
+                const link = linkedSignal(signal, timeoutMs);
+                let res;
+                try {
+                    res = await fetchImpl(url, { headers: { Accept: 'application/json', ...(agent ? { 'User-Agent': agent } : {}) }, signal: link.signal });
+                } catch (err) {
+                    link.done();
+                    if (signal && signal.aborted) throw new ExchangeError('the request was aborted');
+                    if (attempt < maxRetries) { attempt++; await sleep(backoffMs(attempt - 1, retryBaseMs, random)); continue; }
+                    throw new ExchangeError(`the exchange is unreachable: ${err.message}`);
+                }
+                const body = await res.json().catch(() => null);
+                link.done();
+                if (res.ok) return computeBook(body, kind);
+                if (RETRY_STATUS.has(res.status) && attempt < maxRetries) { attempt++; await sleep(backoffMs(attempt - 1, retryBaseMs, random)); continue; }
+                const { message, code } = openAiError(body, res.status);
+                throw new ExchangeError(message, { status: res.status, code, body });
+            }
+        },
+    };
+}
 
 /** A public, keyless reader for Exchange's model and provider search. */
 function createCatalogSearchClient({ baseUrl = CATALOG_SEARCH_URL, fetchImpl = globalThis.fetch } = {}) {

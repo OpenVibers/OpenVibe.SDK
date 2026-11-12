@@ -900,6 +900,7 @@
         "catalog",
         "catalogModels",
         "chat",
+        "computePrices",
         "models",
         "offerList",
         "offerReport",
@@ -917,6 +918,7 @@
     "RETRY_STATUS": "object",
     "SIGNATURE_TOLERANCE_SEC": "number",
     "createCatalogSearchClient": "function",
+    "createComputePriceClient": "function",
     "createExchangeClient": "function",
     "verifyWebhook": "function"
   },

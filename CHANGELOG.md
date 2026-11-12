@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.154.0 — 2026-11-12
+
+- **`openvibe-sdk/exchange`: reviewed compute prices, keyless.**
+  - `createExchangeClient(…).computePrices({ kind })` and the standalone `createComputePriceClient()` read
+    `GET https://openvibe.exchange/api/compute/prices`: each GPU or computer's hourly and per-second price, the
+    provider's own price page, the date it was checked and the date it must be reviewed again, filtered to
+    `kind: 'cpu' | 'gpu'` when asked.
+  - The public endpoint needs no key, sends `Access-Control-Allow-Origin: *` and is cached for 60 seconds. The
+    keyed client still speaks the API host (unchanged); its price read goes to `siteUrl` (default
+    `https://openvibe.exchange`) without its developer key.
+
 ## 0.153.0 — 2026-11-11
 
 - Add `objects.rotate(id, { degrees })` to `openvibe-sdk/media` (the v2 object client): turn a stored JPEG, PNG or WebP
