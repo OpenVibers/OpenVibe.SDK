@@ -1,22 +1,33 @@
 # Changelog
 
-## Unreleased
+## 0.158.0 — 2026-11-12
 
-- **`openvibe-sdk/agents`: runs, steps, approvals and the plugin interfaces** (one agent system, stage 3).
-  - `createAgentsClient(client)` gains `runs.list(options)`, `runs.get(run)`, `runs.steps(run, { after, limit })`,
-    `runs.start(agent, input, { budget, parentRun })`, `runs.stop(run, { reason })` and
-    `approvals.answer(run, stepSeq, answer)`, beside the existing `run`, `post` and `events`. The routes are
-    `GET/POST /api/v1/runs`, `GET /api/v1/runs/:id`, `GET /api/v1/runs/:id/steps?after=`,
-    `POST /api/v1/runs/:id/stop` and `POST /api/v1/runs/:id/approvals/:step`; `events` is the AG-UI/SSE stream
-    (`Last-Event-ID` resumes) and now accepts a run or its id. `runs.get` asks for `agents.run@1` with
-    `Accept: application/vnd.openvibe.agents.run+json`; point the client at the runtime with `{ service: 'actor',
-    audience: 'openvibe.actor' }` (or `{ baseUrl }`) when it is not Network.
-  - The shapes are Contracts `agents.run@1`, `agents.step@1` and `agents.approval@1`, the same on Actor, Codes and
-    Run; `Actor` serves the first read-only version of the run and step routes.
-  - The plugin interfaces — model adapter, tool, sandbox, memory, planner, reviewer — are JSDoc types in
-    `src/agents.js` and interfaces in `types/agents.d.ts`. No runtime yet: nothing in this release implements or
-    calls one.
+The agent engine's client (Contracts 0.414.0: everything a person asks an AI to do is a run with a thread of steps).
 
+- **`openvibe-sdk/agents` runs:** `runs.list({ kind, status, q, limit, cursor, before, agent, parentRun })`,
+  `runs.get(run)` (null on 404), `runs.steps(run, { after, limit })`, `runs.start(text | agents.run-start@1,
+  { idempotencyKey })`, `runs.say(run, text | { text, attachments })` (continue a conversation or steer work),
+  `runs.stop(run, { reason })`, `runs.events(run, { after })` and `runs.follow(run, { onRun, onStep, onDelta,
+  onApproval, onEvent })`, which resolves with the end status.
+- **`approvals.answer(run, approval, answer)`** by the approval's id, its object, or the step seq that asked.
+- **`createFrameAgentsClient(client)`:** every product's runs through the Frame (`/api/frame/runs…`), where a run is
+  named by its ref (`<product>:<id>`); `createAgentsClient(client, { prefix })` for any product's Run API.
+- **Helpers:** `refOf`, `parseRef`, `isEnd`, `needsPerson` (a run waiting for a message is a conversation between
+  turns, not something that needs its person), `KINDS`, `STATUSES`, `END_STATUSES`.
+- **The stream:** the engine's events (`run`, `step`, `delta`, `approval`, `end`) are read beside AG-UI's; only a
+  step advances the resume cursor, so a snapshot or more text that shares a step's id is never skipped.
+- **The plugin interfaces** (model adapter, tool, sandbox, memory, planner, reviewer) stay as JSDoc types; the loop
+  that calls them is the next release.
+- `run`, `post`, `events`, `desks`, `takeOver`, `handBack` and `replay` are unchanged.
+
+## 0.157.0 — 2026-11-12
+
+See it work: a run's desks, control and replay
+
+- Add to `openvibe-sdk/agents`: `desks(run)` → the run's desks with their view and still, `takeOver(run, desk)`,
+  `handBack(run, desk, note)` and `replay(run)` → the steps with the still each saw. They call the same-named routes
+  under the client's service (`/api/v1/runs/:id/desks/...`), so a page and a script make the same calls. No tag: the
+  main session releases this after the sites' stage lands.
 ## 0.156.0 — 2026-11-12
 
 - **`openvibe-sdk/exchange`: reviewed compute prices, keyless.**
