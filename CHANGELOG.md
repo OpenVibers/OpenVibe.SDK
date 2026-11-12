@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.164.0 — 2026-11-12
+
+- **New `openvibe-sdk/ai-meter`:** every product meters its AI calls the same way (ai-metrics.md; Contracts 0.421.0
+  `ai.call.recorded@1` 1.1.0 and `ai.call-report@1`).
+  - `startCall()` measures each call on its own clock: TTFT and latency less any queue, tokens per second after the
+    first token (or Ollama's own decode time), tool calls, fallbacks, the error class, and the charged price when the
+    provider gives one.
+  - `normalize()` reads the usage of OpenAI chat completions and Responses, Anthropic Messages, Gemini and Ollama.
+    The input it reports is the uncached input, with cache reads and writes and reasoning tokens apart.
+  - `createMeterClient()` batches the records to AI's `POST /api/v1/usage/calls` with the service token.
+    - It retries a network error, a 408, 425, 429 or 5xx with backoff, and asks for a new token after a 401.
+    - A batch refused for any other reason is dropped and counted, never sent again.
+    - AI prices any call that brings no price and publishes it.
+
 ## 0.163.0 — 2026-11-12
 
 From reading 24 open agent projects (one-system-v2.md). Three new modules, all pure functions:
