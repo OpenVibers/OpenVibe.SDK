@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.153.0 — 2026-11-11
+
+- Add `objects.rotate(id, { degrees })` to `openvibe-sdk/media` (the v2 object client): turn a stored JPEG, PNG or WebP
+  picture clockwise by 90, 180 or 270 degrees. Media keeps the uploader's original beside the turned copy, every
+  generated size follows, and only the picture's owner may turn it (`subject` / `actingUserId` on a service client).
+
 ## 0.152.0 — 2026-11-11
 
 A train of two pull requests: `openvibe-sdk/elements` (#227) and `openvibe-sdk/ui-layout` (#226).

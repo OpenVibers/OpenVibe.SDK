@@ -112,6 +112,13 @@ async function mockMedia({ singleMax = 1024 * 1024, failPart = null, descriptor 
             }
         }
         if (!authed) return problem(res, 401, 'token.missing', 'no');
+        if (rest === 'rotate' && req.method === 'POST') {
+            const b = JSON.parse(body || '{}');
+            if (![90, 180, 270].includes(Number(b.degrees))) return problem(res, 422, 'media.rotate.invalid', 'a turn is 90, 180 or 270 degrees');
+            obj.rotation = ((obj.rotation || 0) + Number(b.degrees)) % 360;
+            obj.rotatedBy = req.headers['x-ov-subject'] || null;
+            return send(res, 200, { ...pub(obj), rotation: obj.rotation });
+        }
         if (rest === 'download') return send(res, 200, { url: `${base}/o/${id}?exp=1&sig=s&ttl=${u.searchParams.get('ttl')}`, expires_at: '2030-01-01T00:00:00.000Z', public: false, format: u.searchParams.get('format') });
         if (req.method === 'GET' && !rest) return send(res, 200, pub(obj));
         if (req.method === 'DELETE' && !rest) { obj.lifecycle_status = 'deleted'; return send(res, 200, pub(obj)); }
@@ -286,6 +293,8 @@ run([
         const all = [];
         for await (const o of objects.iterate({ limit: 2 })) all.push(o.id);
         assert.equal(all.length, 3);
+        const turned = await objects.rotate(a.id, { degrees: 90 });
+        assert.deepEqual([turned.rotation, m.state.objects.get(a.id).rotation], [90, 90], 'a quarter turn reaches Media and its answer comes back');
         assert.equal(await objects.delete(a.id), true);
         assert.equal(await objects.delete('med_missing'), false);
         assert.ok(m.srv.requests.filter((r) => r.headers.authorization).every((r) => r.headers['x-ov-user-id'] === '7'), 'X-OV-User-Id on every credentialed call');

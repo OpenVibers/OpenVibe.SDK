@@ -139,6 +139,8 @@ export interface ObjectsClient {
     resume(ref: ObjectUploadRef, data: UploadBody, opts?: { signal?: AbortSignal; onProgress?: ObjectUploadOptions['onProgress']; contentHash?: string | false }): Promise<MediaObject>;
     get(id: string): Promise<MediaObject | null>;
     signedUrl(id: string, opts?: { ttl?: number }): Promise<{ url: string; expires_at: string | null; public: boolean }>;
+    /** Turn a stored picture clockwise; only its owner may (subject / actingUserId). */
+    rotate(id: string, opts?: { degrees?: 90 | 180 | 270 }): Promise<MediaObject & { rotation: number }>;
     delete(id: string): Promise<boolean>;
     list(opts?: { kind?: string; visibility?: string; status?: string; owner?: string; userId?: number; limit?: number; cursor?: string; includeDeleted?: boolean }): Promise<{ objects: MediaObject[]; next_cursor: string | null; limit: number }>;
     iterate(opts?: { kind?: string; visibility?: string; status?: string; owner?: string; userId?: number; limit?: number; includeDeleted?: boolean }): AsyncGenerator<MediaObject, void, unknown>;
