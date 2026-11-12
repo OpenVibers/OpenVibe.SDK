@@ -745,6 +745,15 @@
     "TERMINAL": "object",
     "createAiClient": "function"
   },
+  "openvibe-sdk/ai-meter": {
+    "OPERATIONS": "array",
+    "OUTCOMES": "array",
+    "PLACES": "array",
+    "createMeterClient": "function",
+    "normalize": "function",
+    "startCall": "function",
+    "tokensPerSecond": "function"
+  },
   "openvibe-sdk/app-signin": {
     "createAppSignIn": "function",
     "normalizeScope": "function"
