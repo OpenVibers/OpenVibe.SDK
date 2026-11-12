@@ -1,5 +1,61 @@
 # Changelog
 
+## 0.160.0 — 2026-11-12
+
+**The agent engine's loop, Dispatcher and Run API kit: `openvibe-sdk/agents/loop`, `/dispatch` and `/api`** (agent-engine.md §§3, 9). A model, tools and the person's words become
+a run's thread. It runs chat and ask turns on a server with no workspace (Vibe answering, an agent using OpenVibe's own
+products as tools).
+
+- **`runLoop(options)`** resolves `{ messages, stop, error, usage, cost, turns, toolCalls }`. Stop is `done`,
+  `terminated`, `budget`, `turns`, `aborted` or `error`.
+  - **The model adapter:** `complete({ messages, tools, system, signal, budgetLeft, onDelta })` returns the next turn:
+    text, thinking, tool calls, why it stopped, usage and cost. `onDelta` streams the turn as it is written.
+  - **Tools** run in parallel, or in sequence when the loop or a tool asks. Parallel runs are prepared in order, run
+    together, and their results kept in the model's order.
+  - **`beforeToolCall`** is the approval gate (block, with a reason, or end the run); **`afterToolCall`** may rewrite a
+    result.
+  - **`steering()`:** words the person sent while it works, taken before the next turn. **`followUp()`:** words after
+    it would stop. **`finishTurn()`** may end or continue the loop. **`transformContext()`** compacts or filters the
+    thread before each turn, and entries marked `ui_only` never reach the model.
+  - **The budget** (usd, tokens, turns, steps) stops it between turns, never inside one; the model is told what is left.
+- **What it keeps, whatever the hooks say:**
+  - A call cut off by the output limit never runs; the model is asked to send it again.
+  - An unknown tool, input its schema refuses, a throw or a timeout comes back to the model as an error, never as a
+    crash.
+  - The same call repeated past `repeatLimit` gets a reminder instead of a run, and an idempotent tool answers the same
+    call from the run's memo.
+  - A long output is clipped before the model sees it; the whole result stays in the thread.
+- **`createStepSink({ append, update, delta, startSeq, startTurn, runId })`** turns the loop's events into
+  `agents.step@1` steps. In order: the person's words, the thinking (folded), one tool step updated when it ends, then
+  the agent's words streamed into their step. A person's message opens the next `turn` (Contracts 0.417.0).
+- **`checkInput(schema, value)`:** the JSON Schema subset tools use.
+- **New `openvibe-sdk/agents/dispatch`: the Dispatcher** (agent-engine.md §3), as pure functions over a person's
+  choices:
+  - `ladder(choices, { need, pin, avoid, budgetLeft })` orders them: their own machine, a signed-in plan, their own
+    key, the free allowance, then credits, cheapest first inside a rung, and a smaller model before a stronger one
+    unless the step needs strength. What cannot do the step (a capability, the context, the speed, the budget) is
+    listed with why. A person's pick wins when it can, and is otherwise passed over with the reason.
+  - `escalate(current, evidence, choices)` moves to a stronger model only on checkable evidence: a failed test,
+    schema, tool or grader, or the model's own "not sure". A grader's failure also changes family.
+  - `harnessFor(task, harnesses, { plans })` chooses by capability: the loop for turns with tools, the person's
+    signed-in plan, else dsh.
+  - `placeFor(run, { machines, cloud })`: the person's computer first (free), a Codes runner for a repository
+    elsewhere, an OpenVibe computer when allowed, Bot for a robot.
+  - `estimate(choice, tokens)` and `slice(parentBudget, share)`.
+- **New `openvibe-sdk/agents/api`: the Run API from a product's own store** (server).
+  - `createRunApi({ product, subject, store, prefix })` returns `handle(req, res, next)` for Express or any Node http
+    server: the list, start, get, steps, events, messages, stop and approvals routes of Contracts' `docs/agents-runs.md`.
+  - The store has `list, get, steps, start, say, stop, answer` and, optionally, `follow` to push its own events
+    (otherwise the stream reads new steps). A method a store lacks answers 409.
+  - No subject is 401, another person's run 404, and a start without words or with an unknown kind 422.
+  - Every run carries its ref. A store's own `{ status, code }` errors go out as they are; anything else is a 500 that
+    says nothing of the store. A mandate from a caller is dropped (intake's hook sets it).
+  - Read back with the SDK's own client in its test.
+- Ported from pi's agent loop (earendil-works/pi, `packages/agent/src/agent-loop.ts`, MIT, Copyright (c) 2025 Mario
+  Zechner): the inner loop over tools and steering, the outer loop over follow-ups, the turn hook, parallel and
+  sequential tools, and the two tool hooks. The model API, the message shape, the budget, the memo, the repeat guard,
+  the timeouts and the step sink are OpenVibe's.
+
 ## 0.159.0 — 2026-11-12
 
 The agent engine's client (Contracts 0.414.0: everything a person asks an AI to do is a run with a thread of steps).
