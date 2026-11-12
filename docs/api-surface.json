@@ -546,6 +546,16 @@
         "createVideoClient"
       ]
     },
+    "views": {
+      "object": [
+        "HOWS",
+        "MAX_BATCH",
+        "MEDIA_URL",
+        "createViewsClient",
+        "eventOf",
+        "refOf"
+      ]
+    },
     "vip": {
       "object": [
         "createVipCache",
@@ -1432,6 +1442,14 @@
   },
   "openvibe-sdk/video": {
     "createVideoClient": "function"
+  },
+  "openvibe-sdk/views": {
+    "HOWS": "array",
+    "MAX_BATCH": "number",
+    "MEDIA_URL": "string",
+    "createViewsClient": "function",
+    "eventOf": "function",
+    "refOf": "function"
   },
   "openvibe-sdk/vip": {
     "createVipCache": "function",

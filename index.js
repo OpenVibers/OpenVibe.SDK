@@ -10,6 +10,7 @@ module.exports = {
     createWalletClient: require('./src/wallet').createWalletClient,
     ...core,
     report: require('./src/report'),
+    views: require('./src/views'),
     share: require('./src/share').share,
     locker: require('./src/locker'),
     auth: require('./src/auth'),

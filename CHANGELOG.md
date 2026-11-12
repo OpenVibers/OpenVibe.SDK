@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.158.0 — 2026-11-12
+
+- **`openvibe-sdk/views`: one view API for every content kind** (Contracts `media.view-request@1`, the `media.viewed`
+  and `media.engaged` events).
+  - `createViewsClient(client).record(event | [events])` posts a preview, watch or live heartbeat for
+    `ref: { service, kind, id }` to Media's `POST /api/v1/views`, up to 20 at once. `seconds` is cumulative for the
+    session and item, so a retry does not count twice; a signed-out viewer keeps an opaque session id.
+  - `.counts(ref)` reads one item's `{ views, engaged, previews, preview_share, peak_concurrent }` from
+    `GET /api/v1/views/counts`. Media never stores an IP address or a user agent with a view, and a preview counts
+    from 1 second.
+
+
 ## 0.157.0 — 2026-11-12
 
 See it work: a run's desks, control and replay
@@ -8,6 +20,7 @@ See it work: a run's desks, control and replay
   `handBack(run, desk, note)` and `replay(run)` → the steps with the still each saw. They call the same-named routes
   under the client's service (`/api/v1/runs/:id/desks/...`), so a page and a script make the same calls. No tag: the
   main session releases this after the sites' stage lands.
+
 ## 0.156.0 — 2026-11-12
 
 - **`openvibe-sdk/exchange`: reviewed compute prices, keyless.**
