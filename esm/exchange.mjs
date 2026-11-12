@@ -2,7 +2,7 @@
 import cjs from '../src/exchange.js';
 
 export const {
-    createCatalogSearchClient, createExchangeClient, ExchangeError, verifyWebhook, SIGNATURE_TOLERANCE_SEC, EXCHANGE_BASE_URL,
-    NETWORK_BASE_URL, DEFAULT_PATHS, RETRY_STATUS,
+    createCatalogSearchClient, createComputePriceClient, createExchangeClient, ExchangeError, verifyWebhook, SIGNATURE_TOLERANCE_SEC,
+    EXCHANGE_BASE_URL, NETWORK_BASE_URL, DEFAULT_PATHS, RETRY_STATUS,
 } = cjs;
 export default cjs;
