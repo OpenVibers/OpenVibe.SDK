@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.162.0 — 2026-11-12
+
+- **New `openvibe-sdk/agents/blueprint`: make your own agent** (agent-blueprints.md; Contracts 0.419.0's
+  `agents.blueprint@1` and `agents.install@1`). These are pure functions, so a browser, Link, a CLI and every service
+  check and run a blueprint the same way:
+  - `validate`: the shape a person edits, plus the rules a schema cannot say. It carries no secret (anything that
+    looks like a key or a token is refused where it is). Every `{{input}}` is declared. Level `full` has a budget.
+    Machine and robot tools have somewhere to run. A shared place says what it needs, and never names a machine. A
+    tool served over MCP has its shapes. A team never contains itself.
+  - `withDefaults`: it talks only, asks first, keeps nothing, answers its owner, and spends 25¢ a run and $2 a day.
+  - `asks`: the install screen in plain words, with the keys an install records as agreed. `unagreed` lists what an
+    install has not agreed to yet.
+  - `wider`: what a new version asks for that the old one did not. That includes a tool going from ask to allow, a
+    higher level, a bigger budget, more people who may ask, more memory, a new place, trigger or team member. An
+    empty list means an install set to "same-or-less" takes the version without asking.
+  - `fill`: inputs, typed and checked.
+  - `compile`: one run. It returns `agents.run-start@1`, the loop's system prompt (with the floor said in words) and
+    tools, the Dispatcher's need, pin, rungs and price cap, the places and the install's machines, memory, and the
+    team. Try it, or a run without an install, asks before every tool and spends at most 5¢.
+  - `estimate`: the price of a run on the cheapest choice it may use, through `agents/dispatch`, and the rungs on
+    which it is free.
+
 ## 0.161.0 — 2026-11-12
 
 - **`openvibe-sdk/cam`: `capture(options)`** opens a camera through the site's own shared capture core (Shared's

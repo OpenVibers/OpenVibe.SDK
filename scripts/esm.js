@@ -80,6 +80,7 @@ const ENTRIES = {
     'agents-loop.mjs': '../src/agents/loop.js',
     'agents-dispatch.mjs': '../src/agents/dispatch.js',
     'agents-api.mjs': '../src/agents/api.js',
+    'agents-blueprint.mjs': '../src/agents/blueprint.js',
     'tools.mjs': '../src/tools.js',
     'projects.mjs': '../src/projects.js',
     'geo.mjs': '../src/geo.js',
