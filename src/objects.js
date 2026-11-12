@@ -261,6 +261,14 @@ function createObjectsClient({
      */
     const signedUrl = (id, { ttl } = {}) => json({ path: `${O}/${enc(id)}/download`, query: { format: 'json', ttl } });
 
+    /**
+     * rotate(id, { degrees }) -> the object with its new `rotation`.
+     * Turn a stored JPEG, PNG or WebP picture clockwise by 90, 180 or 270 degrees. Only the picture's owner may
+     * (pass `subject` or `actingUserId` when the client's credential is a service); Media keeps the uploader's
+     * original beside the turned copy and records the turn in the object's metadata.
+     */
+    const rotate = (id, { degrees = 90 } = {}) => json({ method: 'POST', path: `${O}/${enc(id)}/rotate`, json: { degrees } });
+
     /** Soft delete. true when deleted (or already), false when there is no such object. */
     async function del(id) {
         try { await call({ method: 'DELETE', path: `${O}/${enc(id)}` }); return true; } catch (err) {
@@ -311,7 +319,7 @@ function createObjectsClient({
         },
     };
 
-    return { app, baseUrl: resolveBase, upload, resume, get, signedUrl, delete: del, list, iterate, jobs, client: http };
+    return { app, baseUrl: resolveBase, upload, resume, get, signedUrl, rotate, delete: del, list, iterate, jobs, client: http };
 }
 
 module.exports = { createObjectsClient };
