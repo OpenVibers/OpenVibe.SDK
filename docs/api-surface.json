@@ -27,6 +27,38 @@
         "refOf"
       ]
     },
+    "agentsApi": {
+      "object": [
+        "KINDS",
+        "STATUSES",
+        "createRunApi",
+        "startInput"
+      ]
+    },
+    "agentsDispatch": {
+      "object": [
+        "EVIDENCE",
+        "RUNGS",
+        "TIERS",
+        "cannot",
+        "escalate",
+        "estimate",
+        "harnessFor",
+        "ladder",
+        "pick",
+        "placeFor",
+        "slice"
+      ]
+    },
+    "agentsLoop": {
+      "object": [
+        "DEFAULTS",
+        "STOPS",
+        "checkInput",
+        "createStepSink",
+        "runLoop"
+      ]
+    },
     "ai": {
       "object": [
         "CLASSES",
@@ -617,6 +649,39 @@
     "needsPerson": "function",
     "parseRef": "function",
     "refOf": "function"
+  },
+  "openvibe-sdk/agents/api": {
+    "KINDS": "array",
+    "STATUSES": "array",
+    "createRunApi": "function",
+    "startInput": "function"
+  },
+  "openvibe-sdk/agents/dispatch": {
+    "EVIDENCE": "array",
+    "RUNGS": "array",
+    "TIERS": "array",
+    "cannot": "function",
+    "escalate": "function",
+    "estimate": "function",
+    "harnessFor": "function",
+    "ladder": "function",
+    "pick": "function",
+    "placeFor": "function",
+    "slice": "function"
+  },
+  "openvibe-sdk/agents/loop": {
+    "DEFAULTS": {
+      "object": [
+        "maxTurns",
+        "repeatLimit",
+        "toolOutputLimit",
+        "toolTimeoutMs"
+      ]
+    },
+    "STOPS": "array",
+    "checkInput": "function",
+    "createStepSink": "function",
+    "runLoop": "function"
   },
   "openvibe-sdk/ai": {
     "CLASSES": "array",
