@@ -8,12 +8,12 @@
 **Install and test:** `npm ci && npm test` (Node 20 or newer)
 
 ```bash
-npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.160.0
+npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.161.0
 ```
 
 > Supported browser and server clients for the OpenVibe platform.
 
-**Status:** alpha, v0.160.0 (the five 1.0 core entries — `core`, `auth`, `events`, `db` and `media` — are frozen: their exported names change only with a major release; roadmap Wave 2; developer apps from Wave 20; Media objects v2 from Wave 4; the Tools platform API; Search, Chat, AI, Vision and consent clients; sign-in with recovery and a client health check). Every release is tagged (see [CHANGELOG.md](CHANGELOG.md)). Tested against local stub servers and the built-in mock platform only, never against the live platform. Services pin release tags; each repository's `STATUS.json` names the one it uses.
+**Status:** alpha, v0.161.0 (the five 1.0 core entries — `core`, `auth`, `events`, `db` and `media` — are frozen: their exported names change only with a major release; roadmap Wave 2; developer apps from Wave 20; Media objects v2 from Wave 4; the Tools platform API; Search, Chat, AI, Vision and consent clients; sign-in with recovery and a client health check). Every release is tagged (see [CHANGELOG.md](CHANGELOG.md)). Tested against local stub servers and the built-in mock platform only, never against the live platform. Services pin release tags; each repository's `STATUS.json` names the one it uses.
 **Plan:** OpenVibe End-to-End Realignment & Implementation Plan, revision 3 (20 Sep 2026), §3.2; roadmap §30.  
 **License:** MIT ([LICENSE](LICENSE)). This package is a library that apps outside the network embed, so it uses MIT. The OpenVibe services themselves stay AGPL-3.0.
 
@@ -22,7 +22,7 @@ npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags
 After v0.97.1 is tagged:
 
 ```bash
-npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.160.0
+npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.161.0
 ```
 
 It has no runtime dependencies. It needs Node ≥ 20, or any browser with `fetch`, Web Crypto and `TextDecoder`. There is no build step. The package is CommonJS with ESM entry points (`import` works). Each subpath has its own `.d.ts`. For a page with no bundler, `browser/openvibe-sdk.mjs` is one self-contained ES module of the browser-safe subpaths (see [Browser without a bundler](#browser-without-a-bundler)). It does not depend on `openvibe-contracts` at runtime: it copies the contract types it uses (from the temporary Contracts sharing branch, a devDependency the tests check them against).
@@ -543,6 +543,16 @@ if (result) await upload(result.file);
 
 Closing Cam resolves to `null`. The calling site owns the file and upload. `openvibe-sdk/cam` also exports
 `open`, `loadCamKit`, `CAM_KIT_SRC` and `CAM_KIT_SRI` for direct use.
+
+`capture(options)` is the direct camera stream, on OpenVibe's one shared capture core: it loads the calling
+site's own `/shared/ov-capture.js` once (every OpenVibe site serves it) and calls `OVCapture.open(options)`,
+so `facing`, `lens`, `mic`, `resolution`, `audio` and `video` behave the same as Live's go-live page:
+
+```js
+import { capture } from 'openvibe-sdk/cam';
+const stream = await capture({ mode: 'camera', facing: 'environment', resolution: '1080' });
+video.srcObject = stream;
+```
 
 `openvibe-sdk/cam` loads the camera app's framework-free `<ov-camera>` element from OpenVibe.Cam and types its
 attributes, events and methods. It injects the embed script once and resolves to the element class:

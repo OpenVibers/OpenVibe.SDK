@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.161.0 — 2026-11-12
+
+- **`openvibe-sdk/cam`: `capture(options)`** opens a camera through the site's own shared capture core (Shared's
+  `ov-capture.js`, OVCapture).
+  - It loads the core once from the calling site's own `/shared/` (never another origin) and resolves to a
+    MediaStream. A page that already has OVCapture uses it.
+  - The options are OVCapture's own: mode, facing, lens, mic, resolution, audio and video.
+- **Cam's in-page kit** (`CAM_KIT_SRC` / `CAM_KIT_SRI`) is re-pinned to the kit Cam serves today, checked against
+  the live file at its versioned address.
+
 ## 0.160.0 — 2026-11-12
 
 **The agent engine's loop, Dispatcher and Run API kit: `openvibe-sdk/agents/loop`, `/dispatch` and `/api`** (agent-engine.md §§3, 9). A model, tools and the person's words become

@@ -32,9 +32,10 @@ run([
         } finally { global.fetch = original; }
     }],
     ['the entry resolves by name and names the loader and the default script', async () => {
-        assert.deepEqual(Object.keys(cam).sort(), ['CAM_KIT_SRC', 'CAM_KIT_SRI', 'OV_CAMERA_SRC', 'defineOvCamera', 'loadCamKit', 'open', 'settings']);
+        assert.deepEqual(Object.keys(cam).sort(), ['CAM_KIT_SRC', 'CAM_KIT_SRI', 'OV_CAMERA_SRC', 'capture', 'defineOvCamera', 'loadCamKit', 'open', 'settings']);
         assert.equal(cam.OV_CAMERA_SRC, 'https://openvibe.cam/embed/ov-camera.js');
-        assert.equal(cam.CAM_KIT_SRC, 'https://openvibe.cam/embed/cam-kit.js?v=yqqjh1FiP7a4');
+        assert.equal(cam.CAM_KIT_SRC, 'https://openvibe.cam/embed/cam-kit.js?v=6D72Zg6MS9RC');
+        assert.equal(cam.CAM_KIT_SRI, 'sha384-6D72Zg6MS9RCQAiXgnP8R8iz/criDdCCgY48Jb87HRjzkVTvCDCCCmDs0E0RLE3s');
         assert.match(cam.CAM_KIT_SRI, /^sha384-/);
         assert.equal(require('openvibe-sdk/cam'), cam);
         assert.deepEqual(pkg.exports['./cam'], {
@@ -47,6 +48,7 @@ run([
         assert.equal(esm.OV_CAMERA_SRC, cam.OV_CAMERA_SRC);
         assert.equal(typeof esm.defineOvCamera, 'function');
         assert.equal(typeof esm.open, 'function');
+        assert.equal(typeof esm.capture, 'function');
     }],
 
     ['in Node it rejects instead of touching a document', async () => {
@@ -54,6 +56,7 @@ run([
         await assert.rejects(cam.defineOvCamera(), /needs a browser/);
         await assert.rejects(cam.defineOvCamera({ src: 'https://example.test/ov-camera.js' }), /needs a browser/);
         await assert.rejects(cam.open({ mode: 'video' }), /needs a browser/);
+        await assert.rejects(cam.capture({ mode: 'camera' }), /needs a browser/);
     }],
 
     ['the recorder loader pins one script and forwards the result', async () => {
@@ -81,6 +84,39 @@ run([
             assert.equal(b.mode, 'photo');
             assert.equal(await cam.loadCamKit(), kit);
         } finally { if (oldWindow === undefined) delete global.window; else global.window = oldWindow; if (oldDocument === undefined) delete global.document; else global.document = oldDocument; }
+    }],
+
+    ['capture loads the site\'s own /shared/ov-capture.js once and calls OVCapture.open', async () => {
+        const oldWindow = global.window;
+        const oldDocument = global.document;
+        const tags = [];
+        let core = null;
+        const listeners = {};
+        const script = { dataset: {}, remove() { this.removed = true; } };
+        global.window = { location: { href: 'https://openvibe.network/studio' } };
+        global.document = {
+            createElement: () => script,
+            head: { appendChild: (tag) => {
+                tags.push(tag.src);
+                core = { open: async (options) => ({ mode: options.mode, getTracks: () => [] }) };
+                global.window.OVCapture = core;
+                queueMicrotask(() => listeners.load());
+            } },
+            documentElement: { appendChild: () => { throw new Error('head exists; documentElement must not be used'); } },
+        };
+        script.addEventListener = (type, fn) => { listeners[type] = fn; };
+        try {
+            const [a, b] = await Promise.all([cam.capture({ mode: 'camera' }), cam.capture({ mode: 'camera_only' })]);
+            assert.equal(tags.length, 1, 'one script, however many calls');
+            assert.equal(tags[0], 'https://openvibe.network/shared/ov-capture.js', 'the calling site\'s own copy');
+            assert.equal(script.dataset.ovCapture, '');
+            assert.equal(script.async, true);
+            assert.equal(a.mode, 'camera');
+            assert.equal(b.mode, 'camera_only');
+        } finally {
+            if (oldWindow === undefined) delete global.window; else global.window = oldWindow;
+            if (oldDocument === undefined) delete global.document; else global.document = oldDocument;
+        }
     }],
 
     ['a browser gets one <script> per load and the class; a defined element resolves without another', async () => {
@@ -134,7 +170,7 @@ run([
     ['the types file names the runtime exports and the element surface', async () => {
         const dts = fs.readFileSync(path.join(ROOT, 'types/cam.d.ts'), 'utf8');
         for (const name of [
-            'OV_CAMERA_SRC', 'defineOvCamera', 'DefineOvCameraOptions', 'CAM_KIT_SRC', 'CAM_KIT_SRI', 'CamKitResult', 'CamKitOptions', 'loadCamKit', 'open(options?',
+            'OV_CAMERA_SRC', 'defineOvCamera', 'DefineOvCameraOptions', 'CAM_KIT_SRC', 'CAM_KIT_SRI', 'CamKitResult', 'CamKitOptions', 'CaptureOptions', 'CaptureMode', 'capture(options?', 'loadCamKit', 'open(options?',
             'OvCameraAttributes', 'OvCameraFacing', 'OvCameraFilter', 'OvCameraTimer', 'OvCameraMode', 'OvCameraUpload',
             'OvCameraElement', 'OvCameraCaptureDetail', 'OvCameraErrorCode', 'OvCameraErrorDetail',
             'OvCameraCaptureEvent', 'OvCameraErrorEvent', 'OvCameraEventMap', 'HTMLElementTagNameMap',
