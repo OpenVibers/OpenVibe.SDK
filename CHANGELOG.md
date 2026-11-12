@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.154.0 — 2026-11-12
 
 - Add the Frame's data client to `openvibe-sdk/frame` (and `sdk.frame` in the root, browser and ESM entries):
   `createFrameClient(client)` gives `choices(task)`, `query(q, { scopes })`, `providers()`, `ask(body)` and
