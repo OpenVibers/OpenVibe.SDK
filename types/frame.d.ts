@@ -65,3 +65,54 @@ export function frameTags(opts?: FrameOptions): { head: string; bodyStart: strin
 export function mountFrame(opts?: FrameOptions): Promise<{ navbar: unknown | null; footer: unknown | null }>;
 /** The footer strip's read; `site` (the calling site's Frame id) brings that site's own items. */
 export function online(opts?: { base?: string; site?: string; signal?: AbortSignal; fetch?: typeof fetch }): Promise<FrameOnline>;
+
+// ── the Frame's data client (composer-post-ask-do.md, R1) ────────────────────────────────────────────────────────
+import type { AgentEvent, AgentRun } from './agents';
+
+export interface FrameModelPrice { in: number | null; out: number | null; unit: 'USD per 1M tokens' }
+export interface FrameChoiceRow {
+    model: string;
+    source: 'openvibe' | 'keys' | 'machines' | 'plans';
+    machine?: string;
+    name: string;
+    maker: string | null;
+    price: FrameModelPrice | null;
+    free: boolean;
+    speed?: number;
+    score?: number;
+    url?: string;
+    /** true only for an 18+ model the person opted into; those are absent otherwise. */
+    adult?: boolean;
+}
+export interface FrameChoicesGroup { id: 'openvibe' | 'keys' | 'machines' | 'plans'; title: string; rows: FrameChoiceRow[]; note?: string }
+export interface FrameChoice { model: string; source: 'openvibe' | 'keys' | 'machines'; machine?: string }
+export interface FrameChoices {
+    task: 'chat' | 'agent' | 'code' | 'image' | 'research';
+    recommended: FrameChoice;
+    choice: FrameChoice;
+    adult: boolean;
+    groups: FrameChoicesGroup[];
+}
+/** GET /api/frame/query — Search's fabric answer, unchanged (search.fabric-result@1). */
+export interface FrameQueryResult { results: Array<Record<string, unknown>>; groups: Record<string, number>; citations: Array<Record<string, unknown>>; route: Record<string, unknown>; next_cursor: string | null; [key: string]: unknown }
+export interface FrameQueryOptions { scopes?: string[] | string; freshness?: string; depth?: string; limit?: number; cursor?: string; owner?: string; type?: string; site?: string; signal?: AbortSignal }
+export interface FrameAskBody {
+    text: string;
+    model?: string | FrameChoice;
+    refs?: Array<{ kind: string; id: string; title?: string; url?: string }>;
+    files?: Array<string | { id?: string; media_id?: string }>;
+    sources?: Array<'web' | 'openvibe' | 'mine' | 'page'>;
+    depth?: 'quick' | 'balanced' | 'deep';
+    context?: { site?: string; url?: string; title?: string; kind?: string; id?: string; text?: string };
+}
+export interface FrameRun { run: string }
+export interface FrameRunSnapshot { run: { id: string; status: 'running' | 'succeeded' | 'failed'; created_at: string; finished_at: string | null; answer: string | null; citations: Array<{ n: number; title: string; url: string; site: string | null }> | null; model: string | null; error: { code: string; message: string } | null } }
+export interface FrameClient {
+    choices(task?: 'chat' | 'agent' | 'code' | 'image' | 'research', options?: { signal?: AbortSignal }): Promise<FrameChoices>;
+    query(q: string, options?: FrameQueryOptions): Promise<FrameQueryResult>;
+    providers(options?: { signal?: AbortSignal }): Promise<{ providers: Array<Record<string, unknown>> }>;
+    ask(body: FrameAskBody, options?: { signal?: AbortSignal }): Promise<FrameRun>;
+    events(run: string, options?: { lastEventId?: string | number; signal?: AbortSignal; maxReconnects?: number; reconnectDelayMs?: number }): AsyncIterable<AgentEvent>;
+    run(id: string, options?: { signal?: AbortSignal }): Promise<AgentRun | null>;
+}
+export function createFrameClient(client: unknown, options?: { baseUrl?: string; networkBaseUrl?: string }): FrameClient;

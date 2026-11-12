@@ -2,7 +2,9 @@
 // openvibe-sdk/frame: any app mounts the network's shared navbar, footer, shipped line and themes,
 // with its own session endpoints; server-rendered apps get the same markup as strings.
 const assert = require('node:assert/strict');
-const { mountFrame, frameTags, frameConfig, scriptUrls, online } = require('../src/frame');
+const { mountFrame, frameTags, frameConfig, scriptUrls, online, createFrameClient } = require('../src/frame');
+const { createClient } = require('../src/core');
+const { stubServer, send } = require('./helpers');
 
 const opts = {
     service: 'myapp',
@@ -100,6 +102,47 @@ function fakeDom() {
         await assert.rejects(() => online({ fetch: async () => ({ ok: false, status: 503 }) }), /answered 503/);
         await assert.rejects(() => online({ fetch: null }), /needs a fetch/, 'no fetch: a clear error');
         await assert.rejects(() => online({ base: 'http://evil.example', fetch: fakeFetch }), /https origin/);
+    }
+
+    // The Frame's data client: the same calls the composer makes, with the person's token.
+    {
+        const sheet = { task: 'chat', recommended: { model: 'openai/gpt-5-mini', source: 'openvibe' }, choice: { model: 'openai/gpt-5-mini', source: 'openvibe' }, adult: false, groups: [{ id: 'openvibe', title: 'OpenVibe', rows: [{ model: 'openai/gpt-5-mini', source: 'openvibe', name: 'GPT-5 Mini', maker: 'openai', price: null, free: false }] }] };
+        const srv = await stubServer((req, res) => {
+            const u = new URL(req.url, 'http://x');
+            if (u.pathname === '/api/frame/choices') return send(res, 200, sheet);
+            if (u.pathname === '/api/frame/query/providers') return send(res, 200, { providers: [{ provider: 'deepseek' }] });
+            if (u.pathname === '/api/frame/query') return send(res, 200, { results: [{ title: 'A', url: 'https://example.org/a' }], groups: { web: 1 }, citations: [], route: { cost_usd: 0 }, next_cursor: null });
+            if (u.pathname === '/api/frame/ask') return send(res, 202, { run: 'run_x' });
+            if (u.pathname === '/api/v1/runs/run_x/events') {
+                res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+                return res.end('id: 1\nevent: RUN_FINISHED\ndata: {"type":"RUN_FINISHED"}\n\n');
+            }
+            return send(res, 404, {});
+        });
+        try {
+            const frame = createFrameClient(createClient({ baseUrls: { network: srv.url }, token: 'person-token' }));
+            assert.deepEqual(await frame.choices('chat'), sheet);
+            const found = await frame.query('surf maps', { scopes: ['web', 'openvibe'], depth: 'deep', limit: 5 });
+            assert.equal(found.results[0].title, 'A');
+            assert.deepEqual(await frame.providers(), { providers: [{ provider: 'deepseek' }] });
+            assert.deepEqual(await frame.ask({ text: 'What is it?', sources: ['web'], depth: 'balanced' }), { run: 'run_x' });
+            const events = [];
+            for await (const ev of frame.events('run_x')) events.push(ev.event);
+            assert.deepEqual(events, ['RUN_FINISHED']);
+            const hits = srv.requests.map((r) => ({ method: r.method, url: r.url, auth: r.headers.authorization, body: r.body.toString() }));
+            assert.equal(hits[0].url, '/api/frame/choices?task=chat');
+            assert.equal(hits[0].auth, 'Bearer person-token');
+            assert.match(hits[1].url, /^\/api\/frame\/query\?q=surf\+maps&scopes=web%2Copenvibe&depth=deep&limit=5$/);
+            assert.equal(hits[2].url, '/api/frame/query/providers');
+            assert.equal(hits[3].method, 'POST');
+            assert.equal(hits[3].url, '/api/frame/ask');
+            assert.match(hits[3].body, /"text":"What is it\?"/);
+            assert.throws(() => createFrameClient(null), /SDK client/);
+            const f = createFrameClient(createClient({ baseUrls: { network: srv.url } }));
+            await assert.rejects(() => f.choices('unreal'), /task is/);
+            await assert.rejects(() => f.query(1), /string/);
+            await assert.rejects(() => f.ask({}), /text is required/);
+        } finally { await srv.close(); }
     }
 
     console.log('frame: all checks passed');

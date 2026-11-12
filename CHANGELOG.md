@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Add the Frame's data client to `openvibe-sdk/frame` (and `sdk.frame` in the root, browser and ESM entries):
+  `createFrameClient(client)` gives `choices(task)`, `query(q, { scopes })`, `providers()`, `ask(body)` and
+  `events(run)`, the same calls every site's composer makes through OpenVibe.Network. `choices` answers the Model sheet
+  (OpenVibe's models enriched from Exchange, the person's keys, computers and plans); `ask` starts a question and
+  `events` reuses `agents.events` for its AG-UI stream, whose `ANSWER` event carries the numbered citations. Types are
+  in `types/frame.d.ts`. The shared navbar, footer and `online()` are unchanged.
+
 ## 0.153.0 — 2026-11-11
 
 - Add `objects.rotate(id, { degrees })` to `openvibe-sdk/media` (the v2 object client): turn a stored JPEG, PNG or WebP
