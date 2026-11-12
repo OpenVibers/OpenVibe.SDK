@@ -21,4 +21,33 @@ run([
    try { const agents=createAgentsClient(createClient({baseUrls:{network:srv.url},token:'t'})); const start=Date.now(); const got=[]; for await(const e of agents.events('run_a',{reconnectDelayMs:10,maxReconnects:5})) got.push(e.id); assert.deepEqual(got,['1']); assert.ok(Date.now()-start>=65,`backoff elapsed ${Date.now()-start}ms`); assert.equal(calls,4); }
    finally { await srv.close(); }
  }],
+ ['runs: list, get, steps, start, stop, and an approval answer', async () => {
+   const run = { id:'run_a', owner:{type:'user',id:'usr_a'}, agent:{id:'actor',product:'actor'}, status:'running', created_at:'2026-11-11T00:00:00Z', updated_at:'2026-11-11T00:00:10Z' };
+   const step = { run_id:'run_a', seq:11, kind:'tool', text:'Ran the tests', started_at:'2026-11-11T00:00:10Z', ended_at:'2026-11-11T00:00:10Z' };
+   const srv = await stubServer((req,res) => {
+     const u = new URL(req.url,'http://x');
+     if (u.pathname === '/api/v1/runs' && req.method === 'GET') return send(res,200,{runs:[run],next:'run_z'});
+     if (u.pathname === '/api/v1/runs' && req.method === 'POST') return send(res,201,{...run,id:'run_new'});
+     if (u.pathname === '/api/v1/runs/run_a/steps') return send(res,200,{steps:[step],next:11});
+     if (u.pathname === '/api/v1/runs/run_a/stop') return send(res,200,{...run,status:'stopped'});
+     if (u.pathname === '/api/v1/runs/run_a/approvals/7') return send(res,200,{run_id:'run_a',step_seq:7,what:'push',options:[{id:'approve',label:'Approve'}],answer:'approve'});
+     if (u.pathname === '/api/v1/runs/run_a') return send(res,200,run);
+     return send(res,404,{code:'agents.run.not_found'});
+   });
+   try {
+     const agents = createAgentsClient(createClient({baseUrls:{network:srv.url},token:'t'}));
+     assert.deepEqual(await agents.runs.list({limit:2,parentRun:'run_p'}), {runs:[run],next:'run_z'});
+     assert.match(srv.requests.at(-1).url, /limit=2/); assert.match(srv.requests.at(-1).url, /parent_run=run_p/);
+     assert.deepEqual(await agents.runs.get('run_a'), run);
+     assert.equal(await agents.runs.get('missing'), null);
+     assert.deepEqual(await agents.runs.steps('run_a',{after:10,limit:5}), {steps:[step],next:11});
+     assert.match(srv.requests.at(-1).url, /after=10/);
+     assert.equal((await agents.runs.start('actor',{text:'find it'},{budget:{usd:1}})).id,'run_new');
+     assert.deepEqual(JSON.parse(srv.requests.at(-1).body.toString()), {agent:'actor',input:{text:'find it'},budget:{usd:1}});
+     assert.equal((await agents.runs.stop('run_a',{reason:'not now'})).status,'stopped');
+     assert.deepEqual(JSON.parse(srv.requests.at(-1).body.toString()), {reason:'not now'});
+     assert.equal((await agents.approvals.answer({id:'run_a'},7,'approve')).answer,'approve');
+     assert.deepEqual(JSON.parse(srv.requests.at(-1).body.toString()), {answer:'approve'});
+   } finally { await srv.close(); }
+ }],
 ]);

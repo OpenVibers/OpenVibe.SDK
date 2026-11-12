@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+- **`openvibe-sdk/agents`: runs, steps, approvals and the plugin interfaces** (one agent system, stage 3).
+  - `createAgentsClient(client)` gains `runs.list(options)`, `runs.get(run)`, `runs.steps(run, { after, limit })`,
+    `runs.start(agent, input, { budget, parentRun })`, `runs.stop(run, { reason })` and
+    `approvals.answer(run, stepSeq, answer)`, beside the existing `run`, `post` and `events`. The routes are
+    `GET/POST /api/v1/runs`, `GET /api/v1/runs/:id`, `GET /api/v1/runs/:id/steps?after=`,
+    `POST /api/v1/runs/:id/stop` and `POST /api/v1/runs/:id/approvals/:step`; `events` is the AG-UI/SSE stream
+    (`Last-Event-ID` resumes) and now accepts a run or its id. `runs.get` asks for `agents.run@1` with
+    `Accept: application/vnd.openvibe.agents.run+json`; point the client at the runtime with `{ service: 'actor',
+    audience: 'openvibe.actor' }` (or `{ baseUrl }`) when it is not Network.
+  - The shapes are Contracts `agents.run@1`, `agents.step@1` and `agents.approval@1`, the same on Actor, Codes and
+    Run; `Actor` serves the first read-only version of the run and step routes.
+  - The plugin interfaces — model adapter, tool, sandbox, memory, planner, reviewer — are JSDoc types in
+    `src/agents.js` and interfaces in `types/agents.d.ts`. No runtime yet: nothing in this release implements or
+    calls one.
+
 ## 0.156.0 — 2026-11-12
 
 - **`openvibe-sdk/exchange`: reviewed compute prices, keyless.**
