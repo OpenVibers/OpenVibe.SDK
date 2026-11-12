@@ -5,7 +5,7 @@
  * model on a person's machine, Vibe) is recorded here and sent to AI's POST /api/v1/usage/calls, which prices it when it
  * brings no price and publishes it, so every AI call on the network is in one meter.
  *
- *   const meter = require('openvibe-sdk/ai-meter');
+ *   (meter is this module, openvibe-sdk/ai-meter)
  *   const call = meter.startCall({ system: 'actor', turn_id, provider: 'deepseek', model, operation: 'chat', task: 'actor.task', task_id, streamed: true });
  *   …on the first streamed token: call.firstToken();   on each tool call the model asks for: call.tool();
  *   const record = call.end({ usage: providerUsage, outcome: 'succeeded' });   // ai.call-report@1's item
