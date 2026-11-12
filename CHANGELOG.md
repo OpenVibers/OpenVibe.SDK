@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.163.0 — 2026-11-12
+
+From reading 24 open agent projects (one-system-v2.md). Three new modules, all pure functions:
+
+- **`openvibe-sdk/agents/rules`:** permissions as data, from Gemini CLI and OpenCode (agents.permission-rule@1).
+  - `decide()` lets the last matching rule win; with no rule, the run's level decides.
+  - Unattended work never waits on an ask. It settles to allow at the levels approve-for-me and full, and to deny below
+    them.
+  - The floor always asks; with nobody there, it is denied.
+  - `fromBlueprint()` compiles a blueprint to rules: only the tools it names, never `.git/hooks` or its own config,
+    and its sandbox and network.
+- **`openvibe-sdk/agents/router`:** pays for the strong model only when it is likely to matter, in RouteLLM's shape
+  over OpenVibe Decisions.
+  - It asks for a calibrated probability that the small model is not enough, and routes against a threshold
+    calibrated to a budget (the share of steps that should go strong).
+  - It draws the quality-cost points the scoreboards show.
+  - The strategy chain is the person's pick, then the blueprint's pin, then the router. When Decisions is down, the
+    cheaper model runs.
+- **`openvibe-sdk/agents/metrics`:** what a run measured (agents.run@1 1.4.0).
+  - The charged cost comes first; an estimate counts only where nothing was charged, and unknown is null, never 0.
+  - It records tokens with cache reads and writes, steps, latency, a named exit and evidence.
+  - Also `passAtK` (unbiased), `passHatK` and `flakeRate`.
+
 ## 0.162.0 — 2026-11-12
 
 - **New `openvibe-sdk/agents/blueprint`: make your own agent** (agent-blueprints.md; Contracts 0.419.0's
