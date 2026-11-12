@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.155.0 — 2026-11-12
+
+- Add `design.icons.suggest(label, { context, limit, rank })` to `openvibe-sdk/design`: the best glyphs for a button's
+  words by meaning (the glyph's name, its META keywords and its other-set names), with `rank: true` asking a small model
+  to order the shortlist when the words are new. The answer is the same shape as `GET /api/v1/glyphs/suggest`, including
+  `new`, `ranked`, `model` and, when known, `draft_price`.
+- `design.icons.get()` and `.search()` are public now, like the Design API they call: no access token. `.draft()` still
+  needs one, and the client still sends a token when it has one.
+
 ## 0.154.0 — 2026-11-12
 
 - Add the Frame's data client to `openvibe-sdk/frame` (and `sdk.frame` in the root, browser and ESM entries):
