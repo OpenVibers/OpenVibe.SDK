@@ -44,6 +44,7 @@ module.exports = {
     credentials: require('./src/credentials'),
     jobs: require('./src/jobs'),
     agents: require('./src/agents'),
+    frame: require('./src/frame'),
     tools: require('./src/tools'),
     projects: require('./src/projects'),
     resources: require('./src/resources'),

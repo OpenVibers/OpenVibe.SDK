@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.154.0 — 2026-11-12
+## 0.155.0 — 2026-11-12
 
 - Add `design.icons.suggest(label, { context, limit, rank })` to `openvibe-sdk/design`: the best glyphs for a button's
   words by meaning (the glyph's name, its META keywords and its other-set names), with `rank: true` asking a small model
@@ -8,6 +8,15 @@
   `new`, `ranked`, `model` and, when known, `draft_price`.
 - `design.icons.get()` and `.search()` are public now, like the Design API they call: no access token. `.draft()` still
   needs one, and the client still sends a token when it has one.
+
+## 0.154.0 — 2026-11-12
+
+- Add the Frame's data client to `openvibe-sdk/frame` (and `sdk.frame` in the root, browser and ESM entries):
+  `createFrameClient(client)` gives `choices(task)`, `query(q, { scopes })`, `providers()`, `ask(body)` and
+  `events(run)`, the same calls every site's composer makes through OpenVibe.Network. `choices` answers the Model sheet
+  (OpenVibe's models enriched from Exchange, the person's keys, computers and plans); `ask` starts a question and
+  `events` reuses `agents.events` for its AG-UI stream, whose `ANSWER` event carries the numbered citations. Types are
+  in `types/frame.d.ts`. The shared navbar, footer and `online()` are unchanged.
 
 ## 0.153.0 — 2026-11-11
 

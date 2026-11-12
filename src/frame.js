@@ -1,4 +1,5 @@
 'use strict';
+const { createAgentsClient } = require('./agents');
 
 /**
  * openvibe-sdk/frame — the OpenVibe Frame: the navbar, footer and themes every OpenVibe site sits in, for any app: the universal navbar (one
@@ -168,4 +169,52 @@ async function online({ base = DEFAULT_BASE, site = '', signal, fetch: fetchImpl
     return await res.json();
 }
 
-module.exports = { mountFrame, frameTags, frameConfig, scriptUrls, online, DEFAULT_BASE };
+/**
+ * openvibe-sdk/frame's data client (composer-post-ask-do.md, R1): the same Frame the shared composer calls, so a
+ * script or another agent can list the models, search, follow a run and ask exactly as a box does.
+ *
+ *   const frame = createFrameClient(client);
+ *   const sheet = await frame.choices('chat');          // { task, recommended, choice, groups: [...] }
+ *   const found = await frame.query('surf maps', { scopes: ['web', 'openvibe'] });
+ *   const { providers } = await frame.providers();      // the web ladder's offers
+ *   const { run } = await frame.ask({ text: 'What is it?', sources: ['web'], depth: 'balanced' });
+ *   for await (const event of frame.events(run)) { … }  // AG-UI; ANSWER carries { answer, citations }
+ *
+ * @param client an SDK client (createClient)
+ * @param options { baseUrl } or { networkBaseUrl } overrides the network for a local service
+ */
+function createFrameClient(client, { baseUrl, networkBaseUrl } = {}) {
+    if (!client || typeof client.json !== 'function') throw new TypeError('createFrameClient: an SDK client is required');
+    const base = baseUrl || networkBaseUrl;
+    const net = (opts) => client.json({ service: 'network', audience: 'openvibe.network', ...(base ? { baseUrl: base } : {}), ...opts });
+    const agents = createAgentsClient(client, { ...(base ? { baseUrl: base } : {}), service: 'network', audience: 'openvibe.network' });
+    const TASKS = new Set(['chat', 'agent', 'code', 'image', 'research']);
+    const QUERY_KEYS = ['freshness', 'depth', 'limit', 'cursor', 'owner', 'type', 'site'];
+
+    const choices = async (task = 'chat', { signal } = {}) => {
+        const t = String(task || 'chat');
+        if (!TASKS.has(t)) throw new TypeError(`frame.choices: task is ${[...TASKS].join(', ')}`);
+        return net({ path: '/api/frame/choices', query: { task: t }, signal });
+    };
+    const query = async (q, options = {}) => {
+        if (typeof q !== 'string') throw new TypeError('frame.query: q must be a string');
+        const scopes = options.scopes === undefined ? ['network'] : Array.isArray(options.scopes) ? options.scopes : String(options.scopes).split(',');
+        const cleanScopes = scopes.map((s) => String(s).trim()).filter(Boolean);
+        if (!cleanScopes.length) throw new TypeError('frame.query: at least one scope is required');
+        const qs = { q, scopes: cleanScopes.join(',') };
+        for (const key of QUERY_KEYS) if (options[key] !== undefined && options[key] !== null) qs[key] = options[key];
+        return net({ path: '/api/frame/query', query: qs, signal: options.signal });
+    };
+    const providers = async ({ signal } = {}) => net({ path: '/api/frame/query/providers', signal });
+    const ask = async (body, { signal } = {}) => {
+        if (!body || typeof body !== 'object' || Array.isArray(body)) throw new TypeError('frame.ask: a body object is required');
+        if (typeof body.text !== 'string' || !body.text.trim()) throw new TypeError('frame.ask: text is required');
+        return net({ method: 'POST', path: '/api/frame/ask', json: body, signal });
+    };
+    const events = (run, options) => agents.events(run, options);
+    const run = (id, options) => agents.run(id, options);
+
+    return { choices, query, providers, ask, events, run };
+}
+
+module.exports = { mountFrame, frameTags, frameConfig, scriptUrls, online, createFrameClient, DEFAULT_BASE };
