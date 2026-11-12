@@ -707,6 +707,38 @@
     "createStepSink": "function",
     "runLoop": "function"
   },
+  "openvibe-sdk/agents/metrics": {
+    "EVIDENCE": "array",
+    "EXITS": "array",
+    "createRecorder": "function",
+    "flakeRate": "function",
+    "passAtK": "function",
+    "passHatK": "function"
+  },
+  "openvibe-sdk/agents/router": {
+    "calibrate": "function",
+    "chain": "function",
+    "outcomes": "function",
+    "probability": "function",
+    "question": "function",
+    "route": "function"
+  },
+  "openvibe-sdk/agents/rules": {
+    "EFFECTS": "array",
+    "LEVELS": "array",
+    "MACHINE_KIND": {
+      "object": [
+        "browser",
+        "desk",
+        "files",
+        "screen",
+        "shell"
+      ]
+    },
+    "decide": "function",
+    "fromBlueprint": "function",
+    "matches": "function"
+  },
   "openvibe-sdk/ai": {
     "CLASSES": "array",
     "OPS": "array",
