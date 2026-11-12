@@ -1,11 +1,32 @@
 # Changelog
 
-## Unreleased — See it work: a run's desks, control and replay
+## 0.157.0 — 2026-11-12
+
+See it work: a run's desks, control and replay
 
 - Add to `openvibe-sdk/agents`: `desks(run)` → the run's desks with their view and still, `takeOver(run, desk)`,
   `handBack(run, desk, note)` and `replay(run)` → the steps with the still each saw. They call the same-named routes
   under the client's service (`/api/v1/runs/:id/desks/...`), so a page and a script make the same calls. No tag: the
   main session releases this after the sites' stage lands.
+## 0.156.0 — 2026-11-12
+
+- **`openvibe-sdk/exchange`: reviewed compute prices, keyless.**
+  - `createExchangeClient(…).computePrices({ kind })` and the standalone `createComputePriceClient()` read
+    `GET https://openvibe.exchange/api/compute/prices`: each GPU or computer's hourly and per-second price, the
+    provider's own price page, the date it was checked and the date it must be reviewed again, filtered to
+    `kind: 'cpu' | 'gpu'` when asked.
+  - The public endpoint needs no key, sends `Access-Control-Allow-Origin: *` and is cached for 60 seconds. The
+    keyed client still speaks the API host (unchanged); its price read goes to `siteUrl` (default
+    `https://openvibe.exchange`) without its developer key.
+
+## 0.155.0 — 2026-11-12
+
+- Add `design.icons.suggest(label, { context, limit, rank })` to `openvibe-sdk/design`: the best glyphs for a button's
+  words by meaning (the glyph's name, its META keywords and its other-set names), with `rank: true` asking a small model
+  to order the shortlist when the words are new. The answer is the same shape as `GET /api/v1/glyphs/suggest`, including
+  `new`, `ranked`, `model` and, when known, `draft_price`.
+- `design.icons.get()` and `.search()` are public now, like the Design API they call: no access token. `.draft()` still
+  needs one, and the client still sends a token when it has one.
 
 ## 0.154.0 — 2026-11-12
 
