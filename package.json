@@ -1,6 +1,6 @@
 {
   "name": "openvibe-sdk",
-  "version": "0.164.0",
+  "version": "0.165.0",
   "description": "Supported browser and server clients for the OpenVibe platform: auth (incl. developer apps), registry discovery, identity, user modules, events, realtime, media, community, Bot robots, search, chat, AI runs, Tools (registry, run API and jobs), VIP memberships and developer projects, the async PostgreSQL data layer (db) and the Valkey cache, limits store, queue and pub/sub, with deadlines, safe retries, problem errors and trace propagation.",
   "main": "index.js",
   "types": "types/index.d.ts",
@@ -328,6 +328,11 @@
       "types": "./types/agents-blueprint.d.ts",
       "import": "./esm/agents-blueprint.mjs",
       "default": "./src/agents/blueprint.js"
+    },
+    "./agents/soul": {
+      "types": "./types/agents-soul.d.ts",
+      "import": "./esm/agents-soul.mjs",
+      "default": "./src/agents/soul.js"
     },
     "./agents/rules": {
       "types": "./types/agents-rules.d.ts",
