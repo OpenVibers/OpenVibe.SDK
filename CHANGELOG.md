@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.165.0 — 2026-11-13
+
+**`openvibe-sdk/agents/soul`: who an agent is** (agents.soul@1, Contracts 0.424.0; Design rules 175
+`actor-is-the-work`, 176 `souls-grow-by-yes`). The owner, 11-13: "you should have different bots … they each have a
+soul … your agents are created based on your memories and personality". Pure functions:
+
+- `validate(soul)`: the shape and the rules a schema cannot say (no secret in a soul; no permission in a soul, which
+  is the blueprint's hands and rules).
+- `toPrompt(soul, { name })`: one stable block of plain words (the dials in words, habits, beliefs, pushback, never,
+  notes), placed before memory so a provider's cached prefix never changes inside a conversation; it says the soul
+  never widens what the agent may do.
+- `toSoulMd`, `toIdentityMd`, `fromSoulMd`: the SOUL.md and IDENTITY.md layout OpenClaw and Hermes read, out and back;
+  a SOUL.md from elsewhere has its sections mapped (Core Truths, Boundaries, Vibe…) and the rest kept as notes.
+- `change(soul, patch)`: an agent's suggestion for its own soul, as a proposed soul and the change in words; nothing
+  is applied (its person says yes).
+- Tests: `agents-soul`.
+
 ## 0.164.0 — 2026-11-12
 
 - **New `openvibe-sdk/ai-meter`:** every product meters its AI calls the same way (ai-metrics.md; Contracts 0.421.0
