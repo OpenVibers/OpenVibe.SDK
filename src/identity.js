@@ -44,6 +44,38 @@ function createAccountEmailsClient({ networkUrl = 'https://openvibe.network', ge
 
 const BATCH = 500;
 
+/**
+ * Who is looking (plan §Z.2, 11-13): Network's GET /api/v1/viewer, the same model the shared navbar gives a page as
+ * OV.viewer() (without the page's visit and device).
+ *
+ *   const v = createViewerClient({ getToken: async () => token });   // a person's Network token, or nothing
+ *   await v.viewer()   // → { signedIn, rank: 'guest'|'member'|'streamer'|'mod'|'admin', staff, owner, id, username }
+ *
+ * No token is a guest, answered without a call. A token Network refuses throws (status 401), so the caller can sign the
+ * person in again rather than treat them as a guest.
+ */
+const GUEST = Object.freeze({ signedIn: false, rank: 'guest', staff: false, owner: false, id: null, username: null });
+function createViewerClient({ networkUrl = 'https://openvibe.network', getToken = null, fetchImpl = globalThis.fetch } = {}) {
+    if (typeof fetchImpl !== 'function') throw new TypeError('createViewerClient: fetch is not available');
+    const base = String(networkUrl || '').replace(/\/+$/, '');
+    if (!base) throw new TypeError('createViewerClient: networkUrl is required');
+    async function viewer() {
+        const token = typeof getToken === 'function' ? await getToken() : null;
+        if (!token) return { ...GUEST };
+        const res = await fetchImpl(`${base}/api/v1/viewer`, { headers: { Accept: 'application/json', Authorization: `Bearer ${token}` } });
+        if (!res.ok) {
+            const err = new Error(res.status === 401 ? 'viewer: the token was refused (sign in again)' : `viewer: HTTP ${res.status}`);
+            err.status = res.status;
+            throw err;
+        }
+        const body = await res.json();
+        const v = body && body.viewer;
+        if (!v || typeof v !== 'object') throw new Error('viewer: the answer carried no viewer');
+        return { signedIn: !!v.signedIn, rank: String(v.rank || 'guest'), staff: !!v.staff, owner: !!v.owner, id: v.id || null, username: v.username || null };
+    }
+    return { viewer };
+}
+
 function createIdentityClient(client, { baseUrl } = {}) {
     const call = (opts) => client.json({ service: 'network', baseUrl, audience: 'openvibe.network', ...opts });
 
@@ -92,4 +124,4 @@ function createIdentityClient(client, { baseUrl } = {}) {
     return { resolve, resolveBatch, isEmailVerified };
 }
 
-module.exports = { createIdentityClient, createAccountEmailsClient };
+module.exports = { createIdentityClient, createAccountEmailsClient, createViewerClient };

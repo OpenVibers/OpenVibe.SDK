@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const { stubServer, send, run } = require('./helpers');
 const { createClient } = require('../src/core');
 const { createServiceTokenClient } = require('../src/auth');
-const { createIdentityClient, createAccountEmailsClient } = require('../src/identity');
+const { createIdentityClient, createAccountEmailsClient, createViewerClient } = require('../src/identity');
 const { createMockPlatform } = require('../src/testing');
 
 run([
@@ -70,6 +70,23 @@ run([
         ]);
         assert.ok(srv.requests.every((r) => r.headers.authorization === 'Bearer person-token'));
         assert.deepEqual(JSON.parse(srv.requests[1].body.toString()), { email: 'person@example.test' });
+        await srv.close();
+    }],
+    ['viewer: who is looking, from Network (a guest without a call; a refused token throws 401)', async () => {
+        let calls = 0;
+        const guest = createViewerClient({ fetchImpl: async () => { calls += 1; throw new Error('no call expected'); } });
+        assert.deepEqual(await guest.viewer(), { signedIn: false, rank: 'guest', staff: false, owner: false, id: null, username: null });
+        assert.equal(calls, 0, 'no token, no call');
+        const srv = await stubServer((req, res) => {
+            if (req.headers.authorization === 'Bearer bad') return send(res, 401, { error: 'unauthorized' });
+            send(res, 200, { viewer: { signedIn: true, rank: 'mod', staff: true, owner: false, id: 'usr_01JZZZVIEWERTEST000000000', username: 'moddy', extra: 'dropped' } });
+        });
+        const v = createViewerClient({ networkUrl: srv.url, getToken: async () => 'tok' });
+        assert.deepEqual(await v.viewer(), { signedIn: true, rank: 'mod', staff: true, owner: false, id: 'usr_01JZZZVIEWERTEST000000000', username: 'moddy' });
+        assert.equal(srv.requests[0].url, '/api/v1/viewer');
+        assert.equal(srv.requests[0].headers.authorization, 'Bearer tok');
+        const bad = createViewerClient({ networkUrl: srv.url, getToken: () => 'bad' });
+        await assert.rejects(bad.viewer(), (err) => err.status === 401);
         await srv.close();
     }],
 ]);

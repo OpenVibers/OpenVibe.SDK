@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.167.0 — 2026-11-13
+
+- **Who is looking: `createViewerClient` (openvibe-sdk/identity, plan §Z.2).** `viewer()` reads Network's
+  `GET /api/v1/viewer`, the model the shared navbar gives a page as `OV.viewer()`: `{ signedIn, rank, staff, owner, id,
+  username }`, rank being guest, member, streamer, mod or admin. No token is a guest (no call); a token Network refuses
+  throws with status 401, so an app signs the person in again instead of treating them as a guest.
+
 ## 0.166.0 — 2026-11-13
 
 **`scripts/test-services.sh` without Docker: the same services from local binaries** (CI checks on shared nodes). A

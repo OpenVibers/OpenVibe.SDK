@@ -41,3 +41,25 @@ export declare function createAccountEmailsClient(opts: {
     getToken: () => string | Promise<string>;
     fetchImpl?: typeof fetch;
 }): AccountEmailsClient;
+
+/** Who is looking (plan §Z.2): Network's GET /api/v1/viewer, the model the shared navbar gives a page as OV.viewer(). */
+export interface Viewer {
+  signedIn: boolean;
+  rank: 'guest' | 'member' | 'streamer' | 'mod' | 'admin';
+  staff: boolean;
+  owner: boolean;
+  /** The person's usr_ subject, or null when nobody is signed in. */
+  id: string | null;
+  username: string | null;
+}
+
+export interface ViewerClient {
+  /** No token: nobody signed in, answered without a call. A token Network refuses rejects with status 401. */
+  viewer(): Promise<Viewer>;
+}
+
+export declare function createViewerClient(opts?: {
+  networkUrl?: string;
+  getToken?: (() => string | null | undefined | Promise<string | null | undefined>) | null;
+  fetchImpl?: typeof fetch;
+}): ViewerClient;
