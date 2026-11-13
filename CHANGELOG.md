@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.166.0 — 2026-11-13
+
+**`scripts/test-services.sh` without Docker: the same services from local binaries** (CI checks on shared nodes). A
+check job on a shared node runs a repository's GitHub Actions job with act in host mode, with no Docker daemon and no
+root, so `eval "$(node_modules/openvibe-sdk/scripts/test-services.sh up)" && npm test && npm run test:pg`, the test line
+of nearly every OpenVibers repository, could not start its containers there.
+
+- With no working Docker (`docker info` does not answer), `up` starts PostgreSQL 18 (initdb, SCRAM, fsync off),
+  PgBouncer (transaction mode; each test role is looked up with `auth_query` and SCRAM is passed through) and Valkey from
+  local binaries, as the current user, under one throwaway directory (`OV_TEST_SERVICES_DIR`, default
+  `$TMPDIR/ovsdk-services-<uid>`), on the same ports with the same users, and prints the same three variables. A second
+  `up` reuses what runs; `down` stops them and removes the directory (and the containers, when Docker is there).
+- `OV_TEST_SERVICES=docker|local` chooses; `OV_TEST_SERVICES_PATH` limits where the binaries are looked for. Ubuntu:
+  `apt install postgresql-18 pgbouncer valkey-server` (their own services can stay off).
+- Verified on ov-node-01 as an unprivileged user with no Docker: `testing-db`, `db`, `pg-outbox`, `db-ambient`,
+  `valkey` and `govern` all ran against the local services (no case skipped) and `down` left nothing behind. Tests:
+  `test-services` (no Docker and no binaries says what is missing and starts nothing; `OV_TEST_SERVICES` overrides).
+
 ## 0.165.0 — 2026-11-13
 
 **`openvibe-sdk/agents/soul`: who an agent is** (agents.soul@1, Contracts 0.424.0; Design rules 175
