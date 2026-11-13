@@ -297,7 +297,8 @@
     "identity": {
       "object": [
         "createAccountEmailsClient",
-        "createIdentityClient"
+        "createIdentityClient",
+        "createViewerClient"
       ]
     },
     "inventory": {
@@ -1176,7 +1177,8 @@
   },
   "openvibe-sdk/identity": {
     "createAccountEmailsClient": "function",
-    "createIdentityClient": "function"
+    "createIdentityClient": "function",
+    "createViewerClient": "function"
   },
   "openvibe-sdk/inventory": {
     "createInventoryClient": "function"
