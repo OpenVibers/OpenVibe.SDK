@@ -739,6 +739,38 @@
     "fromBlueprint": "function",
     "matches": "function"
   },
+  "openvibe-sdk/agents/soul": {
+    "DIALS": {
+      "object": [
+        "edge",
+        "length",
+        "play",
+        "warmth"
+      ]
+    },
+    "LIMITS": {
+      "object": [
+        "belief",
+        "believes",
+        "never",
+        "notes",
+        "pushback",
+        "quirk",
+        "quirks",
+        "rule",
+        "who"
+      ]
+    },
+    "ORIGINS": "array",
+    "SoulError": "class",
+    "change": "function",
+    "dialWords": "function",
+    "fromSoulMd": "function",
+    "toIdentityMd": "function",
+    "toPrompt": "function",
+    "toSoulMd": "function",
+    "validate": "function"
+  },
   "openvibe-sdk/ai": {
     "CLASSES": "array",
     "OPS": "array",
