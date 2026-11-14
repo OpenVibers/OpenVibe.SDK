@@ -27,7 +27,7 @@ module.exports = {
     views: require('./src/views'),
     bot: require('./src/bot'),
     search: require('./src/search'),
-    bench: require('./src/bench'),
+    compare: require('./src/compare'),
     meme: require('./src/meme'),
     vision: require('./src/vision'),
     themes: require('./src/themes'),

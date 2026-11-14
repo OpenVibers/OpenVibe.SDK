@@ -30,7 +30,7 @@ To make something public, define it in OpenVibe.Contracts first, then wrap it he
 
 The SDK never talks to a database or to another SDK module directly; each client takes a
 `createClient()` and calls one service's documented HTTP API: Network (auth, identity, registry,
-projects, user cards), Events, Media, Community, Chat, AI, Tools, Search, Bench, Vision, Live,
+projects, user cards), Events, Media, Community, Chat, AI, Tools, Search, Compare, Vision, Live,
 OpenRestream, Inventory, Tips, Blog, Reviews, Wiki, Coupons, Deals, Trade, Space, Host, Run, Video,
 Work, Zone and VIP. `src/testing` provides `createMockPlatform()` so an app can test without the
 network.

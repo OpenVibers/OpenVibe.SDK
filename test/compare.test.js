@@ -1,13 +1,13 @@
 'use strict';
-/** Bench API routes, envelopes, streaming JSONL, MCP, auth and problem errors. */
+/** Compare's API routes, envelopes, streaming JSONL, MCP, auth and problem errors. */
 const assert = require('node:assert/strict');
 const { stubServer, send, problem, run } = require('./helpers');
 const { createClient, OpenVibeError } = require('../src/core');
-const { createBenchClient } = require('../src/bench');
+const { createCompareClient } = require('../src/compare');
 
 const USR = 'usr_01JAB2C3D4E5F6G7H8J9K0MNPQ';
 
-async function bench() {
+async function compare() {
     return stubServer((req, res, body) => {
         const u = new URL(req.url, 'http://x');
         if (u.pathname === '/api/v1/datasets/vision.jsonl') {
@@ -16,8 +16,8 @@ async function bench() {
             res.end('nd","id":"r1"}\n');
             return;
         }
-        if (u.pathname === '/api/v1/kinds/missing') return problem(res, 404, 'bench.kind_not_found', 'No such kind.');
-        if (u.pathname === '/mcp') return send(res, 200, { jsonrpc: '2.0', id: 1, result: { tools: [{ name: 'bench.list_kinds', inputSchema: { type: 'object' } }] } });
+        if (u.pathname === '/api/v1/kinds/missing') return problem(res, 404, 'compare.kind_not_found', 'No such kind.');
+        if (u.pathname === '/mcp') return send(res, 200, { jsonrpc: '2.0', id: 1, result: { tools: [{ name: 'compare.list_kinds', inputSchema: { type: 'object' } }] } });
         const responses = {
             '/api/v1/kinds': { count: 1, kinds: [{ id: 'vision' }] },
             '/api/v1/kinds/vision': { kind: { id: 'vision' } },
@@ -36,30 +36,30 @@ async function bench() {
             '/api/v1/evals/v1/results': { eval: { id: 'v1' }, runs: [] },
         };
         if (Object.hasOwn(responses, u.pathname)) return send(res, req.method === 'POST' ? 201 : 200, responses[u.pathname]);
-        return problem(res, 404, 'bench.not_found', 'Missing');
+        return problem(res, 404, 'compare.not_found', 'Missing');
     });
 }
 
 run([
-    ['all JSON routes preserve Bench envelopes, paths, query and bodies', async () => {
-        const srv = await bench();
+    ['all JSON routes preserve Compare envelopes, paths, query and bodies', async () => {
+        const srv = await compare();
         try {
-            const b = createBenchClient(createClient({ baseUrls: { bench: srv.url }, retries: 0 }));
-            assert.equal((await b.kinds.list()).count, 1);
-            assert.equal((await b.kinds.get('vision')).kind.id, 'vision');
-            assert.equal((await b.tasks.create('vision', { prompt: 'Compare', task_class: 'image', public: true })).task.id, 't1');
-            assert.equal((await b.tasks.get('t1')).task.id, 't1');
-            assert.equal((await b.rounds.create('t1', { offers: [{ provider: 'ai', model: 'one' }], seed: 7 })).round.id, 'r1');
-            assert.equal((await b.rounds.get('r1')).round.id, 'r1');
-            assert.equal((await b.entries.submit('r1', { provider: 'ai', model: 'one', payload: { text: 'hello' }, cost_usd: 0.01 })).entry.id, 'e1');
-            assert.equal((await b.judgements.next({ kind: 'vision' })).pair, null);
-            assert.equal((await b.judgements.cast('r1', { judge: 'human_pairwise', pair: { left: 'e1', right: 'e2' }, outcome: 'left' })).judgement.id, 'j1');
-            assert.equal((await b.boards.get('vision', { type: 'pareto', category: 'all', period: 'month' })).board.type, 'pareto');
-            assert.equal((await b.models.get('model/one')).model, 'model/one');
-            assert.equal((await b.evals.create({ kind_id: 'vision', name: 'Private', test_suite: [{ prompt: 'x' }] })).eval.id, 'v1');
-            assert.equal((await b.evals.get('v1')).eval.id, 'v1');
-            assert.equal((await b.evals.run('v1', { offers: [{ provider: 'ai' }] })).run.id, 'run1');
-            assert.deepEqual((await b.evals.results('v1')).runs, []);
+            const c = createCompareClient(createClient({ baseUrls: { compare: srv.url }, retries: 0 }));
+            assert.equal((await c.kinds.list()).count, 1);
+            assert.equal((await c.kinds.get('vision')).kind.id, 'vision');
+            assert.equal((await c.tasks.create('vision', { prompt: 'Compare', task_class: 'image', public: true })).task.id, 't1');
+            assert.equal((await c.tasks.get('t1')).task.id, 't1');
+            assert.equal((await c.rounds.create('t1', { offers: [{ provider: 'ai', model: 'one' }], seed: 7 })).round.id, 'r1');
+            assert.equal((await c.rounds.get('r1')).round.id, 'r1');
+            assert.equal((await c.entries.submit('r1', { provider: 'ai', model: 'one', payload: { text: 'hello' }, cost_usd: 0.01 })).entry.id, 'e1');
+            assert.equal((await c.judgements.next({ kind: 'vision' })).pair, null);
+            assert.equal((await c.judgements.cast('r1', { judge: 'human_pairwise', pair: { left: 'e1', right: 'e2' }, outcome: 'left' })).judgement.id, 'j1');
+            assert.equal((await c.boards.get('vision', { type: 'pareto', category: 'all', period: 'month' })).board.type, 'pareto');
+            assert.equal((await c.models.get('model/one')).model, 'model/one');
+            assert.equal((await c.evals.create({ kind_id: 'vision', name: 'Private', test_suite: [{ prompt: 'x' }] })).eval.id, 'v1');
+            assert.equal((await c.evals.get('v1')).eval.id, 'v1');
+            assert.equal((await c.evals.run('v1', { offers: [{ provider: 'ai' }] })).run.id, 'run1');
+            assert.deepEqual((await c.evals.results('v1')).runs, []);
             assert.deepEqual(srv.requests.map((r) => [r.method, r.url]), [
                 ['GET', '/api/v1/kinds'], ['GET', '/api/v1/kinds/vision'],
                 ['POST', '/api/v1/kinds/vision/tasks'], ['GET', '/api/v1/tasks/t1'],
@@ -76,14 +76,14 @@ run([
         } finally { await srv.close(); }
     }],
     ['dataset text and streamed lines; MCP tools list; service audience and acting subject', async () => {
-        const srv = await bench();
+        const srv = await compare();
         try {
-            const b = createBenchClient(createClient({ baseUrls: { bench: srv.url }, getToken: ({ audience }) => `svc-${audience}` }), { actingSubject: USR });
-            assert.match(await b.datasets.get('vision'), /"type":"task"/);
+            const c = createCompareClient(createClient({ baseUrls: { compare: srv.url }, getToken: ({ audience }) => `svc-${audience}` }), { actingSubject: USR });
+            assert.match(await c.datasets.get('vision'), /"type":"task"/);
             const lines = [];
-            await b.datasets.iterate('vision', async (line) => { lines.push(line); });
+            await c.datasets.iterate('vision', async (line) => { lines.push(line); });
             assert.deepEqual(lines, [{ type: 'task', id: 't1' }, { type: 'round', id: 'r1' }]);
-            assert.equal((await b.mcpTools())[0].name, 'bench.list_kinds');
+            assert.equal((await c.mcpTools())[0].name, 'compare.list_kinds');
             assert.deepEqual(JSON.parse(srv.requests[2].body), { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} });
             assert.equal(srv.requests[0].headers.authorization, 'Bearer svc-openvibe.bench');
             assert.equal(srv.requests[0].headers['x-ov-subject'], USR);
@@ -91,12 +91,23 @@ run([
         } finally { await srv.close(); }
     }],
     ['problem errors are OpenVibeError; invalid acting subjects fail before the request', async () => {
-        const srv = await bench();
+        const srv = await compare();
         try {
-            const b = createBenchClient(createClient({ baseUrls: { bench: srv.url }, retries: 0 }));
-            await assert.rejects(b.kinds.get('missing'), (err) => err instanceof OpenVibeError && err.code === 'bench.kind_not_found' && err.status === 404);
-            assert.throws(() => b.kinds.list({ actingSubject: 'bad' }), /actingSubject/);
+            const c = createCompareClient(createClient({ baseUrls: { compare: srv.url }, retries: 0 }));
+            await assert.rejects(c.kinds.get('missing'), (err) => err instanceof OpenVibeError && err.code === 'compare.kind_not_found' && err.status === 404);
+            assert.throws(() => c.kinds.list({ actingSubject: 'bad' }), /actingSubject/);
             assert.equal(srv.requests.length, 1);
         } finally { await srv.close(); }
+    }],
+    ['without an origin of its own the client talks to openvibe.compare', async () => {
+        const seen = [];
+        const c = createCompareClient({ json: async (request) => { seen.push(request); return { count: 0 }; } });
+        await c.kinds.list();
+        assert.equal(seen[0].baseUrl, 'https://openvibe.compare');
+        assert.equal(seen[0].service, 'compare');
+        assert.equal(seen[0].audience, 'openvibe.bench');
+        const withBase = createCompareClient({ json: async (request) => { seen.push(request); return { count: 0 }; } }, { baseUrl: 'http://compare.test' });
+        await withBase.kinds.list();
+        assert.equal(seen[1].baseUrl, 'http://compare.test');
     }],
 ]);

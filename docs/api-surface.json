@@ -92,11 +92,6 @@
         "verifyUserToken"
       ]
     },
-    "bench": {
-      "object": [
-        "createBenchClient"
-      ]
-    },
     "blog": {
       "object": [
         "createBlogClient"
@@ -169,6 +164,11 @@
       "object": [
         "actingHeaders",
         "createCommunityClient"
+      ]
+    },
+    "compare": {
+      "object": [
+        "createCompareClient"
       ]
     },
     "compareVersions": "function",
@@ -835,9 +835,6 @@
     "startAuthorization": "function",
     "unverifiedClaims": "function"
   },
-  "openvibe-sdk/bench": {
-    "createBenchClient": "function"
-  },
   "openvibe-sdk/blog": {
     "createBlogClient": "function"
   },
@@ -914,6 +911,9 @@
   "openvibe-sdk/community": {
     "actingHeaders": "function",
     "createCommunityClient": "function"
+  },
+  "openvibe-sdk/compare": {
+    "createCompareClient": "function"
   },
   "openvibe-sdk/composer": {
     "ATTACHMENT_MAX": "number",

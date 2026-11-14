@@ -1,11 +1,14 @@
-# Shared Bench ratings
+# Shared ratings (Compare)
 
 ```js
 const { createClient } = require('openvibe-sdk/core');
-const { createBenchClient } = require('openvibe-sdk/bench');
-const bench = createBenchClient(createClient(), { baseUrl: 'https://bench.openvibe.services' });
-const { board } = await bench.ratings.get('design.page', { category: 'all' });
+const { createCompareClient } = require('openvibe-sdk/compare');
+const compare = createCompareClient(createClient());
+const { board } = await compare.ratings.get('design.page', { category: 'all' });
 ```
+
+The default origin is `https://openvibe.compare`, where Bench's API is mounted
+(plan §X, 11-13); pass `{ baseUrl }` to point somewhere else.
 
 This browser-safe GET sends no token or acting subject. It uses Bench's fitted
 rating, confidence and rank intervals. Models with fewer than twenty eligible
