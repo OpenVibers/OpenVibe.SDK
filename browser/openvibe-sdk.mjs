@@ -7129,7 +7129,7 @@ const { createAgentsClient } = __load(53);
  *       service: 'myapp',                                          // your app's id (brand + analytics)
  *       brand: { name: 'My App' },                                 // optional brand override
  *       links: [{ label: 'Home', href: '/' }, { label: 'Docs', href: '/docs' }],
- *       menu: { before: [{ label: 'My projects', href: '/projects', icon: 'fa-folder' }] },
+ *       menu: { before: [{ label: 'My projects', href: '/projects', icon: 'folder' }] },
  *       sessionUrl: '/auth/me',                                    // your server session ({ user }), optional
  *       loginUrl: '/auth/login?next={path}',                       // {url} full return URL, {path} local path
  *       logoutUrl: '/auth/logout?next={path}',                     // Sign out ends your session too
