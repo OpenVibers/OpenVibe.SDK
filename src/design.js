@@ -2,10 +2,14 @@
 
 /**
  * OpenVibe.Design: the public component registry (design.component@1; no token) and the glyph API (icons; suggest,
- * get and search are public, a draft needs a token). Browser-safe.
+ * get, search and export are public, a draft needs a token). Browser-safe.
  */
 const DEFAULT_DESIGN_URL = 'https://openvibe.design';
 const STYLES = new Set(['thin', 'light', 'regular', 'bold', 'solid', 'duotone']);
+// The shape a ground may take, and the corner a square may have (plan AB.29): the same four names Design draws them
+// with, so a caller never has to know which service a file came from.
+const GROUNDS = new Set(['none', 'circle', 'square', 'squircle']);
+const ROUNDINGS = new Set(['none', 'soft', 'round', 'squircle']);
 const COMPONENT = /^[a-z][a-z0-9-]{0,63}$/;
 
 function createDesignClient({ accessToken = null, baseUrl = DEFAULT_DESIGN_URL, fetchImpl = globalThis.fetch, timeoutMs = 15000 } = {}) {
@@ -13,6 +17,20 @@ function createDesignClient({ accessToken = null, baseUrl = DEFAULT_DESIGN_URL, 
     if (typeof fetchImpl !== 'function') throw new TypeError('createDesignClient: fetch is unavailable');
     const base = String(baseUrl).replace(/\/+$/, '');
     if (!/^https?:\/\/[^/]+$/i.test(base)) throw new TypeError('createDesignClient: baseUrl must be an origin');
+    /** A file rather than JSON: the glyph's own SVG (or PNG) with the maker's choices. Public. */
+    async function requestFile(path, { accept = 'text/plain', signal } = {}) {
+        const response = await fetchImpl(`${base}${path}`, {
+            headers: { accept, ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}) },
+            signal: signal || AbortSignal.timeout(timeoutMs),
+        });
+        if (!response.ok) {
+            const text = await response.text().catch(() => '');
+            const err = new Error(String(text).trim() || `Design API returned ${response.status}`);
+            err.status = response.status;
+            throw err;
+        }
+        return response;
+    }
     async function request(path, { method = 'GET', body, signal, open = false } = {}) {
         if (!open && !accessToken) throw new TypeError('createDesignClient: the icon API needs accessToken');
         const response = await fetchImpl(`${base}${path}`, {
@@ -47,6 +65,36 @@ function createDesignClient({ accessToken = null, baseUrl = DEFAULT_DESIGN_URL, 
             if (!query) throw new TypeError('icons.search: q is required');
             return request(`/api/v1/glyphs/search?q=${encodeURIComponent(query)}&limit=${encodeURIComponent(Math.min(Math.max(Number(limit) || 24, 1), 60))}`, { signal, open: true });
         },
+        /**
+         * The glyph as a file, with the PNG maker's choices: the SVG text, or the PNG bytes.
+         *   await design.icons.export({ glyph: 'heart', ground: 'square', rounding: 'round' });
+         *   await design.icons.export({ glyph: 'heart', ground: 'square', rounding: 'squircle', format: 'png' });
+         * ground picks the shape (none, circle, square, squircle); rounding picks the corner of that square (none,
+         * soft, round, squircle). A circle has no corner and ignores it. Public: no token needed.
+         */
+        async export(input, o = {}) {
+            const opts = typeof input === 'string' ? { glyph: input, ...o } : { ...(input || {}) };
+            const name = String(opts.glyph || opts.name || '');
+            if (!/^[a-z][a-z0-9-]{0,31}$/.test(name)) throw new TypeError('icons.export: glyph must be lowercase letters, digits or dashes');
+            if (opts.ground != null && !GROUNDS.has(String(opts.ground))) throw new TypeError('icons.export: ground must be none, circle, square or squircle');
+            if (opts.rounding != null && !ROUNDINGS.has(String(opts.rounding))) throw new TypeError('icons.export: rounding must be none, soft, round or squircle');
+            const format = String(opts.format || 'svg');
+            if (format !== 'svg' && format !== 'png') throw new TypeError('icons.export: format must be svg or png');
+            const q = new URLSearchParams();
+            for (const key of ['ground', 'rounding', 'size', 'scale', 'color', 'stroke', 'pad', 'bg', 'fx', 'style']) {
+                const value = opts[key];
+                if (value == null || value === '') continue;
+                q.set(key, String(value));
+            }
+            const query = q.toString();
+            const response = await requestFile(`/icons/${encodeURIComponent(name)}.${format}${query ? `?${query}` : ''}`, { accept: format === 'png' ? 'image/png' : 'image/svg+xml' });
+            if (format === 'png') {
+                const bytes = await response.arrayBuffer();
+                const header = response.headers && typeof response.headers.get === 'function' ? response.headers.get('content-type') : null;
+                return { bytes, contentType: header || 'image/png' };
+            }
+            return response.text();
+        },
         /** The best glyphs for a button's words by meaning; rank asks a small model when the words are new. Public. */
         async suggest(label, { context = '', limit = 8, rank = false, signal } = {}) {
             const words = String(label || '').trim();
@@ -69,4 +117,4 @@ function createDesignClient({ accessToken = null, baseUrl = DEFAULT_DESIGN_URL, 
     });
 }
 
-module.exports = { createDesignClient, DEFAULT_DESIGN_URL };
+module.exports = { createDesignClient, DEFAULT_DESIGN_URL, GROUNDS, ROUNDINGS };
