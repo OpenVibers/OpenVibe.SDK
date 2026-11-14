@@ -8,12 +8,12 @@
 **Install and test:** `npm ci && npm test` (Node 20 or newer)
 
 ```bash
-npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.170.0
+npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.171.0
 ```
 
 > Supported browser and server clients for the OpenVibe platform.
 
-**Status:** alpha, v0.170.0 (the five 1.0 core entries — `core`, `auth`, `events`, `db` and `media` — are frozen: their exported names change only with a major release; roadmap Wave 2; developer apps from Wave 20; Media objects v2 from Wave 4; the Tools platform API; Search, Chat, AI, Vision and consent clients; sign-in with recovery and a client health check). Every release is tagged (see [CHANGELOG.md](CHANGELOG.md)). Tested against local stub servers and the built-in mock platform only, never against the live platform. Services pin release tags; each repository's `STATUS.json` names the one it uses.
+**Status:** alpha, v0.171.0 (the five 1.0 core entries — `core`, `auth`, `events`, `db` and `media` — are frozen: their exported names change only with a major release; roadmap Wave 2; developer apps from Wave 20; Media objects v2 from Wave 4; the Tools platform API; Search, Chat, AI, Vision and consent clients; sign-in with recovery and a client health check). Every release is tagged (see [CHANGELOG.md](CHANGELOG.md)). Tested against local stub servers and the built-in mock platform only, never against the live platform. Services pin release tags; each repository's `STATUS.json` names the one it uses.
 **Plan:** OpenVibe End-to-End Realignment & Implementation Plan, revision 3 (20 Sep 2026), §3.2; roadmap §30.  
 **License:** MIT ([LICENSE](LICENSE)). This package is a library that apps outside the network embed, so it uses MIT. The OpenVibe services themselves stay AGPL-3.0.
 
@@ -22,7 +22,7 @@ npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags
 After v0.97.1 is tagged:
 
 ```bash
-npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.170.0
+npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.171.0
 ```
 
 It has no runtime dependencies. It needs Node ≥ 20, or any browser with `fetch`, Web Crypto and `TextDecoder`. There is no build step. The package is CommonJS with ESM entry points (`import` works). Each subpath has its own `.d.ts`. For a page with no bundler, `browser/openvibe-sdk.mjs` is one self-contained ES module of the browser-safe subpaths (see [Browser without a bundler](#browser-without-a-bundler)). It does not depend on `openvibe-contracts` at runtime: it copies the contract types it uses (from the temporary Contracts sharing branch, a devDependency the tests check them against).
@@ -199,6 +199,7 @@ Until OpenVibe.Tools serves the gateway facade (Tools S6), point the jobs client
 | `openvibe-sdk/user-card` | both | `createUserCardClient(client)`: `get(username)` reads the public Network aggregate (display name, avatar, level, streak, badges, followers, active sites). No credentials; hidden or unavailable fields stay absent ([guide](docs/user-card.md)) |
 | `openvibe-sdk/notifications` | server | `createNotificationsClient(client)`: `push({subjectId \| userId, type, title, message, url, category, priority, …})` through Network (`network.notifications.push`); `{ sent, skipped }` or `{ sent: false, reason: 'unknown_subject' }`; attempted once, the caller retries |
 | `openvibe-sdk/modules` | both | `createModulesClient(client)`: `get`, `put(ns, data, {revision})`, `delete`, `list`, `update(ns, fn)`, `publicGet`; `forSubject.get/put/update` for services |
+| `openvibe-sdk/friends` | both | `createFriendsClient(client)`: `list()` reads the person's circle (`network.friend-circle@1`: mutual, requests, asked), `add(who)`, `accept(who)` (add back), `remove(who)`; `subjects(subject)` reads a person's mutual friends as subjects only (`network.friend-subjects@1`, a service token with `network.friends.read`) |
 | `openvibe-sdk/events` | server | `createEventsClient(client, {source})`: `publish`, `prepare`, `pull`, `iterate`, `get`, `get/setCheckpoint`, `subscriptions.create/list/get/disable/enable` (`subscribe`), `deliveries`, `replay`; `parseDelivery` (v1 and v2, `requireV2`), `verifyDeliveryV2`, `signDeliveryV2`, `signDeliveryHeaders`, `verifyDelivery`, `signDelivery`; developer apps: `createAppEvents(client, {projectId, appId, onBehalfOf?})` (same calls, scoped to `app.<project_key>.*`), `projectKey`, `appSource`; `createOutbox`, `createInbox`, `createPgOutbox`, `createPgInbox`; `createServiceOutbox({db, source, eventsUrl, clientId, clientSecret, eventTypes?, validate?})` (a service's outbox in one call: `emit`/`emitIn` inside the change's transaction, `moderationAction`, `start`/`stop`/`kick`/`status`) |
 | `openvibe-sdk/sso` | server | `createSsoClient({site, baseUrl, clientId, clientSecret, networkUrl, networkInternalUrl, secureCookies})`: a product site's sign-in with OpenVibe.Network: `router(express)` (`/login` with state + PKCE S256, `/callback`, `/fedcm`, `/logout`, `/me`, `/refresh`), `optionalAuth()`, `requireAuth()`, `verify(token)` (offline, shared JWKS), `extractToken(req)`; `sanitizeNext`, `COOKIES` |
 | `openvibe-sdk/realtime` | both | `subscribe(topics, onEvent, {lastEventId, onGap, …})`, `createRealtimeClient(client)`, `parseSSE(body)` |

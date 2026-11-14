@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.171.0 — 2026-11-14
+
+**`openvibe-sdk/friends`: the friend circle, one system across every site (plan §AB.51).**
+
+- **`createFriendsClient(client)`** reads and changes the person's friendships on OpenVibe.Network
+  (contracts `network.friend-circle@1`).
+- **`list()`** is the whole picture in one read: `mutual` (friends), `requests` (they added you),
+  `asked` (you added them), each person with a name, a picture and whether they are on an OpenVibe site now.
+- **`add(who)`**, **`accept(who)`** (add them back) and **`remove(who)`** change it; `who` is a
+  `usr_` subject or a username.
+- **`subjects(subject)`** is the service read (`network.friend-subjects@1`): a person's mutual friends
+  as subjects only, for a service holding `network.friends.read` (Chat's contacts). Never names, never the
+  one-sided requests.
+- **The types follow:** `FriendCircle`, `FriendPerson`, `FriendEntry`, `FriendState`, `FriendSubjects`,
+  `FriendsClient`.
+
 ## 0.170.0 — 2026-11-14
 
 **`openvibe-sdk/ai`: the decisions door — a closed-set question, answered by the model you name (plan §AB.11).**
