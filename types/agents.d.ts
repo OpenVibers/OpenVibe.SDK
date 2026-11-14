@@ -157,7 +157,9 @@ export interface AgentsRuns {
     /** Start a run: the words, or the whole agents.run-start@1 object. */
     start(request: string | AgentsRunStart, options?: { signal?: AbortSignal; idempotencyKey?: string }): Promise<AgentsRun>;
     /** Say something to a run: continue a conversation or steer work under way. */
-    say(run: AgentsRunLike, message: string | { text?: string; attachments?: AgentsAttachment[] }, options?: { signal?: AbortSignal; idempotencyKey?: string }): Promise<AgentsStep>;
+    say(run: AgentsRunLike, message: string | { text?: string; attachments?: AgentsAttachment[]; use?: AgentsUse }, options?: { signal?: AbortSignal; idempotencyKey?: string }): Promise<AgentsStep>;
+    /** Swap the model, harness or effort from the next turn on, in the same run (agents.message@1 use). */
+    swap(run: AgentsRunLike, use: AgentsUse, text?: string, options?: { signal?: AbortSignal; idempotencyKey?: string }): Promise<AgentsStep>;
     stop(run: AgentsRunLike, options?: { reason?: string; signal?: AbortSignal }): Promise<AgentsRun>;
     events(run: AgentsRunLike, options?: AgentsEventsOptions): AsyncIterable<AgentEvent>;
     /** Follow a run until it ends; resolves with its end status (null when the stream closed without one). */
@@ -243,4 +245,11 @@ export interface AgentsReview { ok: boolean; reason?: string; by?: string; cross
 /** The second look: a model of another family, a test suite or a rubric. */
 export interface AgentReviewer {
     review(input: { run: AgentsRun; result: unknown; steps?: AgentsStep[]; signal?: AbortSignal }): Promise<AgentsReview>;
+}
+
+/** agents.message@1's use (Contracts 0.434.0): what runs a conversation from its next turn on. */
+export interface AgentsUse {
+    model?: { id: string; source?: 'openvibe' | 'keys' | 'machines' | 'plans'; name?: string; machine?: string; effort?: string };
+    harness?: string;
+    effort?: 'low' | 'medium' | 'high' | 'max';
 }

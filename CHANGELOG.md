@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.173.0 — 2026-11-14
+
+- **agents: swap the model or the harness mid-conversation, and resume an ended run** (the owner, 11-14: "resume
+  sessions or swap models with ease"; Contracts 0.434.0 agents.message@1). The Run API checks a message's `use`
+  (model, harness, effort) the same way on every product and hands it to the store with the message; a store lists
+  what it can change in `store.uses`, and anything else is 409 `agents.use_unavailable` before the store is asked. A
+  message may carry an Idempotency-Key. The client adds `agents.runs.swap(run, use, text)`. Test:
+  test/agents-api.test.js.
+
 ## 0.172.0 — 2026-11-14
 
 - **db: a connection cut during a transaction fails that transaction, never the process.** A client checked out for a

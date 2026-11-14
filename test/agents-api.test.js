@@ -129,6 +129,36 @@ run([
             assert.equal(bad.status, 400);
         } finally { await srv.close(); }
     }],
+    ['a swap (agents.message@1 use): what the store can change goes with the message; anything else is 409 before it is asked', async () => {
+        const store = memoryStore();
+        const said = [];
+        store.uses = ['model', 'harness'];
+        store.say = async (args) => { said.push(args); return { run_id: args.id, seq: 2, kind: 'message', from: 'person', text: args.text }; };
+        await store.start({ owner: ADA, input: { text: 'x', kind: 'code' } });
+        const srv = await serve(createRunApi({ store, subject, product: 'codes', prefix: '/api/v1' }));
+        try {
+            const post = (body, headers = {}) => fetch(srv.url + '/api/v1/runs/c_1/messages', { method: 'POST', headers: { authorization: 'Bearer ada', 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) });
+            let r = await post({ text: 'Hand it to Codex', use: { harness: 'codex', model: { id: 'openai/gpt-5.2-codex', source: 'plans', extra: 'dropped' } } }, { 'idempotency-key': 'msg-0001' });
+            assert.equal(r.status, 201);
+            assert.deepEqual(said[0].use, { harness: 'codex', model: { id: 'openai/gpt-5.2-codex', source: 'plans' } }, 'only the contract\'s fields go to the store');
+            assert.equal(said[0].idempotencyKey, 'msg-0001');
+            r = await post({ text: 'Think harder', use: { effort: 'max' } });
+            assert.deepEqual([r.status, (await r.json()).code], [409, 'agents.use_unavailable'], 'this store cannot change the effort');
+            assert.equal(said.length, 1, 'and was never asked');
+            for (const bad of [{ use: {} }, { use: { harness: 'Codex CLI!' } }, { use: { effort: 'huge' } }, { use: { model: { id: '' } } }, { use: { colour: 'red' } }, { use: 'codex' }]) {
+                r = await post({ text: 'x', ...bad });
+                assert.deepEqual([r.status, (await r.json()).code], [422, 'runs.bad_use'], JSON.stringify(bad));
+            }
+            r = await post({ text: 'plain' });
+            assert.equal(r.status, 201);
+            assert.ok(!('use' in said[1]), 'a plain message changes nothing');
+            // The client: swap is a message with use.
+            const sdk = createAgentsClient(createClient({ baseUrls: { network: srv.url }, token: 'ada' }));
+            await sdk.runs.swap('c_1', { model: { id: 'deepseek/deepseek-v4.1-flash' } }, 'Cheaper now');
+            assert.deepEqual([said[2].text, said[2].use], ['Cheaper now', { model: { id: 'deepseek/deepseek-v4.1-flash' } }]);
+            await assert.rejects(sdk.runs.swap('c_1', {}), /use is/);
+        } finally { await srv.close(); }
+    }],
     ['a store and a subject are required', () => {
         assert.throws(() => createRunApi({ subject, product: 'chat' }), /a store is required/);
         assert.throws(() => createRunApi({ store: {}, product: 'chat' }), /subject\(req\) is required/);

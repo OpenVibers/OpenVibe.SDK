@@ -116,6 +116,15 @@ function createAgentsClient(client, { baseUrl, service = 'network', audience = '
         }
         return (await call({ method: 'POST', path: `${at('agents.runs.say', run)}/messages`, json: body, ...(idempotencyKey ? { idempotencyKey } : {}), signal })).data;
     }
+    /**
+     * Swap what runs a conversation from its next turn on (agents.message@1 use: a model, a harness, an effort), with
+     * the words for that turn: the same run and thread carry over. 409 agents.use_unavailable where the product cannot.
+     *   await all.runs.swap('codes:tsk_…', { harness: 'codex', effort: 'high' }, 'Finish the tests')
+     */
+    async function swap(run, use, text = 'Continue', { signal, idempotencyKey } = {}) {
+        if (!use || typeof use !== 'object' || Array.isArray(use) || !Object.keys(use).length) throw new TypeError('agents.runs.swap: use is { model, harness, effort }');
+        return say(run, { text, use }, { signal, idempotencyKey });
+    }
     async function stop(run, { reason, signal } = {}) {
         return (await call({ method: 'POST', path: `${at('agents.runs.stop', run)}/stop`, ...(reason !== undefined ? { json: { reason } } : {}), signal })).data;
     }
@@ -215,7 +224,7 @@ function createAgentsClient(client, { baseUrl, service = 'network', audience = '
     }
 
     return {
-        runs: { list, get, steps, start, say, stop, events, follow },
+        runs: { list, get, steps, start, say, swap, stop, events, follow },
         approvals: { answer },
         desks, takeOver, handBack, replay,
         run, post, events,
