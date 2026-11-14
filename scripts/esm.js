@@ -45,7 +45,7 @@ const ENTRIES = {
     'bot.mjs': '../src/bot.js',
     'machines.mjs': '../src/machines.js',
     'search.mjs': '../src/search.js',
-    'bench.mjs': '../src/bench.js',
+    'compare.mjs': '../src/compare.js',
     'meme.mjs': '../src/meme.js',
     'themes.mjs': '../src/themes.js',
     'elements.mjs': '../src/elements.js',

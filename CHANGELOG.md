@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.168.0 — 2026-11-14
+
+**`openvibe-sdk/compare`: Bench's API, now Compare's (plan §X).** Bench's whole API is mounted inside
+OpenVibe.Compare since the 11-13 cutover (Compare answers it at `https://openvibe.compare/api/v1/…`), so the SDK entry
+that spoke to it is renamed in one clean cut: no alias, no second name, every consumer moved in the same round.
+
+- **What moved:** `openvibe-sdk/bench` (`createBenchClient`) is gone. `openvibe-sdk/compare` (`createCompareClient`)
+  has the same calls and the same envelopes: `kinds.list/get`, `tasks.create/get`, `rounds.create/get`,
+  `entries.submit`, `judgements.next/cast`, `boards.get`, `ratings.get` (public, at least twenty games),
+  `models.get`, `datasets.get/iterate`, `evals.create/get/run/results`, `mcpTools()`.
+- **The origin moves with it:** the client talks to `https://openvibe.compare` unless the caller sets `baseUrl` (or the
+  shared client carries `baseUrls.compare`). The service id is `compare`.
+- **The audience does not:** the API inside Compare still verifies service tokens for `openvibe.bench`, so calls ask
+  for that audience.
+- **The types follow:** `BenchClient`, `BenchTask`, `BenchRound`, `BenchEntry`, `BenchBoard`, `BenchRating`,
+  `BenchSharedRatings`, `BenchEval`, `BenchEvalRun`, `BenchDatasetLine`, `BenchMcpTool`, `BenchOptions` and
+  `BenchDefaults` are now `CompareClient`, `CompareTask`, `CompareRound`, `CompareEntry`, `CompareBoard`,
+  `CompareRating`, `CompareSharedRatings`, `CompareEval`, `CompareEvalRun`, `CompareDatasetLine`,
+  `CompareMcpTool`, `CompareOptions` and `CompareDefaults`. The wire schema `bench.ratings@1` is unchanged.
+- **Consumers:** Codes, Compare, Exchange, Live, Report and Run move to `openvibe-sdk/compare` in their own pull
+  requests, each with the pin bump to this tag.
+- **Breaking:** `openvibe-sdk/bench`, `createBenchClient`, the root entry's `bench` namespace and the browser
+  bundle's `bench` namespace are removed. Nothing answers under the old name.
+
 ## 0.167.0 — 2026-11-13
 
 - **Who is looking: `createViewerClient` (openvibe-sdk/identity, plan §Z.2).** `viewer()` reads Network's

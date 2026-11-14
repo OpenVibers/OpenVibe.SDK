@@ -8,7 +8,7 @@ export const {
     report, views, share, locker, auth, registry,
     identity, trust, levels, modules, events, realtime,
     media, composer, cam, mediaUpload, ui, uiLayout,
-    community, homeFeed, feed, bot, search, bench,
+    community, homeFeed, feed, bot, search, compare,
     meme, vision, themes, elements, design, redact,
     chat, chatApps, ai, credentials, jobs, agents,
     agentsLoop, agentsDispatch, agentsApi, frame, tools, projects,
