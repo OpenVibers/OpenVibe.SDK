@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.168.0 — 2026-11-14
+## 0.168.0 — 2026-11-13
 
 **`openvibe-sdk/compare`: Bench's API, now Compare's (plan §X).** Bench's whole API is mounted inside
 OpenVibe.Compare since the 11-13 cutover (Compare answers it at `https://openvibe.compare/api/v1/…`), so the SDK entry
