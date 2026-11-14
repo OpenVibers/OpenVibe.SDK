@@ -18,6 +18,9 @@ async function aiStub() {
         if (u.pathname === '/api/v1/runs/missing') return send(res, 404, { code: 'run.not_found' });
         if (u.pathname === '/api/v1/summarize') return send(res, 201, { run: { id: 'run_2', status: 'succeeded' } });
         if (u.pathname === '/api/v1/creations') return send(res, 200, { creations: [{ id: 'blog-post', product: 'blog', name: 'Write a blog post' }], count: 1, generated_at: '2026-11-09T22:15:00.000Z' });
+        if (req.method === 'POST' && u.pathname === '/api/v1/decisions') return send(res, 200, { answers: { is_spam: { type: 'noul', noul: 0.04, confidence: 0.96 } }, calibrated: true,
+            receipt: { provider: 'gemini', model: 'gemini-decision-1', input_tokens: 120, cost_usd: 0.000012, steps: [{ step: 1, provider: 'gemini', model: 'gemini-decision-1', input_tokens: 120, cost_usd: 0.000012, calibrated: true, questions: ['is_spam'] }] } });
+        if (u.pathname === '/api/v1/decisions/models') return send(res, 200, { models: [{ id: 'gemini/gemini-decision-1', provider: 'gemini', name: "Google's Decisions API", price_in_per_mtok: 0.1, price_out_per_mtok: 0, speed_p50_ms: null, calibrated: true, max_questions: 1000, inputs: ['text', 'image'], available: true }], count: 1, generated_at: '2026-11-14T10:00:00.000Z' });
         return send(res, 404, {});
     });
 }
@@ -58,6 +61,38 @@ run([
             workflow: 'ai.complete', input: { messages: [{ role: 'user', content: 'Summarize this file' }], files: [{ id: 'med_example' }],
                 output_file: { name: 'answer.md', media_type: 'text/markdown' } }, on_behalf_of: { type: 'user', id: 'usr_example' },
         });
+        await srv.close();
+    }],
+    ['decide asks the questions with the model, the kind and the preference, and answers with the receipt', async () => {
+        const srv = await aiStub();
+        const ai = createAiClient(createClient({ baseUrls: { ai: srv.url }, token: 't' }));
+        const out = await ai.decide({ input: 'buy cheap pills', questions: { is_spam: { type: 'noul', instructions: 'Is this spam?' } },
+            model: 'openai/gpt-4o-mini', kind: 'moderation', prefer: 'cheap' });
+        assert.equal(out.answers.is_spam.noul, 0.04);
+        assert.equal(out.answers.is_spam.confidence, 0.96);
+        assert.equal(out.calibrated, true);
+        assert.equal(out.receipt.model, 'gemini-decision-1');
+        assert.equal(out.receipt.steps.length, 1);
+        assert.equal(out.receipt.steps[0].cost_usd, 0.000012);
+        const req = srv.requests[0];
+        assert.equal(req.url, '/api/v1/decisions');
+        assert.deepEqual(JSON.parse(String(req.body)), {
+            input: 'buy cheap pills', questions: { is_spam: { type: 'noul', instructions: 'Is this spam?' } },
+            model: 'openai/gpt-4o-mini', kind: 'moderation', prefer: 'cheap',
+        });
+        await srv.close();
+    }],
+    ['decide sends only what the caller gave, and the models list is public', async () => {
+        const srv = await aiStub();
+        const ai = createAiClient(createClient({ baseUrls: { ai: srv.url }, token: 't' }));
+        await ai.decide({ input: 'x', questions: { a: { type: 'noul', instructions: 'y' } } });
+        assert.deepEqual(JSON.parse(String(srv.requests[0].body)), { input: 'x', questions: { a: { type: 'noul', instructions: 'y' } } });
+        const list = await ai.decideModels();
+        assert.equal(list.count, 1);
+        assert.equal(list.models[0].id, 'gemini/gemini-decision-1');
+        assert.equal(list.models[0].calibrated, true);
+        assert.equal(srv.requests[1].url, '/api/v1/decisions/models');
+        assert.equal(srv.requests[1].headers.authorization, undefined, 'public: no token is sent');
         await srv.close();
     }],
     ['a create without a key is not retried; direct ops post the input as the body', async () => {
