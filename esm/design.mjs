@@ -2,6 +2,6 @@
 import cjs from '../src/design.js';
 
 export const {
-    createDesignClient, DEFAULT_DESIGN_URL,
+    createDesignClient, DEFAULT_DESIGN_URL, GROUNDS, ROUNDINGS,
 } = cjs;
 export default cjs;

@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.169.0 — 2026-11-14
+
+**`openvibe-sdk/design`: the glyph as a file, with the ground and the corner of that ground (plan AB.29).**
+
+- **`design.icons.export({ glyph, ground, rounding, … })`** fetches the drawing with the PNG maker's choices: the
+  SVG text, or the PNG bytes with `format: 'png'`. It is public — no token is sent.
+- **`ground`** picks the shape (`none`, `circle`, `square`, `squircle`); **`rounding`** picks the corner of that
+  square (`none`, `soft` — a 12 % corner, `round` — the app icon's corner, `squircle` — a superellipse). A circle
+  has no corner and ignores it.
+- **The names are checked twice:** the client refuses anything that is not one of the four before the request goes
+  out, and Design refuses it too, with a plain message.
+- **The types follow:** `DesignGround`, `DesignRounding`, `DesignIconExportOptions`, `DesignIconPng`.
+- `GROUNDS` and `ROUNDINGS` are exported, so a caller can check a name without repeating it.
+
 ## 0.168.0 — 2026-11-13
 
 **`openvibe-sdk/compare`: Bench's API, now Compare's (plan §X).** Bench's whole API is mounted inside

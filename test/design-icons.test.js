@@ -34,5 +34,42 @@ const { createDesignClient } = require('../src/design');
     const designEsm = await import('../esm/design.mjs');
     const esmClient = designEsm.createDesignClient({ accessToken: 'test-token', fetchImpl: async () => ({ ok: true, async json() { return {}; } }) });
     await esmClient.icons.get('heart', { style: 'bold' });
-    console.log('Design SDK icons: draft uses the authenticated API; suggest, get and search are public');
+
+    // The export (plan AB.29): the glyph as a file, with the ground and the corner of that ground.
+    const fileCalls = [];
+    const fileClient = createDesignClient({ fetchImpl: async (url, init) => {
+        fileCalls.push({ url: String(url), init });
+        return {
+            ok: true,
+            async text() { return '<svg xmlns="http://www.w3.org/2000/svg"></svg>'; },
+            async arrayBuffer() { return new ArrayBuffer(8); },
+            headers: { get: () => 'image/png' },
+        };
+    } });
+    const svg = await fileClient.icons.export({ glyph: 'heart', ground: 'square', rounding: 'round' });
+    assert.match(svg, /^<svg/);
+    assert.match(fileCalls[0].url, /\/icons\/heart\.svg\?ground=square&rounding=round$/);
+    assert.equal(fileCalls[0].init.headers.accept, 'image/svg+xml');
+    assert.ok(!fileCalls[0].init.headers.authorization, 'the export is public: no token is sent');
+    // A name of the four corners, each in the link.
+    for (const rounding of ['none', 'soft', 'round', 'squircle']) {
+        await fileClient.icons.export({ glyph: 'heart', ground: 'square', rounding });
+        assert.ok(fileCalls[fileCalls.length - 1].url.endsWith(`rounding=${rounding}`), rounding);
+    }
+    // No corner, no ground: the plain drawing.
+    await fileClient.icons.export('heart');
+    assert.match(fileCalls[fileCalls.length - 1].url, /\/icons\/heart\.svg$/);
+    // The PNG comes back as bytes.
+    const png = await fileClient.icons.export({ glyph: 'heart', ground: 'square', rounding: 'squircle', format: 'png' });
+    assert.equal(png.contentType, 'image/png');
+    assert.equal(png.bytes.byteLength, 8);
+    assert.match(fileCalls[fileCalls.length - 1].url, /\.png\?ground=square&rounding=squircle$/);
+    // Anything that is not one of the four names is refused before the request goes out.
+    await assert.rejects(fileClient.icons.export({ glyph: 'heart', rounding: 'squarish' }), TypeError);
+    await assert.rejects(fileClient.icons.export({ glyph: 'heart', ground: 'blob' }), TypeError);
+    await assert.rejects(fileClient.icons.export({ glyph: 'bad name' }), TypeError);
+    await assert.rejects(fileClient.icons.export({ glyph: 'heart', format: 'gif' }), TypeError);
+    assert.equal(fileCalls.length, 7, 'a refused call asks the server nothing');
+
+    console.log('Design SDK icons: draft uses the authenticated API; suggest, get, search and export are public');
 })().catch((err) => { console.error(err); process.exit(1); });

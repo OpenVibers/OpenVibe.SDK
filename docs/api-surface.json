@@ -201,6 +201,8 @@
     "design": {
       "object": [
         "DEFAULT_DESIGN_URL",
+        "GROUNDS",
+        "ROUNDINGS",
         "createDesignClient"
       ]
     },
@@ -1021,6 +1023,8 @@
   },
   "openvibe-sdk/design": {
     "DEFAULT_DESIGN_URL": "string",
+    "GROUNDS": "object",
+    "ROUNDINGS": "object",
     "createDesignClient": "function"
   },
   "openvibe-sdk/download": {
