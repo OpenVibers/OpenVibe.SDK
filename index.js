@@ -19,6 +19,7 @@ module.exports = {
     trust: require('./src/trust'),
     levels: require('./src/levels'),
     modules: require('./src/modules'),
+    friends: require('./src/friends'),
     events: require('./src/events'),
     realtime: require('./src/realtime'),
     media: require('./src/media'),

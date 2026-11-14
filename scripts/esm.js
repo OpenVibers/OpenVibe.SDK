@@ -31,6 +31,7 @@ const ENTRIES = {
     'levels.mjs': '../src/levels.js',
     'notifications.mjs': '../src/notifications.js',
     'modules.mjs': '../src/modules.js',
+    'friends.mjs': '../src/friends.js',
     'events.mjs': '../src/events.js',
     'sso.mjs': '../src/sso/index.js',
     'app-signin.mjs': '../src/app-signin/index.js',
