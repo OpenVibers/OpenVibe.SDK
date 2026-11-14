@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.172.0 — 2026-11-14
+
+- **db: a connection cut during a transaction fails that transaction, never the process.** A client checked out for a
+  transaction had no listener of the pool's: when the server cut the connection while the transaction waited
+  (Postgres's idle-in-transaction timeout, a restart), the unhandled 'error' event exited the service (OpenVibe.AI,
+  2026-11-14 20:18 UTC). The pg adapter now listens on each checked-out client, the transaction's next statement fails
+  as usual, and release destroys the client instead of pooling it. Test: `test/db-tx-cut.test.js` (PostgreSQL;
+  `scripts/test-services.sh up`).
+
 ## 0.171.0 — 2026-11-14
 
 **`openvibe-sdk/friends`: the friend circle, one system across every site (plan §AB.51).**

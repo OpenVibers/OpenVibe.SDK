@@ -283,8 +283,19 @@ function pgAdapter({ url, max, service, queryTimeoutMs, log }) {
     return {
         store: 'postgresql',
         run: (conn, text, values) => (conn || pool).query({ text, values }).then((r) => ({ rows: r.rows, rowCount: r.rowCount })),
-        acquire: () => pool.connect(),
-        release: (c) => c.release(),
+        // A client checked out for a transaction has no listener of the pool's: a connection the server cuts while the
+        // transaction waits (Postgres's idle-in-transaction timeout, a restart) emitted an unhandled 'error' and
+        // crashed the service (OpenVibe.AI, 2026-11-14 20:18 UTC). The listener keeps the error on the client, the
+        // transaction's next statement fails as usual, and release destroys the client instead of pooling it.
+        acquire: async () => {
+            const c = await pool.connect();
+            if (!c.__ovTxError) {
+                c.__ovTxError = (err) => { c.__ovBroken = err; log.warn(`[db] connection lost during a transaction: ${err && err.message}`); };
+                c.on('error', c.__ovTxError);
+            }
+            return c;
+        },
+        release: (c) => { const broken = c.__ovBroken; c.__ovBroken = null; c.release(broken || undefined); },
         pool: () => ({ total: pool.totalCount, idle: pool.idleCount, waiting: pool.waitingCount }),
         close: () => pool.end(),
     };
