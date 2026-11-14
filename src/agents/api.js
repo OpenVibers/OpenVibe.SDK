@@ -20,7 +20,14 @@
  *   get({ owner, id })                               → run | null
  *   steps({ owner, id, after, limit })               → { steps, next }
  *   start({ owner, input, idempotencyKey })          → run
- *   say({ owner, id, text, attachments })            → step
+ *   say({ owner, id, text, attachments, use, idempotencyKey })
+ *                                                    → step. USE (agents.message@1, Contracts 0.434.0) swaps the model,
+ *                                                      the harness or the effort from this turn on, in the same run;
+ *                                                      a store lists what it can swap in store.uses (['model',
+ *                                                      'harness', 'effort']) and anything else is 409
+ *                                                      agents.use_unavailable before it is asked. A message to an
+ *                                                      ended run is a resume: the store runs it again, or throws 409
+ *                                                      agents.run_closed.
  *   stop({ owner, id, reason })                      → run
  *   answer({ owner, id, approval, answer })          → anything
  *   follow({ owner, id, after, signal, emit })       → optional: push events (emit(event, data, id)) until the signal
@@ -39,6 +46,35 @@ const ID = /^[A-Za-z0-9._~:-]{1,200}$/;
 const APPROVAL = /^[A-Za-z0-9._~-]{1,160}$/;
 const KEY = /^[A-Za-z0-9._~-]{1,200}$/;
 const BODY_MAX = 64 * 1024;
+const USE_KEYS = ['model', 'harness', 'effort'];
+const HARNESS = /^[a-z0-9][a-z0-9-]{0,39}$/;
+const MODEL_ID = /^[A-Za-z0-9._:/@+| -]{1,200}$/;
+const EFFORTS = ['low', 'medium', 'high', 'max'];
+
+/** agents.message@1's `use`, checked here so every product reads the same thing: { model?, harness?, effort? } or null. */
+function useOf(raw) {
+    if (raw === undefined || raw === null) return null;
+    if (typeof raw !== 'object' || Array.isArray(raw)) throw problem(422, 'runs.bad_use', 'use is { model, harness, effort }');
+    const keys = Object.keys(raw);
+    if (!keys.length || keys.some((k) => !USE_KEYS.includes(k))) throw problem(422, 'runs.bad_use', 'use names a model, a harness or an effort');
+    const out = {};
+    if (raw.model !== undefined) {
+        const m = raw.model;
+        if (!m || typeof m !== 'object' || typeof m.id !== 'string' || !MODEL_ID.test(m.id)) throw problem(422, 'runs.bad_use', 'use.model is { id, source?, name?, machine?, effort? }');
+        out.model = { id: m.id, ...(['openvibe', 'keys', 'machines', 'plans'].includes(m.source) ? { source: m.source } : {}),
+            ...(typeof m.name === 'string' ? { name: clip(m.name, 200) } : {}), ...(typeof m.machine === 'string' ? { machine: clip(m.machine, 40) } : {}),
+            ...(typeof m.effort === 'string' ? { effort: clip(m.effort, 40) } : {}) };
+    }
+    if (raw.harness !== undefined) {
+        if (typeof raw.harness !== 'string' || !HARNESS.test(raw.harness)) throw problem(422, 'runs.bad_use', 'use.harness is a harness id (claude-code, codex, opencode, openvibe, …)');
+        out.harness = raw.harness;
+    }
+    if (raw.effort !== undefined) {
+        if (!EFFORTS.includes(raw.effort)) throw problem(422, 'runs.bad_use', `use.effort is one of ${EFFORTS.join(', ')}`);
+        out.effort = raw.effort;
+    }
+    return out;
+}
 
 function problem(status, code, message) { const e = new Error(message); e.status = status; e.code = code; return e; }
 const clip = (v, n) => String(v == null ? '' : v).slice(0, n);
@@ -196,7 +232,16 @@ function createRunApi({ store, subject, product, prefix = '', pollMs = 1500, str
                 const text = clip(b.text, 16000);
                 const attachments = Array.isArray(b.attachments) ? b.attachments.slice(0, 20) : [];
                 if (!text.trim() && !attachments.length) throw problem(422, 'runs.say_needs_words', 'Say something ({ text })');
-                return send(res, 201, await store.say({ owner, id: localId, text, attachments }));
+                // A swap (agents.message@1 use): only what this product can run, asked of the store with the message.
+                const use = useOf(b.use);
+                if (use) {
+                    const can = Array.isArray(store.uses) ? store.uses : [];
+                    const missing = Object.keys(use).filter((k) => !can.includes(k));
+                    if (missing.length) throw problem(409, 'agents.use_unavailable', `A ${product} run cannot change its ${missing.join(' or ')} here`);
+                }
+                const msgKey = clip(req.headers['idempotency-key'] || b.idempotency_key, 200);
+                if (msgKey && !KEY.test(msgKey)) throw problem(422, 'runs.bad_key', 'Idempotency-Key is letters, digits and . _ ~ -');
+                return send(res, 201, await store.say({ owner, id: localId, text, attachments, ...(use ? { use } : {}), ...(msgKey ? { idempotencyKey: msgKey } : {}) }));
             }
             if (part === 'stop') { need('stop'); return send(res, 200, withRef(await store.stop({ owner, id: localId, reason: clip(b.reason, 500) || null }))); }
             if (part === 'approvals') {
