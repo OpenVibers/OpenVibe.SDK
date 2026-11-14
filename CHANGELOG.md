@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.170.0 — 2026-11-14
+
+**`openvibe-sdk/ai`: the decisions door — a closed-set question, answered by the model you name (plan §AB.11).**
+
+- **`ai.decide({ input, questions, model?, kind?, prefer? })`** asks closed-set questions about one input (yes or no,
+  one of a list, a rubric level) and answers each with its probabilities and a confidence. The receipt lists every
+  step and what it cost.
+- **`model`** is the id of the model that answers (`ai.decideModels()` lists them, with their price, their measured
+  speed and whether their answers are calibrated). **`kind`** (`routing`, `moderation`, `grading`, `tool_choice`,
+  `other`) picks the owner's own model, ladder and confidence for that kind of question. **`prefer`** is
+  `calibrated` or `cheap`, as before.
+- **`ai.decideModels()`** is the public list of the models that can answer a decision.
+- **The types follow:** `DecisionRequest`, `DecisionResult`, `DecisionAnswer`, `DecisionReceipt`,
+  `DecisionReceiptStep`, `DecisionModel`, `DecisionModelList`, `DecisionKind`.
+
 ## 0.169.0 — 2026-11-14
 
 **`openvibe-sdk/design`: the glyph as a file, with the ground and the corner of that ground (plan AB.29).**

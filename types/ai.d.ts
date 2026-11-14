@@ -9,6 +9,23 @@ export interface AiOutputFile { name: string; media_type: 'text/plain' | 'text/m
 export interface AiTurnRequest { messages: AiTurnMessage[]; files?: Array<AiFile | Pick<AiFile, 'id'>>; output_file?: AiOutputFile; model?: string; max_tokens?: number; }
 export interface AiTurnResult { content?: string; choices?: Array<{ index: number; message: { role: 'assistant'; content: string | null; artifacts?: AiFile[] }; finish_reason?: string | null }>; artifacts?: AiFile[]; model?: string | null; }
 export interface AiTurnResponse { run: AiRun & { output?: AiTurnResult }; replayed?: boolean; }
+export type DecisionQuestionType = 'noul' | 'choice' | 'score';
+/** What a question is for: it picks the owner's model, ladder and confidence for that kind. */
+export type DecisionKind = 'routing' | 'moderation' | 'grading' | 'tool_choice' | 'other';
+export interface DecisionQuestion { type: DecisionQuestionType; instructions: string; criteria?: Record<string, string> | string[]; }
+export interface DecisionInputPart { type: 'text' | 'image' | 'audio' | 'video' | 'document'; text?: string; uri?: string; mime_type?: string; }
+export interface DecisionRequest { input: string | DecisionInputPart[]; questions: Record<string, DecisionQuestion>; /** The model that answers: an id from decideModels(), or "auto". */ model?: string; kind?: DecisionKind; prefer?: 'calibrated' | 'cheap'; }
+export interface DecisionNoulAnswer { type: 'noul'; noul: number; confidence: number; }
+export interface DecisionChoiceAnswer { type: 'choice'; choice: string; probabilities: Record<string, number>; confidence: number; }
+export interface DecisionScoreAnswer { type: 'score'; score: number; probabilities: Record<string, number>; legend: Record<string, string>; confidence: number; }
+export type DecisionAnswer = DecisionNoulAnswer | DecisionChoiceAnswer | DecisionScoreAnswer;
+/** One step of the answer: the model, what it cost and the questions it answered. */
+export interface DecisionReceiptStep { step: number; provider: string; model: string; cost_usd: number; input_tokens: number; calibrated: boolean; questions: string[]; escalated?: boolean; }
+export interface DecisionReceipt { provider: string; model: string; input_tokens?: number; cost_usd: number; run_id?: string; steps: DecisionReceiptStep[]; escalated?: boolean; threshold?: number; }
+export interface DecisionResult { answers: Record<string, DecisionAnswer>; calibrated: boolean; receipt: DecisionReceipt; }
+/** A model that can answer a decision. */
+export interface DecisionModel { id: string; provider: string; name?: string; price_in_per_mtok: number | null; price_out_per_mtok: number | null; speed_p50_ms: number | null; calibrated: boolean; max_questions: number; inputs: string[]; available: boolean; }
+export interface DecisionModelList { models: DecisionModel[]; count: number; generated_at: string; }
 export interface AiFiles { attach(data: Blob | ArrayBuffer | ArrayBufferView | string, opts?: { filename?: string; mediaType?: string; subject?: string; signal?: AbortSignal; [option: string]: unknown }): Promise<AiFile>; list(opts?: Record<string, unknown>): Promise<{ files: AiFile[]; [field: string]: unknown }>; read(id: string, opts?: { ttl?: number; signal?: AbortSignal }): Promise<{ file: unknown; bytes: Uint8Array }>; remove(id: string): Promise<boolean>; }
 /** How long the caller may wait: interactive (as soon as the provider can), background (minutes, priced on the cheapest tier that can wait), batch (hours, answered through the provider's own batch API). */
 export type LatencyClass = 'interactive' | 'background' | 'batch';
@@ -74,7 +91,7 @@ export interface AiBatches {
     cancel(id: string, opts?: { signal?: AbortSignal }): Promise<{ batch: AiBatch }>;
 }
 type Op = (input?: Record<string, unknown>, opts?: Omit<RunOptions, 'version' | 'onBehalfOf'>) => Promise<RunResponse>;
-export interface AiClient { metrics: AiMetrics; tasks(opts?: {signal?: AbortSignal}): Promise<{tasks: AiTask[]}>; creations(opts?: {signal?: AbortSignal}): Promise<AiCreationList>; run(task: string, input?: Record<string, unknown>, opts?: RunOptions): Promise<RunResponse>; turn(input: AiTurnRequest, opts?: RunOptions): Promise<AiTurnResponse>; choices: { get(task: string, opts?: {signal?: AbortSignal}): Promise<{task: AiTask; choice: AiChoice; why: string; options: Record<string, unknown[]>}>; set(task: string, choice: AiChoice, opts?: {signal?: AbortSignal}): Promise<{choice: AiChoice}> }; admin: { defaults(value?: {defaults: Array<{task: string; value: AiTaskDefaults}>}, opts?: {signal?: AbortSignal}): Promise<{tasks?: AiTask[]; defaults: Record<string, AiTaskDefaults>}> }; runs: AiRuns; batches: AiBatches; files: AiFiles; TERMINAL: Set<string>; CLASSES: string[]; chat: Op; generate: Op; summarize: Op; classify: Op; extract: Op; enrich: Op; embed: Op; }
+export interface AiClient { metrics: AiMetrics; decide(request: DecisionRequest, opts?: { signal?: AbortSignal }): Promise<DecisionResult>; decideModels(opts?: { signal?: AbortSignal }): Promise<DecisionModelList>; tasks(opts?: {signal?: AbortSignal}): Promise<{tasks: AiTask[]}>; creations(opts?: {signal?: AbortSignal}): Promise<AiCreationList>; run(task: string, input?: Record<string, unknown>, opts?: RunOptions): Promise<RunResponse>; turn(input: AiTurnRequest, opts?: RunOptions): Promise<AiTurnResponse>; choices: { get(task: string, opts?: {signal?: AbortSignal}): Promise<{task: AiTask; choice: AiChoice; why: string; options: Record<string, unknown[]>}>; set(task: string, choice: AiChoice, opts?: {signal?: AbortSignal}): Promise<{choice: AiChoice}> }; admin: { defaults(value?: {defaults: Array<{task: string; value: AiTaskDefaults}>}, opts?: {signal?: AbortSignal}): Promise<{tasks?: AiTask[]; defaults: Record<string, AiTaskDefaults>}> }; runs: AiRuns; batches: AiBatches; files: AiFiles; TERMINAL: Set<string>; CLASSES: string[]; chat: Op; generate: Op; summarize: Op; classify: Op; extract: Op; enrich: Op; embed: Op; }
 export function createAiClient(client: OpenVibeClient, defaults?: { baseUrl?: string; media?: Record<string, unknown> & { app: string; subject?: string }; objectsClient?: { upload: Function; list: Function; signedUrl: Function; get: Function; delete: Function }; fetch?: typeof fetch }): AiClient;
 export const TERMINAL: Set<string>;
 export const OPS: string[];

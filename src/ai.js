@@ -21,6 +21,10 @@
  * idempotencyKey so a retried create never runs twice; creates are otherwise not retried. A quota
  * refusal or a full queue is a 429 error carrying Retry-After.
  *
+ * ai.decide is the decisions door (2026-11-14): closed-set questions about one input, answered by the
+ * model the caller names, by the default of the kind, or by OpenVibe's own choice — with the probabilities,
+ * the confidence and the receipt of every step. ai.decideModels lists the models that can answer.
+ *
  * ai.batches is the other door into AI: a batch is many prompts answered later, at half the retail
  * price (POST /api/v1/batches, GET /api/v1/batches, GET /api/v1/batches/:id, POST
  * /api/v1/batches/:id/cancel). The answers are not waited for: the batch says where it stands.
@@ -99,6 +103,22 @@ function createAiClient(client, defaults = {}) {
     const tasks = (o = {}) => call({ path: '/api/v1/tasks' }, o);
     /** What AI can make (GET /api/v1/creations; public, cached, CORS open) → { creations, count, generated_at } */
     const creations = (o = {}) => call({ path: '/api/v1/creations', auth: false }, o);
+    /**
+     * The decisions answer: closed-set questions about one input (yes or no, one of a list, a rubric level),
+     * each with its probabilities and a confidence. The model that answers is the one `model` names (an id from
+     * decideModels()), else the default of the `kind` (routing, moderation, grading, tool_choice, other), else
+     * OpenVibe's own choice. An answer that is not sure enough is asked again of the next model in the kind's
+     * ladder; the receipt lists every step and what it cost.
+     */
+    const decide = (request = {}, o = {}) => {
+        const body = {};
+        for (const key of ['input', 'questions', 'model', 'kind', 'prefer']) {
+            if (request && request[key] !== undefined) body[key] = request[key];
+        }
+        return call({ method: 'POST', path: '/api/v1/decisions', json: body, ...writeOpts(o) }, o);
+    };
+    /** The models that can answer a decision (public): their price, their measured speed and their calibration. */
+    const decideModels = (o = {}) => call({ path: '/api/v1/decisions/models', auth: false }, o);
     const choices = {
         get: (task, o = {}) => call({ path: '/api/v1/choices', query: { task } }, o),
         set: (task, choice, o = {}) => call({ method: 'PUT', path: `/api/v1/me/choices/${enc(task)}`, json: choice, idempotencyKey: false }, o),
@@ -177,7 +197,7 @@ function createAiClient(client, defaults = {}) {
     };
 
     const metrics = require('./ai-metrics').createMetricsClient(call);
-    const api = { tasks, creations, choices, run, turn, admin, runs, batches, files, metrics, TERMINAL, CLASSES };
+    const api = { tasks, creations, choices, run, turn, admin, runs, batches, files, metrics, decide, decideModels, TERMINAL, CLASSES };
     // Direct operations: a run of workflow ai.<op> with the input as the body, waited for by AI.
     for (const op of OPS) {
         api[op] = (input = {}, o = {}) => call({ method: 'POST', path: `/api/v1/${op}`, query: waitQuery(o),
