@@ -8,12 +8,12 @@
 **Install and test:** `npm ci && npm test` (Node 20 or newer)
 
 ```bash
-npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.176.0
+npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.177.0
 ```
 
 > Supported browser and server clients for the OpenVibe platform.
 
-**Status:** alpha, v0.176.0 (the five 1.0 core entries — `core`, `auth`, `events`, `db` and `media` — are frozen: their exported names change only with a major release; roadmap Wave 2; developer apps from Wave 20; Media objects v2 from Wave 4; the Tools platform API; Search, Chat, AI, Vision and consent clients; sign-in with recovery and a client health check). Every release is tagged (see [CHANGELOG.md](CHANGELOG.md)). Tested against local stub servers and the built-in mock platform only, never against the live platform. Services pin release tags; each repository's `STATUS.json` names the one it uses.
+**Status:** alpha, v0.177.0 (the five 1.0 core entries — `core`, `auth`, `events`, `db` and `media` — are frozen: their exported names change only with a major release; roadmap Wave 2; developer apps from Wave 20; Media objects v2 from Wave 4; the Tools platform API; Search, Chat, AI, Vision and consent clients; sign-in with recovery and a client health check). Every release is tagged (see [CHANGELOG.md](CHANGELOG.md)). Tested against local stub servers and the built-in mock platform only, never against the live platform. Services pin release tags; each repository's `STATUS.json` names the one it uses.
 **Plan:** OpenVibe End-to-End Realignment & Implementation Plan, revision 3 (20 Sep 2026), §3.2; roadmap §30.  
 **License:** MIT ([LICENSE](LICENSE)). This package is a library that apps outside the network embed, so it uses MIT. The OpenVibe services themselves stay AGPL-3.0.
 
@@ -22,7 +22,7 @@ npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags
 After v0.97.1 is tagged:
 
 ```bash
-npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.176.0
+npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.177.0
 ```
 
 It has no runtime dependencies. It needs Node ≥ 20, or any browser with `fetch`, Web Crypto and `TextDecoder`. There is no build step. The package is CommonJS with ESM entry points (`import` works). Each subpath has its own `.d.ts`. For a page with no bundler, `browser/openvibe-sdk.mjs` is one self-contained ES module of the browser-safe subpaths (see [Browser without a bundler](#browser-without-a-bundler)). It does not depend on `openvibe-contracts` at runtime: it copies the contract types it uses (from the temporary Contracts sharing branch, a devDependency the tests check them against).
@@ -279,6 +279,7 @@ Until OpenVibe.Tools serves the gateway facade (Tools S6), point the jobs client
 | `openvibe-sdk/site` | server | what every site's server copied, as one module: `createKeyStore` (the Network's signing key), `asyncRouter`, `linkHeader`, `openapiRoute`, ISO times, `createTwins` (Markdown twins). docs/site.md |
 | `openvibe-sdk/html` | server | what every site's pages copied: `esc`, the `html` template, `table` (a named, focusable scroll region), `problemBox`, `notice`, `badge`, `csrfField`, `time`, and `markdown` (escaped first; people's and models' links never vouched for; `trusted` for a service's own text). docs/html.md |
 | `openvibe-sdk/svg` | server | an SVG cleaned before it is shown or saved: `sanitize` rebuilds a drawing from an allowlist and refuses scripts, links and external references; `path` reads path data (absolute, arcs as cubics, true bounds). Was Design's vectors/svg.js. [docs/svg.md](docs/svg.md) |
+| `openvibe-sdk/mcp` | server | the Model Context Protocol in both eras: 2026-07-28 (stateless: the version and method on every request, `server/discover`, `resultType`, list caching) beside the initialize handshake; for MCP servers (`checkRequest`, `discoverResult`, `listResult`) and clients (`modernRequest`). [docs/mcp.md](docs/mcp.md) |
 | `openvibe-sdk/testing` | Node | `createMockPlatform()`: fake Network (incl. developer apps and projects), Events, Media, Tools jobs and the Tools platform API on an in-process `fetch` |
 | `openvibe-sdk/browser/openvibe-sdk.mjs` | browser | one self-contained ES module: core + auth (browser), registry, modules, realtime, media, community, bot, jobs, tools, projects |
 

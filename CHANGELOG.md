@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.177.0 — 2026-11-16
+
+- **`openvibe-sdk/mcp`: MCP 2026-07-28 beside the handshake era, for every service's MCP server and client.** The
+  current revision is stateless:
+  - there is no initialize and there are no sessions;
+  - the version goes in each request's `_meta` and in the `MCP-Protocol-Version` header, and the method in
+    `Mcp-Method` (plus `Mcp-Name` where the method names a target);
+  - servers answer `server/discover`, and results carry `resultType` (lists also `ttlMs` and `cacheScope`).
+
+  OpenVibe's MCP servers (Network, Actor, Compare, Search, Services, Tools) spoke only the handshake era, so a
+  2026-07-28 client got a 400 from them.
+
+  The module has `requestVersion`, `checkRequest` (400 HeaderMismatch -32020 or UnsupportedProtocolVersion -32022),
+  `discoverResult`, `listResult`, `complete`, `methodNotFound`, `legacyVersion`, and for clients `modernRequest` and
+  `isComplete`. Docs: `docs/mcp.md`. Test: `test/mcp.test.js`.
+
 ## 0.176.0 — 2026-11-16
 
 - **`openvibe-sdk/svg`: one SVG sanitizer for every service.** `sanitize(markup)` rebuilds a drawing from an
