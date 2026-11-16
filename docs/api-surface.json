@@ -1187,6 +1187,24 @@
   "openvibe-sdk/host": {
     "createHostClient": "function"
   },
+  "openvibe-sdk/html": {
+    "MAX_COLUMNS": "number",
+    "MAX_ROWS": "number",
+    "Raw": "class",
+    "badge": "function",
+    "code": "function",
+    "csrfField": "function",
+    "esc": "function",
+    "html": "function",
+    "inline": "function",
+    "markdown": "function",
+    "notice": "function",
+    "problemBox": "function",
+    "raw": "function",
+    "render": "function",
+    "table": "function",
+    "time": "function"
+  },
   "openvibe-sdk/identity": {
     "createAccountEmailsClient": "function",
     "createIdentityClient": "function",

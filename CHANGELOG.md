@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.175.0 — 2026-11-16
+
+- **html: the page helpers and the Markdown renderer every site copied, as one module** (consolidation part 2; the
+  owner, 11-16: "finish looking into all the duplicated or identical shit … to combine").
+  - New entry `openvibe-sdk/html` (Node): `esc`, `html`, `raw`, `Raw`, `render`, `code`, `time`, `table`,
+    `problemBox`, `notice`, `csrfField`, `badge` and `markdown`. These were `server/render/html.js` in 25 sites (nine
+    variants) and `server/render/markdown.js` in 10 (six variants).
+  - Every copy's fix is in it:
+    - Codes' table is a focusable, named scroll region, now for every site;
+    - Food's links from people and models carry `rel="nofollow ugc noopener"` and open a new tab, with bare links
+      and italics;
+    - Codes' pipe tables take escaped `\|` cells, are read without a backtracking pattern and are capped at 64 × 1,000;
+    - Actor's model output that ends on a bare list marker leaves no empty bullet;
+    - Zone's code blocks are reachable by keyboard.
+  - `markdown(text, { trusted: true })` keeps plain links for a service's own text (Codes' and Services' ADR pages).
+  - The sites move in the pin round: a copy becomes `module.exports = require('openvibe-sdk/html')`, and Rent keeps its
+    own `time`, MediaHub its `shareButton` and `askAgent`. Git's and Community's files are different modules and stay.
+  - Docs: `docs/html.md`. Test: `html.test.js`.
+
 ## 0.174.0 — 2026-11-16
 
 - **site: the pieces every site copied, as one module** (the owner, 11-16: "analyze and read all code bases to find
