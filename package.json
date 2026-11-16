@@ -635,6 +635,12 @@
       "import": "./esm/svg.mjs",
       "default": "./src/svg/index.js"
     },
+    "./mcp": {
+      "types": "./types/mcp.d.ts",
+      "browser": null,
+      "import": "./esm/mcp.mjs",
+      "default": "./src/mcp/index.js"
+    },
     "./testing": {
       "types": "./types/testing.d.ts",
       "browser": null,

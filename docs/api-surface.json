@@ -1320,6 +1320,41 @@
     "MachinesError": "class",
     "createMachines": "function"
   },
+  "openvibe-sdk/mcp": {
+    "DEFAULT_LEGACY": "string",
+    "ERRORS": {
+      "object": [
+        "headerMismatch",
+        "internal",
+        "invalidParams",
+        "invalidRequest",
+        "methodNotFound",
+        "missingRequiredClientCapability",
+        "parse",
+        "unsupportedProtocolVersion"
+      ]
+    },
+    "LEGACY_VERSIONS": "array",
+    "META": {
+      "object": [
+        "clientCapabilities",
+        "clientInfo",
+        "logLevel",
+        "protocolVersion",
+        "serverInfo"
+      ]
+    },
+    "MODERN_VERSIONS": "array",
+    "checkRequest": "function",
+    "complete": "function",
+    "discoverResult": "function",
+    "isComplete": "function",
+    "legacyVersion": "function",
+    "listResult": "function",
+    "methodNotFound": "function",
+    "modernRequest": "function",
+    "requestVersion": "function"
+  },
   "openvibe-sdk/media": {
     "DEFAULT_PUBLIC_ORIGIN": "string",
     "createMediaClient": "function",
