@@ -1516,6 +1516,30 @@
   "openvibe-sdk/shoes": {
     "createShoesClient": "function"
   },
+  "openvibe-sdk/site": {
+    "ASYNC_METHODS": "array",
+    "DOES_NOT_VERIFY": "string",
+    "KEY_UNAVAILABLE": "string",
+    "OPENAPI_METHODS": "array",
+    "SQL_TEXT_TIME": "object",
+    "TIME_KEY": "object",
+    "asyncRouter": "function",
+    "createKeyStore": "function",
+    "createTwins": "function",
+    "isoJsonTimes": "function",
+    "isoTime": "function",
+    "jwksUrl": "function",
+    "linkHeader": "function",
+    "linksOf": "function",
+    "mountPathOf": "function",
+    "normalizeTimes": "function",
+    "openapiRoute": "function",
+    "publicReason": "function",
+    "routesOf": "function",
+    "storedTime": "function",
+    "summariesFrom": "function",
+    "wrapHandler": "function"
+  },
   "openvibe-sdk/space": {
     "createSpaceClient": "function"
   },

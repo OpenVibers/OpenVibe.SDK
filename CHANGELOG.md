@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.174.0 — 2026-11-16
+
+- **site: the pieces every site copied, as one module** (the owner, 11-16: "analyze and read all code bases to find
+  duplicate shit and consolidate … the same shared universal systems in a more modular sdk api cohesive way").
+  - The consolidation review read all 69 repositories and found the same server files in up to 31 of them: new sites
+    were made by cloning an existing site.
+  - New entry `openvibe-sdk/site` (Node). Each part is built from the copy most sites shared, and a site passes its own
+    name, patterns and packages:
+    - `createKeyStore`, `jwksUrl`, `publicReason` (was `server/auth/keys.js` in 31 sites; `jwksUrl` reads both config
+      shapes);
+    - `asyncRouter` (`server/http/router.js`, 27 sites);
+    - `linkHeader` (`server/link-header.js`, 8);
+    - `openapiRoute` (`server/http/openapi-routes.js`, 8);
+    - the ISO times (`server/iso-times.js`, 5: Chat's copy, with `storedTime`);
+    - `createTwins` (`server/agent-twins.js`, 9).
+  - `docs/site.md` has the adoption recipe. Test: `test/site.test.js` runs the sites' own checks against it.
+
 ## 0.173.0 — 2026-11-14
 
 - **agents: swap the model or the harness mid-conversation, and resume an ended run** (the owner, 11-14: "resume

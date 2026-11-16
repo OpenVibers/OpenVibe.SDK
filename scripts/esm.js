@@ -131,6 +131,7 @@ const ENTRIES = {
     'home-feed.mjs': '../src/home-feed.js',
     'feed.mjs': '../src/feed.js',
     'service.mjs': '../src/service/index.js',
+    'site.mjs': '../src/site/index.js',
     'testing.mjs': '../src/testing/index.js',
 };
 
