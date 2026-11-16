@@ -133,6 +133,7 @@ const ENTRIES = {
     'service.mjs': '../src/service/index.js',
     'site.mjs': '../src/site/index.js',
     'html.mjs': '../src/html/index.js',
+    'svg.mjs': '../src/svg/index.js',
     'testing.mjs': '../src/testing/index.js',
 };
 
