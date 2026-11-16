@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.176.0 — 2026-11-16
+
+- **`openvibe-sdk/svg`: one SVG sanitizer for every service.** `sanitize(markup)` rebuilds a drawing from an
+  allowlist and refuses scripts, links, external references and entities outright. `path` reads SVG path data
+  (absolute commands, arcs as cubics, true bounds). It was OpenVibe.Design's `server/vectors/svg.js` and
+  `server/typefaces/path.js`; Design's typefaces keep their own opentype.js step. Media, Pics and Inventory take SVGs
+  too (item art, uploads) and can now clean them the same way. Docs: `docs/svg.md`. Test: `test/svg.test.js`.
+
 ## 0.175.0 — 2026-11-16
 
 - **html: the page helpers and the Markdown renderer every site copied, as one module** (consolidation part 2; the

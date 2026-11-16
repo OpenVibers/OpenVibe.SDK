@@ -1587,6 +1587,49 @@
   "openvibe-sdk/streams": {
     "createStreamsClient": "function"
   },
+  "openvibe-sdk/svg": {
+    "ATTRIBUTES": {
+      "object": [
+        "circle",
+        "clipPath",
+        "defs",
+        "desc",
+        "ellipse",
+        "g",
+        "line",
+        "linearGradient",
+        "mask",
+        "path",
+        "polygon",
+        "polyline",
+        "radialGradient",
+        "rect",
+        "stop",
+        "svg",
+        "title"
+      ]
+    },
+    "ELEMENTS": "object",
+    "MAX_BYTES": "number",
+    "NEVER": "object",
+    "path": {
+      "object": [
+        "bbox",
+        "closed",
+        "numText",
+        "parse",
+        "round",
+        "scan",
+        "subpaths",
+        "toData"
+      ]
+    },
+    "safePathData": "function",
+    "safePoints": "function",
+    "safeStyle": "function",
+    "safeValue": "function",
+    "sanitize": "function"
+  },
   "openvibe-sdk/telemetry": {
     "createPgTelemetrySink": "function",
     "createTelemetry": "function",
