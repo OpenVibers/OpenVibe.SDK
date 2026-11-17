@@ -1320,6 +1320,11 @@
     "MachinesError": "class",
     "createMachines": "function"
   },
+  "openvibe-sdk/markdown": {
+    "escapeHtml": "function",
+    "markdownToText": "function",
+    "renderMarkdown": "function"
+  },
   "openvibe-sdk/mcp": {
     "DEFAULT_LEGACY": "string",
     "ERRORS": {

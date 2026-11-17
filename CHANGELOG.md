@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.178.0 — 2026-11-17
+
+- **`openvibe-sdk/markdown`: the richer Markdown renderer, for posts, pastes and documents.** The 0.175 consolidation
+  left two copies to merge by hand: OpenVibe.Community's server/render/markdown.js (forum posts and Markdown pastes:
+  pipe tables with alignment, lists nested in quotes, a heading shift and document numbering, openvibe.pics embeds)
+  and OpenVibe.Git's, an older subset of it. Community's is now this module, with Community's own tests. The code
+  highlighter is passed in (`renderMarkdown(source, { highlight })`, `highlight(code, language) → { html, language }`)
+  instead of required, so the SDK takes no highlight.js; without one, a fence is escaped as it is.
+  `openvibe-sdk/html`'s `markdown` stays the small renderer the other sites use.
+
 ## 0.177.0 — 2026-11-16
 
 - **`openvibe-sdk/mcp`: MCP 2026-07-28 beside the handshake era, for every service's MCP server and client.** The
