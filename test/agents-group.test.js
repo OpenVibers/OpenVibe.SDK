@@ -62,7 +62,7 @@ let nx = g.next({ message: r1[1], members: room, history: r1 });
 assert.deepEqual([nx.speakers, nx.parallel, nx.review], [['design', 'codex'], true, 1], 'the reviewers look, in parallel');
 assert.equal(g.limits({ history: r1, members: room }).ok, true, 'a DONE a review follows does not close the round');
 assert.equal(g.limits({ history: r1 }).ok, false, 'without the members (an older caller) DONE still closes it');
-assert.deepEqual(g.reviewState({ history: r1, members: room }), { builder: 'codes', cycles: 1, panel: ['design', 'codex'], answered: [], waiting: ['design', 'codex'], asks: [] });
+assert.deepEqual(g.reviewState({ history: r1, members: room }), { builder: 'codes', cycles: 1, panel: ['design', 'codex'], answered: [], waiting: ['design', 'codex'], asks: [], gateFails: 0, gated: false, check: null });
 
 // One verdict in: wait for the other. Then one asks for changes: the builder fixes.
 const r2 = [...r1, say('design', 'The gauges are full width.\nCHANGES\n1. Draw each gauge to its share.', 0.05)];
@@ -130,5 +130,42 @@ const solo = [say('usr_alex', '@design make an icon'), say('design', 'Here it is
 assert.deepEqual(g.next({ message: solo[1], members: room, history: solo }), { speakers: [], why: 'DONE' }, 'a reviewer\'s own DONE closes');
 assert.deepEqual(g.next({ message: r1[1], members, history: r1 }), { speakers: [], why: 'DONE' }, 'no reviewers: DONE closes');
 assert.deepEqual(g.next({ message: r1[1], members: room, history: r1, policy: { review: false } }), { speakers: [], why: 'DONE' }, 'review off');
+
+// The check before the reviewers (0.185.0; Stageshow's gate): free, measured, and it can send work back once.
+{
+    const gate = (text) => ({ from: 'gate', fromKind: 'gate', text });
+    const pol = { gate: true };
+    const d1 = [say('usr_alex', '@codes build the usage sheet'), say('codes', 'Built it: https://openvibe.live/x. DONE', 0.2)];
+    let x = g.next({ message: d1[1], members: room, history: d1, policy: pol });
+    assert.deepEqual([x.speakers, x.gate, x.mayBlock, x.review], [[], true, true, 1], 'the DONE asks for the check first');
+    assert.equal(g.limits({ history: d1, members: room, policy: pol }).ok, true, 'the round stays open for the check');
+    // The check finds faults: back to the builder, no reviewer paid, and that DONE is no review.
+    const g1 = gate('Checked https://openvibe.live/x: 2 faults.\nCHANGES\n1. Native select visible (no-native-controls).\n2. A button without a name.');
+    const d2 = [...d1, g1];
+    x = g.next({ message: g1, members: room, history: d2, policy: pol });
+    assert.deepEqual([x.speakers, x.fix, x.gate], [['codes'], true, true], 'the builder fixes what the check found');
+    const s2 = g.reviewState({ history: d2, members: room });
+    assert.deepEqual([s2.cycles, s2.gateFails, s2.builder], [0, 1, 'codes'], 'a bounced DONE is no review');
+    assert.equal(g.limits({ history: d2, members: room, policy: pol }).turns, 1, 'the check is no agent turn');
+    assert.equal(g.limits({ history: d2, members: room, policy: pol }).ok, true, 'a bounce keeps the round open');
+    assert.deepEqual(g.reviewState({ history: [...d2, g1], members: room }).gateFails, 1, 'one check counts once a DONE');
+    assert.ok(!/What was made:/.test(g.transcript({ history: d2, member: 'design', members: room })), 'no review yet: a reviewer asked meanwhile is no fresh eye');
+    assert.match(g.transcript({ history: d2, member: 'codes', members: room }), /\[The check\]: Checked https:\/\/openvibe\.live\/x: 2 faults\.[\s\S]*The check found faults above before any reviewer looked/);
+    // The second DONE: the check runs again but may not block; it passes the facts to the reviewers.
+    const d3 = [...d2, say('codes', 'Fixed both. DONE', 0.1)];
+    x = g.next({ message: d3[3], members: room, history: d3, policy: pol });
+    assert.deepEqual([x.gate, x.mayBlock, x.review], [true, false, 1], 'one bounce a round: this check informs');
+    const g2 = gate('Checked https://openvibe.live/x: nothing wrong in the markup.');
+    const d4 = [...d3, g2];
+    x = g.next({ message: g2, members: room, history: d4, policy: pol });
+    assert.deepEqual([x.speakers, x.parallel, x.review], [['design', 'codex'], true, 1], 'passed: the reviewers look, review 1');
+    const fresh = g.transcript({ history: d4, member: 'design', members: room });
+    assert.match(fresh, /What was made:\n\[Codes\]: Fixed both\. DONE\n\nWhat the check before you found \(free, measured, no model\):\nChecked https:\/\/openvibe\.live\/x: nothing wrong in the markup\./, 'the reviewers see what the check found');
+    assert.ok(!/2 faults/.test(fresh), 'not the earlier bounce');
+    // Gate off (the default): straight to the reviewers, as before.
+    assert.deepEqual(g.next({ message: d1[1], members: room, history: d1 }).speakers, ['design', 'codex']);
+    // A check with no review to answer does nothing.
+    assert.deepEqual(g.next({ message: g2, members: room, history: [say('usr_alex', 'hi'), g2], policy: pol }), { speakers: [], why: 'nothing to check' });
+}
 
 console.log('agents-group: mentions, who answers, handoffs, limits, the transcript, and review cycles');

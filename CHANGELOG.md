@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.185.0 — 2026-11-17
+
+- **`openvibe-sdk/agents/group`: the check before the reviewers.** This is Stageshow's gate (the owner sent it on
+  11-17): free, measured checks run before any reviewer model is paid.
+  - **The check first.** With `policy.gate`, a builder's DONE answers `{ gate: true, mayBlock }`. The host runs its
+    checks (Network: Design's page audit of the hand-over's links) and posts a message
+    `{ from: 'gate', fromKind: 'gate', text }`.
+  - **Faults go back first.** A CHANGES line with a numbered list sends the builder back with the faults, and that DONE
+    counts as no review. That happens at most `maxGateFails` (1) times a round.
+  - **Otherwise the reviewers look.** What the check found is in their fresh-eye transcript.
+  - A check's message is no agent turn. `reviewState` adds `gateFails`, `gated` and `check`.
+
 ## 0.184.0 — 2026-11-17
 
 - **`openvibe-sdk/agents/group`: a builder hands over with a note.** This comes from the Stageshow lessons the owner sent

@@ -706,7 +706,9 @@
     "POLICY": {
       "object": [
         "budgetUsd",
+        "gate",
         "maxAgentTurns",
+        "maxGateFails",
         "maxReviewCycles",
         "review",
         "reviewBudgetUsd",
