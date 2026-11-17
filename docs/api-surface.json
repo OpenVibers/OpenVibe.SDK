@@ -701,6 +701,22 @@
     "placeFor": "function",
     "slice": "function"
   },
+  "openvibe-sdk/agents/group": {
+    "CODE_WORDS": "object",
+    "POLICY": {
+      "object": [
+        "budgetUsd",
+        "maxAgentTurns",
+        "transcriptLast"
+      ]
+    },
+    "isDone": "function",
+    "limits": "function",
+    "mentions": "function",
+    "next": "function",
+    "round": "function",
+    "transcript": "function"
+  },
   "openvibe-sdk/agents/loop": {
     "DEFAULTS": {
       "object": [

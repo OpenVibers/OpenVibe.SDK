@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.180.0 — 2026-11-17
+
+- **`openvibe-sdk/agents/group`: a conversation of people and agents in one thread** (plan §AD.19; the owner: "use
+  .actor and .codes in a group conversation mode … modular sdk and API"). The research of the day: one agent with more
+  tools matches a team on most tasks for a fraction of the tokens, and explicit addressing beats an LLM choosing who
+  speaks next (a model call per turn, a different path for the same words). So the rules are ones a person can
+  predict: a person's message goes to the agents it @mentions (@all for every agent), else to the coding agent when the
+  words are plainly about code, else to the group's lead; an agent hands off by @mentioning another (never itself); a
+  round stops at three agent turns, at its budget ($0.50) or when an agent ends with DONE. `transcript()` gives each
+  agent what it has not seen, the shared space's files, and how to hand off and finish.
+
 ## 0.179.1 — 2026-11-17
 
 - **`openvibe-sdk/agents/roads`: an allowance with no cap is the free AI.** OpenVibe.AI answers `left: null` for a rank
