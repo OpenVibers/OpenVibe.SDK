@@ -78,6 +78,14 @@ const tf = g.transcript({ history: r3, member: 'codes', members: room });
 assert.match(tf, /They asked for changes above: fix each numbered point you agree with/);
 const tr = g.transcript({ history: r1, member: 'design', members: room });
 assert.match(tr, /You are reviewing @codes's work \(review 1 of 2 at most\)/);
+assert.match(tr, /The request:\n\[Alex\]: @codes build the usage sheet\n\nWhat was made:\n\[Codes\]: Built it: https:\/\/openvibe\.live\/x\. DONE/, 'a fresh eye: the request and the result');
+assert.match(tr, /Judge the result, not the reasons/);
+// The second review: the reviewer sees its own last verdict and the new result, never the other reviewer's critique.
+const tr2 = g.transcript({ history: [...r3, say('codes', 'Fixed the gauges. DONE')], member: 'codex', members: room });
+assert.match(tr2, /What was made:\n\[Codes\]: Fixed the gauges\. DONE/);
+assert.match(tr2, /Your last review of it:\nCode reads fine\.\nAPPROVED/);
+assert.ok(!/gauges are full width/.test(tr2), 'never another reviewer\'s critique');
+assert.ok(!/Built it:/.test(tr2), 'only the latest result');
 assert.match(tr, /End with APPROVED as your last word when it is ready, or start a line with CHANGES/);
 assert.match(g.transcript({ history: [say('usr_alex', 'build it')], member: 'codes', members: room }), /When you end with DONE, the reviewers \(@design, @codex\) look at your work and may ask for changes\./);
 
