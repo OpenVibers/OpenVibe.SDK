@@ -88,6 +88,8 @@ assert.ok(!/gauges are full width/.test(tr2), 'never another reviewer\'s critiqu
 assert.ok(!/Built it:/.test(tr2), 'only the latest result');
 assert.match(tr, /End with APPROVED as your last word when it is ready, or start a line with CHANGES/);
 assert.match(g.transcript({ history: [say('usr_alex', 'build it')], member: 'codes', members: room }), /When you end with DONE, the reviewers \(@design, @codex\) look at your work and may ask for changes\./);
+assert.match(g.transcript({ history: [say('usr_alex', 'build it')], member: 'codes', members: room }), /Before DONE, hand over in a few lines: where to see it \(a link, a file or a preview\), what you started from, what you changed, what you checked and what you did not check\./, 'a builder hands over with a note');
+assert.ok(!/Before DONE, hand over/.test(g.transcript({ history: [say('usr_alex', 'plan')], member: 'codes', members })), 'no reviewers: no note asked');
 
 // The fix, DONE again: the second review. Both approve: the round closes.
 const r4 = [...r3, say('codes', 'Fixed the gauges. DONE', 0.1)];
