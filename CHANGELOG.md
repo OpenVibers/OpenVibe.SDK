@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.183.0 — 2026-11-17
+
+- **`openvibe-sdk/code-mode`: an agent writes a script instead of calling tools one at a time** (plan §AD.26; the
+  owner, 11-17, sending Cloudflare's Code Mode and Claude Code's: "Analyze and use to improve openvibe").
+  - One sandbox for every OpenVibe service: Actor's loop (`tools_search` / `tools_code`, Actor #590), Tools' MCP
+    (`run_code` over the catalogue), and Codes next.
+  - `runCode(code, { tools, functions, call })`: the script sees `tools.<name>(input)` for each tool named, and each
+    plain function named (`run(id, input)`, `find(need)`). The caller decides every call. Only the returned value
+    (8 KB at most) and the console lines come back.
+  - **The sandbox:** a child process under Node's permission model (it reads only its own file), code generation from
+    strings off in every realm (a function from outside cannot become a way out), no environment, 64 MB, 30 s and 30
+    calls. Values cross as JSON text.
+  - `signatureOf()` and `searchTools()` answer a tool as the typed signature a script calls; both the OpenAI and the MCP
+    definition shapes are taken.
+  - Node 22.13 or newer.
+
 ## 0.182.0 — 2026-11-17
 
 - **`openvibe-sdk/agents/group`: reviewers judge with a fresh eye.** The owner sent Stageshow (11-17), a design
