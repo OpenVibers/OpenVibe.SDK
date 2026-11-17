@@ -707,6 +707,9 @@
       "object": [
         "budgetUsd",
         "maxAgentTurns",
+        "maxReviewCycles",
+        "review",
+        "reviewBudgetUsd",
         "transcriptLast"
       ]
     },
@@ -714,8 +717,10 @@
     "limits": "function",
     "mentions": "function",
     "next": "function",
+    "reviewState": "function",
     "round": "function",
-    "transcript": "function"
+    "transcript": "function",
+    "verdict": "function"
   },
   "openvibe-sdk/agents/loop": {
     "DEFAULTS": {
