@@ -723,6 +723,16 @@
     "passAtK": "function",
     "passHatK": "function"
   },
+  "openvibe-sdk/agents/roads": {
+    "MODES": "array",
+    "ROADS": "array",
+    "TURN_TOKENS": "number",
+    "fits": "function",
+    "needFor": "function",
+    "pick": "function",
+    "say": "function",
+    "walk": "function"
+  },
   "openvibe-sdk/agents/router": {
     "calibrate": "function",
     "chain": "function",
