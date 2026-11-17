@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.181.0 — 2026-11-17
+
+- **`openvibe-sdk/agents/group`: review cycles** (plan §AD.25; the owner: "have claude code work on the code and
+  interface and then have muse and codex or API analyze and review the gui and critique it … a Design bot as a default
+  next to Actor and Codes").
+  - **A member may be a reviewer** (`reviewer: true`): Design, or Codex, Muse or one model as a critic.
+  - **A builder's DONE no longer closes the round.** Every reviewer but the builder looks at the work at once
+    (`next()` answers `parallel: true`, `review: n`). Each ends with APPROVED, or a CHANGES line and a numbered list.
+  - **The last verdict in decides.** It sends the builder back (`fix: true`), with the asks in its transcript, or it
+    closes the round when all approved (`approved: true`).
+  - **Two reviews at most** (`maxReviewCycles`). A review has its own turns (3 + 2 × (reviewers + 1)) and the round's
+    budget rises to `reviewBudgetUsd` ($1.50). `policy.review: false` turns review off.
+  - **`limits()` takes the members**, so a DONE that a review follows, or a review missing a verdict, keeps the round
+    open. A caller without members keeps the old rules.
+  - **New:** `verdict(text)` and `reviewState({ history, members })`. `transcript()` tells a reviewer how to answer
+    and tells a builder that the reviewers look, and what they asked.
+
 ## 0.180.0 — 2026-11-17
 
 - **`openvibe-sdk/agents/group`: a conversation of people and agents in one thread** (plan §AD.19; the owner: "use
