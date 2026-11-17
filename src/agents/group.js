@@ -23,10 +23,16 @@
  *     before DONE (0.184.0: where to see it, what it started from, changed, checked and did not). A reviewer judges with a fresh eye
  *     (0.182.0): its transcript is the request, the builder's latest result and its own last verdict, never the other
  *     reviewers' critiques.
+ *   - the check before the reviewers (0.185.0; Stageshow's gate, 11-17): with `policy.gate`, a builder's DONE first
+ *     answers `{ gate: true, mayBlock }` and the host runs its free, deterministic checks (Network: Design's page audit
+ *     of the hand-over's links). It posts what they found as a message `{ from: 'gate', fromKind: 'gate', text }`:
+ *     a CHANGES line and a numbered list sends the builder back without paying a reviewer, and that DONE does not count
+ *     as a review (`maxGateFails`, 1, such bounces a round; `mayBlock` says whether this one may). Anything else brings
+ *     the reviewers, with what the check found in their transcript. A check's message is no agent turn.
  *
  *   mentions(text, members)                 → member ids @mentioned, in order, each once (handle or name; @all)
  *   next({ message, members, history, policy })
- *                                           → { speakers: [ids], why, parallel?, review?, fix?, approved? } for the
+ *                                           → { speakers: [ids], why, parallel?, review?, fix?, approved?, gate?, mayBlock? } for the
  *                                             message just posted (parallel: the speakers may answer at once)
  *   verdict(text)                           → 'approved' | 'changes' | null: a reviewer's last word
  *   reviewState({ history, members })       → { builder, cycles, panel, answered, waiting, asks }: the round's review
@@ -40,7 +46,9 @@
  * message: { from, fromKind: 'person' | 'agent', text, usd? }   history: messages in order, oldest first
  */
 
-const POLICY = Object.freeze({ maxAgentTurns: 3, budgetUsd: 0.5, transcriptLast: 30, maxReviewCycles: 2, reviewBudgetUsd: 1.5, review: true });
+const POLICY = Object.freeze({ maxAgentTurns: 3, budgetUsd: 0.5, transcriptLast: 30, maxReviewCycles: 2, reviewBudgetUsd: 1.5, review: true, gate: false, maxGateFails: 1 });
+const GATE = 'gate';
+const isGate = (m) => !!(m && m.fromKind === GATE);
 const CODE_WORDS = /\b(code|coding|repo|repository|bug|stack ?trace|function|refactor|compile|deploy|pull request|PR|commit|branch|merge|unit test|tests?|typescript|javascript|python|golang|rust|npm|pnpm|git|lint|build fails?|exception|null pointer|endpoint|migration|schema)\b/i;
 const DONE = /(?:^|\s)DONE[.!]?\s*$/;
 // A reviewer's verdict: APPROVED as its last word, or a line that starts with CHANGES (then what to fix).
@@ -96,17 +104,27 @@ function round(history) {
 function reviewState({ history, members } = {}) {
     const rev = reviewers(members);
     const isRev = (id) => rev.some((a) => a.id === id);
-    let builder = null, cycles = 0, since = [];
+    let builder = null, cycles = 0, since = [], gateFails = 0, gated = false, check = null, checkedDone = false;
     for (const m of round(history)) {
         if (!m || m.fromKind === 'person') continue;
-        if (!isRev(m.from) && isDone(m.text) && rev.some((a) => a.id !== m.from)) { builder = m.from; cycles += 1; since = []; }
+        if (isGate(m)) {
+            // The check answers the DONE just before it, once: a CHANGES sends it back before any reviewer looked, and
+            // that DONE is no review.
+            if (builder && !checkedDone && !since.length) {
+                checkedDone = true;
+                check = m;
+                if (verdict(m.text) === 'changes') { cycles -= 1; gateFails += 1; } else gated = true;
+            }
+            continue;
+        }
+        if (!isRev(m.from) && isDone(m.text) && rev.some((a) => a.id !== m.from)) { builder = m.from; cycles += 1; since = []; gated = false; check = null; checkedDone = false; }
         else if (builder && isRev(m.from) && m.from !== builder) since.push(m);
     }
     const panel = builder ? rev.filter((a) => a.id !== builder).map((a) => a.id) : [];
     const answered = panel.filter((id) => since.some((m) => m.from === id));
     const last = (id) => since.filter((m) => m.from === id).slice(-1)[0];
     return {
-        builder, cycles, panel, answered,
+        builder, cycles, panel, answered, gateFails, gated, check,
         waiting: panel.filter((id) => !answered.includes(id)),
         // Only a CHANGES line sends the builder back: a turn that failed or said neither holds nothing up.
         asks: answered.filter((id) => verdict(last(id).text) === 'changes'),
@@ -115,20 +133,22 @@ function reviewState({ history, members } = {}) {
 
 function limits({ history, members, policy } = {}) {
     const p = policyOf(policy);
-    const r = round(history);
+    const r = round(history).filter((x) => !isGate(x));
     const turns = r.length;
     const usd = r.reduce((n, x) => n + (Number(x && x.usd) || 0), 0);
+    const lastAny = round(history).slice(-1)[0];
     const last = r[r.length - 1];
     const panelSize = reviewers(members).length;
-    const st = p.review !== false && panelSize ? reviewState({ history, members }) : { cycles: 0, builder: null, waiting: [] };
+    const st = p.review !== false && panelSize ? reviewState({ history, members }) : { cycles: 0, builder: null, waiting: [], gateFails: 0 };
     const reviewing = st.cycles > 0 && st.cycles <= p.maxReviewCycles;
     // A builder's DONE that a review follows, or a review still waiting for verdicts, does not close the round.
     const open = reviewing && last && (last.from === st.builder || st.waiting.length > 0 || st.asks.length > 0);
-    if (last && isDone(last.text) && !open) return { ok: false, turns, usd, why: 'the last agent said DONE' };
+    const bounced = isGate(lastAny) && verdict(lastAny.text) === 'changes';
+    if (last && isDone(last.text) && !open && !bounced) return { ok: false, turns, usd, why: 'the last agent said DONE' };
     const most = p.maxAgentTurns + (panelSize ? p.maxReviewCycles * (panelSize + 1) : 0);
-    const cap = st.cycles > 0 ? most : p.maxAgentTurns;
+    const cap = st.cycles > 0 || st.gateFails > 0 ? most : p.maxAgentTurns;
     if (turns >= cap) return { ok: false, turns, usd, why: `${turns} agent turns answered this message (the most is ${cap})` };
-    const budget = st.cycles > 0 ? Math.max(p.budgetUsd, p.reviewBudgetUsd) : p.budgetUsd;
+    const budget = st.cycles > 0 || st.gateFails > 0 ? Math.max(p.budgetUsd, p.reviewBudgetUsd) : p.budgetUsd;
     if (usd >= budget) return { ok: false, turns, usd, why: `this round spent $${usd.toFixed(2)} of $${budget.toFixed(2)}` };
     return { ok: true, turns, usd, why: 'within the limits' };
 }
@@ -138,6 +158,20 @@ function next({ message, members, history, policy } = {}) {
     const at = (ids) => ids.map((id) => `@${handleOf(list.find((m) => m && m.id === id) || { id })}`).join(', ');
     const all = agents(list);
     if (!message || !all.length) return { speakers: [], why: 'no agent in the group' };
+    if (message.fromKind === GATE) {
+        const h0 = Array.isArray(history) ? history : [];
+        const h = h0.some((x) => isGate(x) && x.text === message.text) ? h0 : h0.concat([{ ...message, from: message.from || GATE }]);
+        const p = policyOf(policy);
+        const st = reviewState({ history: h, members: list });
+        if (!st.builder) return { speakers: [], why: 'nothing to check' };
+        if (verdict(message.text) === 'changes') {
+            const room = limits({ history: h, members: list, policy });
+            if (!room.ok) return { speakers: [], why: room.why };
+            return { speakers: [st.builder], why: 'the check found faults', fix: true, gate: true };
+        }
+        if (st.cycles > p.maxReviewCycles || !st.panel.length) return { speakers: [], why: `the reviewers looked ${p.maxReviewCycles} times` };
+        return { speakers: st.panel, why: `review ${st.cycles} of ${p.maxReviewCycles}`, parallel: true, review: st.cycles };
+    }
     const from = list.find((m) => m && m.id === message.from);
     const named = mentions(message.text, list).filter((id) => all.some((a) => a.id === id) && id !== message.from);
     if (!from || from.kind === 'person') {
@@ -158,10 +192,12 @@ function next({ message, members, history, policy } = {}) {
         // A builder said DONE: the reviewers look, all at once.
         if (!fromReviewer && isDone(message.text) && st.builder === message.from && st.panel.length) {
             if (st.cycles > p.maxReviewCycles) return { speakers: [], why: `the reviewers looked ${p.maxReviewCycles} times` };
+            // The check first (0.185.0): the host runs it and posts its message; mayBlock says whether it may send back.
+            if (p.gate) return { speakers: [], why: 'the check first', gate: true, mayBlock: st.gateFails < p.maxGateFails, review: st.cycles };
             return { speakers: st.panel, why: `review ${st.cycles} of ${p.maxReviewCycles}`, parallel: true, review: st.cycles };
         }
         // A reviewer's verdict in a review: the last one in decides.
-        if (fromReviewer && st.builder && st.panel.includes(message.from) && st.cycles <= p.maxReviewCycles) {
+        if (fromReviewer && st.builder && st.cycles > 0 && st.panel.includes(message.from) && st.cycles <= p.maxReviewCycles) {
             if (st.waiting.length) return { speakers: [], why: `waiting for ${at(st.waiting)}`, review: st.cycles };
             if (!st.asks.length) return { speakers: [], why: 'every reviewer approved', approved: true, review: st.cycles };
             if (st.cycles >= p.maxReviewCycles) return { speakers: [], why: `${at(st.asks)} still asked for changes after ${st.cycles} reviews`, review: st.cycles };
@@ -186,7 +222,7 @@ function transcript({ history, member, members, files, last } = {}) {
     for (let i = h.length - 1; i >= 0; i--) if (h[i] && h[i].from === me.id) { since = i; break; }
     const n = Number(last) > 0 ? Number(last) : POLICY.transcriptLast;
     const fresh = h.slice(since + 1).slice(-n);
-    const name = (id) => { const m = list.find((x) => x && x.id === id); return m ? (m.name || m.id) : id; };
+    const name = (id) => { if (id === GATE) return 'The check'; const m = list.find((x) => x && x.id === id); return m ? (m.name || m.id) : id; };
     const others = agents(list).filter((a) => a.id !== me.id).map((a) => `@${handleOf(a)} (${a.name || a.id})`);
     const people = list.filter((m) => m && m.kind === 'person').map((m) => m.name || m.id);
     const head = `You are ${me.name || me.id} in a group conversation with ${people.join(', ') || 'people'}${others.length ? ` and the agents ${others.join(', ')}` : ''}.`;
@@ -194,20 +230,22 @@ function transcript({ history, member, members, files, last } = {}) {
     // plan): a reviewer in a review is given the person's request, the builder's latest result and its own last
     // verdict, never the other reviewers' critiques, so each judges on its own and none anchors on another.
     const rv0 = me.reviewer ? reviewState({ history: h, members: list }) : null;
-    const freshEye = !!(rv0 && rv0.builder && rv0.panel.includes(me.id));
+    const freshEye = !!(rv0 && rv0.builder && rv0.cycles > 0 && rv0.panel.includes(me.id));
     let lines;
     if (freshEye) {
         const r = round(h);
         const all = h.slice(0, h.length - r.length);
         const asked = all[all.length - 1];
-        let built = null, mine = null;
+        let built = null, mine = null, checked = null;
         for (const x of r) {
-            if (x && x.from === rv0.builder && isDone(x.text)) built = x;
+            if (x && x.from === rv0.builder && isDone(x.text)) { built = x; checked = null; }
+            if (x && isGate(x) && built) checked = x;
             if (x && x.from === me.id) mine = x;
         }
         lines = [head,
             ...(asked ? ['The request:', `[${name(asked.from)}]: ${String(asked.text || '').slice(0, 4000)}`] : []),
             ...(built ? ['', 'What was made:', `[${name(built.from)}]: ${String(built.text || '').slice(0, 8000)}`] : []),
+            ...(checked ? ['', 'What the check before you found (free, measured, no model):', String(checked.text || '').slice(0, 4000)] : []),
             ...(mine ? ['', 'Your last review of it:', String(mine.text || '').slice(0, 4000)] : []),
         ];
     } else {
@@ -221,7 +259,7 @@ function transcript({ history, member, members, files, last } = {}) {
     const rev = reviewers(list);
     const st = rev.length ? reviewState({ history: h, members: list }) : null;
     const name1 = (id) => `@${handleOf(list.find((x) => x && x.id === id) || { id })}`;
-    if (me.reviewer && st && st.builder && st.panel.includes(me.id)) {
+    if (me.reviewer && st && st.builder && st.cycles > 0 && st.panel.includes(me.id)) {
         lines.push('', `You are reviewing ${name1(st.builder)}'s work (review ${st.cycles} of ${POLICY.maxReviewCycles} at most). Judge the result, not the reasons: look at what it made, its files and links, and the pages themselves (open, audit or capture them when you can). Say what works, then what does not, the thing that spoils the most first, each with its evidence and the fix in one line, and say what you could not check. Do not fix it yourself.`,
             'End with APPROVED as your last word when it is ready, or start a line with CHANGES followed by a numbered list of what to fix, the most important first.');
     } else if (me.reviewer) {
@@ -234,6 +272,7 @@ function transcript({ history, member, members, files, last } = {}) {
             // A hand-over note (0.184.0; the Stageshow lessons, 11-17): what the reviewers need to judge the work itself.
             lines.push('Before DONE, hand over in a few lines: where to see it (a link, a file or a preview), what you started from, what you changed, what you checked and what you did not check.');
             if (st && st.builder === me.id && st.asks.length) lines.push(`They asked for changes above: fix each numbered point you agree with, say which you leave and why, then end with DONE again.`);
+            else if (st && st.builder === me.id && isGate(h[h.length - 1]) && verdict(h[h.length - 1].text) === 'changes') lines.push('The check found faults above before any reviewer looked: fix them (or say why one is wrong), then end with DONE again.');
         }
     }
     return lines.join('\n');
