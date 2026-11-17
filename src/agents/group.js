@@ -19,7 +19,8 @@
  *     looks at the work at once (`parallel: true`) and ends with APPROVED, or with a CHANGES line and a numbered list.
  *     The last verdict in sends the builder back to fix (it ends with DONE again, and the reviewers look again), or
  *     closes the round when all approved. At most `maxReviewCycles` (2) reviews, each with its own turns, and the
- *     round's budget rises to `reviewBudgetUsd` (1.50) once a review has started. A reviewer judges with a fresh eye
+ *     round's budget rises to `reviewBudgetUsd` (1.50) once a review has started. A builder hands over with a note
+ *     before DONE (0.184.0: where to see it, what it started from, changed, checked and did not). A reviewer judges with a fresh eye
  *     (0.182.0): its transcript is the request, the builder's latest result and its own last verdict, never the other
  *     reviewers' critiques.
  *
@@ -230,6 +231,8 @@ function transcript({ history, member, members, files, last } = {}) {
         const panel = rev.filter((a) => a.id !== me.id);
         if (panel.length) {
             lines.push(`When you end with DONE, the reviewers (${panel.map((a) => `@${handleOf(a)}`).join(', ')}) look at your work${st && st.builder === me.id && st.asks.length ? '' : ' and may ask for changes'}.`);
+            // A hand-over note (0.184.0; the Stageshow lessons, 11-17): what the reviewers need to judge the work itself.
+            lines.push('Before DONE, hand over in a few lines: where to see it (a link, a file or a preview), what you started from, what you changed, what you checked and what you did not check.');
             if (st && st.builder === me.id && st.asks.length) lines.push(`They asked for changes above: fix each numbered point you agree with, say which you leave and why, then end with DONE again.`);
         }
     }

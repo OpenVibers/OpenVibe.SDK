@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.184.0 — 2026-11-17
+
+- **`openvibe-sdk/agents/group`: a builder hands over with a note.** This comes from the Stageshow lessons the owner sent
+  on 11-17, where the builder leaves a hand-over and the reviewer judges the work itself.
+  - In a group with reviewers, a builder's transcript asks for a few lines before DONE: where to see it (a link, a file
+    or a preview), what it started from, what changed, what it checked and what it did not check.
+  - Reviewers, who see the builder's latest result with a fresh eye (0.182.0), then know where to look.
+
 ## 0.183.0 — 2026-11-17
 
 - **`openvibe-sdk/code-mode`: an agent writes a script instead of calling tools one at a time** (plan §AD.26; the
