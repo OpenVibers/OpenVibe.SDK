@@ -62,9 +62,9 @@ const short = (n) => {
 function fits(allowance, need) {
     const n = Math.max(0, Number(need) || 0);
     if (!allowance || typeof allowance !== 'object') return { ok: true, known: false, left: null, why: 'the allowance is not known: the free AI is tried' };
-    if (allowance.unlimited) return { ok: true, known: true, left: null, why: 'no daily cap' };
+    // OpenVibe.AI answers left: null for a rank with no cap (GET /api/v1/allowance/:subject), with or without unlimited.
+    if (allowance.unlimited || allowance.left == null) return { ok: true, known: true, left: null, why: 'no daily cap' };
     const left = Math.max(0, Number(allowance.left) || 0);
-    if (allowance.left == null && allowance.tokens == null) return { ok: true, known: false, left: null, why: 'the allowance is not known: the free AI is tried' };
     if (left >= n && left > 0) return { ok: true, known: true, left, why: `${short(left)} tokens left today` };
     if (left > 0) return { ok: false, known: true, left, why: `${short(left)} tokens left today, a turn like this takes about ${short(n)}` };
     return { ok: false, known: true, left: 0, why: 'the free allowance is used up today' };

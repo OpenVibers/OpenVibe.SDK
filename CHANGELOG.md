@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.179.1 — 2026-11-17
+
+- **`openvibe-sdk/agents/roads`: an allowance with no cap is the free AI.** OpenVibe.AI answers `left: null` for a rank
+  with no daily cap, and does not always say `unlimited` beside it; `fits` read that as nothing left and sent the turn to
+  a key or a computer (or refused it). Now `left: null` is "no daily cap", as Actor's own check treated it.
+
 ## 0.179.0 — 2026-11-17
 
 - **`openvibe-sdk/agents/roads`: the one order a turn is routed by.** Every agent surface asks the same question before

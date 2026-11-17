@@ -28,6 +28,9 @@ test('free when the turn fits, and when the allowance is not known or has no cap
     const unknown = roads.pick({ mode: 'agent', allowance: null });
     assert.deepEqual([unknown.road, unknown.known], ['free', false]);
     assert.equal(roads.pick({ mode: 'agent', allowance: { unlimited: true } }).road, 'free');
+    // AI's answer for a rank with no cap: left null, unlimited not always said (0.179.1).
+    const nocap = roads.pick({ mode: 'agent', allowance: { unlimited: false, tokens: 20000, left: null } });
+    assert.deepEqual([nocap.road, nocap.why], ['free', 'no daily cap']);
 });
 
 test('an agent turn that cannot fit goes to the key allowed for this app, then an online computer', () => {
