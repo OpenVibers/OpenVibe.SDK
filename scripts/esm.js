@@ -85,6 +85,7 @@ const ENTRIES = {
     'agents-rules.mjs': '../src/agents/rules.js',
     'agents-router.mjs': '../src/agents/router.js',
     'agents-roads.mjs': '../src/agents/roads.js',
+    'agents-group.mjs': '../src/agents/group.js',
     'agents-metrics.mjs': '../src/agents/metrics.js',
     'agents-blueprint.mjs': '../src/agents/blueprint.js',
     'agents-soul.mjs': '../src/agents/soul.js',
