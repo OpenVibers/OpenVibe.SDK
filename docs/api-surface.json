@@ -937,6 +937,20 @@
     "verifySlack": "function",
     "verifyTelegram": "function"
   },
+  "openvibe-sdk/code-mode": {
+    "LIMITS": {
+      "object": [
+        "calls",
+        "memMb",
+        "ms",
+        "resultBytes"
+      ]
+    },
+    "runCode": "function",
+    "searchTools": "function",
+    "signatureOf": "function",
+    "typeOf": "function"
+  },
   "openvibe-sdk/codes": {
     "createCodesClient": "function"
   },

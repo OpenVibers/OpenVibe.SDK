@@ -137,6 +137,7 @@ const ENTRIES = {
     'html.mjs': '../src/html/index.js',
     'markdown.mjs': '../src/markdown/index.js',
     'svg.mjs': '../src/svg/index.js',
+    'code-mode.mjs': '../src/code-mode/index.js',
     'mcp.mjs': '../src/mcp/index.js',
     'testing.mjs': '../src/testing/index.js',
 };
