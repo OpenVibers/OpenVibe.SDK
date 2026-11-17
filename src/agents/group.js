@@ -132,12 +132,13 @@ function limits({ history, members, policy } = {}) {
 
 function next({ message, members, history, policy } = {}) {
     const list = Array.isArray(members) ? members : [];
+    const at = (ids) => ids.map((id) => `@${handleOf(list.find((m) => m && m.id === id) || { id })}`).join(', ');
     const all = agents(list);
     if (!message || !all.length) return { speakers: [], why: 'no agent in the group' };
     const from = list.find((m) => m && m.id === message.from);
     const named = mentions(message.text, list).filter((id) => all.some((a) => a.id === id) && id !== message.from);
     if (!from || from.kind === 'person') {
-        if (named.length) return { speakers: named, why: `@${named.join(', @')}` };
+        if (named.length) return { speakers: named, why: at(named) };
         const coder = all.find((a) => a.coder);
         if (coder && CODE_WORDS.test(String(message.text || ''))) return { speakers: [coder.id], why: 'the words are about code' };
         const lead = all.find((a) => a.lead) || all[0];
@@ -158,12 +159,12 @@ function next({ message, members, history, policy } = {}) {
         }
         // A reviewer's verdict in a review: the last one in decides.
         if (fromReviewer && st.builder && st.panel.includes(message.from) && st.cycles <= p.maxReviewCycles) {
-            if (st.waiting.length) return { speakers: [], why: `waiting for @${st.waiting.join(', @')}`, review: st.cycles };
+            if (st.waiting.length) return { speakers: [], why: `waiting for ${at(st.waiting)}`, review: st.cycles };
             if (!st.asks.length) return { speakers: [], why: 'every reviewer approved', approved: true, review: st.cycles };
-            if (st.cycles >= p.maxReviewCycles) return { speakers: [], why: `@${st.asks.join(', @')} still asked for changes after ${st.cycles} reviews`, review: st.cycles };
+            if (st.cycles >= p.maxReviewCycles) return { speakers: [], why: `${at(st.asks)} still asked for changes after ${st.cycles} reviews`, review: st.cycles };
             const room = limits({ history: h, members: list, policy });
             if (!room.ok) return { speakers: [], why: room.why };
-            return { speakers: [st.builder], why: `@${st.asks.join(', @')} asked for changes`, fix: true, review: st.cycles };
+            return { speakers: [st.builder], why: `${at(st.asks)} asked for changes`, fix: true, review: st.cycles };
         }
     }
     // A handoff when it names another agent and the round has room.
@@ -171,7 +172,7 @@ function next({ message, members, history, policy } = {}) {
     if (!named.length) return { speakers: [], why: 'no handoff' };
     const room = limits({ history: h, members: list, policy });
     if (!room.ok) return { speakers: [], why: room.why };
-    return { speakers: named.slice(0, Math.max(0, p.maxAgentTurns - room.turns)), why: `handed to @${named.join(', @')}` };
+    return { speakers: named.slice(0, Math.max(0, p.maxAgentTurns - room.turns)), why: `handed to ${at(named)}` };
 }
 
 function transcript({ history, member, members, files, last } = {}) {

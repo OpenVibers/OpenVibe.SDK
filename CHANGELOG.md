@@ -15,6 +15,8 @@
     budget rises to `reviewBudgetUsd` ($1.50). `policy.review: false` turns review off.
   - **`limits()` takes the members**, so a DONE that a review follows, or a review missing a verdict, keeps the round
     open. A caller without members keeps the old rules.
+  - **Reasons name members by handle** (`@design asked for changes`), as people write them, never by id
+    (`agent:design`).
   - **New:** `verdict(text)` and `reviewState({ history, members })`. `transcript()` tells a reviewer how to answer
     and tells a builder that the reviewers look, and what they asked.
 

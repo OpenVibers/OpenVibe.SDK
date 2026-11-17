@@ -105,6 +105,12 @@ const dear = [say('usr_alex', 'build'), say('codes', 'x DONE', 1.2)];
 assert.equal(g.limits({ history: dear, members: room }).ok, true, '$1.20 is within a review\'s $1.50');
 assert.match(g.limits({ history: [...dear, say('design', 'CHANGES\n1. z', 0.4)], members: room }).why, /of \$1\.50/);
 
+// Reasons name members by handle, as people write them (Network's ids are agent:<handle>).
+const ids = [{ id: 'usr:alex', kind: 'person', name: 'Alex' }, { id: 'agent:codes', kind: 'agent', name: 'Codes', handle: 'codes', coder: true }, { id: 'agent:design', kind: 'agent', name: 'Design', handle: 'design', reviewer: true }];
+const q = [say('usr:alex', '@codes build it'), { from: 'agent:codes', fromKind: 'agent', text: 'Built. DONE' }, { from: 'agent:design', fromKind: 'agent', text: 'CHANGES\n1. Wider gutters' }];
+assert.equal(g.next({ message: q[0], members: ids, history: q.slice(0, 1) }).why, '@codes');
+assert.equal(g.next({ message: q[2], members: ids, history: q }).why, '@design asked for changes');
+
 // Only a CHANGES line sends the builder back: a reviewer whose turn failed, or that said neither, holds nothing up.
 const r8 = [...r1, say('design', 'Could not answer: the run failed'), say('codex', 'Reads fine to me.')];
 assert.deepStrictEqual(g.next({ message: r8[3], members: room, history: r8 }), { speakers: [], why: 'every reviewer approved', approved: true, review: 1 });
