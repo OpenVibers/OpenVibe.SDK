@@ -105,6 +105,10 @@ const dear = [say('usr_alex', 'build'), say('codes', 'x DONE', 1.2)];
 assert.equal(g.limits({ history: dear, members: room }).ok, true, '$1.20 is within a review\'s $1.50');
 assert.match(g.limits({ history: [...dear, say('design', 'CHANGES\n1. z', 0.4)], members: room }).why, /of \$1\.50/);
 
+// Only a CHANGES line sends the builder back: a reviewer whose turn failed, or that said neither, holds nothing up.
+const r8 = [...r1, say('design', 'Could not answer: the run failed'), say('codex', 'Reads fine to me.')];
+assert.deepStrictEqual(g.next({ message: r8[3], members: room, history: r8 }), { speakers: [], why: 'every reviewer approved', approved: true, review: 1 });
+
 // A reviewer is never its own reviewer, and a group without reviewers keeps the old rules; review: false turns it off.
 const solo = [say('usr_alex', '@design make an icon'), say('design', 'Here it is. DONE')];
 assert.deepEqual(g.next({ message: solo[1], members: room, history: solo }), { speakers: [], why: 'DONE' }, 'a reviewer\'s own DONE closes');

@@ -9,7 +9,8 @@
   - **A builder's DONE no longer closes the round.** Every reviewer but the builder looks at the work at once
     (`next()` answers `parallel: true`, `review: n`). Each ends with APPROVED, or a CHANGES line and a numbered list.
   - **The last verdict in decides.** It sends the builder back (`fix: true`), with the asks in its transcript, or it
-    closes the round when all approved (`approved: true`).
+    closes the round when all approved (`approved: true`). Only a CHANGES line sends the builder
+    back: a reviewer turn that failed, or that said neither, holds nothing up.
   - **Two reviews at most** (`maxReviewCycles`). A review has its own turns (3 + 2 × (reviewers + 1)) and the round's
     budget rises to `reviewBudgetUsd` ($1.50). `policy.review: false` turns review off.
   - **`limits()` takes the members**, so a DONE that a review follows, or a review missing a verdict, keeps the round

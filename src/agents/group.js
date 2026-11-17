@@ -88,7 +88,7 @@ function round(history) {
 /**
  * The round's review: the builder (the last agent that is no reviewer and said DONE with reviewers to look), how many
  * reviews have started (one per such DONE), the panel (every reviewer but the builder), who of it has answered since the
- * builder's last DONE, who it waits for, and the answers that did not approve.
+ * builder's last DONE, who it waits for, and the reviewers whose last answer asked for changes (a CHANGES line).
  */
 function reviewState({ history, members } = {}) {
     const rev = reviewers(members);
@@ -105,7 +105,8 @@ function reviewState({ history, members } = {}) {
     return {
         builder, cycles, panel, answered,
         waiting: panel.filter((id) => !answered.includes(id)),
-        asks: answered.filter((id) => verdict(last(id).text) !== 'approved'),
+        // Only a CHANGES line sends the builder back: a turn that failed or said neither holds nothing up.
+        asks: answered.filter((id) => verdict(last(id).text) === 'changes'),
     };
 }
 
