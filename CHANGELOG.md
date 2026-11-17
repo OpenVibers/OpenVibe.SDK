@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.179.0 — 2026-11-17
+
+- **`openvibe-sdk/agents/roads`: the one order a turn is routed by.** Every agent surface asks the same question before
+  a turn: which of the person's own resources takes it? Actor's engine, the Frame and Shared's road chip each kept their
+  own copy, and the chip had to follow Actor by hand (Shared 4.300.0 after Actor #575). Now one module answers:
+  the person's own pick, then OpenVibe's free AI when today's allowance covers the turn (an agent turn takes about
+  12,000 tokens, `TURN_TOKENS`; Chat's one model, anything left; an allowance that is not known is tried), then a key
+  they allowed this app, then a computer of theirs that is online, else `none` with why, when the free AI comes back
+  and whether Chat would still answer (`chat_only`). A coding run is Codes' own (`code`). `pick(facts)` decides from
+  facts in hand; `walk(rungs)` asks each rung only when it is reached, and a rung may take the road (Actor dispatching
+  to the computer) and answer what it did. Every result carries `ladder`, each rung considered with why it was open or
+  closed, for the receipt and the chip. Balance is not a rung yet: it waits on the owner's decision (H1).
+
 ## 0.178.0 — 2026-11-17
 
 - **`openvibe-sdk/markdown`: the richer Markdown renderer, for posts, pastes and documents.** The 0.175 consolidation
