@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.182.0 — 2026-11-17
+
+- **`openvibe-sdk/agents/group`: reviewers judge with a fresh eye.** The owner sent Stageshow (11-17), a design
+  skill whose reviewer gets the result and never the builder's plan. A reviewer in a review is now given:
+  - the person's request;
+  - the builder's latest result (its DONE message; the files are in the shared space);
+  - its own last verdict.
+  It never sees the other reviewers' critiques, so each judges on its own and none anchors on another. Its instructions
+  say to judge the result, not the reasons: what works, then what does not (the thing that spoils the most first, each
+  with its evidence and a one-line fix), and what it could not check.
+
 ## 0.181.0 — 2026-11-17
 
 - **`openvibe-sdk/agents/group`: review cycles** (plan §AD.25; the owner: "have claude code work on the code and

@@ -19,7 +19,9 @@
  *     looks at the work at once (`parallel: true`) and ends with APPROVED, or with a CHANGES line and a numbered list.
  *     The last verdict in sends the builder back to fix (it ends with DONE again, and the reviewers look again), or
  *     closes the round when all approved. At most `maxReviewCycles` (2) reviews, each with its own turns, and the
- *     round's budget rises to `reviewBudgetUsd` (1.50) once a review has started.
+ *     round's budget rises to `reviewBudgetUsd` (1.50) once a review has started. A reviewer judges with a fresh eye
+ *     (0.182.0): its transcript is the request, the builder's latest result and its own last verdict, never the other
+ *     reviewers' critiques.
  *
  *   mentions(text, members)                 → member ids @mentioned, in order, each once (handle or name; @all)
  *   next({ message, members, history, policy })
@@ -186,18 +188,40 @@ function transcript({ history, member, members, files, last } = {}) {
     const name = (id) => { const m = list.find((x) => x && x.id === id); return m ? (m.name || m.id) : id; };
     const others = agents(list).filter((a) => a.id !== me.id).map((a) => `@${handleOf(a)} (${a.name || a.id})`);
     const people = list.filter((m) => m && m.kind === 'person').map((m) => m.name || m.id);
-    const lines = [
-        `You are ${me.name || me.id} in a group conversation with ${people.join(', ') || 'people'}${others.length ? ` and the agents ${others.join(', ')}` : ''}.`,
-        since >= 0 ? 'Since you last spoke:' : 'The conversation so far:',
-        ...fresh.map((x) => `[${name(x.from)}]: ${String(x.text || '').slice(0, 4000)}`),
-    ];
+    const head = `You are ${me.name || me.id} in a group conversation with ${people.join(', ') || 'people'}${others.length ? ` and the agents ${others.join(', ')}` : ''}.`;
+    // A fresh eye (0.182.0; the owner sent Stageshow, 11-17, whose reviewer gets the result and never the builder's
+    // plan): a reviewer in a review is given the person's request, the builder's latest result and its own last
+    // verdict, never the other reviewers' critiques, so each judges on its own and none anchors on another.
+    const rv0 = me.reviewer ? reviewState({ history: h, members: list }) : null;
+    const freshEye = !!(rv0 && rv0.builder && rv0.panel.includes(me.id));
+    let lines;
+    if (freshEye) {
+        const r = round(h);
+        const all = h.slice(0, h.length - r.length);
+        const asked = all[all.length - 1];
+        let built = null, mine = null;
+        for (const x of r) {
+            if (x && x.from === rv0.builder && isDone(x.text)) built = x;
+            if (x && x.from === me.id) mine = x;
+        }
+        lines = [head,
+            ...(asked ? ['The request:', `[${name(asked.from)}]: ${String(asked.text || '').slice(0, 4000)}`] : []),
+            ...(built ? ['', 'What was made:', `[${name(built.from)}]: ${String(built.text || '').slice(0, 8000)}`] : []),
+            ...(mine ? ['', 'Your last review of it:', String(mine.text || '').slice(0, 4000)] : []),
+        ];
+    } else {
+        lines = [head,
+            since >= 0 ? 'Since you last spoke:' : 'The conversation so far:',
+            ...fresh.map((x) => `[${name(x.from)}]: ${String(x.text || '').slice(0, 4000)}`),
+        ];
+    }
     const f = (Array.isArray(files) ? files : []).filter((x) => x && (x.name || x.url));
     if (f.length) lines.push('', 'Files in the group\'s shared space:', ...f.slice(0, 30).map((x) => `- ${x.name || 'A file'}${x.url ? `: ${x.url}` : ''}`));
     const rev = reviewers(list);
     const st = rev.length ? reviewState({ history: h, members: list }) : null;
     const name1 = (id) => `@${handleOf(list.find((x) => x && x.id === id) || { id })}`;
     if (me.reviewer && st && st.builder && st.panel.includes(me.id)) {
-        lines.push('', `You are reviewing ${name1(st.builder)}'s work (review ${st.cycles} of ${POLICY.maxReviewCycles} at most). Look at what it made: its words, its files and links, and the pages themselves (open or capture them when you can). Say what works and what does not, plainly. Do not fix it yourself.`,
+        lines.push('', `You are reviewing ${name1(st.builder)}'s work (review ${st.cycles} of ${POLICY.maxReviewCycles} at most). Judge the result, not the reasons: look at what it made, its files and links, and the pages themselves (open, audit or capture them when you can). Say what works, then what does not, the thing that spoils the most first, each with its evidence and the fix in one line, and say what you could not check. Do not fix it yourself.`,
             'End with APPROVED as your last word when it is ready, or start a line with CHANGES followed by a numbered list of what to fix, the most important first.');
     } else if (me.reviewer) {
         lines.push('', `Answer as ${me.name || me.id}. When you review something, end with APPROVED, or a CHANGES line and a numbered list of what to fix. When the request is fully answered, end your message with DONE.`);
