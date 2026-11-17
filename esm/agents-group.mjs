@@ -3,6 +3,6 @@ import cjs from '../src/agents/group.js';
 
 export const {
     POLICY, CODE_WORDS, mentions, next, limits, isDone,
-    transcript, round,
+    verdict, reviewState, transcript, round,
 } = cjs;
 export default cjs;
