@@ -62,6 +62,8 @@ export interface VerifyUserTokenOptions {
     now?: number;
     fetch?: FetchLike;
     allowServiceTokens?: boolean;
+    /** 0.187.0: accept a delegated person token that names this service (otherwise it is a typed token, refused). */
+    delegated?: { service: string };
 }
 export declare function verifyUserToken(token: string, opts: VerifyUserTokenOptions): Promise<UserTokenClaims>;
 

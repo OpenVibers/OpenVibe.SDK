@@ -11,5 +11,6 @@ const { createJwksClient, jwksClient, jwksStatus } = require('./jwks');
 const { createNetworkKeys } = require('./keys');
 const { exchangeCode, refreshUserToken } = require('./oauth');
 const { createPgRevocationStore, revocationSchema, TOKEN_VALID_AFTER } = require('./revocations');
+// Delegated person tokens (0.187.0) are their own entry, openvibe-sdk/auth/delegated: this one's names are frozen.
 
 module.exports = { ...browser, createServiceTokenClient, verifyUserToken, verifyAppToken, verifyServiceToken, createJwksClient, jwksClient, jwksStatus, createNetworkKeys, exchangeCode, refreshUserToken, createPgRevocationStore, revocationSchema, TOKEN_VALID_AFTER };

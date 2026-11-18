@@ -24,6 +24,7 @@ const { OpenVibeError } = require('../core/errors');
 
 const fromB64url = (s) => Buffer.from(String(s).replace(/-/g, '+').replace(/_/g, '/'), 'base64');
 const { jwksClient, keysFromJwks, _clients } = require('./jwks');
+const delegated = require('./delegated');
 
 function fail(code, detail, kind = 'user') {
     return new OpenVibeError({ code, status: 401, detail, message: `${kind} token rejected: ${detail}` });
@@ -79,8 +80,13 @@ async function verifyUserToken(token, opts = {}) {
     // a robot's computer for OpenVibe.Bot). None of them is a person's session, whatever audience it names.
     const principal = ['service', 'app', 'mod', 'link'].includes(claims.actor_type) || /^(svc|app|mod|link):/.test(String(claims.sub || ''));
     if (principal && !opts.allowServiceTokens) throw fail('token.not_user', 'a principal token (service, app, module or node) is not a user token');
+    // A delegated person token (0.187.0, ./delegated.js): only where the site opted in (opts.delegated.service) and the
+    // token names that service; it comes back as the person, never as staff, marked `delegated`.
+    if (claims.typ === delegated.DELEGATED_TYP && claims.purpose === undefined && opts.delegated && opts.delegated.service) {
+        return delegated.checkDelegated(claims, String(opts.delegated.service));
+    }
     // A typed token (Network's realtime ticket, an export token: `typ` or `purpose` set) is never a session, whatever its
-    // issuer and audience say (OpenVibe.Events' rule, now every service's).
+    // issuer and audience say (OpenVibe.Events' rule, now every service's). A delegated token is one, unless asked for.
     if (claims.typ !== undefined || claims.purpose !== undefined) throw fail('token.not_user', 'a typed token is not a user session');
     return claims;
 }

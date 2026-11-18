@@ -57,6 +57,7 @@
  */
 const crypto = require('node:crypto');
 const { verifyUserToken } = require('../auth/jwt');
+const { isDelegated } = require('../auth/delegated');
 
 const ACCESS_COOKIE = 'ov_token';
 const REFRESH_COOKIE = 'ov_refresh';
@@ -199,6 +200,9 @@ function createSsoClient(opts = {}) {
     const accessMaxAgeMs = opts.accessMaxAgeMs || 24 * 3600e3;
     // Related-origin passkeys are opt-in per site (the well-known list and the Network decide the rest).
     const relatedPasskeys = opts.relatedPasskeys === true;
+    // 0.187.0: a delegated person token (openvibe-sdk/auth delegatedClaims) is accepted only when the site asks for it,
+    // and only one that names this site's service (opts.delegated: true → the site's own name, or { service }).
+    const delegatedFor = opts.delegated === true ? site : (opts.delegated && typeof opts.delegated === 'object' && opts.delegated.service ? String(opts.delegated.service) : null);
     if (!baseUrl || !opts.clientId) throw new TypeError('createSsoClient: baseUrl and clientId are required');
     const next = (value) => sanitizeNext(value, { baseUrl, networkUrl });
     const siteName = String(opts.siteName || `OpenVibe.${site.charAt(0).toUpperCase()}${site.slice(1)}`);
@@ -213,7 +217,7 @@ function createSsoClient(opts = {}) {
     async function verify(token) {
         if (!token) return null;
         try {
-            return await verifyUserToken(token, { jwks, publicKey: opts.publicKey, issuer, audience, log, fetch: fetchImpl });
+            return await verifyUserToken(token, { jwks, publicKey: opts.publicKey, issuer, audience, log, fetch: fetchImpl, ...(delegatedFor ? { delegated: { service: delegatedFor } } : {}) });
         } catch (err) {
             if (err && err.code === 'token.no_key') log.warn(`[${site} auth] Network keys unavailable: ${err.message}`);
             return null;
@@ -604,6 +608,19 @@ function createSsoClient(opts = {}) {
     }
 
     /**
+     * 0.187.0: the person themselves, never a delegated token: for what a key or an agent acting for them must not do
+     * (their settings, money, keys, deleting their account). 401 without a session, 403 for a delegated one.
+     */
+    function requireFullSession() {
+        const opt = optionalAuth();
+        return (req, res, nextFn) => opt(req, res, () => {
+            if (!req.user) return res.status(401).json({ error: 'Sign in required' });
+            if (isDelegated(req.user)) return res.status(403).json({ error: 'delegated.not_allowed', detail: 'Only you can do this, not something acting for you.' });
+            return nextFn();
+        });
+    }
+
+    /**
      * Arrival with ?ov_handoff=<ticket>: redeem it for this site's session before the page renders, so a
      * link from another OpenVibe site lands signed in with no extra round trip. Mount early (before your
      * pages): `app.use(sso.handoff())`. Rules, all enforced here, never in the page:
@@ -637,7 +654,7 @@ function createSsoClient(opts = {}) {
         };
     }
 
-    return { router, handlers, handoff, optionalAuth, requireAuth, verify, extractToken, authorizeUrl, tokenGrant, checkClient, redirectUri, audience, relatedPasskeys };
+    return { router, handlers, handoff, optionalAuth, requireFullSession, requireAuth, verify, extractToken, authorizeUrl, tokenGrant, checkClient, redirectUri, audience, relatedPasskeys };
 }
 
 module.exports = {

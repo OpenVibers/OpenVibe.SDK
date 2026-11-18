@@ -23,6 +23,8 @@ export interface SsoClientOptions {
     scope?: string;
     /** Default ['openvibe.network', 'openvibe.<site>']. */
     audience?: string | string[];
+    /** 0.187.0: accept delegated person tokens that name this site (true: the site's own name), e.g. a key's call through Connect's /mcp/all. */
+    delegated?: boolean | { service: string };
     /** A pinned PEM instead of the JWKS. */
     publicKey?: string;
     secureCookies?: boolean;
@@ -50,6 +52,8 @@ export interface SsoClient {
     optionalAuth(): (req: Req, res: Res, next: Next) => void;
     /** 401 JSON without a valid session. */
     requireAuth(): (req: Req, res: Res, next: Next) => void;
+    /** 0.187.0: the person themselves: 401 without a session, 403 for a delegated token. */
+    requireFullSession(): (req: Req, res: Res, next: Next) => void;
     /** The verified claims, or null. */
     verify(token: string | null | undefined): Promise<UserTokenClaims | null>;
     /** A Bearer header, else the ov_token cookie. */

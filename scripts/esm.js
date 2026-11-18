@@ -24,6 +24,7 @@ const ENTRIES = {
     'core.mjs': '../src/core/index.js',
     'auth.mjs': '../src/auth/index.js',
     'auth-browser.mjs': '../src/auth/browser.js',
+    'auth-delegated.mjs': '../src/auth/delegated.js',
     'assertions.mjs': '../src/assertions.js',
     'registry.mjs': '../src/registry.js',
     'identity.mjs': '../src/identity.js',
