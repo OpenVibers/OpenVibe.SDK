@@ -109,7 +109,7 @@ function pickCode(facts, base) {
     if (choice) return { ...base, need, road: 'choice', harness: choice.harness || null, model: choice.model || null, provider: choice.provider || null, why: ladder[0].why };
     const plan = (Array.isArray(facts.fleet) ? facts.fleet : []).find(planUp);
     ladder.push({ road: 'plan', open: !!plan, why: plan ? planWords(plan) : 'no coding agent signed in with your plan is online' });
-    if (plan) return { ...base, need, road: 'plan', harness: plan.harness, plan: plan.plan, machine: { id: plan.machine == null ? null : plan.machine, name: plan.machine_name || null }, why: planWords(plan) };
+    if (plan) return { ...base, need, road: 'plan', harness: plan.harness, harness_name: plan.harness_name || null, plan: plan.plan, machine: { id: plan.machine == null ? null : plan.machine, name: plan.machine_name || null }, why: planWords(plan) };
     const key = (Array.isArray(facts.keys) ? facts.keys : []).find((k) => keyFor(k, facts.app || 'codes'));
     ladder.push({ road: 'key', open: !!key, why: key ? `your ${key.provider} key` : 'no key allowed for Codes' });
     if (key) return { ...base, need, road: 'key', provider: key.provider, why: `your ${key.provider} key takes it` };
@@ -170,7 +170,7 @@ async function walk(rungs = {}) {
         if (plan) {
             const why = plan.harness && plan.plan ? planWords(plan) : 'your plan took it';
             ladder.push({ road: 'plan', open: true, why });
-            return { ...base, need: codeNeed, road: 'plan', value: plan, harness: plan.harness || null, plan: plan.plan || null, why };
+            return { ...base, need: codeNeed, road: 'plan', value: plan, harness: plan.harness || null, harness_name: plan.harness_name || null, machine: plan.machine_name ? { id: plan.machine == null ? null : plan.machine, name: plan.machine_name } : undefined, plan: plan.plan || null, why };
         }
         if (plan !== undefined) ladder.push({ road: 'plan', open: false, why: 'no coding agent signed in with your plan is online' });
         const key = await ask('key', rungs.key);
@@ -220,7 +220,7 @@ function say(result) {
         case 'key': return `Your ${r.provider} key answers: ${String(r.why || '').split(', so')[0]}.`;
         case 'computer': return `${(r.machine && r.machine.name) || 'Your computer'} answers: ${String(r.why || '').split(', so')[0]}.`;
         case 'code': return 'Codes runs it.';
-        case 'plan': return `${r.harness || 'Your coding agent'} runs it${r.machine && r.machine.name ? ` on ${r.machine.name}` : ''}${r.plan ? `, on your ${r.plan} plan` : ''}.`;
+        case 'plan': return `${r.harness_name || r.harness || 'Your coding agent'} runs it${r.machine && r.machine.name ? ` on ${r.machine.name}` : ''}${r.plan ? `, on your ${r.plan} plan` : ''}.`;
         case 'none': return r.mode === 'code'
             ? 'Nothing can run this coding work right now: sign a coding agent in with your plan on your computer, add your own AI key, or wait for the free AI to come back.'
             : r.chat_only

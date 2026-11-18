@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.186.1 — 2026-11-18
+
+- **`openvibe-sdk/agents/roads`: the plan road names the coding agent.** A plan result carries `harness_name` (from the
+  fleet entry or the walked rung), and `say()` uses it: *Claude Code runs it on ov-node-01, on your Claude Max plan.*,
+  not *claude-code runs it …*. A walked plan rung with `machine_name` also gives the result its `machine`.
+
 ## 0.186.0 — 2026-11-18
 
 - **`openvibe-sdk/agents/roads`: the coding order** (plan §AD.28 item 4; §AD.17 left "Codes' own runs on the same
