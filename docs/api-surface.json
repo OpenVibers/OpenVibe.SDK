@@ -1429,6 +1429,12 @@
   "openvibe-sdk/meme": {
     "createMemeClient": "function"
   },
+  "openvibe-sdk/memory": {
+    "KINDS": "array",
+    "MAX_BATCH": "number",
+    "MEMORY_PAGE": "string",
+    "createMemoryClient": "function"
+  },
   "openvibe-sdk/menu": {
     "MENU_PATH": "string",
     "menuCard": "function",

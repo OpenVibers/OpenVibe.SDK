@@ -8,12 +8,12 @@
 **Install and test:** `npm ci && npm test` (Node 20 or newer)
 
 ```bash
-npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.187.0
+npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.188.0
 ```
 
 > Supported browser and server clients for the OpenVibe platform.
 
-**Status:** alpha, v0.187.0 (the five 1.0 core entries — `core`, `auth`, `events`, `db` and `media` — are frozen: their exported names change only with a major release; roadmap Wave 2; developer apps from Wave 20; Media objects v2 from Wave 4; the Tools platform API; Search, Chat, AI, Vision and consent clients; sign-in with recovery and a client health check). Every release is tagged (see [CHANGELOG.md](CHANGELOG.md)). Tested against local stub servers and the built-in mock platform only, never against the live platform. Services pin release tags; each repository's `STATUS.json` names the one it uses.
+**Status:** alpha, v0.188.0 (the five 1.0 core entries — `core`, `auth`, `events`, `db` and `media` — are frozen: their exported names change only with a major release; roadmap Wave 2; developer apps from Wave 20; Media objects v2 from Wave 4; the Tools platform API; Search, Chat, AI, Vision and consent clients; sign-in with recovery and a client health check). Every release is tagged (see [CHANGELOG.md](CHANGELOG.md)). Tested against local stub servers and the built-in mock platform only, never against the live platform. Services pin release tags; each repository's `STATUS.json` names the one it uses.
 **Plan:** OpenVibe End-to-End Realignment & Implementation Plan, revision 3 (20 Sep 2026), §3.2; roadmap §30.  
 **License:** MIT ([LICENSE](LICENSE)). This package is a library that apps outside the network embed, so it uses MIT. The OpenVibe services themselves stay AGPL-3.0.
 
@@ -22,7 +22,7 @@ npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags
 After v0.97.1 is tagged:
 
 ```bash
-npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.187.0
+npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.188.0
 ```
 
 It has no runtime dependencies. It needs Node ≥ 20, or any browser with `fetch`, Web Crypto and `TextDecoder`. There is no build step. The package is CommonJS with ESM entry points (`import` works). Each subpath has its own `.d.ts`. For a page with no bundler, `browser/openvibe-sdk.mjs` is one self-contained ES module of the browser-safe subpaths (see [Browser without a bundler](#browser-without-a-bundler)). It does not depend on `openvibe-contracts` at runtime: it copies the contract types it uses (from the temporary Contracts sharing branch, a devDependency the tests check them against).
@@ -230,6 +230,7 @@ Until OpenVibe.Tools serves the gateway facade (Tools S6), point the jobs client
 | `openvibe-sdk/agents/group` | both | A conversation of people and agents in one thread (plan §AD.19): who answers by rules a person can predict (@mentions, else the lead, or the coding agent for plainly coding words), handoffs by @mention, hard limits per round (agent turns, a budget, DONE), and the transcript each agent is given with the shared space's files. `mentions`, `next`, `limits`, `isDone`, `transcript`. |
 | `openvibe-sdk/agents/metrics` | both | What a run measured (agents.run@1 1.4.0 metrics): `createRecorder()` (charged cost first, an estimate apart, unknown is null; tokens with cache; steps; latency; a named exit; evidence), `passAtK`, `passHatK`, `flakeRate` |
 | `openvibe-sdk/ai-meter` | both | Every product meters its AI calls the same way (ai.call.recorded@1 1.1.0, ai.call-report@1): `startCall({ system, provider, model, run_id|turn_id, operation, task, task_id, harness, place })` → `queued(ms)`, `firstToken()`, `tool()`, `end({ usage, outcome, charged_usd, fallbacks, error_class })` (TTFT, latency, tokens per second after the first token); `normalize(usage)` (OpenAI chat and Responses, Anthropic, Gemini, Ollama; the uncached input); `createMeterClient({ aiUrl, tokenClient })` (batches to AI's POST /api/v1/usage/calls, retries what can be retried, never resends a refused batch) |
+| `openvibe-sdk/memory` | both | A person's memory in OpenVibe.AI for services granted `ai.memory.read`/`ai.memory.write`: `createMemoryClient(client)` → `remember(person, items)` (suggestions the person keeps on openvibe.my/memory), `recall(person, q, { scopes })`, `profile(person)`; only the person deletes. |
 | `openvibe-sdk/agents/api` | server | The Run API from a product's own store: `createRunApi({ product, subject, store, prefix })` returns `handle(req, res, next)` for Express or any Node http server, serving `GET/POST /runs`, `GET /runs/:id`, `…/steps`, `…/events` (server-sent events, from the store's `follow` or by reading new steps), `POST …/messages`, `…/stop`, `…/approvals/:approval`. The store has `list, get, steps, start, say, stop, answer, follow?`; a method it lacks answers 409. No subject is 401, another person's run 404, a start without words 422; every run carries its ref; a store's own `{ status, code }` errors go out as they are and anything else is a 500 that says nothing of the store; a mandate from a caller is dropped (intake only) |
 | `openvibe-sdk/agents` | both | `createAgentsClient(client, {baseUrl?, service?, audience?})`: `run(id)` fetches an agent run snapshot (null when missing), `events(id, {lastEventId, signal})` follows the resumable AG-UI event stream, `post(id, approval)` answers an approval request |
 | `openvibe-sdk/tools` | both | `createToolsClient(client, {baseUrl?, anonymousReads?})`: `list({family, q, execution, api, status})`, `get(id)`, `schema(id)`, `run(id, input, {files, waitMs, idempotencyKey, signal, timeoutMs, prefer})` (+ `.wait()`), `jobs`; `ToolRunError`, `isToolRunError()`; `prefer` picks the worker placement (`auto`, `home`, `host`) ([details](docs/tools-routing.md)) |

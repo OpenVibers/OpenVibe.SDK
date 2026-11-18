@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.188.0 — 2026-11-18
+
+- **`openvibe-sdk/memory`** (new entry; plan §V.1, "one memory, on openvibe.my"). A person's memory in OpenVibe.AI for
+  first-party services granted `ai.memory.read` / `ai.memory.write`, always on behalf of one person:
+  `createMemoryClient(client)` → `remember(person, items, { scope })` (POST `/api/v1/memory/items:batch`: suggestions,
+  confidence at most 0.5, kept or let go by the person on openvibe.my/memory), `recall(person, q, { scopes })` (the
+  store's search: active items, granted scopes, at most 8, logged) and `profile(person, { scope })`. No forget for a
+  service: only the person deletes (`MEMORY_PAGE`). Test: memory-client.
+
 ## 0.187.0 — 2026-11-18
 
 - **Delegated person tokens** (new entry `openvibe-sdk/auth/delegated`; options on `openvibe-sdk/auth` and `openvibe-sdk/sso`). Something a person allowed (an Apps-page key,
