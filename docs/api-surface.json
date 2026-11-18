@@ -747,6 +747,8 @@
     "passHatK": "function"
   },
   "openvibe-sdk/agents/roads": {
+    "CODE_ROADS": "array",
+    "CODE_TURN_TOKENS": "number",
     "MODES": "array",
     "ROADS": "array",
     "TURN_TOKENS": "number",
