@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.187.0 — 2026-11-18
+
+- **Delegated person tokens** (new entry `openvibe-sdk/auth/delegated`; options on `openvibe-sdk/auth` and `openvibe-sdk/sso`). Something a person allowed (an Apps-page key,
+  Codes or Actor acting for them) uses that person's account at a few named OpenVibe services, for minutes, never as
+  staff. The owner, 11-18, on the person's own Design and Vision tools through Connect's `/mcp/all`: "Do it way better".
+  - `delegatedClaims({ user, by, services, scope, ttlSec })` gives the claims Network signs:
+    - the person's own identity, with `role: 'user'` whatever their own role;
+    - `typ: 'delegated'`, `svc` (the services that may accept it) and `act: { sub }` (who acts for the person);
+    - `scope` (`read` or `write`), and at most 15 minutes.
+  - **Refused by default.** It is a typed token, so every site that has not opted in refuses it as a session, as before.
+  - **Accepted only where asked, and named.** `verifyUserToken(…, { delegated: { service } })` and
+    `createSsoClient({ delegated: true | { service } })` accept one only when `svc` names that service, it names an
+    actor, its scope is read or write and it lives at most 15 minutes.
+    - It comes back as the person with role `user` and every staff claim removed (`is_owner`, `staff_caps`,
+      `staff_map`, `cap`, `perms`), marked `delegated: { by, scope, services }`.
+  - `openvibe-sdk/auth/delegated` also has `isDelegated(user)`, `checkDelegated(claims, service)`, `DELEGATED_TYP`,
+    `DELEGATED_MAX_TTL_SEC` and `STAFF_CLAIMS`. It is a new entry, because `openvibe-sdk/auth`'s names are frozen;
+    `verifyUserToken` only gains an option.
+  - **`sso.requireFullSession()`**: the person themselves, for what nothing acting for them may do (settings, money,
+    keys, deleting the account). It answers 401 without a session and 403 for a delegated one.
+
 ## 0.186.1 — 2026-11-18
 
 - **`openvibe-sdk/agents/roads`: the plan road names the coding agent.** A plan result carries `harness_name` (from the

@@ -877,6 +877,14 @@
     "startAuthorization": "function",
     "unverifiedClaims": "function"
   },
+  "openvibe-sdk/auth/delegated": {
+    "DELEGATED_MAX_TTL_SEC": "number",
+    "DELEGATED_TYP": "string",
+    "STAFF_CLAIMS": "array",
+    "checkDelegated": "function",
+    "delegatedClaims": "function",
+    "isDelegated": "function"
+  },
   "openvibe-sdk/blog": {
     "createBlogClient": "function"
   },
