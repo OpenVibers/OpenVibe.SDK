@@ -99,7 +99,8 @@ test('coding: without the fleet it is still Codes\' own; with it: choice, plan, 
     assert.deepEqual([chose.road, chose.harness], ['choice', 'opencode']);
     const plan = roads.pick({ mode: 'code', fleet, allowance: left(0) });
     assert.deepEqual([plan.road, plan.harness, plan.plan, plan.machine.name], ['plan', 'claude-code', 'Claude Max', 'ov-node-01'], 'the first online plan with its window left');
-    assert.equal(roads.say(plan), 'claude-code runs it on ov-node-01, on your Claude Max plan.');
+    assert.equal(roads.say(plan), 'Claude Code runs it on ov-node-01, on your Claude Max plan.', 'the harness by its name (0.186.1)');
+    assert.equal(roads.say({ ...plan, harness_name: null }), 'claude-code runs it on ov-node-01, on your Claude Max plan.');
     assert.deepEqual(plan.ladder.map((x) => [x.road, x.open]), [['choice', false], ['plan', true]]);
     const key = roads.pick({ mode: 'code', fleet: [], keys: [{ provider: 'anthropic', apps: ['codes'] }], allowance: left(0) });
     assert.deepEqual([key.road, key.provider], ['key', 'anthropic']);
@@ -117,6 +118,8 @@ test('coding walk: the plan rung is asked lazily and may take the road', async (
     const r = await roads.walk({ mode: 'code', choice: () => { asked.push('choice'); return null; }, plan: async () => { asked.push('plan'); return { harness: 'claude-code', plan: 'Claude Max', task: 'tsk_1' }; }, key: () => { asked.push('key'); return null; } });
     assert.deepEqual(asked, ['choice', 'plan']);
     assert.deepEqual([r.road, r.value.task], ['plan', 'tsk_1']);
+    const named = await roads.walk({ mode: 'code', plan: { harness: 'codex', harness_name: 'Codex', plan: 'ChatGPT', machine: 'm2', machine_name: 'Laptop' } });
+    assert.equal(roads.say(named), 'Codex runs it on Laptop, on your ChatGPT plan.');
     const free = await roads.walk({ mode: 'code', plan: () => null, key: () => null, allowance: () => left(50000) });
     assert.deepEqual([free.road, free.ladder.map((x) => x.road)], ['free', ['plan', 'key', 'free']]);
     const old = await roads.walk({ mode: 'code' });

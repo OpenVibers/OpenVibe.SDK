@@ -6,7 +6,7 @@ export interface Rung { road: Road; open: boolean; why: string; }
 export interface RoadResult {
     road: Road; mode: Mode; need: number; why: string; ladder: Rung[];
     provider?: string | null; model?: string | null; machine?: { id: string | number | null; name: string | null };
-    harness?: string | null; plan?: string | null;
+    harness?: string | null; harness_name?: string | null; plan?: string | null;
     left?: number | null; known?: boolean; resets_at?: string | null; chat_only?: boolean; value?: unknown;
 }
 export interface Facts {
