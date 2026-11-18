@@ -14,8 +14,17 @@
  *   4. computer   a computer of theirs that is online (Codes runs the turn there, on their own plans and harnesses)
  *   5. none       nothing can: the answer says why, when the free AI comes back, and the ways to add a road
  *
- * A coding run (mode 'code') is Codes' own and has no road here. Balance (paid AI) is not a road yet: it is the owner's
- * decision (H1, a person-paid task budget), and comes in as its own rung when it is made.
+ * A coding run (mode 'code') has its own order (0.186.0, plan §AD.28 item 4), used when the caller brings Codes' fleet
+ * (pick: facts.fleet; walk: rungs.plan); without it the answer stays { road: 'code' }, Codes routing it itself:
+ *   1. choice     the harness or model the person picked
+ *   2. plan       a coding agent signed in with the person's own plan (Claude Max, ChatGPT, Muse …) on a machine of theirs
+ *                 that is online, with its plan window not used up
+ *   3. key        their AI key allowed for Codes, for a harness that takes it
+ *   4. free       OpenVibe's free AI through a harness that takes it (opencode, deepseek), when today's allowance covers a
+ *                 coding turn (about CODE_TURN_TOKENS)
+ *   5. none       nothing can, and why
+ * Balance (paid AI) is not a road yet: it is the owner's decision (H1, a person-paid task budget), and comes in as its
+ * own rung when it is made.
  *
  *   needFor(mode, { turnTokens })        → the tokens a turn in that mode needs from the free AI (chat 1, code 0)
  *   fits(allowance, need)                → { ok, known, left, why }: does today's allowance cover it
@@ -37,6 +46,10 @@
  */
 
 const ROADS = Object.freeze(['choice', 'free', 'key', 'computer']);
+// The coding order's rungs (0.186.0).
+const CODE_ROADS = Object.freeze(['choice', 'plan', 'key', 'free']);
+// What a coding turn on the free AI takes, about: a harness reads files and loops, several times an agent turn.
+const CODE_TURN_TOKENS = 40000;
 // What an agent turn on the free AI takes, about (Actor, 2026-11-17: two probe turns took 11,134 and 10,986 tokens).
 const TURN_TOKENS = 12000;
 const MODES = Object.freeze(['auto', 'agent', 'chat', 'code']);
@@ -84,10 +97,33 @@ function closed(base, allowance) {
     return out;
 }
 
+const planUp = (p) => !!p && p.online === true && !!p.harness && !!p.plan && !p.disabled && !(p.window_left != null && Number(p.window_left) <= 0);
+const planWords = (p) => `${p.harness_name || p.harness} on ${p.machine_name || 'your computer'}, on your ${p.plan} plan`;
+
+/** The coding order from facts in hand: { choice: { harness?, model? }, fleet, keys, allowance, app: 'codes' }. */
+function pickCode(facts, base) {
+    const ladder = base.ladder;
+    const need = facts.need != null ? Math.max(0, Number(facts.need) || 0) : CODE_TURN_TOKENS;
+    const choice = facts.choice && (facts.choice.harness || facts.choice.model || facts.choice.provider) ? facts.choice : null;
+    ladder.push({ road: 'choice', open: !!choice, why: choice ? `you picked ${choice.harness || choice.model || choice.provider}` : 'no coding agent picked' });
+    if (choice) return { ...base, need, road: 'choice', harness: choice.harness || null, model: choice.model || null, provider: choice.provider || null, why: ladder[0].why };
+    const plan = (Array.isArray(facts.fleet) ? facts.fleet : []).find(planUp);
+    ladder.push({ road: 'plan', open: !!plan, why: plan ? planWords(plan) : 'no coding agent signed in with your plan is online' });
+    if (plan) return { ...base, need, road: 'plan', harness: plan.harness, plan: plan.plan, machine: { id: plan.machine == null ? null : plan.machine, name: plan.machine_name || null }, why: planWords(plan) };
+    const key = (Array.isArray(facts.keys) ? facts.keys : []).find((k) => keyFor(k, facts.app || 'codes'));
+    ladder.push({ road: 'key', open: !!key, why: key ? `your ${key.provider} key` : 'no key allowed for Codes' });
+    if (key) return { ...base, need, road: 'key', provider: key.provider, why: `your ${key.provider} key takes it` };
+    const f = fits(facts.allowance, need);
+    ladder.push({ road: 'free', open: f.ok, why: f.why });
+    if (f.ok) return { ...base, need, road: 'free', left: f.left, known: f.known, why: f.why };
+    return { ...closed({ ...base, need }, facts.allowance), chat_only: false, why: f.known ? `${f.why}, and no plan, key or computer of yours can take it` : 'no road is open' };
+}
+
 function pick(facts = {}) {
     const mode = modeOf(facts.mode);
     const need = facts.need != null ? Math.max(0, Number(facts.need) || 0) : needFor(mode);
     const base = { mode, need, ladder: [] };
+    if (mode === 'code' && Array.isArray(facts.fleet)) return pickCode(facts, base);
     if (mode === 'code') return { ...base, road: 'code', why: 'a coding run goes to Codes, which routes it itself' };
     const ladder = base.ladder;
     const choice = facts.choice && facts.choice.provider ? facts.choice : null;
@@ -116,11 +152,40 @@ async function walk(rungs = {}) {
     const mode = modeOf(rungs.mode);
     const need = rungs.need != null ? Math.max(0, Number(rungs.need) || 0) : needFor(mode);
     const base = { mode, need, ladder: [] };
-    if (mode === 'code') return { ...base, road: 'code', why: 'a coding run goes to Codes, which routes it itself' };
     const ladder = base.ladder;
     const ask = async (road, rung) => {
         try { return await valueOf(rung); } catch (err) { ladder.push({ road, open: false, why: `could not be asked: ${err && err.message ? err.message : err}` }); return undefined; }
     };
+    if (mode === 'code' && rungs.plan !== undefined) {
+        // The coding order, lazily: choice, plan (a function may take the road: start the task on that machine), key, free.
+        const codeNeed = rungs.need != null ? need : CODE_TURN_TOKENS;
+        const choice = await ask('choice', rungs.choice);
+        if (choice && (choice.harness || choice.model || choice.provider)) {
+            const why = `you picked ${choice.harness || choice.model || choice.provider}`;
+            ladder.push({ road: 'choice', open: true, why });
+            return { ...base, need: codeNeed, road: 'choice', harness: choice.harness || null, model: choice.model || null, value: choice, why };
+        }
+        if (choice !== undefined) ladder.push({ road: 'choice', open: false, why: 'no coding agent picked' });
+        const plan = await ask('plan', rungs.plan);
+        if (plan) {
+            const why = plan.harness && plan.plan ? planWords(plan) : 'your plan took it';
+            ladder.push({ road: 'plan', open: true, why });
+            return { ...base, need: codeNeed, road: 'plan', value: plan, harness: plan.harness || null, plan: plan.plan || null, why };
+        }
+        if (plan !== undefined) ladder.push({ road: 'plan', open: false, why: 'no coding agent signed in with your plan is online' });
+        const key = await ask('key', rungs.key);
+        if (key && key.provider) {
+            ladder.push({ road: 'key', open: true, why: `your ${key.provider} key` });
+            return { ...base, need: codeNeed, road: 'key', provider: key.provider, value: key, why: `your ${key.provider} key takes it` };
+        }
+        if (key !== undefined) ladder.push({ road: 'key', open: false, why: 'no key allowed for Codes' });
+        const allowance = await ask('free', rungs.allowance);
+        const f = fits(allowance === undefined ? null : allowance, codeNeed);
+        ladder.push({ road: 'free', open: f.ok, why: f.why });
+        if (f.ok) return { ...base, need: codeNeed, road: 'free', left: f.left, known: f.known, why: f.why };
+        return { ...closed({ ...base, need: codeNeed }, allowance === undefined ? null : allowance), chat_only: false, why: f.known ? `${f.why}, and no plan, key or computer of yours can take it` : 'no road is open' };
+    }
+    if (mode === 'code') return { ...base, road: 'code', why: 'a coding run goes to Codes, which routes it itself' };
     const choice = await ask('choice', rungs.choice);
     if (choice && choice.provider) {
         ladder.push({ road: 'choice', open: true, why: `you picked ${choice.model || choice.provider}` });
@@ -155,11 +220,14 @@ function say(result) {
         case 'key': return `Your ${r.provider} key answers: ${String(r.why || '').split(', so')[0]}.`;
         case 'computer': return `${(r.machine && r.machine.name) || 'Your computer'} answers: ${String(r.why || '').split(', so')[0]}.`;
         case 'code': return 'Codes runs it.';
-        case 'none': return r.chat_only
+        case 'plan': return `${r.harness || 'Your coding agent'} runs it${r.machine && r.machine.name ? ` on ${r.machine.name}` : ''}${r.plan ? `, on your ${r.plan} plan` : ''}.`;
+        case 'none': return r.mode === 'code'
+            ? 'Nothing can run this coding work right now: sign a coding agent in with your plan on your computer, add your own AI key, or wait for the free AI to come back.'
+            : r.chat_only
             ? `OpenVibe's free AI has ${short(r.left)} tokens left today: enough for Chat, not for an agent turn. Add your own AI key or your computer to keep going.`
             : `OpenVibe's free AI is used up for today. Add your own AI key or your computer to keep going.`;
         default: return '';
     }
 }
 
-module.exports = { ROADS, MODES, TURN_TOKENS, needFor, fits, pick, walk, say };
+module.exports = { ROADS, CODE_ROADS, MODES, TURN_TOKENS, CODE_TURN_TOKENS, needFor, fits, pick, walk, say };

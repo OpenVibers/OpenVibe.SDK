@@ -87,6 +87,42 @@ test('walk: a rung that throws is closed with its reason; a missing rung is not 
     assert.match(roads.say(k), /^Your deepseek key answers: the free allowance is used up today\.$/);
 });
 
+// 0.186.0 (plan §AD.28 item 4): Codes' runs walk the coding order when they bring their fleet.
+test('coding: without the fleet it is still Codes\' own; with it: choice, plan, key, free, none', () => {
+    assert.equal(roads.pick({ mode: 'code' }).road, 'code', 'old callers are unchanged');
+    const fleet = [
+        { machine: 'm1', machine_name: 'Tower', harness: 'claude-code', harness_name: 'Claude Code', plan: 'Claude Max', online: false },
+        { machine: 'm2', machine_name: 'Laptop', harness: 'codex', harness_name: 'Codex', plan: 'ChatGPT Plus', online: true, window_left: 0 },
+        { machine: 'm3', machine_name: 'ov-node-01', harness: 'claude-code', harness_name: 'Claude Code', plan: 'Claude Max', online: true, window_left: 3 },
+    ];
+    const chose = roads.pick({ mode: 'code', fleet, choice: { harness: 'opencode' } });
+    assert.deepEqual([chose.road, chose.harness], ['choice', 'opencode']);
+    const plan = roads.pick({ mode: 'code', fleet, allowance: left(0) });
+    assert.deepEqual([plan.road, plan.harness, plan.plan, plan.machine.name], ['plan', 'claude-code', 'Claude Max', 'ov-node-01'], 'the first online plan with its window left');
+    assert.equal(roads.say(plan), 'claude-code runs it on ov-node-01, on your Claude Max plan.');
+    assert.deepEqual(plan.ladder.map((x) => [x.road, x.open]), [['choice', false], ['plan', true]]);
+    const key = roads.pick({ mode: 'code', fleet: [], keys: [{ provider: 'anthropic', apps: ['codes'] }], allowance: left(0) });
+    assert.deepEqual([key.road, key.provider], ['key', 'anthropic']);
+    const notForCodes = roads.pick({ mode: 'code', fleet: [], keys: [{ provider: 'anthropic', apps: ['actor'] }], allowance: left(60000) });
+    assert.equal(notForCodes.road, 'free', 'a key allowed only for Actor is not Codes\'');
+    assert.equal(notForCodes.need, roads.CODE_TURN_TOKENS);
+    const short = roads.pick({ mode: 'code', fleet: [], allowance: left(20000) });
+    assert.equal(short.road, 'none', 'a coding turn needs more than an agent turn');
+    assert.match(short.why, /no plan, key or computer of yours can take it/);
+    assert.match(roads.say(short), /^Nothing can run this coding work right now/);
+});
+
+test('coding walk: the plan rung is asked lazily and may take the road', async () => {
+    const asked = [];
+    const r = await roads.walk({ mode: 'code', choice: () => { asked.push('choice'); return null; }, plan: async () => { asked.push('plan'); return { harness: 'claude-code', plan: 'Claude Max', task: 'tsk_1' }; }, key: () => { asked.push('key'); return null; } });
+    assert.deepEqual(asked, ['choice', 'plan']);
+    assert.deepEqual([r.road, r.value.task], ['plan', 'tsk_1']);
+    const free = await roads.walk({ mode: 'code', plan: () => null, key: () => null, allowance: () => left(50000) });
+    assert.deepEqual([free.road, free.ladder.map((x) => x.road)], ['free', ['plan', 'key', 'free']]);
+    const old = await roads.walk({ mode: 'code' });
+    assert.equal(old.road, 'code', 'without a plan rung, Codes routes it itself');
+});
+
 (async () => {
     for (const [name, fn] of tests) { await fn(); console.log(`  ✓ ${name}`); }
     console.log('agents-roads: all checks passed');

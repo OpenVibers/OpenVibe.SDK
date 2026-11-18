@@ -2,7 +2,7 @@
 import cjs from '../src/agents/roads.js';
 
 export const {
-    ROADS, MODES, TURN_TOKENS, needFor, fits, pick,
-    walk, say,
+    ROADS, CODE_ROADS, MODES, TURN_TOKENS, CODE_TURN_TOKENS, needFor,
+    fits, pick, walk, say,
 } = cjs;
 export default cjs;

@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.186.0 — 2026-11-18
+
+- **`openvibe-sdk/agents/roads`: the coding order** (plan §AD.28 item 4; §AD.17 left "Codes' own runs on the same
+  ladder"). A coding run (mode `code`) walks its own order when the caller brings Codes' fleet: `pick({ fleet })` or
+  `walk({ plan })`.
+  1. choice: the harness or model the person picked;
+  2. **plan**: a coding agent signed in with the person's own plan on an online machine, its plan window not used up;
+  3. key: an AI key of theirs allowed for Codes;
+  4. free: OpenVibe's free AI, when today's allowance covers a coding turn (`CODE_TURN_TOKENS`, about 40k);
+  5. none, and why.
+  - `say()` words the plan road (*claude-code runs it on ov-node-01, on your Claude Max plan.*) and the coding none.
+  - Without the fleet the answer is unchanged, `{ road: 'code' }`, so Actor, the Frame and the chip see no difference.
+  - New exports: `CODE_ROADS`, `CODE_TURN_TOKENS`. Types: the `plan` road, `harness` and `plan` on the result,
+    `Facts.fleet`, `Rungs.plan`.
+
 ## 0.185.0 — 2026-11-17
 
 - **`openvibe-sdk/agents/group`: the check before the reviewers.** This is Stageshow's gate (the owner sent it on
