@@ -83,6 +83,7 @@ const ENTRIES = {
     'agents-dispatch.mjs': '../src/agents/dispatch.js',
     'agents-api.mjs': '../src/agents/api.js',
     'ai-meter.mjs': '../src/ai-meter.js',
+    'memory.mjs': '../src/memory.js',
     'agents-rules.mjs': '../src/agents/rules.js',
     'agents-router.mjs': '../src/agents/router.js',
     'agents-roads.mjs': '../src/agents/roads.js',
