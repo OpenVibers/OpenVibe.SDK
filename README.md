@@ -760,3 +760,7 @@ await pics.publish(picture.slug, { listed: true, tags: ['landscape'] });
 `pics.albums` lists, creates and manages albums; `pics.like(slug, false)` removes a
 like. Upload and write calls require a person's Network token. Gallery reads are
 public. Resumable completion and likes are idempotent; creation is not retried.
+
+<!-- versions:start -->
+- openvibe-contracts: v0.449.0
+<!-- versions:end -->
