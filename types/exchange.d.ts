@@ -372,7 +372,11 @@ export type ExchangeEarnings = {
 };
 
 export type ExchangeKey = { id: string; name: string; prefix: string; monthly_cap_usd: number; allowed_models: string[]; created_at: string; revoked_at: string | null };
-export type ExchangeSearchOptions = { engine?: string; limit?: number; license?: string; commercial?: boolean; format?: string; orientation?: string; size?: 'small' | 'medium' | 'large'; color?: 'black_and_white' | 'black' | 'white' | 'yellow' | 'orange' | 'red' | 'purple' | 'magenta' | 'green' | 'teal' | 'blue'; type?: 'icon' | 'photo' | 'illustration' | 'vector'; after?: string; safe_search?: 'strict'; style?: 'line' | 'solid' | 'any'; set?: string; signal?: AbortSignal };
+/** Search v2 (OpenVibe.AI): how deep, what comes back, more searches merged, sites and a date, and the stream. */
+export type ExchangeSearchV2Options = { depth?: 'instant' | 'fast' | 'standard' | 'deep'; output?: 'results' | 'answer' | 'structured'; schema?: Record<string, unknown>; queries?: string[]; engines?: string[]; include_domains?: string[]; exclude_domains?: string[]; from?: string; excerpts?: boolean; freshness?: 'day' | 'month' | 'year'; max_cost_usd?: number };
+/** One event of a streamed search v2: results (stage first | merged | second_round | read), answer, structured, done or error. */
+export type ExchangeSearchEvent = { event: 'results' | 'answer' | 'structured' | 'done' | 'error' | string; data: any };
+export type ExchangeSearchOptions = ExchangeSearchV2Options & { engine?: string; limit?: number; license?: string; commercial?: boolean; format?: string; orientation?: string; size?: 'small' | 'medium' | 'large'; color?: 'black_and_white' | 'black' | 'white' | 'yellow' | 'orange' | 'red' | 'purple' | 'magenta' | 'green' | 'teal' | 'blue'; type?: 'icon' | 'photo' | 'illustration' | 'vector'; after?: string; safe_search?: 'strict'; style?: 'line' | 'solid' | 'any'; set?: string; signal?: AbortSignal };
 export interface CatalogSearchFilters { provider?: string; capability?: string; min_price?: number; max_price?: number; max_speed_ms?: number; sort?: 'relevance' | 'price' | 'speed' | 'quality'; rating_kind?: string; }
 export interface CatalogModelResult { model: string; name: string; family: string | null; capabilities: Record<string, boolean>; provider: string; price: { in: number; out: number; cached?: number; per?: string; currency?: string } | null; speed: { p50_ms?: number; p95_ms?: number; tokens_per_second?: number } | null; quality: { elo: number; games: number; kind: string } | null; offers: number; task_match: string | null; score: number; }
 export interface CatalogSearchResponse { q: string; count: number; results: CatalogModelResult[]; quality_unavailable: boolean; }
@@ -390,7 +394,7 @@ export type ExchangeClient = {
         create(input: { model: string; idle_minutes?: number }, opts?: { signal?: AbortSignal }): Promise<unknown>;
         stop(id: string, opts?: { signal?: AbortSignal }): Promise<unknown>;
     };
-    search: ((q: string, opts?: ExchangeSearchOptions) => Promise<ExchangeSearchResult>) & { icons(q: string, opts?: ExchangeSearchOptions): Promise<ExchangeSearchResult> };
+    search: ((q: string, opts?: ExchangeSearchOptions & { stream: true }) => Promise<AsyncIterable<ExchangeSearchEvent>>) & ((q: string, opts?: ExchangeSearchOptions & { stream?: false }) => Promise<ExchangeSearchResult>) & { icons(q: string, opts?: ExchangeSearchOptions): Promise<ExchangeSearchResult> };
     images(q: string, opts?: ExchangeSearchOptions): Promise<ExchangeSearchResult>;
     fetch(url: string, opts?: { signal?: AbortSignal }): Promise<{ url: string; text: string; receipt: ExchangeSearchResult['receipt'] }>;
 
