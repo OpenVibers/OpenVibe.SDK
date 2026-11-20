@@ -14,6 +14,12 @@
  *   // { id: 'chatcmpl-...', object: 'chat.completion', choices, usage, x_openvibe: { run_id, cost_usd, ... } }
  *   for await (const chunk of exchange.chat({ model: 'openvibe', messages, stream: true })) { ... }
  *
+ * Search (OpenVibe.AI search v2): exchange.search(q, { depth, output, queries, include_domains, from, max_cost_usd })
+ * answers the merged results (and the cited answer); with stream: true it answers an async iterable of events, sources
+ * first: { event: 'results', data: { stage, results } } as the engines answer, then 'answer' or 'structured', then
+ * 'done' with everything and the receipt ('error' when the search failed after it started).
+ *   for await (const { event, data } of exchange.search('louvre opening hours', { depth: 'standard', output: 'answer', stream: true })) { ... }
+ *
  * The seller side registers an offer in one of two forms. With `machineId`, it reports a Link machine's offer to the
  * Network's user-owned AI offers (POST /internal/ai/offers/report, the capability network.resource.report). With
  * `endpoint` and no machine, it registers a standalone OpenAI-compatible server on the Exchange's public seller API
@@ -216,6 +222,39 @@ function parseSse(block) {
         try { out.push(JSON.parse(data)); } catch { /* a partial or unknown event is skipped */ }
     }
     return out;
+}
+
+/** The named events of an SSE stream (search v2): { event, data } for each block whose data is JSON. */
+async function* sseEvents(res) {
+    const body = res.body;
+    const one = (block) => {
+        const event = (/^event: ?(.*)$/m.exec(block) || [])[1] || 'message';
+        const raw = block.split('\n').filter((l) => l.startsWith('data:')).map((l) => l.slice(5).replace(/^ /, '')).join('\n');
+        if (!raw) return null;
+        try { return { event: event.trim(), data: JSON.parse(raw) }; } catch { return null; }
+    };
+    if (!body || typeof body.getReader !== 'function') {
+        for (const block of String(await res.text()).replace(/\r\n/g, '\n').split('\n\n')) { const e = one(block); if (e) yield e; }
+        return;
+    }
+    const reader = body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
+        let cut = buffer.indexOf('\n\n');
+        while (cut >= 0) {
+            const e = one(buffer.slice(0, cut));
+            buffer = buffer.slice(cut + 2);
+            if (e) yield e;
+            cut = buffer.indexOf('\n\n');
+        }
+    }
+    buffer += decoder.decode().replace(/\r\n/g, '\n');
+    const last = one(buffer);
+    if (last) yield last;
 }
 
 /**
@@ -547,7 +586,15 @@ function createExchangeClient({
         },
     };
 
-    const search = (q, opts = {}) => { const { signal, ...query } = opts; return jsonCall('POST', '/v1/search', { json: { ...query, q }, signal }); };
+    // stream: true answers the named events of search v2's stream (sseEvents), sources first; otherwise the whole answer.
+    const search = async (q, opts = {}) => {
+        const { signal, ...query } = opts;
+        if (query.stream === true) {
+            const out = await call('POST', '/v1/search', { json: { ...query, q }, signal, accept: 'text/event-stream' });
+            return sseEvents(out.res);
+        }
+        return jsonCall('POST', '/v1/search', { json: { ...query, q }, signal });
+    };
     search.icons = (q, opts = {}) => { const { signal, ...query } = opts; return jsonCall('POST', '/v1/search/icons', { json: { ...query, q }, signal }); };
     return {
         keys: {

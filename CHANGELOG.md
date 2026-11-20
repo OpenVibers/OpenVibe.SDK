@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **`exchange.search(q, { stream: true })`**: OpenVibe.AI search v2's Server-Sent Events as an async iterable of
+  `{ event, data }`, sources first (`results` with `stage` first / merged / second_round / read, then `answer` or
+  `structured`, then `done` with the receipt; `error` after a failed start). The v2 options (`depth`, `output`, `schema`,
+  `queries`, `include_domains`, `exclude_domains`, `from`, `excerpts`) are typed. Test: exchange-search-stream.
+
 ## 0.188.0 — 2026-11-18
 
 - **`openvibe-sdk/memory`** (new entry; plan §V.1, "one memory, on openvibe.my"). A person's memory in OpenVibe.AI for
