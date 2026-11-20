@@ -128,14 +128,17 @@ up)
     # A reused ovsdk-pg from before --shm-size has the 64 MB default; remove it and PgBouncer (which points at it) so both start again.
     docker rm -f -v ovsdk-pg ovsdk-pgbouncer >/dev/null 2>&1 || true
   fi
-  if ! docker ps --format '{{.Names}}' | grep -qx ovsdk-pg; then
+  # The running names, captured first: under pipefail, `docker ps | grep -q` fails when grep matches and exits before
+  # docker has written its last line (SIGPIPE), and the script then rebuilt a running container (2026-11-20).
+  running=$(docker ps --format '{{.Names}}')
+  if ! printf '%s\n' "$running" | grep -x ovsdk-pg >/dev/null; then
     docker rm -f -v ovsdk-pg >/dev/null 2>&1 || true
     docker run -d --name ovsdk-pg --network $NET -p 127.0.0.1:55432:5432 \
       --shm-size=1g \
       -e POSTGRES_USER=ov -e POSTGRES_PASSWORD=$PW -e POSTGRES_DB=ovtest -e POSTGRES_HOST_AUTH_METHOD=scram-sha-256 -e POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256 \
       postgres:18-alpine -c max_connections=200 >/dev/null
   fi
-  if ! docker ps --format '{{.Names}}' | grep -qx ovsdk-pgbouncer; then
+  if ! printf '%s\n' "$running" | grep -x ovsdk-pgbouncer >/dev/null; then
     docker rm -f -v ovsdk-pgbouncer >/dev/null 2>&1 || true
     docker run -d --name ovsdk-pgbouncer --network $NET -p 127.0.0.1:56432:5432 \
       -e DATABASE_URL="postgres://ov:$PW@ovsdk-pg:5432/ovtest" -e POOL_MODE=transaction -e AUTH_TYPE=scram-sha-256 -e MAX_CLIENT_CONN=500 -e DEFAULT_POOL_SIZE=10 \
