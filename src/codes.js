@@ -7,6 +7,8 @@
  *   const { tasks } = await codes.tasks.list({ limit: 8 });   // running first, codes.task-summary@1
  *   const { id, url } = await codes.tasks.create({ text: 'Add a test.', mode: 'repo', repo: 'octocat/Hello-World' });
  *   await codes.tasks.stop(id);                                // { ok: true }
+ *   const { agents } = await codes.usage();                    // each coding agent's plan windows: used %, resets_at
+ *   await codes.spare.add({ prompt: 'Add tests', repo: 'owner/name' });   // spare usage: run before a plan resets
  *
  * A task is its requester's own: another person's id is 404. Creates are never retried on their own (a retry would
  * start a second task); neither is a stop (a task already ended answers 409). The person token rides every call.
@@ -14,6 +16,7 @@
 const enc = encodeURIComponent;
 
 const TASK = /^tsk_[0-9A-HJKMNP-TV-Z]{26}$/;
+const SPARE = /^spt_[0-9A-HJKMNP-TV-Z]{26}$/;
 const MODES = ['create', 'openvibe', 'repo'];
 const PRESETS = ['Fast', 'Balanced', 'Deep', 'Council'];
 
@@ -55,6 +58,39 @@ function createCodesClient(client, { baseUrl } = {}) {
             },
             /** Stop the running attempt; nothing carries it on. → { ok: true }. */
             stop: (taskId, { signal } = {}) => once({ method: 'POST', path: `/api/v1/tasks/${id(taskId)}/stop`, signal }),
+        },
+        /**
+         * What each of the person's coding agents has left (Codes C9c fleet, plan §AD.37): per agent its plan windows
+         * (used %, resets_at) and whether the spare list would use it now, and why.
+         */
+        usage: ({ signal } = {}) => call({ path: '/api/v1/me/usage', signal }),
+        /**
+         * Spare usage (plan §AD.37): a list the person's agents work through when a plan window resets soon with time
+         * left and the agent is idle. The same list openvibe.codes/settings/spare, openvibe.my and Actor show.
+         */
+        spare: {
+            /** → { settings, tasks, agents } */
+            get: ({ signal } = {}) => call({ path: '/api/v1/me/spare', signal }),
+            /** { enabled, reset_within_hours, min_left_pct, keep_pct, max_running, agents } → { settings } */
+            settings: (settings, { signal } = {}) => {
+                if (!settings || typeof settings !== 'object' || Array.isArray(settings)) throw new TypeError('codes.spare.settings: pass the settings to change');
+                return once({ method: 'PUT', path: '/api/v1/me/spare', json: settings, signal });
+            },
+            /** { prompt, repo, title?, agent?, priority?, repeat? } → { task } */
+            add: (task, { signal } = {}) => {
+                if (!task || typeof task.prompt !== 'string' || !task.prompt.trim()) throw new TypeError('codes.spare.add: prompt is what to do');
+                if (typeof task.repo !== 'string' || !task.repo.trim()) throw new TypeError('codes.spare.add: repo is owner/name or an https address');
+                return once({ method: 'POST', path: '/api/v1/me/spare/tasks', json: task, signal });
+            },
+            /** Change a task, or pause/queue it ({ state: 'paused' | 'queued' }) → { task } */
+            update: (taskId, patch, { signal } = {}) => {
+                if (!SPARE.test(String(taskId || ''))) throw new TypeError('codes.spare: a task id is spt_…');
+                return once({ method: 'PATCH', path: `/api/v1/me/spare/tasks/${enc(taskId)}`, json: patch || {}, signal });
+            },
+            remove: (taskId, { signal } = {}) => {
+                if (!SPARE.test(String(taskId || ''))) throw new TypeError('codes.spare: a task id is spt_…');
+                return once({ method: 'DELETE', path: `/api/v1/me/spare/tasks/${enc(taskId)}`, signal });
+            },
         },
         modelPlans: {
             /** The account default and optional project's effective plan. */
