@@ -33,6 +33,7 @@ const summary = (over = {}) => ({
             if (req.url === '/api/v1/me/usage' && req.method === 'GET') return json(200, { agents: [{ agent: 'codex', name: 'Codex', state: 'ok', windows: [{ name: 'week', used_pct: 30, resets_at: '2026-11-25T07:00:00Z' }], take: false, why: 'its next reset is in 80 h' }], spare: { enabled: true, queued: 1 } });
             if (req.url === '/api/v1/me/spare' && req.method === 'PUT') return json(200, { settings: { enabled: JSON.parse(body).enabled } });
             if (req.url === '/api/v1/me/spare/tasks' && req.method === 'POST') return json(201, { task: { id: 'spt_01J8Z3Q4R5S6T7V8W9X0Y1Z2A3', ...JSON.parse(body) } });
+            if (req.url === '/api/v1/me/spare/loops' && req.method === 'GET') return json(200, { loops: [{ id: 'accessibility', name: 'Accessibility', what: 'WCAG 2.2 AA' }] });
             if (req.url === '/api/v1/me/spare/tasks/spt_01J8Z3Q4R5S6T7V8W9X0Y1Z2A3' && req.method === 'PATCH') return json(200, { task: { state: JSON.parse(body).state } });
             if (req.url === '/api/v1/me/spare/tasks/spt_01J8Z3Q4R5S6T7V8W9X0Y1Z2A3' && req.method === 'DELETE') { res.writeHead(204); return res.end(); }
             return json(404, { code: 'codes.task_not_found' });
@@ -51,6 +52,9 @@ const summary = (over = {}) => ({
         assert.strictEqual((await codes.spare.update(added.task.id, { state: 'paused' })).task.state, 'paused');
         await codes.spare.remove(added.task.id);
         assert.throws(() => codes.spare.add({ prompt: 'x' }), /repo is owner\/name/);
+        const looped = await codes.spare.add({ loop: 'accessibility', repo: 'OpenVibers/OpenVibe.Live', site: 'https://openvibe.live' });
+        assert.strictEqual(looped.task.loop, 'accessibility', 'a loop is sent as such');
+        assert.deepStrictEqual((await codes.spare.loops()).loops.map((l) => l.id), ['accessibility']);
         assert.throws(() => codes.spare.update('tsk_x', {}), /spt_/);
         assert.ok(seen.filter((x) => x.url.startsWith('/api/v1/me/')).every((x) => x.auth === 'Bearer person-token'), 'the person token rides every call');
         seen.length = 0;

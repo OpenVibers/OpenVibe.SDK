@@ -5,7 +5,8 @@
 - **`openvibe-sdk/codes`: usage and spare usage** (plan §AD.37): `codes.usage()` (each coding agent's plan windows,
   used % and reset time, and whether the spare list would use it now), and `codes.spare.get/settings/add/update/remove`
   — the list a person's agents work through when a plan resets soon with time left (OpenVibe.Codes #573). Typed.
-  Test: codes.
+  `codes.spare.add({ loop, repo, site })` adds a loop (accessibility, security, latency, tests, docs, dependencies: a
+  repeating task that ends in a pull request), `codes.spare.loops()` lists them. Test: codes.
 
 - **Stopping a search early** (OpenVibe.AI search v2, 11-21): leaving a streamed `exchange.search` loop early (`break`,
   `return`, a throw) now closes the connection, so the server stops the search and charges only what ran (it used to

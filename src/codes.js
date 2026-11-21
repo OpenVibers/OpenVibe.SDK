@@ -76,12 +76,18 @@ function createCodesClient(client, { baseUrl } = {}) {
                 if (!settings || typeof settings !== 'object' || Array.isArray(settings)) throw new TypeError('codes.spare.settings: pass the settings to change');
                 return once({ method: 'PUT', path: '/api/v1/me/spare', json: settings, signal });
             },
-            /** { prompt, repo, title?, agent?, priority?, repeat? } → { task } */
+            /**
+             * { prompt, repo, title?, agent?, priority?, repeat? } → { task }; or a loop: { loop, repo, site? }
+             * (accessibility, security, latency, tests, docs, dependencies: a repeating task that ends in a pull request).
+             */
             add: (task, { signal } = {}) => {
-                if (!task || typeof task.prompt !== 'string' || !task.prompt.trim()) throw new TypeError('codes.spare.add: prompt is what to do');
+                const loop = task && typeof task.loop === 'string' && task.loop.trim();
+                if (!task || (!loop && (typeof task.prompt !== 'string' || !task.prompt.trim()))) throw new TypeError('codes.spare.add: prompt is what to do (or loop names one)');
                 if (typeof task.repo !== 'string' || !task.repo.trim()) throw new TypeError('codes.spare.add: repo is owner/name or an https address');
                 return once({ method: 'POST', path: '/api/v1/me/spare/tasks', json: task, signal });
             },
+            /** The loops a task can be: [{ id, name, what }] */
+            loops: ({ signal } = {}) => call({ path: '/api/v1/me/spare/loops', signal }),
             /** Change a task, or pause/queue it ({ state: 'paused' | 'queued' }) → { task } */
             update: (taskId, patch, { signal } = {}) => {
                 if (!SPARE.test(String(taskId || ''))) throw new TypeError('codes.spare: a task id is spt_…');

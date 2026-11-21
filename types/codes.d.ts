@@ -33,7 +33,8 @@ export interface CodesClient {
     spare: {
         get(opts?: Opts): Promise<{ settings: CodesSpareSettings; tasks: CodesSpareTask[]; agents: CodesAgentUsage[] }>;
         settings(settings: Partial<CodesSpareSettings>, opts?: Opts): Promise<{ settings: CodesSpareSettings }>;
-        add(task: { prompt: string; repo: string; title?: string; agent?: string; priority?: number; repeat?: boolean }, opts?: Opts): Promise<{ task: CodesSpareTask }>;
+        add(task: { prompt: string; repo: string; title?: string; agent?: string; priority?: number; repeat?: boolean } | { loop: 'accessibility' | 'security' | 'latency' | 'tests' | 'docs' | 'dependencies'; repo: string; site?: string; agent?: string; priority?: number }, opts?: Opts): Promise<{ task: CodesSpareTask }>;
+        loops(opts?: Opts): Promise<{ loops: Array<{ id: string; name: string; what: string }> }>;
         update(id: string, patch: Partial<Pick<CodesSpareTask, 'title' | 'prompt' | 'repo' | 'agent' | 'priority' | 'repeat'>> & { state?: 'queued' | 'paused' }, opts?: Opts): Promise<{ task: CodesSpareTask }>;
         remove(id: string, opts?: Opts): Promise<unknown>;
     };
