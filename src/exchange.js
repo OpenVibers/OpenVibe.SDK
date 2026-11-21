@@ -19,6 +19,8 @@
  * first: { event: 'results', data: { stage, results } } as the engines answer, then 'answer' or 'structured', then
  * 'done' with everything and the receipt ('error' when the search failed after it started).
  *   for await (const { event, data } of exchange.search('louvre opening hours', { depth: 'standard', output: 'answer', stream: true })) { ... }
+ * Leaving the loop early (break, return, a throw) ends the search on the server: it stops and is charged only what ran.
+ * exchange.search.stop(id) ends a running search by its id (the stream's `started` event, or the search_id given).
  *
  * The seller side registers an offer in one of two forms. With `machineId`, it reports a Link machine's offer to the
  * Network's user-owned AI offers (POST /internal/ai/offers/report, the capability network.resource.report). With
@@ -240,17 +242,25 @@ async function* sseEvents(res) {
     const reader = body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
-    for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
-        let cut = buffer.indexOf('\n\n');
-        while (cut >= 0) {
-            const e = one(buffer.slice(0, cut));
-            buffer = buffer.slice(cut + 2);
-            if (e) yield e;
-            cut = buffer.indexOf('\n\n');
+    let finished = false;
+    try {
+        for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
+            let cut = buffer.indexOf('\n\n');
+            while (cut >= 0) {
+                const e = one(buffer.slice(0, cut));
+                buffer = buffer.slice(cut + 2);
+                if (e) yield e;
+                cut = buffer.indexOf('\n\n');
+            }
         }
+        finished = true;
+    } finally {
+        // A reader that left early (it found what it needed): the connection closes, so the server stops the search
+        // and charges only what ran, instead of finishing it for nobody.
+        if (!finished) await reader.cancel('stopped by the reader').catch(() => {});
     }
     buffer += decoder.decode().replace(/\r\n/g, '\n');
     const last = one(buffer);
@@ -596,6 +606,11 @@ function createExchangeClient({
         return jsonCall('POST', '/v1/search', { json: { ...query, q }, signal });
     };
     search.icons = (q, opts = {}) => { const { signal, ...query } = opts; return jsonCall('POST', '/v1/search/icons', { json: { ...query, q }, signal }); };
+    // Ends a running search early: it answers its own caller with what it found so far, charged only what ran.
+    search.stop = (id, { signal } = {}) => {
+        if (typeof id !== 'string' || !/^[A-Za-z0-9_-]{8,64}$/.test(id)) throw new TypeError('search.stop: id is the search id (the stream\'s started event, or the search_id you gave)');
+        return jsonCall('POST', '/v1/search/stop', { json: { id }, signal });
+    };
     return {
         keys: {
             list: ({ signal } = {}) => jsonCall('GET', '/api/v1/exchange/keys', { signal }),

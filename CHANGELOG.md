@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Stopping a search early** (OpenVibe.AI search v2, 11-21): leaving a streamed `exchange.search` loop early (`break`,
+  `return`, a throw) now closes the connection, so the server stops the search and charges only what ran (it used to
+  run to the end for nobody). `exchange.search.stop(id)` ends a running search by the id in its `started` event or the
+  `search_id` given. New typed options: `max_time_ms`, `search_id`, `free_only`, `steps`, `model`, `own_index`, `cache`.
+  Test: exchange-search-stream.
+
 - **`exchange.search(q, { stream: true })`**: OpenVibe.AI search v2's Server-Sent Events as an async iterable of
   `{ event, data }`, sources first (`results` with `stage` first / merged / second_round / read, then `answer` or
   `structured`, then `done` with the receipt; `error` after a failed start). The v2 options (`depth`, `output`, `schema`,

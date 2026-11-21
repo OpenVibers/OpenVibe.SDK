@@ -41,5 +41,33 @@ const SSE = 'event: results\ndata: {"stage":"first","results":[{"url":"https://a
 
     mode = 'refuse';
     await assert.rejects(exchange.search('x', { depth: 'bottomless', stream: true }), (err) => err instanceof ExchangeError && err.status === 422);
-    console.log('exchange-search-stream: 3 checks passed');
+
+    // Leaving the loop early closes the connection (the server then stops the search and charges what ran).
+    mode = 'slow';
+    let cancelled = null;
+    const slowFetch = async (url, init) => {
+        calls.push({ url: String(url), body: init.body ? JSON.parse(init.body) : null });
+        if (String(url).endsWith('/v1/search/stop')) return new Response(JSON.stringify({ id: 'srch_abcdefgh123', stopped: true }), { status: 200, headers: { 'content-type': 'application/json' } });
+        const enc = new TextEncoder();
+        return new Response(new ReadableStream({
+            start(c) { c.enqueue(enc.encode('event: started\ndata: {"id":"srch_abcdefgh123"}\n\nevent: results\ndata: {"stage":"first","results":[{"url":"https://a.example/"}]}\n\n')); },
+            cancel(reason) { cancelled = reason || 'cancelled'; },
+        }), { status: 200, headers: { 'content-type': 'text/event-stream' } });
+    };
+    const ex2 = createExchangeClient({ developerKey: 'test', maxRetries: 0, fetchImpl: slowFetch });
+    let id = null;
+    for await (const { event, data } of await ex2.search('louvre', { depth: 'deep', stream: true, max_time_ms: 5000, free_only: true })) {
+        if (event === 'started') id = data.id;
+        if (event === 'results') break;   // found what it needed
+    }
+    assert.equal(id, 'srch_abcdefgh123');
+    assert.ok(cancelled, 'breaking out closed the stream');
+    const asked = calls[calls.length - 1].body;
+    assert.deepEqual([asked.max_time_ms, asked.free_only], [5000, true], 'the new options go through');
+    const stopped = await ex2.search.stop('srch_abcdefgh123');
+    assert.deepEqual(stopped, { id: 'srch_abcdefgh123', stopped: true });
+    assert.ok(calls[calls.length - 1].url.endsWith('/v1/search/stop'));
+    assert.deepEqual(calls[calls.length - 1].body, { id: 'srch_abcdefgh123' });
+    assert.throws(() => ex2.search.stop('no'), /search.stop: id is the search id/);
+    console.log('exchange-search-stream: 5 checks passed');
 })().catch((e) => { console.error(e); process.exit(1); });
