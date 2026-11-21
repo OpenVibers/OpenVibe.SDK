@@ -20,7 +20,23 @@ export interface CodesTaskCreate {
     text: string; mode: CodesTaskMode; repo?: string; attachments?: string[];
     plan?: CodesModelPlan; preset?: CodesModelPreset;
 }
+export interface CodesUsageWindow { name: string; used_pct: number | null; resets_at: string | null }
+export interface CodesAgentUsage { agent: string; name: string; state: string; windows: CodesUsageWindow[]; take?: boolean; why?: string; window?: string | null }
+export interface CodesSpareSettings { enabled: boolean; reset_within_hours: number; min_left_pct: number; keep_pct: number; max_running: number; agents: string[] | null }
+export interface CodesSpareTask {
+    id: string; title: string; prompt: string; repo: string; agent: string; priority: number; repeat: boolean;
+    state: 'queued' | 'running' | 'done' | 'failed' | 'paused'; task_id: string | null; last_agent: string | null; last_window: string | null;
+    note: string | null; runs: number; created_at: string; started_at: string | null; ended_at: string | null;
+}
 export interface CodesClient {
+    usage(opts?: Opts): Promise<{ agents: CodesAgentUsage[]; spare: { enabled: boolean; queued: number } }>;
+    spare: {
+        get(opts?: Opts): Promise<{ settings: CodesSpareSettings; tasks: CodesSpareTask[]; agents: CodesAgentUsage[] }>;
+        settings(settings: Partial<CodesSpareSettings>, opts?: Opts): Promise<{ settings: CodesSpareSettings }>;
+        add(task: { prompt: string; repo: string; title?: string; agent?: string; priority?: number; repeat?: boolean }, opts?: Opts): Promise<{ task: CodesSpareTask }>;
+        update(id: string, patch: Partial<Pick<CodesSpareTask, 'title' | 'prompt' | 'repo' | 'agent' | 'priority' | 'repeat'>> & { state?: 'queued' | 'paused' }, opts?: Opts): Promise<{ task: CodesSpareTask }>;
+        remove(id: string, opts?: Opts): Promise<unknown>;
+    };
     tasks: {
         list(opts?: Opts & { limit?: number }): Promise<{ tasks: CodesTaskSummary[] }>;
         create(req: CodesTaskCreate, opts?: Opts): Promise<{ id: string | null; url: string }>;

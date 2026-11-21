@@ -30,6 +30,11 @@ const summary = (over = {}) => ({
                 return json(201, { id: TASK, url: `https://openvibe.codes/tasks/${TASK}` });
             }
             if (req.url === `/api/v1/tasks/${TASK}/stop` && req.method === 'POST') return json(200, { ok: true });
+            if (req.url === '/api/v1/me/usage' && req.method === 'GET') return json(200, { agents: [{ agent: 'codex', name: 'Codex', state: 'ok', windows: [{ name: 'week', used_pct: 30, resets_at: '2026-11-25T07:00:00Z' }], take: false, why: 'its next reset is in 80 h' }], spare: { enabled: true, queued: 1 } });
+            if (req.url === '/api/v1/me/spare' && req.method === 'PUT') return json(200, { settings: { enabled: JSON.parse(body).enabled } });
+            if (req.url === '/api/v1/me/spare/tasks' && req.method === 'POST') return json(201, { task: { id: 'spt_01J8Z3Q4R5S6T7V8W9X0Y1Z2A3', ...JSON.parse(body) } });
+            if (req.url === '/api/v1/me/spare/tasks/spt_01J8Z3Q4R5S6T7V8W9X0Y1Z2A3' && req.method === 'PATCH') return json(200, { task: { state: JSON.parse(body).state } });
+            if (req.url === '/api/v1/me/spare/tasks/spt_01J8Z3Q4R5S6T7V8W9X0Y1Z2A3' && req.method === 'DELETE') { res.writeHead(204); return res.end(); }
             return json(404, { code: 'codes.task_not_found' });
         });
     });
@@ -37,6 +42,18 @@ const summary = (over = {}) => ({
     const base = `http://127.0.0.1:${server.address().port}`;
     const codes = createCodesClient(createClient({ baseUrls: { codes: base }, token: 'person-token' }));
     try {
+        // Spare usage (plan §AD.37): the agents' windows, the list's settings, and its tasks.
+        const usage = await codes.usage();
+        assert.strictEqual(usage.agents[0].windows[0].used_pct, 30);
+        assert.strictEqual((await codes.spare.settings({ enabled: true })).settings.enabled, true);
+        const added = await codes.spare.add({ prompt: 'Add tests for fleet.js', repo: 'OpenVibers/OpenVibe.Codes' });
+        assert.strictEqual(added.task.id, 'spt_01J8Z3Q4R5S6T7V8W9X0Y1Z2A3');
+        assert.strictEqual((await codes.spare.update(added.task.id, { state: 'paused' })).task.state, 'paused');
+        await codes.spare.remove(added.task.id);
+        assert.throws(() => codes.spare.add({ prompt: 'x' }), /repo is owner\/name/);
+        assert.throws(() => codes.spare.update('tsk_x', {}), /spt_/);
+        assert.ok(seen.filter((x) => x.url.startsWith('/api/v1/me/')).every((x) => x.auth === 'Bearer person-token'), 'the person token rides every call');
+        seen.length = 0;
         const listed = await codes.tasks.list({ limit: 8 });
         assert.deepStrictEqual(listed, { tasks: [summary()] });
         const created = await codes.tasks.create({ text: 'Add a test.', mode: 'repo', repo: 'octocat/Hello-World' });
