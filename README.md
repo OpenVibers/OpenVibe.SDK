@@ -8,7 +8,7 @@
 **Install and test:** `npm ci && npm test` (Node 20 or newer)
 
 ```bash
-npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.188.0
+npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.189.0
 ```
 
 > Supported browser and server clients for the OpenVibe platform.
@@ -22,7 +22,7 @@ npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags
 After v0.97.1 is tagged:
 
 ```bash
-npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.188.0
+npm install https://codeload.github.com/OpenVibers/OpenVibe.SDK/tar.gz/refs/tags/v0.189.0
 ```
 
 It has no runtime dependencies. It needs Node ≥ 20, or any browser with `fetch`, Web Crypto and `TextDecoder`. There is no build step. The package is CommonJS with ESM entry points (`import` works). Each subpath has its own `.d.ts`. For a page with no bundler, `browser/openvibe-sdk.mjs` is one self-contained ES module of the browser-safe subpaths (see [Browser without a bundler](#browser-without-a-bundler)). It does not depend on `openvibe-contracts` at runtime: it copies the contract types it uses (from the temporary Contracts sharing branch, a devDependency the tests check them against).
