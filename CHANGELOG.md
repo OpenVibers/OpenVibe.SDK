@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.189.0 — 2026-11-23
 
 - **`openvibe-sdk/codes`: usage and spare usage** (plan §AD.37): `codes.usage()` (each coding agent's plan windows,
   used % and reset time, and whether the spare list would use it now), and `codes.spare.get/settings/add/update/remove`
