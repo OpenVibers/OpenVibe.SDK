@@ -33,7 +33,7 @@ function createMemoryClient(client, defaults = {}) {
     const { baseUrl } = defaults;
     const call = (opts, o = {}) => client.json({ service: 'ai', baseUrl, audience: 'openvibe.ai', ...opts, signal: o.signal });
 
-    /** Suggest notes for the person: [{ text, kind?, scope?, confidence? }] or plain strings. → { items, … } */
+    /** Suggest notes for the person: [{ text, kind?, scope?, confidence?, person_said? }] or plain strings. → { items, … } */
     async function remember(who, items, o = {}) {
         const person = personOf(who);
         const list = (Array.isArray(items) ? items : [items]).map((x) => (typeof x === 'string' ? { text: x } : x || {}));
@@ -47,6 +47,9 @@ function createMemoryClient(client, defaults = {}) {
                 scope: String(x.scope || o.scope || 'user'),
                 ...(x.kind != null ? { kind: x.kind } : {}),
                 ...(x.confidence != null ? { confidence: Number(x.confidence) } : {}),
+                // The person said it, in their own words, in their own message (the service checked): the store keeps it
+                // active at once instead of as a suggestion (OpenVibe.AI #694). Only `true` counts.
+                ...(x.person_said === true ? { person_said: true } : {}),
             };
         });
         return call({ method: 'POST', path: '/api/v1/memory/items:batch', json: { on_behalf_of: person, items: out },
