@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.190.0 — 2026-11-24
+
+- **`openvibe-sdk/memory`: `person_said`** (plan §V.1, one memory). `remember(person, [{ text, kind, person_said: true }])`
+  tells OpenVibe.AI the person said it, in their own words, in their own message (the service checked): the store keeps
+  it active at once (confidence at most 0.9) instead of as a suggestion (OpenVibe.AI #694). Only `true` is sent; typed.
+  Test: memory-client.
+
 ## 0.189.0 — 2026-11-23
 
 - **`openvibe-sdk/codes`: usage and spare usage** (plan §AD.37): `codes.usage()` (each coding agent's plan windows,

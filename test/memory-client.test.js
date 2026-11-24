@@ -21,6 +21,9 @@ run([
         assert.equal(x.idempotencyKey, false, 'not retried unless the caller gives a key');
         await m.remember(PERSON, { text: 'x' }, { scope: 'project:p1', idempotencyKey: 'k1' });
         assert.deepEqual([c.calls[1].json.items[0].scope, c.calls[1].idempotencyKey], ['project:p1', 'k1']);
+        // The person's own words (the service checked): person_said goes through as true, and only true.
+        await m.remember(PERSON, [{ text: 'I prefer metric', kind: 'preference', person_said: true }, { text: 'y', person_said: 'yes' }]);
+        assert.deepEqual(c.calls[2].json.items, [{ text: 'I prefer metric', scope: 'user', kind: 'preference', person_said: true }, { text: 'y', scope: 'user' }]);
         await assert.rejects(() => m.remember(PERSON, [{ text: 'x', kind: 'gossip' }]), /kind is one of/);
         await assert.rejects(() => m.remember(PERSON, [{ text: '   ' }]), /no text/);
         await assert.rejects(() => m.remember(PERSON, []), /1 to 200/);

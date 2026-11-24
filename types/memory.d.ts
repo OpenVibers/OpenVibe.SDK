@@ -1,6 +1,6 @@
 // openvibe-sdk/memory: a person's memory in OpenVibe.AI, for services granted ai.memory.read / ai.memory.write.
 export type Kind = 'preference' | 'fact' | 'project_rule' | 'procedure' | 'decision' | 'lesson';
-export interface NoteIn { text: string; kind?: Kind; scope?: string; confidence?: number }
+export interface NoteIn { text: string; kind?: Kind; scope?: string; confidence?: number; /** the person said it, in their own words (the store keeps it active) */ person_said?: boolean }
 export interface Note { id?: string; text: string; kind?: Kind; scope?: string; [k: string]: unknown }
 export interface CallOptions { signal?: AbortSignal }
 export interface MemoryClient {
