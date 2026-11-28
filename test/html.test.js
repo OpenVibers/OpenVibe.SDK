@@ -14,7 +14,12 @@ assert.strictEqual(String(html`<ul>${['a', 'b'].map((x) => html`<li>${x}</li>`)}
 assert.strictEqual(render(null) + render(false) + render(undefined), '');
 assert.ok(html`x` instanceof h.Raw);
 assert.strictEqual(String(code('a<b')), '<code>a&lt;b</code>');
-assert.strictEqual(String(time('2026-11-16T10:00:00.123Z')), '<time datetime="2026-11-16T10:00:00.123Z">2026-11-16 10:00:00 UTC</time>');
+assert.strictEqual(String(time('2026-11-16T10:00:00.123Z')), '<time datetime="2026-11-16T10:00:00.123Z" data-ov-time="datetime">2026-11-16 10:00:00 UTC</time>');
+// The reader's own zone (Shared's theme loader rewrites data-ov-time); a kind of its own; an unknown kind is datetime.
+assert.strictEqual(String(time('2026-11-16T10:00Z', 'day')), '<time datetime="2026-11-16T10:00Z" data-ov-time="day">2026-11-16 10:00 UTC</time>');
+assert.strictEqual(String(time('2026-11-16T10:00:00Z', 'nonsense')), '<time datetime="2026-11-16T10:00:00Z" data-ov-time="datetime">2026-11-16 10:00:00 UTC</time>');
+// Not a full instant (no zone): no data-ov-time, since a browser would read it in its own zone and move it.
+assert.strictEqual(String(time('2026-11-16 10:00:00')), '<time datetime="2026-11-16 10:00:00">2026-11-16 10:00:00</time>');
 assert.strictEqual(time(null), '—');
 
 // The table: a focusable, named region (Codes' fix, now every site's); cells name their columns.

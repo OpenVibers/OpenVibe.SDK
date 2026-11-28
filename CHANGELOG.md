@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.191.0 — 2026-11-28
+
+- **`openvibe-sdk/html` `time()` says the reader's own time** (plan item 13, openvibe.design/rules): a full instant
+  (`…Z`) gets `data-ov-time`, so Shared's theme loader (on every OpenVibe page) rewrites it in the reader's zone and clock;
+  the UTC words stay for crawlers and no-script. An optional second argument picks the kind (`datetime` by default,
+  `date`, `time`, `day`, `ago`, `full`). Help's /sites and Work's /sources printed UTC to everyone. Test: html.
+
 ## 0.190.0 — 2026-11-24
 
 - **`openvibe-sdk/memory`: `person_said`** (plan §V.1, one memory). `remember(person, [{ text, kind, person_said: true }])`

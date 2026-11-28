@@ -36,7 +36,18 @@ function render(v) {
 }
 
 const code = (s) => html`<code>${s}</code>`;
-const time = (iso) => (iso ? html`<time datetime="${iso}">${String(iso).replace('T', ' ').replace(/\.\d+Z$/, ' UTC').replace(/Z$/, ' UTC')}</time>` : '—');
+// A moment as <time>: UTC words for crawlers and no-script, and for a full instant (…Z) data-ov-time, so Shared's theme
+// loader (4.248.0+, on every OpenVibe page) says it in the reader's own zone and clock (openvibe.design/rules; plan item
+// 13: Help's /sites and Work's /sources printed UTC to everyone). kind: datetime (default) | date | time | day | ago | full.
+const TIME_KINDS = new Set(['datetime', 'date', 'time', 'day', 'ago', 'full']);
+const INSTANT_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?Z$/;
+const time = (iso, kind = 'datetime') => {
+    if (!iso) return '—';
+    const s = String(iso);
+    const words = s.replace('T', ' ').replace(/\.\d+Z$/, ' UTC').replace(/Z$/, ' UTC');
+    if (!INSTANT_RE.test(s)) return html`<time datetime="${s}">${words}</time>`;
+    return html`<time datetime="${s}" data-ov-time="${TIME_KINDS.has(kind) ? kind : 'datetime'}">${words}</time>`;
+};
 
 /**
  * A <table> from headers and rows of cells (cells are already html or plain values). Each cell names its column
