@@ -18,7 +18,8 @@ export declare function render(v: Renderable): string;
 
 export declare function code(s: Renderable): Raw;
 /** An ISO time as <time datetime>, read as "2026-11-16 10:00:00 UTC"; '—' when there is none. */
-export declare function time(iso: string | null | undefined): Raw | '—';
+/** A moment as `<time>`; a full instant (…Z) also gets data-ov-time so the page says it in the reader's own zone. */
+export declare function time(iso: string | null | undefined, kind?: 'datetime' | 'date' | 'time' | 'day' | 'ago' | 'full'): Raw | '—';
 
 export interface TableOptions {
     cls?: string;
