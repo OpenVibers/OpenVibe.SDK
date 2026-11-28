@@ -762,5 +762,5 @@ like. Upload and write calls require a person's Network token. Gallery reads are
 public. Resumable completion and likes are idempotent; creation is not retried.
 
 <!-- versions:start -->
-- openvibe-contracts: v0.449.0
+- openvibe-contracts: v0.454.0
 <!-- versions:end -->
